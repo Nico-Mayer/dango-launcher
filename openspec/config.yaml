@@ -1,0 +1,134 @@
+schema: spec-driven
+
+context: |
+  # Dango
+
+  A keyboard-first application launcher and command palette, in the spirit of
+  Raycast and Wox. A tray application that stays resident, listens on one global
+  shortcut, and summons a command prompt over whatever the user is doing.
+
+  Personal hobby project. No external users, no revenue, no support burden.
+  Optimise for the author's daily use and for a codebase that stays pleasant to
+  work in. Do not add process, telemetry, or infrastructure that only pays off at
+  a scale this project will never reach.
+
+  ## Tech stack
+
+  - Rust + Tauri v2 for the shell, all OS integration, and all business logic.
+  - Svelte 5 (runes) + TypeScript for the frontend, deliberately minimal. No
+    component library. The frontend is a renderer, not a place for logic.
+  - SQLite for local persistence.
+  - Node 24 and the OpenSpec CLI are pinned via mise (`mise.toml`).
+  - Prefer official Tauri v2 plugins over hand-rolled equivalents.
+
+  ## Platform stance
+
+  - Windows and macOS are both first class. Every feature ships on both, or the
+    gap is stated explicitly in the spec with a reason.
+  - Linux is out of scope. The author owns no Linux desktop. Do not write Linux
+    code, do not design for Wayland, do not add Linux branches "just in case".
+    Trait boundaries keep the door open; nothing more is owed to it.
+  - Development happens on macOS, daily use happens on Windows. CI must build and
+    test both from the very first change.
+  - All OS-specific code sits behind narrow Rust traits (for example
+    `WindowManager`, `ClipboardSource`, `KeyMonitor`, `AppIndexer`). Platform
+    code lives in `platform/windows` and `platform/macos` modules behind those
+    traits, never inline behind `cfg` attributes scattered through feature code.
+
+  ## Architectural spine
+
+  Everything the user can invoke is a command, and every command belongs to an
+  extension. Built-in features are extensions too.
+
+  - Built-in extensions share the full contract with future third-party ones:
+    manifest shape, preference schema, hotkeys, aliases, enable and disable,
+    view protocol. They differ only in who executes them. Built-ins run as
+    native Rust with full OS access; third-party extensions will later run in a
+    sandboxed host. Do not try to run built-ins through the sandbox.
+  - An extension is a package with one enable and disable toggle. It may
+    contribute four things: `commands` (static, searchable, invocable),
+    `rootItems` (a dynamic provider queried per keystroke), `services`
+    (background work whose lifecycle follows the enabled state), and
+    `preferences` (a typed schema rendered generically). Third-party extensions
+    will get commands, rootItems, and preferences, but not services.
+  - Deactivating an extension unregisters its commands, hotkeys, and root
+    provider, and stops its services.
+  - The manifest and the view protocol are versioned from the start
+    (`manifestVersion`, `protocolVersion`). They are the parts that become
+    expensive to change.
+
+  ## Non-negotiable constraints
+
+  - Latency is the product. The launcher window is created hidden at startup and
+    is only shown and hidden, never created on demand. The webview stays warm, so
+    "reset to root state" is an explicit operation. Budget: under 80ms from
+    hotkey to painted window.
+  - Search never blocks. Root item providers are async with a time budget of
+    roughly 50ms; results stream in and slow providers simply appear late. Use
+    cancel-and-restart per keystroke, not debounce.
+  - View updates are full-tree replace. No reconciler, no diffing. Trees are
+    small and this stays true even for streaming AI output.
+  - Every syncable table carries a UUID `id`, `updated_at`, and `deleted_at` from
+    the first migration, even though sync ships last.
+  - Secrets go in the OS keychain (macOS Keychain, Windows Credential Manager).
+    Never in SQLite, never in a config file.
+  - Clipboard history must honour platform privacy markers so password managers
+    do not leak into it. Internal copy-and-restore tricks are excluded from
+    history.
+
+  ## Known platform traps
+
+  Recorded so specs do not rediscover them:
+
+  - Windows app indexing must enumerate `shell:AppsFolder`, not Start Menu `.lnk`
+    files. Only that route sees UWP and MSIX apps alongside Win32 ones, and it
+    gives AppUserModelIDs for launching plus icons via
+    `IShellItemImageFactory::GetImage`.
+  - Windows window management must correct geometry with
+    `DWMWA_EXTENDED_FRAME_BOUNDS`, or invisible resize borders leave visible
+    gaps. Per-monitor DPI awareness is required for multi-monitor tiling.
+  - Restoring focus to the previous foreground window on Windows is subject to
+    foreground lock and needs the `AttachThreadInput` and
+    `AllowSetForegroundWindow` handling. Paste, snippet expansion, and AI
+    replace-selection all depend on this one piece of plumbing.
+  - A non-elevated process cannot hook or manage elevated windows on Windows.
+    Accept the limit and document it.
+  - macOS gates window management, paste, snippet expansion, and reading the
+    selection behind the Accessibility permission. Treat permission onboarding
+    as a real feature.
+  - Showing the launcher over fullscreen apps on macOS needs an NSPanel rather
+    than a standard window.
+  - Reading the current selection is direct on macOS via `AXSelectedText`, but on
+    Windows the realistic path is copy, read clipboard, restore clipboard.
+
+  ## Conventions
+
+  - Conventional commits. Imperative subject under 50 characters, no trailing
+    period. Atomic commits.
+  - Be extremely conservative with code comments. Comment only non-obvious
+    reasoning, a surprising constraint, or a subtle workaround. Never restate
+    what the code does.
+  - Rust: prefer borrowing over cloning, `Result` with typed errors over strings,
+    and small focused modules.
+  - Svelte: runes only, no stores unless there is a concrete reason.
+
+rules:
+  proposal:
+    - State which milestone from openspec/ROADMAP.md this change belongs to.
+    - Include a "Non-goals" list. Scope creep is the main risk on this project.
+    - Name the platforms covered. If a platform is deliberately not covered, say so and why.
+
+  specs:
+    - Write requirements that are observable from outside, not implementation steps.
+    - Any requirement with different behaviour on Windows and macOS needs a scenario per platform.
+    - Performance and latency budgets belong in scenarios with concrete numbers, not in prose.
+
+  design:
+    - Record the alternatives that were rejected and why. Future sessions need the reasoning, not just the conclusion.
+    - Call out anything that locks in the extension manifest or view protocol, since those are versioned contracts.
+    - Skip the design artifact for changes that introduce no new architectural decision.
+
+  tasks:
+    - Group tasks so that each group leaves the app in a runnable state.
+    - Platform-specific work gets separate tasks per platform, never one task covering both.
+    - Include a task for verifying the change on both Windows and macOS before the change is done.
