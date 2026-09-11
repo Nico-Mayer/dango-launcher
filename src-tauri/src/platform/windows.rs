@@ -1,13 +1,11 @@
-use std::ffi::c_void;
-
 use tauri::WebviewWindow;
-use windows_sys::Win32::Foundation::{HWND, TRUE};
-use windows_sys::Win32::System::Threading::GetCurrentThreadId;
+use windows_sys::Win32::Foundation::{FALSE, HWND, TRUE};
+use windows_sys::Win32::System::Threading::{AttachThreadInput, GetCurrentThreadId};
 use windows_sys::Win32::UI::Input::KeyboardAndMouse::SetFocus;
 use windows_sys::Win32::UI::WindowsAndMessaging::{
-    AllowSetForegroundWindow, AttachThreadInput, GetForegroundWindow, GetWindowLongPtrW,
-    GetWindowThreadProcessId, SetForegroundWindow, SetWindowLongPtrW, SetWindowPos, GWL_EXSTYLE,
-    HWND_TOPMOST, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, WS_EX_TOOLWINDOW, WS_EX_TOPMOST,
+    AllowSetForegroundWindow, GetForegroundWindow, GetWindowLongPtrW, GetWindowThreadProcessId,
+    SetForegroundWindow, SetWindowLongPtrW, SetWindowPos, GWL_EXSTYLE, HWND_TOPMOST,
+    SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, WS_EX_TOOLWINDOW, WS_EX_TOPMOST,
 };
 
 use super::LauncherWindow;
@@ -88,7 +86,7 @@ impl LauncherWindow for WindowsLauncherWindow {
             return;
         };
         unsafe {
-            let hwnd = previous as *mut c_void as HWND;
+            let hwnd = previous as HWND;
             AllowSetForegroundWindow(u32::MAX);
             force_foreground(hwnd);
         }
@@ -100,30 +98,29 @@ impl LauncherWindow for WindowsLauncherWindow {
 /// thread lifts the restriction, which is the standard way around foreground
 /// lock.
 unsafe fn force_foreground(target: HWND) {
-    unsafe {
-        let foreground = GetForegroundWindow();
-        if foreground.is_null() {
-            SetForegroundWindow(target);
-            return;
-        }
+    let foreground = GetForegroundWindow();
+    if foreground.is_null() {
+        SetForegroundWindow(target);
+        return;
+    }
 
-        let current = GetCurrentThreadId();
-        let owner = GetWindowThreadProcessId(foreground, std::ptr::null_mut());
+    let current = GetCurrentThreadId();
+    let owner = GetWindowThreadProcessId(foreground, std::ptr::null_mut());
 
-        if owner == current {
-            SetForegroundWindow(target);
-            SetFocus(target);
-            return;
-        }
-
-        AttachThreadInput(current, owner, TRUE);
+    if owner == current {
         SetForegroundWindow(target);
         SetFocus(target);
-        AttachThreadInput(current, owner, 0);
+        return;
     }
+
+    AttachThreadInput(current, owner, TRUE);
+    SetForegroundWindow(target);
+    SetFocus(target);
+    AttachThreadInput(current, owner, FALSE);
 }
 
 fn hwnd(window: &WebviewWindow) -> Option<HWND> {
-    let handle = window.hwnd().ok()?;
-    Some(handle.0 as *mut c_void as HWND)
+    // Tauri hands back the windows crate HWND, whose inner pointer is exactly
+    // the windows-sys HWND, so no conversion is involved.
+    Some(window.hwnd().ok()?.0)
 }
