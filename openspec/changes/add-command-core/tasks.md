@@ -8,12 +8,12 @@
 
 ## 2. Local store
 
-- [ ] 2.1 Open or create the database in the per-user application data directory at startup
-- [ ] 2.2 Add the forward-only migration runner, applying each migration at most once and refusing to run against a newer schema
-- [ ] 2.3 Add the first migration covering extension enabled state, preferences, frecency, and the application index
-- [ ] 2.4 Apply the syncable record convention of UUID identifier, `updated_at`, and soft delete to the tables that need it, and keep machine-local tables separate
-- [ ] 2.5 Handle a corrupt database by starting empty, preserving the file, and reporting it
-- [ ] 2.6 Confirm no database access sits on the activation path
+- [x] 2.1 Open or create the database in the per-user application data directory at startup
+- [x] 2.2 Add the forward-only migration runner, applying each migration at most once and refusing to run against a newer schema
+- [x] 2.3 Add the first migration covering extension enabled state, preferences, frecency, and the application index
+- [x] 2.4 Apply the syncable record convention of UUID identifier, `updated_at`, and soft delete to the tables that need it, and keep machine-local tables separate
+- [x] 2.5 Handle a corrupt database by starting empty, preserving the file, and reporting it
+- [x] 2.6 Confirm no database access sits on the activation path
 
 ## 3. Extension model
 
