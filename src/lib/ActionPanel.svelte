@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { onMount } from "svelte";
   import type { ActionDto } from "./types";
 
   interface Props {
@@ -10,22 +11,27 @@
   let { actions, onrun, onclose }: Props = $props();
   let selected = $state(0);
 
-  function onKeydown(event: KeyboardEvent) {
-    if (event.key === "ArrowDown") {
+  // Capture phase so the panel owns these keys while open, before the Command
+  // list beneath it can act on them.
+  onMount(() => {
+    function onKeydown(event: KeyboardEvent) {
+      if (event.key === "ArrowDown") {
+        selected = Math.min(selected + 1, actions.length - 1);
+      } else if (event.key === "ArrowUp") {
+        selected = Math.max(selected - 1, 0);
+      } else if (event.key === "Enter") {
+        onrun(actions[selected].id);
+      } else if (event.key === "Escape") {
+        onclose();
+      } else {
+        return;
+      }
       event.preventDefault();
-      selected = Math.min(selected + 1, actions.length - 1);
-    } else if (event.key === "ArrowUp") {
-      event.preventDefault();
-      selected = Math.max(selected - 1, 0);
-    } else if (event.key === "Enter") {
-      event.preventDefault();
-      onrun(actions[selected].id);
-    } else if (event.key === "Escape") {
-      event.preventDefault();
-      event.stopPropagation();
-      onclose();
+      event.stopImmediatePropagation();
     }
-  }
+    window.addEventListener("keydown", onKeydown, true);
+    return () => window.removeEventListener("keydown", onKeydown, true);
+  });
 
   function label(action: ActionDto): string {
     if (!action.shortcut) return "";
@@ -35,8 +41,6 @@
     return mods ? `${mods}+${action.shortcut.key.toUpperCase()}` : action.shortcut.key.toUpperCase();
   }
 </script>
-
-<svelte:window onkeydown={onKeydown} />
 
 <div
   class="border-border-card bg-background/95 absolute bottom-2 right-2 w-72 overflow-hidden rounded-[10px] border shadow-xl backdrop-blur-xl"
