@@ -629,6 +629,7 @@ dependencies = [
  "objc2",
  "objc2-app-kit",
  "objc2-foundation",
+ "png 0.18.1",
  "serde",
  "serde_json",
  "tauri",
@@ -636,6 +637,7 @@ dependencies = [
  "tauri-plugin-global-shortcut",
  "tauri-plugin-single-instance",
  "tokio",
+ "windows",
  "windows-sys 0.61.2",
 ]
 
