@@ -1,10 +1,11 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
   import { listen } from "@tauri-apps/api/event";
+  import { Command } from "bits-ui";
   import { onMount } from "svelte";
 
   let query = $state("");
-  let input: HTMLInputElement | undefined = $state();
+  let input = $state<HTMLInputElement | null>(null);
 
   function onKeydown(event: KeyboardEvent) {
     if (event.key !== "Escape") return;
@@ -31,6 +32,7 @@
     const reset = listen("dango://reset", () => {
       query = "";
     });
+
     return () => {
       activate.then((un) => un());
       reset.then((un) => un());
@@ -38,44 +40,17 @@
   });
 </script>
 
-<svelte:window on:keydown={onKeydown} on:blur={() => invoke("dismiss")} />
+<svelte:window onkeydown={onKeydown} onblur={() => invoke("dismiss")} />
 
-<main>
-  <input
-    bind:this={input}
+<Command.Root
+  class="border-border-card bg-background/85 flex h-screen w-screen flex-col overflow-hidden rounded-[14px] border backdrop-blur-xl"
+>
+  <Command.Input
+    bind:ref={input}
     bind:value={query}
     placeholder="Search..."
-    spellcheck="false"
+    spellcheck={false}
     autocomplete="off"
+    class="text-foreground placeholder:text-muted-foreground h-full w-full bg-transparent px-6 text-[26px] focus:outline-none"
   />
-</main>
-
-<style>
-  :global(html, body) {
-    margin: 0;
-    background: transparent;
-    overflow: hidden;
-  }
-  main {
-    font-family: -apple-system, "Segoe UI", system-ui, sans-serif;
-    display: flex;
-    align-items: center;
-    height: 100vh;
-    box-sizing: border-box;
-    background: rgba(30, 30, 34, 0.86);
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    border-radius: 14px;
-    padding: 0 22px;
-  }
-  input {
-    flex: 1;
-    background: none;
-    border: none;
-    outline: none;
-    color: #f2f2f4;
-    font-size: 26px;
-  }
-  input::placeholder {
-    color: rgba(255, 255, 255, 0.3);
-  }
-</style>
+</Command.Root>

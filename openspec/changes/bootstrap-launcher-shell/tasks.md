@@ -1,7 +1,7 @@
 ## 1. Spike: macOS panel and latency floor
 
-- [ ] 1.1 Convert the Tauri window to an NSPanel with the non-activating style mask, verify it becomes key and receives typing while another application stays active
-- [ ] 1.2 Verify the panel appears over a fullscreen application without switching spaces
+- [x] 1.1 Convert the Tauri window to an NSPanel with the non-activating style mask, verify it becomes key and receives typing while another application stays active
+- [x] 1.2 Verify the panel appears over a fullscreen application without switching spaces
 - [ ] 1.3 Measure hotkey-to-paint on a release build on macOS and record the number
 - [ ] 1.4 If the 80ms budget is not reachable, stop and revisit the design before continuing
 

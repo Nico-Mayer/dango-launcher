@@ -1,0 +1,60 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  --background: hsl(0 0% 100%);
+  --background-alt: hsl(0 0% 100%);
+  --foreground: hsl(0 0% 9%);
+  --foreground-alt: hsl(0 0% 32%);
+  --muted: hsl(240 5% 96%);
+  --muted-foreground: hsla(0 0% 9% / 0.4);
+  --border: hsl(240 6% 10%);
+  --border-input: hsla(240 6% 10% / 0.17);
+  --border-card: hsla(240 6% 10% / 0.1);
+  --accent: hsl(204 94% 94%);
+  --accent-foreground: hsl(204 80% 16%);
+  --destructive: hsl(347 77% 50%);
+}
+
+.dark {
+  --background: hsl(0 0% 5%);
+  --background-alt: hsl(0 0% 7%);
+  --foreground: hsl(0 0% 95%);
+  --foreground-alt: hsl(0 0% 70%);
+  --muted: hsl(240 4% 16%);
+  --muted-foreground: hsla(0 0% 100% / 0.4);
+  --border: hsl(240 6% 90%);
+  --border-input: hsla(0 0% 100% / 0.17);
+  --border-card: hsla(0 0% 100% / 0.1);
+  --accent: hsl(204 80% 16%);
+  --accent-foreground: hsl(204 94% 94%);
+  --destructive: hsl(347 77% 50%);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-background-alt: var(--background-alt);
+  --color-foreground: var(--foreground);
+  --color-foreground-alt: var(--foreground-alt);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-border-input: var(--border-input);
+  --color-border-card: var(--border-card);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --radius-card: 0.875rem;
+  --radius-button: 0.5rem;
+}
+
+/* The launcher is a floating panel, so the page itself must not paint a
+   background or the window's rounded corners show a square behind them. */
+html,
+body {
+  margin: 0;
+  overflow: hidden;
+  background: transparent;
+}

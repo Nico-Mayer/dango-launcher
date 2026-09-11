@@ -7,7 +7,7 @@
     "beforeDevCommand": "npm run dev",
     "devUrl": "http://localhost:1420",
     "beforeBuildCommand": "npm run build",
-    "frontendDist": "../build"
+    "frontendDist": "../dist"
   },
   "app": {
     "windows": [
@@ -15,7 +15,7 @@
         "label": "main",
         "title": "Dango",
         "width": 720,
-        "height": 420,
+        "height": 64,
         "visible": false,
         "decorations": false,
         "transparent": true,
