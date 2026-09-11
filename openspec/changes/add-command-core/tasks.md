@@ -17,20 +17,21 @@
 
 ## 3. Extension model
 
-- [ ] 3.1 Define the manifest type with `manifestVersion`, identifier, name, and icon, and reject unsupported versions without stopping other extensions
-- [ ] 3.2 Define the four contribution types and reject a manifest that contributes none
-- [ ] 3.3 Define command declarations with identifier, title, mode, subtitle, icon, keywords, and alias, and resolve fully qualified identities
-- [ ] 3.4 Define the typed preference schema with defaults and required values
-- [ ] 3.5 Implement the activate and deactivate lifecycle so it registers and unregisters commands, root providers, and services
-- [ ] 3.6 Persist enabled state and restore it at startup
-- [ ] 3.7 Isolate failures so a broken extension cannot stop the launcher opening or block other extensions
+- [x] 3.1 Define the manifest type with `manifestVersion`, identifier, name, and icon, and reject unsupported versions without stopping other extensions
+- [x] 3.2 Define the four contribution types and reject a manifest that contributes none
+- [x] 3.3 Define command declarations with identifier, title, mode, subtitle, icon, keywords, and alias, and resolve fully qualified identities
+- [x] 3.4 Define the typed preference schema with defaults and required values
+- [x] 3.5 Implement the activate and deactivate lifecycle so it registers and unregisters commands, root providers, and services
+  - Commands and services are registered and torn down on enable and disable. Root-provider registration attaches in group 6, where the provider trait and pipeline exist.
+- [x] 3.6 Persist enabled state and restore it at startup
+- [x] 3.7 Isolate failures so a broken extension cannot stop the launcher opening or block other extensions
 
 ## 4. Command registry
 
-- [ ] 4.1 Build the registry holding commands from all enabled extensions, keyed by fully qualified identity
-- [ ] 4.2 Record which host executes each command, with only the built-in native host implemented
-- [ ] 4.3 Detect and report identifier collisions between extensions
-- [ ] 4.4 Support live registration and unregistration so enabling and disabling needs no restart
+- [x] 4.1 Build the registry holding commands from all enabled extensions, keyed by fully qualified identity
+- [x] 4.2 Record which host executes each command, with only the built-in native host implemented
+- [x] 4.3 Detect and report identifier collisions between extensions
+- [x] 4.4 Support live registration and unregistration so enabling and disabling needs no restart
 
 ## 5. View protocol
 
