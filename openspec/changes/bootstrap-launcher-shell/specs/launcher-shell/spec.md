@@ -89,7 +89,7 @@ background, always on top of other windows, and non-resizable by the user.
 #### Scenario: Window appears over a fullscreen application on macOS
 
 - **WHEN** the user presses the shortcut while a macOS application occupies a fullscreen space
-- **THEN** the launcher appears over that space
+- **THEN** the launcher is drawn above that application's window, not behind it
 - **AND** the system does not switch to another space
 
 #### Scenario: Window appears over a maximized application on Windows
@@ -131,13 +131,22 @@ if it had just started.
 
 ### Requirement: Dismissal
 
-The launcher SHALL hide when the user presses Escape, when it loses focus to
-another application, and when the global shortcut is pressed while it is
-visible.
+The launcher SHALL hide when it loses focus to another application and when the
+global shortcut is pressed while it is visible.
 
-#### Scenario: Escape dismisses
+Escape SHALL act in two stages. With text in the prompt, Escape SHALL clear the
+prompt and leave the launcher open. With an empty prompt, Escape SHALL hide the
+launcher.
 
-- **WHEN** the launcher is visible and the user presses Escape
+#### Scenario: Escape clears a non-empty prompt
+
+- **WHEN** the launcher is visible with text in the prompt and the user presses Escape
+- **THEN** the prompt is cleared
+- **AND** the launcher stays visible
+
+#### Scenario: Escape on an empty prompt dismisses
+
+- **WHEN** the launcher is visible with an empty prompt and the user presses Escape
 - **THEN** the launcher hides
 - **AND** focus returns to the application that was in the foreground beforehand
 
