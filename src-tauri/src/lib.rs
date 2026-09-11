@@ -13,6 +13,11 @@ use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut,
 use latency::LatencyProbe;
 use platform::LauncherWindow;
 
+#[cfg(target_os = "macos")]
+const SHORTCUT_LABEL: &str = "Option+Space";
+#[cfg(not(target_os = "macos"))]
+const SHORTCUT_LABEL: &str = "Alt+Space";
+
 struct AppState {
     launcher: Mutex<Box<dyn LauncherWindow>>,
 }
@@ -121,7 +126,7 @@ pub fn run() {
                 .build(),
         )
         .manage(LatencyProbe::default())
-            .invoke_handler(tauri::generate_handler![report_paint, dismiss, warmup_done])
+        .invoke_handler(tauri::generate_handler![report_paint, dismiss, warmup_done])
         .setup(move |app| {
             #[cfg(target_os = "macos")]
             app.set_activation_policy(tauri::ActivationPolicy::Accessory);
@@ -132,9 +137,31 @@ pub fn run() {
                 launcher: Mutex::new(launcher),
             });
 
+            // Registration is attempted before the tray is built so the menu can
+            // report the failure. Another application holding the combination
+            // must not stop Dango from starting.
+            let shortcut_registered = match app.global_shortcut().register(shortcut) {
+                Ok(()) => true,
+                Err(error) => {
+                    eprintln!("[dango] could not register {SHORTCUT_LABEL}: {error}");
+                    false
+                }
+            };
+
             let toggle_item = MenuItem::with_id(app, "toggle", "Toggle Dango", true, None::<&str>)?;
             let quit_item = MenuItem::with_id(app, "quit", "Quit Dango", true, None::<&str>)?;
-            let menu = Menu::with_items(app, &[&toggle_item, &quit_item])?;
+            let menu = if shortcut_registered {
+                Menu::with_items(app, &[&toggle_item, &quit_item])?
+            } else {
+                let notice = MenuItem::with_id(
+                    app,
+                    "shortcut-unavailable",
+                    format!("{SHORTCUT_LABEL} unavailable, already in use"),
+                    false,
+                    None::<&str>,
+                )?;
+                Menu::with_items(app, &[&notice, &toggle_item, &quit_item])?
+            };
 
             TrayIconBuilder::new()
                 .icon(app.default_window_icon().expect("bundled icon").clone())
@@ -142,12 +169,16 @@ pub fn run() {
                 .show_menu_on_left_click(true)
                 .on_menu_event(|app, event| match event.id().as_ref() {
                     "toggle" => toggle(app, None),
-                    "quit" => app.exit(0),
+                    "quit" => {
+                        // Hand the combination back before going away, or it
+                        // stays claimed until the session ends.
+                        let _ = app.global_shortcut().unregister_all();
+                        app.exit(0);
+                    }
                     _ => {}
                 })
                 .build(app)?;
 
-            app.global_shortcut().register(shortcut)?;
             warm_up(&app.handle().clone(), &window);
 
             Ok(())

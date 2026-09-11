@@ -14,57 +14,57 @@
 
 ## 3. Platform boundary
 
-- [ ] 3.1 Define the `LauncherWindow` trait with `show`, `hide`, `position_on_active_display`, and `restore_previous_focus`
-- [ ] 3.2 Create `platform/macos` and `platform/windows` modules and the compile-time selection between them
-- [ ] 3.3 Add a compile guard so a build for any target other than macOS or Windows fails with a clear message
+- [x] 3.1 Define the `LauncherWindow` trait with `show`, `hide`, `position_on_active_display`, and `restore_previous_focus`
+- [x] 3.2 Create `platform/macos` and `platform/windows` modules and the compile-time selection between them
+- [x] 3.3 Add a compile guard so a build for any target other than macOS or Windows fails with a clear message
 
 ## 4. Window behaviour on macOS
 
-- [ ] 4.1 Set the activation policy to accessory so no dock icon appears
-- [ ] 4.2 Apply the NSPanel conversion, collection behaviour for all spaces and fullscreen auxiliary, and always-on-top level
-- [ ] 4.3 Implement show, hide, and positioning on the display holding the foreground window
-- [ ] 4.4 Verify absence from Command+Tab whether the launcher is visible or hidden
+- [x] 4.1 Set the activation policy to accessory so no dock icon appears
+- [x] 4.2 Apply the NSPanel conversion, collection behaviour for all spaces and fullscreen auxiliary, and always-on-top level
+- [x] 4.3 Implement show, hide, and positioning on the display holding the foreground window
+- [x] 4.4 Verify absence from Command+Tab whether the launcher is visible or hidden
 
 ## 5. Window behaviour on Windows
 
-- [ ] 5.1 Apply the tool window extended style and topmost z-order, and confirm absence from the taskbar and Alt+Tab
-- [ ] 5.2 Capture the foreground window before showing and implement focus restore on hide, handling foreground lock
-- [ ] 5.3 Implement positioning on the display holding the foreground window, using per-monitor DPI aware work area geometry
+- [x] 5.1 Apply the tool window extended style and topmost z-order, and confirm absence from the taskbar and Alt+Tab
+- [x] 5.2 Capture the foreground window before showing and implement focus restore on hide, handling foreground lock
+- [x] 5.3 Implement positioning on the display holding the foreground window, using per-monitor DPI aware work area geometry
 - [ ] 5.4 Verify correct physical size and placement across two displays with different scaling factors
 
 ## 6. Tray and lifecycle
 
-- [ ] 6.1 Add the tray icon with a menu offering toggle and quit
-- [ ] 6.2 Create the launcher window hidden during startup and confirm the frontend finishes loading before first activation
-- [ ] 6.3 Add single instance handling so a second launch shows the running instance and exits
-- [ ] 6.4 Unregister the global shortcut and clean up the tray on quit
+- [x] 6.1 Add the tray icon with a menu offering toggle and quit
+- [x] 6.2 Create the launcher window hidden during startup and confirm the frontend finishes loading before first activation
+- [x] 6.3 Add single instance handling so a second launch shows the running instance and exits
+- [x] 6.4 Unregister the global shortcut and clean up the tray on quit
 
 ## 7. Global activation
 
-- [ ] 7.1 Register the default shortcut, Option+Space on macOS and Alt+Space on Windows
-- [ ] 7.2 Toggle visibility from the shortcut, including hiding when already visible
-- [ ] 7.3 Handle registration failure by starting anyway, marking the tray menu, and keeping the launcher openable from the tray
+- [x] 7.1 Register the default shortcut, Option+Space on macOS and Alt+Space on Windows
+- [x] 7.2 Toggle visibility from the shortcut, including hiding when already visible
+- [x] 7.3 Handle registration failure by starting anyway, marking the tray menu, and keeping the launcher openable from the tray
 - [ ] 7.4 Verify the shortcut still works after the machine wakes from sleep
 
 ## 8. Frontend placeholder
 
-- [ ] 8.1 Build the empty prompt: a borderless rounded surface with a single text input and no results
-- [ ] 8.2 Hide on Escape and on window blur
-- [ ] 8.3 Handle the reset signal by clearing the input and returning to root state
+- [x] 8.1 Build the empty prompt: a borderless rounded surface with a single text input and no results
+- [x] 8.2 Hide on Escape and on window blur
+- [x] 8.3 Handle the reset signal by clearing the input and returning to root state
 - [ ] 8.4 Confirm the frontend loads exactly once across repeated show and hide cycles
 
 ## 9. Latency instrumentation
 
-- [ ] 9.1 Timestamp the shortcut in the backend and send an activation id to the frontend
-- [ ] 9.2 Report back from the frontend on the animation frame following render
-- [ ] 9.3 Compute and log the elapsed time from the backend monotonic clock, in development builds only
+- [x] 9.1 Timestamp the shortcut in the backend and send an activation id to the frontend
+- [x] 9.2 Report back from the frontend on the animation frame following render
+- [x] 9.3 Compute and log the elapsed time from the backend monotonic clock, in development builds only
 - [ ] 9.4 Record release-build measurements for cold and warm activation on both platforms
 
 ## 10. CI
 
-- [ ] 10.1 Add a GitHub Actions workflow building on `windows-latest` and `macos-latest`
-- [ ] 10.2 Run `cargo fmt --check`, `cargo clippy -- -D warnings`, and `cargo test` on both
-- [ ] 10.3 Run `svelte-check` and the frontend build
+- [x] 10.1 Add a GitHub Actions workflow building on `windows-latest` and `macos-latest`
+- [x] 10.2 Run `cargo fmt --check`, `cargo clippy -- -D warnings`, and `cargo test` on both
+- [x] 10.3 Run `svelte-check` and the frontend build
 - [ ] 10.4 Confirm a deliberate Windows-only compile error fails the matrix
 
 ## 11. Verification
