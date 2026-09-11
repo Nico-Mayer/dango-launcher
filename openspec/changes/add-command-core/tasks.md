@@ -44,12 +44,13 @@
 
 ## 6. Search pipeline
 
-- [ ] 6.1 Define the root items provider trait, async and cancellable
-- [ ] 6.2 Implement per-keystroke cancel and restart with no debounce and at most one query in flight
-- [ ] 6.3 Enforce the 50ms provider budget and merge late results as they arrive without blocking
-- [ ] 6.4 Handle a provider that errors or never returns, without leaking the abandoned work
-- [ ] 6.5 Stream partial results to the frontend as providers answer
-- [ ] 6.6 Bound the result list sent to the frontend
+- [x] 6.1 Define the root items provider trait, async and cancellable
+- [x] 6.2 Implement per-keystroke cancel and restart with no debounce and at most one query in flight
+- [x] 6.3 Enforce the 50ms provider budget and merge late results as they arrive without blocking
+- [x] 6.4 Handle a provider that errors or never returns, without leaking the abandoned work
+- [x] 6.5 Stream partial results to the frontend as providers answer
+  - The pipeline streams merged snapshots over a channel as providers answer. Forwarding those snapshots to the webview is wired in group 11.
+- [x] 6.6 Bound the result list sent to the frontend
 
 ## 7. Ranking
 
