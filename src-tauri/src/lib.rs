@@ -1,7 +1,9 @@
+pub mod extension;
 mod latency;
 mod platform;
-mod store;
+pub mod store;
 
+use std::sync::Arc;
 use std::sync::Mutex;
 
 use tauri::{
@@ -11,9 +13,21 @@ use tauri::{
 };
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
 
+use extension::{EnabledStore, ExtensionHost};
 use latency::LatencyProbe;
 use platform::LauncherWindow;
 use store::{Opened, Store};
+
+/// Fallback enabled store used only when the database could not be opened, so
+/// extensions still load with their default state.
+struct AlwaysEnabled;
+
+impl EnabledStore for AlwaysEnabled {
+    fn is_enabled(&self, _extension_id: &str) -> bool {
+        true
+    }
+    fn set_enabled(&self, _extension_id: &str, _enabled: bool) {}
+}
 
 #[cfg(target_os = "macos")]
 const SHORTCUT_LABEL: &str = "Option+Space";
@@ -165,7 +179,7 @@ pub fn run() {
             // starting.
             let mut notices = Vec::new();
 
-            match open_store(app) {
+            let enabled: Arc<dyn EnabledStore> = match open_store(app) {
                 Ok(Opened {
                     store,
                     recovered_from,
@@ -178,13 +192,22 @@ pub fn run() {
                         "[dango] store ready at schema version {}",
                         store.schema_version().unwrap_or(0)
                     );
-                    app.manage(store);
+                    let store = Arc::new(store);
+                    app.manage(store.clone());
+                    store
                 }
                 Err(error) => {
                     eprintln!("[dango] database unavailable: {error}");
                     notices.push("Database unavailable, see log".to_string());
+                    // Without a store, extensions default to enabled and their
+                    // state simply does not persist.
+                    Arc::new(AlwaysEnabled)
                 }
-            }
+            };
+
+            // The host is empty until the first extension is registered in a
+            // later milestone; it exists now so registration needs no restart.
+            app.manage(Mutex::new(ExtensionHost::new(enabled)));
 
             if let Err(error) = app.global_shortcut().register(shortcut) {
                 eprintln!("[dango] could not register {SHORTCUT_LABEL}: {error}");

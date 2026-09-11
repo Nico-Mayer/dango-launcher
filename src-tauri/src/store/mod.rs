@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use rusqlite::{Connection, OpenFlags};
+use rusqlite::{params, Connection, OpenFlags, OptionalExtension};
 
 pub use migrations::MigrationError;
 
@@ -93,6 +93,47 @@ impl Store {
         let connection = self.connection.lock().unwrap();
         query(&connection)
     }
+
+    /// Enabled unless a row says otherwise, so a never-seen extension defaults
+    /// to on.
+    pub fn extension_enabled(&self, extension_id: &str) -> rusqlite::Result<bool> {
+        self.with(|c| {
+            c.query_row(
+                "SELECT enabled FROM extension_state \
+                 WHERE extension_id = ?1 AND deleted_at IS NULL",
+                [extension_id],
+                |row| row.get::<_, i64>(0),
+            )
+            .optional()
+            .map(|value| value.is_none_or(|enabled| enabled != 0))
+        })
+    }
+
+    pub fn set_extension_enabled(&self, extension_id: &str, enabled: bool) -> rusqlite::Result<()> {
+        let now = now_millis();
+        self.with(|c| {
+            c.execute(
+                "INSERT INTO extension_state (id, extension_id, enabled, updated_at) \
+                 VALUES (?1, ?2, ?3, ?4) \
+                 ON CONFLICT(extension_id) DO UPDATE SET \
+                 enabled = ?3, updated_at = ?4, deleted_at = NULL",
+                params![
+                    uuid::Uuid::new_v4().to_string(),
+                    extension_id,
+                    enabled as i64,
+                    now
+                ],
+            )?;
+            Ok(())
+        })
+    }
+}
+
+fn now_millis() -> i64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_millis() as i64)
+        .unwrap_or(0)
 }
 
 fn is_corruption(error: &StoreError) -> bool {
