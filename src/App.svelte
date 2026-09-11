@@ -5,6 +5,7 @@
   import { onMount } from "svelte";
   import ActionPanel from "./lib/ActionPanel.svelte";
   import Icon, { namedIcon } from "./lib/Icon.svelte";
+  import { pointerOwnsSelection } from "./lib/pointer.svelte";
   import ProtocolView from "./lib/ProtocolView.svelte";
   import { highlight } from "./lib/highlight";
   import { matchesShortcut, type ActionResponse, type ResultItem, type ResultsPayload } from "./lib/types";
@@ -263,6 +264,7 @@
 {:else}
   <Command.Root
     shouldFilter={false}
+    disablePointerSelection={!pointerOwnsSelection()}
     bind:value={selectedId}
     class="border-border-card bg-background flex h-screen w-screen flex-col overflow-hidden rounded-[14px] border"
   >

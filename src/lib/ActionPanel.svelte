@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from "svelte";
+  import { pointerOwnsSelection } from "./pointer.svelte";
   import type { ActionDto } from "./types";
 
   interface Props {
@@ -51,7 +52,7 @@
       class="flex w-full items-center justify-between px-3 py-2 text-left text-sm {i === selected
         ? 'bg-muted text-foreground'
         : 'text-foreground-alt'}"
-      onmouseenter={() => (selected = i)}
+      onpointermove={() => pointerOwnsSelection() && (selected = i)}
       onclick={() => onrun(action.id)}
     >
       <span>{action.title}</span>

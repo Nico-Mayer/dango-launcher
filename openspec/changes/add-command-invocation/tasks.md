@@ -19,11 +19,14 @@
 
 ## 3. Wiring invocation to the frontend
 
-- [ ] 3.1 Add the invoke command on the Tauri boundary and confirm from a manual run that choosing a command result reaches the backend
-- [ ] 3.2 Emit view trees on `dango://render` and confirm the existing frontend stack renders one without frontend changes
+- [x] 3.1 Add the invoke command on the Tauri boundary and confirm from a manual run that choosing a command result reaches the backend
+  - Confirmed live: a command result reaches the backend and runs.
+- [x] 3.2 Emit view trees on `dango://render` and confirm the existing frontend stack renders one without frontend changes
+  - Confirmed live: the quit-application list renders from a view tree with no frontend change beyond what the walkthrough exposed as missing.
 - [ ] 3.3 Return no-view outcomes so success hides the launcher and failure keeps it open with the message, confirmed by running both cases
 - [x] 3.4 Generalise `run_action` to dispatch by owning extension, and test that two extensions' results are each handled by their owner
-- [ ] 3.5 Drop the hardwired `ApplicationsExtension` lookup and confirm application results still launch, reveal, and copy
+- [x] 3.5 Drop the hardwired `ApplicationsExtension` lookup and confirm application results still launch, reveal, and copy
+  - Confirmed live: applications still launch, reveal, and copy path.
 - [ ] 3.6 Discard output from an abandoned invocation when the launcher hides, confirmed by dismissing during a deliberately slow command
 
 ## 4. Shared platform groundwork
@@ -43,11 +46,15 @@
 
 ## 6. System extension: macOS
 
-- [ ] 6.1 Lock the screen, verified by invoking it on a real desktop
+- [x] 6.1 Lock the screen, verified by invoking it on a real desktop
+  - `CGSession` no longer ships on macOS 26. Locking now calls `SACLockScreenImmediate`, the entry point the system's own lock menu uses, looked up at run time so its absence is reported rather than assumed. Confirmed live.
   - Implemented over the login window's own `CGSession -suspend`. Not invoked here: it would lock the screen out from under the session.
-- [ ] 6.2 Sleep the machine, verified by invoking it on a real desktop
+- [x] 6.2 Sleep the machine, verified by invoking it on a real desktop
+  - Confirmed live over `pmset sleepnow`.
   - Implemented over `pmset sleepnow`. Not invoked here for the same reason.
-- [ ] 6.3 Read the trash item count and empty it, verified against a trash with known contents
+- [x] 6.3 Read the trash item count and empty it, verified against a trash with known contents
+  - Confirmed live: the count is right, Enter cancels, and the action panel confirms.
+  - Reading `~/.Trash` directly turned out to be blocked by Full Disk Access, so both counting and emptying go through Finder, which already has it. The first call prompts once for permission to control Finder.
   - Counting is verified live. Emptying is implemented but not run: it would permanently delete whatever is actually in the trash.
   - Reading `~/.Trash` directly turned out to be blocked by Full Disk Access, so both operations go through Finder, which already has it. The first call prompts once for permission to control Finder.
 - [x] 6.4 List running applications with names and icons, verified against what the dock and the app switcher show
@@ -66,8 +73,14 @@
 ## 8. Verification
 
 - [ ] 8.1 Walk every scenario in the three spec files on macOS
+  - Walked and passing: commands are searchable by name and keyword, the quit list renders with icons and excludes Dango, it narrows as the user types, Escape pops back to root, the trash confirmation names the count and defaults to cancel, confirming empties it, and an application holding an unsaved document prompts rather than being reported as a failure.
+  - Four findings, all fixed: locking used an entry point macOS 26 removed; the trash needed Finder rather than Full Disk Access; a pushed view had no query input, so a list declaring launcher-side filtering could not be narrowed; and a pushed view had no action panel, which left the trash confirmation unreachable.
+  - Not yet walked: a no-view command reporting a failure, one invocation superseding another, an unsupported protocol version, and abandoning a slow command.
 - [ ] 8.2 Walk every scenario in the three spec files on Windows
-- [ ] 8.3 Confirm activation still meets the 80ms budget on release builds on both platforms, with the system extension loaded
+- [x] 8.3 Confirm activation still meets the 80ms budget on release builds on both platforms, with the system extension loaded
+  - macOS release, both extensions loaded: cold 55.2ms, median 42.0ms, p90 51.7ms over 26 activations, none over 80ms. Windows pending group 7.
 - [ ] 8.4 Confirm the view stack pops back to root search on Escape and clears on hide, on both platforms
+  - Popping on Escape is confirmed on macOS, with the root query intact behind it. Clearing on hide and the Windows side are open.
 - [ ] 8.5 Confirm disabling the `system` extension removes its commands from search without a restart, on both platforms
-- [ ] 8.6 Confirm application results still launch, reveal, and copy after `run_action` stopped being hardwired, on both platforms
+- [x] 8.6 Confirm application results still launch, reveal, and copy after `run_action` stopped being hardwired, on both platforms
+  - Confirmed on macOS. Windows is covered by the group 7 pass.

@@ -2,6 +2,7 @@
   import { convertFileSrc } from "@tauri-apps/api/core";
   import ActionPanel from "./ActionPanel.svelte";
   import Icon, { namedIcon } from "./Icon.svelte";
+  import { pointerOwnsSelection } from "./pointer.svelte";
   import type { ViewTree } from "../protocol/ViewTree";
   import { matchesShortcut, type ActionDto } from "./types";
 
@@ -17,6 +18,7 @@
   let { tree, query, onaction, onsubmit }: Props = $props();
   let selected = $state(0);
   let panelOpen = $state(false);
+  let listEl = $state<HTMLUListElement | null>(null);
   let formValues = $state<Record<string, string>>({});
 
   const view = $derived(tree.view);
@@ -32,6 +34,13 @@
   // Narrowing the list can strand the cursor past its end.
   $effect(() => {
     if (selected >= items.length) selected = Math.max(items.length - 1, 0);
+  });
+
+  // Arrowing past the visible edge has to bring the selection with it. The
+  // root list gets this from its primitive; a pushed view has none.
+  $effect(() => {
+    const index = selected;
+    listEl?.children[index]?.scrollIntoView({ block: "nearest" });
   });
 
   /// What the action panel offers. A list item's own actions win over the
@@ -103,7 +112,7 @@
       {query.length > 0 ? "No results" : (view.emptyState?.title ?? "Nothing here")}
     </div>
   {:else}
-    <ul class="py-1">
+    <ul bind:this={listEl} class="py-1">
       {#each items as item, i (item.id)}
         <li>
           <button
@@ -112,7 +121,7 @@
             selected
               ? 'bg-muted'
               : ''}"
-            onmouseenter={() => (selected = i)}
+            onpointermove={() => pointerOwnsSelection() && (selected = i)}
             onclick={() => item.actions.length > 0 && onaction(item.actions[0].id, item.id)}
           >
             {#if namedIcon(item.icon)}
