@@ -131,6 +131,30 @@ but it is reliably overridable and is what most Windows launchers use.
 Command+Space is not chosen on macOS because taking it from Spotlight during M0
 would make the machine unpleasant to use while the launcher does nothing.
 
+## Verification status
+
+macOS is verified end to end on a release build: the panel draws above a
+fullscreen application without switching spaces, it accepts typing, Escape
+clears then dismisses, blur dismisses, the launcher is absent from Command+Tab,
+and the tray menu works. Activation was measured at a median of 46.7ms with a
+cold first activation of 61.3ms.
+
+Windows compiles in CI but has never been run. Everything in the Windows module
+is therefore unverified behaviour, and the foreground-restore path is the part
+most likely to be wrong: `AttachThreadInput` was written without the ability to
+execute it. Expect the launcher to take focus correctly and to be uncertain
+about handing it back.
+
+CI itself is verified. A real `AttachThreadInput` import error produced macOS
+success alongside Windows failure, which is exactly the Windows-only breakage
+the matrix exists to catch, so no synthetic error was needed.
+
+Local cross-compilation to Windows from macOS is not possible here: the Tauri
+build script needs `llvm-rc`, which is not installed. CI is the only Windows
+compile check. Before pushing Windows code, check symbol names and module paths
+against the vendored crate source under `~/.cargo/registry` rather than spending
+CI rounds guessing; that caught two further errors after the first failure.
+
 ## Risks / Trade-offs
 
 - **The NSPanel dependency is the main unknown.** It is a community crate

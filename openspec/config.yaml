@@ -105,6 +105,25 @@ context: |
     than a standard window.
   - Reading the current selection is direct on macOS via `AXSelectedText`, but on
     Windows the realistic path is copy, read clipboard, restore clipboard.
+  - `AttachThreadInput` is in `Win32::System::Threading`, not
+    `Win32::UI::WindowsAndMessaging`. More generally, check symbol names and
+    module paths against the vendored crate source under `~/.cargo/registry`
+    before pushing Windows code, because it cannot be compiled locally.
+
+  ## Build and verification facts
+
+  - Windows cannot be cross-compiled from macOS here: the Tauri build script
+    needs `llvm-rc`, which is not installed. CI on `windows-latest` is the only
+    Windows compile check, so Windows code lands unverified until it runs there.
+  - CI runs `cargo clippy -- -D warnings`, which turns lints into failures. Two
+    that bite in platform code: an inner `unsafe` block inside an `unsafe fn`
+    (`unused_unsafe` on edition 2021) and casting a value to a type it already
+    has (`unnecessary_cast`, easy to hit with `HWND`, since Tauri's wraps
+    exactly the windows-sys one).
+  - The shell in use is fish, where `VAR=value cmd` is not valid prefix syntax.
+    Use `env VAR=value cmd`.
+  - Set `DANGO_MEASURE=1` to enable activation timing in a release build. Timing
+    logs go to stderr.
 
   ## Conventions
 

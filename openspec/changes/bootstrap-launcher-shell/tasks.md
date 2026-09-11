@@ -51,14 +51,15 @@
 - [x] 8.1 Build the empty prompt: a borderless rounded surface with a single text input and no results
 - [x] 8.2 Hide on Escape and on window blur
 - [x] 8.3 Handle the reset signal by clearing the input and returning to root state
-- [ ] 8.4 Confirm the frontend loads exactly once across repeated show and hide cycles
+- [ ] 8.4 Confirm the frontend loads exactly once across repeated show and hide cycles (`[dango] frontend mounted` must appear once in a session with many activations)
 
 ## 9. Latency instrumentation
 
 - [x] 9.1 Timestamp the shortcut in the backend and send an activation id to the frontend
 - [x] 9.2 Report back from the frontend on the animation frame following render
 - [x] 9.3 Compute and log the elapsed time from the backend monotonic clock, in development builds only
-- [ ] 9.4 Record release-build measurements for cold and warm activation on both platforms
+- [x] 9.4 Record release-build measurements for cold and warm activation on macOS
+- [ ] 9.5 Record release-build measurements for cold and warm activation on Windows
 
 ## 10. CI
 
@@ -69,7 +70,10 @@
 
 ## 11. Verification
 
-- [ ] 11.1 Walk every scenario in `specs/launcher-shell/spec.md` on macOS
-- [ ] 11.2 Walk every scenario in `specs/launcher-shell/spec.md` on Windows
-- [ ] 11.3 Walk every scenario in `specs/global-activation/spec.md` on both platforms
-- [ ] 11.4 Confirm both cold and warm activation meet the 80ms budget on release builds on both platforms
+- [x] 11.1 Walk every scenario in `specs/launcher-shell/spec.md` on macOS
+- [x] 11.2 Walk every scenario in `specs/global-activation/spec.md` on macOS
+- [x] 11.3 Confirm cold and warm activation meet the 80ms budget on a macOS release build
+- [ ] 11.4 Walk every scenario in `specs/launcher-shell/spec.md` on Windows
+- [ ] 11.5 Walk every scenario in `specs/global-activation/spec.md` on Windows
+- [ ] 11.6 Confirm cold and warm activation meet the 80ms budget on a Windows release build
+- [ ] 11.7 Confirm the launcher hands focus back to the previous window on Windows dismiss, including when that window belongs to another process
