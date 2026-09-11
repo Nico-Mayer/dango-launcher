@@ -72,6 +72,9 @@ fn dismiss(app: tauri::AppHandle) {
 /// without a visible flash.
 #[tauri::command]
 fn warmup_done(app: tauri::AppHandle) {
+    // Called once per frontend mount. More than one line here across a session
+    // means the webview reloaded, which would defeat the warm-window design.
+    eprintln!("[dango] frontend mounted");
     let Some(window) = app.get_webview_window("main") else {
         return;
     };
