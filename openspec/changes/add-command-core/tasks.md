@@ -1,10 +1,10 @@
 ## 1. Spike: Windows application enumeration
 
-- [ ] 1.1 Enumerate the shell applications folder and confirm both packaged and conventional desktop applications are returned with display names and launch identifiers
-- [ ] 1.2 Extract an icon for one of each kind at the size the result list needs
-- [ ] 1.3 Launch one of each kind by its identifier, and confirm an already-running application is brought forward rather than started twice
-- [ ] 1.4 Measure how long a full enumeration takes on a typical machine
-- [ ] 1.5 If any of the above does not work, revisit the design before building on it
+- [x] 1.1 Enumerate the shell applications folder and confirm both packaged and conventional desktop applications are returned with display names and launch identifiers
+- [x] 1.2 Extract an icon for one of each kind at the size the result list needs
+- [x] 1.3 Launch one of each kind by its identifier, and confirm an already-running application is brought forward rather than started twice
+- [x] 1.4 Measure how long a full enumeration takes on a typical machine
+- [x] 1.5 If any of the above does not work, revisit the design before building on it
 
 ## 2. Local store
 
