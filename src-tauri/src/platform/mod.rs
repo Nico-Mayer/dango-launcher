@@ -22,29 +22,6 @@ pub fn launcher_window(window: &WebviewWindow) -> Box<dyn LauncherWindow> {
     return Box::new(windows::WindowsLauncherWindow::new(window));
 }
 
-fn position_centred(window: &WebviewWindow) {
-    let Some(monitor) = active_monitor(window) else {
-        return;
-    };
-    let scale = monitor.scale_factor();
-    let area = monitor.size().to_logical::<f64>(scale);
-    let origin = monitor.position().to_logical::<f64>(scale);
-    let Ok(size) = window.outer_size() else {
-        return;
-    };
-    let size = size.to_logical::<f64>(scale);
-
-    let (x, y) = launcher_origin(
-        origin.x,
-        origin.y,
-        area.width,
-        area.height,
-        size.width,
-        size.height,
-    );
-    let _ = window.set_position(tauri::LogicalPosition::new(x, y));
-}
-
 /// The cursor is the most reliable signal for "the display the user is looking
 /// at". `current_monitor` cannot answer while the window is parked offscreen for
 /// warmup, and returning nothing there would leave the launcher unpositioned and

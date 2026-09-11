@@ -52,8 +52,34 @@ impl LauncherWindow for WindowsLauncherWindow {
         let _ = window.hide();
     }
 
+    /// Windows uses one physical pixel space across displays, so the window's
+    /// size is projected to the target display's DPI before centring. Going
+    /// through logical coordinates would scale by the display the window is
+    /// leaving, not the one it is moving to.
     fn position_on_active_display(&self, window: &WebviewWindow) {
-        super::position_centred(window);
+        let Some(monitor) = super::active_monitor(window) else {
+            return;
+        };
+        let (Ok(size), Ok(scale)) = (window.outer_size(), window.scale_factor()) else {
+            return;
+        };
+        let size = size
+            .to_logical::<f64>(scale)
+            .to_physical::<f64>(monitor.scale_factor());
+        let area = monitor.work_area();
+
+        let (x, y) = super::launcher_origin(
+            area.position.x as f64,
+            area.position.y as f64,
+            area.size.width as f64,
+            area.size.height as f64,
+            size.width,
+            size.height,
+        );
+        let _ = window.set_position(tauri::PhysicalPosition::new(
+            x.round() as i32,
+            y.round() as i32,
+        ));
     }
 
     fn restore_previous_focus(&mut self) {

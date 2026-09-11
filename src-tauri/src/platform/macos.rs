@@ -52,8 +52,30 @@ impl LauncherWindow for MacLauncherWindow {
         let _ = window.hide();
     }
 
+    /// macOS positions in logical points, and each display's physical
+    /// coordinates are its own points times its own scale, so centring has to
+    /// stay in logical space.
     fn position_on_active_display(&self, window: &WebviewWindow) {
-        super::position_centred(window);
+        let Some(monitor) = super::active_monitor(window) else {
+            return;
+        };
+        let scale = monitor.scale_factor();
+        let area = monitor.size().to_logical::<f64>(scale);
+        let origin = monitor.position().to_logical::<f64>(scale);
+        let Ok(size) = window.outer_size() else {
+            return;
+        };
+        let size = size.to_logical::<f64>(scale);
+
+        let (x, y) = super::launcher_origin(
+            origin.x,
+            origin.y,
+            area.width,
+            area.height,
+            size.width,
+            size.height,
+        );
+        let _ = window.set_position(tauri::LogicalPosition::new(x, y));
     }
 
     fn restore_previous_focus(&mut self) {
