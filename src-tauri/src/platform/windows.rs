@@ -1,7 +1,6 @@
 use tauri::WebviewWindow;
 use windows_sys::Win32::Foundation::{FALSE, HWND, TRUE};
 use windows_sys::Win32::System::Threading::{AttachThreadInput, GetCurrentThreadId};
-use windows_sys::Win32::UI::Input::KeyboardAndMouse::SetFocus;
 use windows_sys::Win32::UI::WindowsAndMessaging::{
     AllowSetForegroundWindow, GetForegroundWindow, GetWindowLongPtrW, GetWindowThreadProcessId,
     SetForegroundWindow, SetWindowLongPtrW, SetWindowPos, GWL_EXSTYLE, HWND_TOPMOST,
@@ -116,6 +115,11 @@ unsafe fn apply_tool_window_style(hwnd: HWND) {
 /// current foreground window. Briefly sharing an input queue with that window's
 /// thread lifts the restriction, which is the standard way around foreground
 /// lock.
+///
+/// Deliberately no SetFocus on the target: activation already hands focus to
+/// the WebView2 child, and re-focusing the top-level window afterwards pulls it
+/// away for an instant, which fires blur in the page and dismisses the launcher
+/// as soon as it shows.
 unsafe fn force_foreground(target: HWND) {
     let foreground = GetForegroundWindow();
     if foreground.is_null() {
@@ -128,13 +132,11 @@ unsafe fn force_foreground(target: HWND) {
 
     if owner == current {
         SetForegroundWindow(target);
-        SetFocus(target);
         return;
     }
 
     AttachThreadInput(current, owner, TRUE);
     SetForegroundWindow(target);
-    SetFocus(target);
     AttachThreadInput(current, owner, FALSE);
 }
 
