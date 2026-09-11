@@ -13,7 +13,7 @@ constraints every milestone inherits.
 M0  shell       tray, hidden window, global hotkey, show/hide, CI matrix
 M1  core        registry + manifest v1 + view protocol v1 + search/rank
                 + SQLite; first built-in extension: applications
-M2  builtins    clipboard-history, calculator, system commands
+M2  builtins    command invocation + system commands; clipboard-history
 M3  plumbing    selection capture, paste + focus restore, template engine
                 -> snippets + quicklinks
 M4  ai          BYOK providers, keychain, streaming, user-defined AI commands
@@ -51,12 +51,17 @@ contract third-party extensions will later use.
 
 ### M2 - builtins
 
-Three more built-in extensions that broaden the contract without new plumbing:
-`clipboard-history` (watcher service, store, privacy exclusions),
-`calculator`, and `system` commands (lock, sleep, empty trash, quit app).
+Two built-in extensions: `system` commands (lock, sleep, empty trash, quit app)
+and `clipboard-history` (watcher service, store, privacy exclusions, images).
 
-Chosen because they exercise the three contribution types that `applications`
-does not: a background service, a no-view command, and a dynamic root provider.
+This milestone was planned as needing no new plumbing. That was wrong. M1 built
+the shape of the command contract but never the path that runs a command:
+nothing invokes a command and nothing emits a view tree, because `applications`
+contributes root items rather than commands. So M2 splits in two, and the first
+change builds invocation with `system` as its first consumer, the way M1 paired
+the contract with `applications`.
+
+`calculator` is dropped. The author does not use one.
 
 ### M3 - plumbing
 
@@ -120,6 +125,7 @@ real sync engine possible if that ever changes.
 
 | Item | Why not |
 |---|---|
+| Calculator | Dropped from M2. The author does not use one. |
 | Linux and Wayland | No Linux desktop. Wayland would break four features. |
 | Accounts and cloud sync | Weeks of work so two machines agree on snippets. |
 | Code signing, notarization, auto-update | No external users. |
