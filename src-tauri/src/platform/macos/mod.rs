@@ -1,3 +1,7 @@
+mod apps;
+
+pub use apps::MacAppIndexer;
+
 use std::ptr::NonNull;
 use std::sync::OnceLock;
 

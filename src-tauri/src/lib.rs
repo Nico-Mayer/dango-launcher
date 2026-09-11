@@ -331,24 +331,23 @@ pub fn run() {
             };
             let mut host = ExtensionHost::new(enabled);
 
-            if let Some(indexer) = platform::app_indexer() {
-                let index = AppIndex::new(indexer.clone(), store.clone());
-                let cache_dir = app
-                    .path()
-                    .app_cache_dir()
-                    .unwrap_or_else(|_| std::env::temp_dir())
-                    .join("icons");
-                // The webview loads cached icon files through the asset protocol.
-                let _ = app.asset_protocol_scope().allow_directory(&cache_dir, true);
-                let icons = IconCache::new(cache_dir, indexer);
-                let extension = Arc::new(ApplicationsExtension::new(index, icons));
-                match host.register(extension.clone()) {
-                    Ok(report) if report.is_clean() => {}
-                    Ok(report) => eprintln!("[dango] applications loaded with issues: {report:?}"),
-                    Err(error) => eprintln!("[dango] applications failed to load: {error}"),
-                }
-                app.manage(extension);
+            let indexer = platform::app_indexer();
+            let index = AppIndex::new(indexer.clone(), store.clone());
+            let cache_dir = app
+                .path()
+                .app_cache_dir()
+                .unwrap_or_else(|_| std::env::temp_dir())
+                .join("icons");
+            // The webview loads cached icon files through the asset protocol.
+            let _ = app.asset_protocol_scope().allow_directory(&cache_dir, true);
+            let icons = IconCache::new(cache_dir, indexer);
+            let extension = Arc::new(ApplicationsExtension::new(index, icons));
+            match host.register(extension.clone()) {
+                Ok(report) if report.is_clean() => {}
+                Ok(report) => eprintln!("[dango] applications loaded with issues: {report:?}"),
+                Err(error) => eprintln!("[dango] applications failed to load: {error}"),
             }
+            app.manage(extension);
 
             let frecency = Arc::new(match &store {
                 Some(store) => FrecencyTable::load(Box::new(store.clone())),

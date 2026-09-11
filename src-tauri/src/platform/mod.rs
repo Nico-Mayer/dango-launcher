@@ -22,13 +22,12 @@ pub fn launcher_window(window: &WebviewWindow) -> Box<dyn LauncherWindow> {
     return Box::new(windows::WindowsLauncherWindow::new(window));
 }
 
-/// The application indexer for this platform, or `None` where one does not
-/// exist yet. macOS returns `None` until its indexer lands.
-pub fn app_indexer() -> Option<std::sync::Arc<dyn crate::extensions::applications::AppIndexer>> {
+/// The application indexer for this platform.
+pub fn app_indexer() -> std::sync::Arc<dyn crate::extensions::applications::AppIndexer> {
     #[cfg(target_os = "windows")]
-    return Some(std::sync::Arc::new(windows::WindowsAppIndexer));
+    return std::sync::Arc::new(windows::WindowsAppIndexer);
     #[cfg(target_os = "macos")]
-    return None;
+    return std::sync::Arc::new(macos::MacAppIndexer);
 }
 
 /// The cursor is the most reliable signal for "the display the user is looking

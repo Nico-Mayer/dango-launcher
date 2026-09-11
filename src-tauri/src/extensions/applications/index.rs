@@ -33,6 +33,13 @@ pub trait AppIndexer: Send + Sync {
     fn launch(&self, app: &IndexedApp) -> Result<(), LaunchError>;
     fn reveal(&self, app: &IndexedApp) -> std::io::Result<()>;
     fn icon(&self, app: &IndexedApp, size: u32) -> Option<IconRgba>;
+
+    /// A signature of the places applications are installed, cheap enough to
+    /// poll. A platform that can offer one gets its index refreshed within
+    /// seconds of an install; one that returns `None` waits for the next sweep.
+    fn fingerprint(&self) -> Option<u64> {
+        None
+    }
 }
 
 /// The in-memory application index. Loaded from the store at startup so results
@@ -96,6 +103,10 @@ impl AppIndex {
 
     pub fn reveal(&self, app: &IndexedApp) -> std::io::Result<()> {
         self.indexer.reveal(app)
+    }
+
+    pub fn fingerprint(&self) -> Option<u64> {
+        self.indexer.fingerprint()
     }
 
     fn persist(&self, apps: &[IndexedApp]) {

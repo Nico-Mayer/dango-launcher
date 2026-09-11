@@ -57,8 +57,22 @@ windows = { version = "0.61", features = [
 
 [target.'cfg(target_os = "macos")'.dependencies]
 objc2 = "0.6"
-objc2-app-kit = { version = "0.3", features = ["NSWindow", "NSPanel", "NSResponder", "NSApplication"] }
-objc2-foundation = "0.3"
+objc2-app-kit = { version = "0.3", features = [
+  "NSWindow",
+  "NSPanel",
+  "NSResponder",
+  "NSApplication",
+  "NSWorkspace",
+  "NSRunningApplication",
+  "NSImage",
+  "NSImageRep",
+  "NSGraphicsContext",
+  "block2",
+  "objc2-core-graphics",
+] }
+objc2-foundation = { version = "0.3", features = ["NSArray", "NSFileManager", "NSGeometry", "NSString", "NSURL"] }
+objc2-core-foundation = { version = "0.3", features = ["CFCGTypes"] }
+objc2-core-graphics = { version = "0.3", features = ["CGBitmapContext", "CGColorSpace", "CGContext", "CGImage"] }
 
 
 # Read the optimization guideline for more details: https://tauri.app/concept/size/#cargo-configuration

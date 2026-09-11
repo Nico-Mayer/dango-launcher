@@ -143,6 +143,11 @@ impl RootProvider for AppProvider {
     }
 }
 
+#[cfg(target_os = "macos")]
+const REVEAL_TITLE: &str = "Reveal in Finder";
+#[cfg(not(target_os = "macos"))]
+const REVEAL_TITLE: &str = "Reveal in File Explorer";
+
 /// The action panel for an application result. Launch is primary; reveal and
 /// copy are offered only when the app has a filesystem path.
 fn app_actions(has_path: bool) -> Vec<Action> {
@@ -154,7 +159,7 @@ fn app_actions(has_path: bool) -> Vec<Action> {
     if has_path {
         actions.push(Action {
             id: ACTION_REVEAL.into(),
-            title: "Reveal in File Explorer".into(),
+            title: REVEAL_TITLE.into(),
             shortcut: Some(Shortcut {
                 key: "r".into(),
                 modifiers: vec![Modifier::Ctrl],
@@ -172,10 +177,16 @@ fn app_actions(has_path: bool) -> Vec<Action> {
     actions
 }
 
-/// How often the index is rebuilt so installs and uninstalls appear without a
-/// restart. A plain schedule rather than a native change watcher, which is
-/// enough for a personal launcher.
+/// The longest the index may go without being rebuilt, for platforms that
+/// cannot signal a change and as a backstop for those that can.
 const REFRESH_INTERVAL: std::time::Duration = std::time::Duration::from_secs(180);
+
+/// How often the loop wakes to check whether it should stop or re-index.
+const TICK: std::time::Duration = std::time::Duration::from_millis(200);
+
+/// Installing an application writes many files; waiting a moment after the
+/// first sign of change avoids re-indexing over a half-copied bundle.
+const SETTLE: std::time::Duration = std::time::Duration::from_secs(1);
 
 /// The background service: builds the index and extracts icons off the
 /// activation path, so the launcher stays responsive, then re-indexes on a
@@ -202,12 +213,7 @@ impl Service for IndexingService {
                     }
                     icons.ensure(&app);
                 }
-                // Sleep in short slices so disabling stops the loop promptly.
-                let mut waited = std::time::Duration::ZERO;
-                while waited < REFRESH_INTERVAL && running.load(Ordering::SeqCst) {
-                    std::thread::sleep(std::time::Duration::from_millis(200));
-                    waited += std::time::Duration::from_millis(200);
-                }
+                wait_for_refresh(&index, &running);
             }
         });
         Ok(())
@@ -216,6 +222,22 @@ impl Service for IndexingService {
     fn stop(&self) {
         self.running
             .store(false, std::sync::atomic::Ordering::SeqCst);
+    }
+}
+
+/// Waits until the applications on disk look different or the sweep is due,
+/// whichever comes first. Sleeps in short slices so disabling the extension
+/// stops the loop promptly.
+fn wait_for_refresh(index: &AppIndex, running: &std::sync::atomic::AtomicBool) {
+    use std::sync::atomic::Ordering;
+    let baseline = index.fingerprint();
+    let started = std::time::Instant::now();
+    while running.load(Ordering::SeqCst) && started.elapsed() < REFRESH_INTERVAL {
+        std::thread::sleep(TICK);
+        if baseline.is_some() && index.fingerprint() != baseline {
+            std::thread::sleep(SETTLE);
+            return;
+        }
     }
 }
 
