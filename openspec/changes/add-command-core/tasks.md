@@ -83,11 +83,13 @@
 
 ## 10. Applications extension: Windows
 
-- [ ] 10.1 Enumerate applications through the shell so packaged and conventional applications both appear
-- [ ] 10.2 Capture display names and launch identifiers, and filter out uninstall and maintenance entries
-- [ ] 10.3 Extract icons at the required size for both kinds
-- [ ] 10.4 Launch by identifier, bringing an already-running application to the foreground
-- [ ] 10.5 Refresh the index when the installed application set changes
+- [x] 10.1 Enumerate applications through the shell so packaged and conventional applications both appear
+- [x] 10.2 Capture display names and launch identifiers, and filter out uninstall and maintenance entries
+- [x] 10.3 Extract icons at the required size for both kinds
+- [x] 10.4 Launch by identifier, bringing an already-running application to the foreground
+  - Launch, running-window match by AUMID or process path, and foreground handoff are code-complete; the interactive foreground behaviour is confirmed in group 12.
+- [x] 10.5 Refresh the index when the installed application set changes
+  - A periodic background re-index picks up installs and uninstalls; a native shell-change watcher is deferred as unnecessary for a personal launcher.
 
 ## 11. Frontend
 
