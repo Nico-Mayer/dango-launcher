@@ -1,9 +1,10 @@
 <script lang="ts">
+  import { convertFileSrc } from "@tauri-apps/api/core";
   import type { ViewTree } from "../protocol/ViewTree";
 
   interface Props {
     tree: ViewTree;
-    onaction: (actionId: string) => void;
+    onaction: (actionId: string, itemId: string | null) => void;
     onsubmit: (values: Record<string, string>) => void;
   }
 
@@ -12,6 +13,12 @@
   let formValues = $state<Record<string, string>>({});
 
   const view = $derived(tree.view);
+
+  /// Which item the action applies to. A detail or form view has none, and the
+  /// command is expected to already know what it asked about.
+  function selectedItemId(): string | null {
+    return view.kind === "list" ? (view.items[selected]?.id ?? null) : null;
+  }
 
   function primaryAction(): string | null {
     const actions = "actions" in view ? view.actions : [];
@@ -40,7 +47,7 @@
           : primaryAction();
       if (action) {
         event.preventDefault();
-        onaction(action);
+        onaction(action, selectedItemId());
       }
     }
   }
@@ -58,17 +65,28 @@
   {:else}
     <ul class="max-h-[420px] overflow-y-auto py-1">
       {#each view.items as item, i (item.id)}
-        <li
-          class="mx-2 flex items-center gap-3 rounded-lg px-3 py-2 {i === selected
-            ? 'bg-muted'
-            : ''}"
-        >
-          <div class="flex flex-col">
-            <span class="text-foreground text-sm">{item.title}</span>
-            {#if item.subtitle}
-              <span class="text-muted-foreground text-xs">{item.subtitle}</span>
+        <li>
+          <button
+            type="button"
+            class="mx-2 flex w-[calc(100%-1rem)] items-center gap-3 rounded-lg px-3 py-2 text-left {i ===
+            selected
+              ? 'bg-muted'
+              : ''}"
+            onmouseenter={() => (selected = i)}
+            onclick={() => item.actions.length > 0 && onaction(item.actions[0].id, item.id)}
+          >
+            {#if item.icon}
+              <img src={convertFileSrc(item.icon)} alt="" class="h-6 w-6 shrink-0" />
+            {:else}
+              <div class="bg-muted h-6 w-6 shrink-0 rounded"></div>
             {/if}
-          </div>
+            <div class="flex min-w-0 flex-col">
+              <span class="text-foreground truncate text-sm">{item.title}</span>
+              {#if item.subtitle}
+                <span class="text-muted-foreground truncate text-xs">{item.subtitle}</span>
+              {/if}
+            </div>
+          </button>
         </li>
       {/each}
     </ul>

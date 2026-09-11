@@ -7,12 +7,7 @@ use std::hash::{DefaultHasher, Hash, Hasher};
 use std::path::{Path, PathBuf};
 
 use objc2_app_kit::{NSWorkspace, NSWorkspaceOpenConfiguration};
-use objc2_core_foundation::{CGPoint, CGRect, CGSize};
-use objc2_core_graphics::{
-    CGBitmapContextCreate, CGColorSpace, CGContext, CGImage, CGImageAlphaInfo,
-    CGInterpolationQuality,
-};
-use objc2_foundation::{NSArray, NSFileManager, NSRect, NSString, NSURL};
+use objc2_foundation::{NSArray, NSFileManager, NSString, NSURL};
 
 use crate::extensions::applications::{AppIndexer, IconRgba, IndexedApp, LaunchError};
 
@@ -71,12 +66,7 @@ impl AppIndexer for MacAppIndexer {
     }
 
     fn icon(&self, app: &IndexedApp, size: u32) -> Option<IconRgba> {
-        let image =
-            NSWorkspace::sharedWorkspace().iconForFile(&NSString::from_str(bundle_path(app)));
-        let mut proposed = NSRect::new(CGPoint::ZERO, CGSize::new(size as f64, size as f64));
-        let cg_image =
-            unsafe { image.CGImageForProposedRect_context_hints(&mut proposed, None, None) }?;
-        render(&cg_image, size)
+        super::icon_for(bundle_path(app), size)
     }
 }
 
@@ -168,47 +158,6 @@ fn bundle_path(app: &IndexedApp) -> &str {
 
 fn file_url(path: &str) -> objc2::rc::Retained<NSURL> {
     NSURL::fileURLWithPath(&NSString::from_str(path))
-}
-
-/// Draws the icon into a square RGBA buffer at the requested size. Core
-/// Graphics only offers premultiplied alpha for 8-bit RGBA, and PNG wants it
-/// straight, so the colour channels are divided back out.
-fn render(image: &CGImage, size: u32) -> Option<IconRgba> {
-    let space = CGColorSpace::new_device_rgb()?;
-    let bytes_per_row = size as usize * 4;
-    let mut pixels = vec![0u8; bytes_per_row * size as usize];
-    let context = unsafe {
-        CGBitmapContextCreate(
-            pixels.as_mut_ptr().cast(),
-            size as usize,
-            size as usize,
-            8,
-            bytes_per_row,
-            Some(&space),
-            CGImageAlphaInfo::PremultipliedLast.0,
-        )
-    }?;
-    CGContext::set_interpolation_quality(Some(&context), CGInterpolationQuality::High);
-    CGContext::draw_image(
-        Some(&context),
-        CGRect::new(CGPoint::ZERO, CGSize::new(size as f64, size as f64)),
-        Some(image),
-    );
-    drop(context);
-
-    for px in pixels.as_chunks_mut::<4>().0 {
-        let alpha = px[3] as u32;
-        if alpha > 0 && alpha < 255 {
-            for channel in &mut px[..3] {
-                *channel = ((*channel as u32 * 255) / alpha).min(255) as u8;
-            }
-        }
-    }
-    Some(IconRgba {
-        width: size,
-        height: size,
-        rgba: pixels,
-    })
 }
 
 #[cfg(test)]

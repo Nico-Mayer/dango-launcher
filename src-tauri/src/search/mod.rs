@@ -21,6 +21,9 @@ pub enum Source {
 
 #[derive(Clone, Debug)]
 pub struct Candidate {
+    /// The extension that contributed this result, so acting on it is
+    /// dispatched to its owner rather than to a privileged default.
+    pub extension_id: String,
     pub id: String,
     pub title: String,
     pub subtitle: Option<String>,
@@ -196,6 +199,7 @@ mod tests {
 
     fn candidate(id: &str, source: Source) -> Candidate {
         Candidate {
+            extension_id: "test".into(),
             id: id.into(),
             title: id.into(),
             subtitle: None,

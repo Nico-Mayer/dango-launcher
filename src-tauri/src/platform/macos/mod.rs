@@ -1,6 +1,10 @@
 mod apps;
+mod icons;
+mod system;
 
 pub use apps::MacAppIndexer;
+pub use icons::icon_for;
+pub use system::MacSystemControl;
 
 use std::ptr::NonNull;
 use std::sync::OnceLock;
@@ -11,7 +15,7 @@ use objc2::sel;
 use objc2_app_kit::{NSWindow, NSWindowCollectionBehavior, NSWindowStyleMask};
 use tauri::WebviewWindow;
 
-use super::LauncherWindow;
+use super::{LauncherWindow, RunningApp, SystemControl, SystemError};
 
 /// Above NSMainMenuWindowLevel. A fullscreen application's window outranks the
 /// floating level that `alwaysOnTop` gives us, which leaves the launcher behind

@@ -7,6 +7,9 @@ export interface ActionDto {
 }
 
 export interface ResultItem {
+  /// The extension that contributed the result; acting on it is dispatched
+  /// back to that owner.
+  extensionId: string;
   id: string;
   title: string;
   subtitle?: string | null;
@@ -22,8 +25,7 @@ export interface ResultsPayload {
 }
 
 export type ActionResponse =
-  | { kind: "launched" }
-  | { kind: "revealed" }
+  | { kind: "done" }
   | { kind: "copy"; text: string }
   | { kind: "failed"; message: string };
 

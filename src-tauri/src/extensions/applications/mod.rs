@@ -5,28 +5,18 @@
 mod icons;
 mod index;
 
-pub use icons::IconCache;
+pub use icons::{IconCache, ICON_SIZE};
 pub use index::{AppIndex, AppIndexer, IconRgba, IndexedApp, LaunchError};
 
 use std::sync::Arc;
 
 use async_trait::async_trait;
 
-use crate::extension::{Extension, Manifest, Service};
+use crate::extension::{ActionOutcome, Extension, Manifest, Service};
 use crate::protocol::{Action, Modifier, Shortcut};
 use crate::search::{Candidate, RootProvider, Source};
 
 pub const EXTENSION_ID: &str = "dango.applications";
-
-/// What a chosen action produced. The frontend hides on a plain success, shows
-/// the message on failure, and writes text to the clipboard for a copy action.
-#[derive(Debug, PartialEq, Eq)]
-pub enum ActionOutcome {
-    Launched,
-    Revealed,
-    CopyToClipboard(String),
-    Failed(String),
-}
 
 pub const ACTION_LAUNCH: &str = "launch";
 pub const ACTION_REVEAL: &str = "reveal";
@@ -67,13 +57,13 @@ impl ApplicationsExtension {
     }
 
     /// Runs a chosen action, removing an entry that turns out to be gone.
-    pub fn perform(&self, app_id: &str, action: &str) -> ActionOutcome {
+    fn perform(&self, app_id: &str, action: &str) -> ActionOutcome {
         let Some(app) = self.index.get(app_id) else {
             return ActionOutcome::Failed("application is no longer in the index".into());
         };
         match action {
             ACTION_LAUNCH => match self.index.launch(&app) {
-                Ok(()) => ActionOutcome::Launched,
+                Ok(()) => ActionOutcome::Done,
                 Err(LaunchError::NotFound) => {
                     self.index.remove(app_id);
                     ActionOutcome::Failed("application no longer exists".into())
@@ -81,7 +71,7 @@ impl ApplicationsExtension {
                 Err(LaunchError::Failed(message)) => ActionOutcome::Failed(message),
             },
             ACTION_REVEAL => match self.index.reveal(&app) {
-                Ok(()) => ActionOutcome::Revealed,
+                Ok(()) => ActionOutcome::Done,
                 Err(error) => ActionOutcome::Failed(error.to_string()),
             },
             ACTION_COPY_PATH => match app.target {
@@ -98,10 +88,15 @@ impl Extension for ApplicationsExtension {
         &self.manifest
     }
 
+    fn perform_action(&self, item_id: &str, action_id: &str) -> ActionOutcome {
+        self.perform(item_id, action_id)
+    }
+
     fn services(&self) -> Vec<Arc<dyn Service>> {
         vec![Arc::new(IndexingService {
             index: self.index.clone(),
             icons: self.icons.clone(),
+            indexer: self.index.indexer(),
             running: Arc::new(std::sync::atomic::AtomicBool::new(false)),
         })]
     }
@@ -128,6 +123,7 @@ impl RootProvider for AppProvider {
             .map(|app| {
                 let has_path = app.target.is_some();
                 Candidate {
+                    extension_id: EXTENSION_ID.into(),
                     icon: self.icons.path(&app.id),
                     subtitle: app.target.clone(),
                     title: app.name,
@@ -194,6 +190,7 @@ const SETTLE: std::time::Duration = std::time::Duration::from_secs(1);
 struct IndexingService {
     index: Arc<AppIndex>,
     icons: Arc<IconCache>,
+    indexer: Arc<dyn AppIndexer>,
     running: Arc<std::sync::atomic::AtomicBool>,
 }
 
@@ -203,6 +200,7 @@ impl Service for IndexingService {
         self.running.store(true, Ordering::SeqCst);
         let index = self.index.clone();
         let icons = self.icons.clone();
+        let indexer = self.indexer.clone();
         let running = self.running.clone();
         std::thread::spawn(move || {
             while running.load(Ordering::SeqCst) {
@@ -211,7 +209,7 @@ impl Service for IndexingService {
                     if !running.load(Ordering::SeqCst) {
                         return;
                     }
-                    icons.ensure(&app);
+                    icons.ensure_with(&app.id, || indexer.icon(&app, ICON_SIZE));
                 }
                 wait_for_refresh(&index, &running);
             }
@@ -254,7 +252,7 @@ mod tests {
         )]));
         let index = AppIndex::new(indexer.clone(), None);
         index.rebuild();
-        let icons = IconCache::in_temp(indexer.clone());
+        let icons = IconCache::in_temp();
         (ApplicationsExtension::new(index, icons), indexer)
     }
 

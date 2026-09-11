@@ -1,6 +1,8 @@
 mod apps;
+mod system;
 
-pub use apps::WindowsAppIndexer;
+pub use apps::{icon_for, WindowsAppIndexer};
+pub use system::WindowsSystemControl;
 
 use tauri::WebviewWindow;
 use windows_sys::Win32::Foundation::{FALSE, HWND, TRUE};
@@ -12,7 +14,7 @@ use windows_sys::Win32::UI::WindowsAndMessaging::{
     WS_EX_TOPMOST,
 };
 
-use super::LauncherWindow;
+use super::{LauncherWindow, RunningApp, SystemControl, SystemError};
 
 pub struct WindowsLauncherWindow {
     /// Captured before the launcher takes the foreground, because Windows has

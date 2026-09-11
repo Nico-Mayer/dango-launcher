@@ -1,5 +1,6 @@
 pub mod extension;
 pub mod extensions;
+pub mod invocation;
 mod latency;
 mod platform;
 pub mod protocol;
@@ -17,8 +18,10 @@ use tauri::{
 };
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
 
-use extension::{EnabledStore, ExtensionHost};
-use extensions::applications::{ActionOutcome, AppIndex, ApplicationsExtension, IconCache};
+use extension::{ActionOutcome, EnabledStore, ExtensionHost, HostResolver};
+use extensions::applications::{AppIndex, ApplicationsExtension, IconCache};
+use extensions::system::SystemExtension;
+use invocation::{InvokeError, Invoker, Outcome, Output};
 use latency::LatencyProbe;
 use platform::LauncherWindow;
 use ranking::{now_millis, DangoRanker, FrecencyTable};
@@ -31,9 +34,14 @@ const RESULT_LIMIT: usize = 50;
 /// Event carrying a streamed search snapshot to the frontend.
 const EVENT_RESULTS: &str = "dango://results";
 
+/// Event carrying the message from a command that failed. Success needs no
+/// event: the launcher simply gets out of the way.
+const EVENT_FAILED: &str = "dango://failed";
+
 #[derive(Clone, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 struct ResultItem {
+    extension_id: String,
     id: String,
     title: String,
     subtitle: Option<String>,
@@ -45,6 +53,7 @@ struct ResultItem {
 impl From<Candidate> for ResultItem {
     fn from(c: Candidate) -> Self {
         Self {
+            extension_id: c.extension_id,
             id: c.id,
             title: c.title,
             subtitle: c.subtitle,
@@ -66,8 +75,7 @@ struct ResultsPayload {
 #[derive(serde::Serialize)]
 #[serde(tag = "kind", rename_all = "camelCase")]
 enum ActionResponse {
-    Launched,
-    Revealed,
+    Done,
     Copy { text: String },
     Failed { message: String },
 }
@@ -116,8 +124,18 @@ fn hide(app: &tauri::AppHandle) -> bool {
     let mut launcher = state.launcher.lock().unwrap();
     launcher.hide(&window);
     launcher.restore_previous_focus();
+    abandon_running_command(app);
     let _ = app.emit_to("main", "dango://reset", ());
     true
+}
+
+/// A command still working when the launcher goes away has nowhere to put its
+/// output, and the user has moved on. Its later output is dropped rather than
+/// waiting to surprise them on the next activation.
+fn abandon_running_command(app: &tauri::AppHandle) {
+    if let Some(invoker) = app.try_state::<Arc<Invoker>>() {
+        invoker.abandon();
+    }
 }
 
 fn toggle(app: &tauri::AppHandle) {
@@ -168,31 +186,85 @@ async fn search(app: tauri::AppHandle, query: String) {
     });
 }
 
-/// Runs an item's action. Launch and reveal hide the launcher; copy hands the
-/// text back for the frontend to place on the clipboard; failure keeps the
-/// launcher open with a message.
+/// Runs an action on a result, through the extension that contributed it.
+/// Success hides the launcher; copy hands the text back for the frontend to
+/// place on the clipboard; failure keeps the launcher open with a message.
 #[tauri::command]
-fn run_action(app: tauri::AppHandle, item_id: String, action_id: String) -> ActionResponse {
-    let Some(extension) = app.try_state::<Arc<ApplicationsExtension>>() else {
+fn run_action(
+    app: tauri::AppHandle,
+    extension_id: String,
+    item_id: String,
+    action_id: String,
+) -> ActionResponse {
+    let Some(host) = app.try_state::<Arc<Mutex<ExtensionHost>>>() else {
         return ActionResponse::Failed {
-            message: "no application handler is available".into(),
+            message: "no extensions are loaded".into(),
         };
     };
-    match extension.perform(&item_id, &action_id) {
-        ActionOutcome::Launched => {
+    let outcome = host
+        .lock()
+        .unwrap()
+        .perform_action(&extension_id, &item_id, &action_id);
+    match outcome {
+        ActionOutcome::Done => {
+            // Any successful action counts as use. Revealing an application is
+            // reaching for it just as much as launching it is.
             if let Some(frecency) = app.try_state::<Arc<FrecencyTable>>() {
                 frecency.record_launch(&item_id, now_millis());
             }
             hide_after_launch(&app);
-            ActionResponse::Launched
-        }
-        ActionOutcome::Revealed => {
-            hide_after_launch(&app);
-            ActionResponse::Revealed
+            ActionResponse::Done
         }
         ActionOutcome::CopyToClipboard(text) => ActionResponse::Copy { text },
         ActionOutcome::Failed(message) => ActionResponse::Failed { message },
     }
+}
+
+/// Invokes a command and streams what it produces to the frontend. Returns the
+/// extension that owns it, so an action chosen inside a view the command pushes
+/// can be sent back to the right place, or the reason it could not start.
+#[tauri::command]
+async fn invoke_command(app: tauri::AppHandle, command_id: String) -> Result<String, String> {
+    let Some(invoker) = app.try_state::<Arc<Invoker>>() else {
+        return Err("no extensions are loaded".into());
+    };
+    let owner = app
+        .try_state::<Arc<Mutex<ExtensionHost>>>()
+        .and_then(|host| {
+            let host = host.lock().ok()?;
+            Some(host.registry().get(&command_id)?.extension_id.clone())
+        })
+        .ok_or_else(|| InvokeError::Unavailable.to_string())?;
+    let mut rx = match invoker.invoke(&command_id) {
+        Ok(rx) => rx,
+        Err(error @ (InvokeError::Unavailable | InvokeError::HostUnavailable)) => {
+            return Err(error.to_string())
+        }
+    };
+    if let Some(frecency) = app.try_state::<Arc<FrecencyTable>>() {
+        frecency.record_launch(&command_id, now_millis());
+    }
+
+    tauri::async_runtime::spawn(async move {
+        while let Some(output) = rx.recv().await {
+            match output {
+                Output::View(tree) => {
+                    if app.emit_to("main", protocol::EVENT_RENDER, tree).is_err() {
+                        break;
+                    }
+                }
+                Output::Finished(Outcome::Success) => {
+                    hide_after_launch(&app);
+                    break;
+                }
+                Output::Finished(Outcome::Failure(message)) => {
+                    let _ = app.emit_to("main", EVENT_FAILED, message);
+                    break;
+                }
+            }
+        }
+    });
+    Ok(owner)
 }
 
 /// Hides the launcher without restoring the previous foreground, because the
@@ -202,6 +274,7 @@ fn hide_after_launch(app: &tauri::AppHandle) {
     if let Some(window) = app.get_webview_window("main") {
         let _ = window.hide();
     }
+    abandon_running_command(app);
     let _ = app.emit_to("main", "dango://reset", ());
 }
 
@@ -282,7 +355,8 @@ pub fn run() {
             dismiss,
             warmup_done,
             search,
-            run_action
+            run_action,
+            invoke_command
         ])
         .setup(move |app| {
             #[cfg(target_os = "macos")]
@@ -340,14 +414,24 @@ pub fn run() {
                 .join("icons");
             // The webview loads cached icon files through the asset protocol.
             let _ = app.asset_protocol_scope().allow_directory(&cache_dir, true);
-            let icons = IconCache::new(cache_dir, indexer);
-            let extension = Arc::new(ApplicationsExtension::new(index, icons));
+            let icons = IconCache::new(cache_dir);
+            let extension = Arc::new(ApplicationsExtension::new(index, icons.clone()));
             match host.register(extension.clone()) {
                 Ok(report) if report.is_clean() => {}
                 Ok(report) => eprintln!("[dango] applications loaded with issues: {report:?}"),
                 Err(error) => eprintln!("[dango] applications failed to load: {error}"),
             }
             app.manage(extension);
+
+            let system = Arc::new(SystemExtension::new(
+                platform::system_control(),
+                icons.clone(),
+            ));
+            match host.register(system) {
+                Ok(report) if report.is_clean() => {}
+                Ok(report) => eprintln!("[dango] system loaded with issues: {report:?}"),
+                Err(error) => eprintln!("[dango] system failed to load: {error}"),
+            }
 
             let frecency = Arc::new(match &store {
                 Some(store) => FrecencyTable::load(Box::new(store.clone())),
@@ -363,7 +447,13 @@ pub fn run() {
             );
             app.manage(pipeline);
             app.manage(frecency);
-            app.manage(Mutex::new(host));
+
+            // Shared rather than owned by the invoker, because resolving a
+            // command has to see the host as it is now: an extension disabled
+            // since startup must no longer be invocable.
+            let host = Arc::new(Mutex::new(host));
+            app.manage(Arc::new(Invoker::new(Arc::new(HostResolver(host.clone())))));
+            app.manage(host);
 
             if let Err(error) = app.global_shortcut().register(shortcut) {
                 eprintln!("[dango] could not register {SHORTCUT_LABEL}: {error}");

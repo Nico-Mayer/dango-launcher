@@ -5,7 +5,7 @@ use super::manifest::CommandDecl;
 /// Which kind of host runs a command. Only the built-in native host exists in
 /// M1; a script host and a sandboxed host come later without the registry
 /// changing.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Host {
     Builtin,
 }

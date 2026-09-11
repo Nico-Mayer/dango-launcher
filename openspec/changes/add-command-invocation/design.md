@@ -101,6 +101,25 @@ whose whole design is about not stealing focus, it looks nothing like the rest
 of the surface, and it would be the only confirmation in the product that does
 not go through the view stack.
 
+### An action inside a pushed view re-dispatches to the extension
+
+Found while building: `ProtocolView` reports only an action id, and nothing
+receives it. A command that pushes a list has no way to hear that one of its
+items was chosen, which is most of what quit application and empty trash do.
+
+An action chosen inside a view goes back through the same `run_action` path as a
+root result, carrying the item id and the extension that owns the running
+invocation. `invoke_command` returns that owner so the frontend knows where to
+send it. Nothing is added to the view protocol.
+
+Rejected: keeping the invoked command alive and delivering actions to it, so it
+holds state between pushing a view and handling a choice. That is where a
+stateful command eventually has to go, and it is probably where M4 lands, but
+both commands here are stateless: the chosen application is named by the item
+id, and the confirmation needs nothing but the choice. Building an event loop
+for a consumer that does not need one would be inventing the requirement. The
+re-dispatch path does not block it later.
+
 ### Platform calls sit behind one `SystemControl` trait
 
 Lock, sleep, empty trash, list running applications, and quit an application are
@@ -127,6 +146,17 @@ Icon extraction moves to a shared platform helper that both `AppIndexer` and
 `SystemControl` call. No extension-to-extension dependency: that would make
 disabling `applications` silently break `system`.
 
+### Windows lands after macOS, not with it
+
+The task order puts the Windows spike first, which assumes whoever implements
+has a Windows machine. Development happens on macOS and the project cannot
+cross-compile, so the shared core and macOS are built first and Windows
+`SystemControl` returns an unsupported error until the spike runs.
+
+This is a sequencing change, not a scope change. The change is not done until
+group 7 is, and until then Windows shows the commands with a clear failure
+rather than a silent nothing.
+
 ## Risks / Trade-offs
 
 - **The sink shape is a guess about M4.** → It is the one decision here made for
@@ -143,6 +173,9 @@ disabling `applications` silently break `system`.
 - **Empty trash is destructive and is one Enter away in root search.** → The
   confirmation view is required by the spec and its primary action is cancel,
   not confirm, so a reflexive second Enter does nothing.
+- **Windows carries a visibly dead extension between groups 6 and 7.** → The
+  commands fail with a stated reason rather than appearing to work. Accepted as
+  the cost of not having a Windows machine to hand.
 - **Deviating from the roadmap twice** (quit-app as a view command, empty trash
   as a view command). → Both are recorded above with reasons. The roadmap's
   milestone intent, exercising contribution types `applications` did not, is

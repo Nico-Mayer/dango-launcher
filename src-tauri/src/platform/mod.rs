@@ -22,6 +22,58 @@ pub fn launcher_window(window: &WebviewWindow) -> Box<dyn LauncherWindow> {
     return Box::new(windows::WindowsLauncherWindow::new(window));
 }
 
+/// One running application, as the quit command needs to see it. `id` is
+/// whatever the platform addresses it by, opaque above this line.
+#[derive(Clone, Debug, PartialEq)]
+pub struct RunningApp {
+    pub id: String,
+    pub name: String,
+    pub icon: Option<String>,
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum SystemError {
+    #[error("{0}")]
+    Failed(String),
+    #[error("that application is no longer running")]
+    Gone,
+    #[error("{0} is not implemented on this platform yet")]
+    Unsupported(&'static str),
+}
+
+/// The operating-system actions the `system` extension offers. Everything
+/// platform-specific about them sits behind this one trait.
+pub trait SystemControl: Send + Sync {
+    fn lock(&self) -> Result<(), SystemError>;
+    fn sleep(&self) -> Result<(), SystemError>;
+    /// How many items are in the trash. Zero means emptying it is a no-op, and
+    /// the command says so instead of asking for confirmation.
+    fn trash_count(&self) -> Result<usize, SystemError>;
+    fn empty_trash(&self) -> Result<(), SystemError>;
+    fn running_apps(&self) -> Vec<RunningApp>;
+    /// Asks an application to quit the ordinary way, so it can prompt about
+    /// unsaved work. A refusal is not an error.
+    fn quit(&self, app_id: &str) -> Result<(), SystemError>;
+}
+
+pub fn system_control() -> std::sync::Arc<dyn SystemControl> {
+    #[cfg(target_os = "windows")]
+    return std::sync::Arc::new(windows::WindowsSystemControl);
+    #[cfg(target_os = "macos")]
+    return std::sync::Arc::new(macos::MacSystemControl);
+}
+
+/// Renders the icon the system shows for something, at the requested size.
+/// `locator` is a filesystem path on macOS and a shell parsing name on Windows,
+/// which is what lets one helper serve both the application index and the list
+/// of running applications.
+pub fn icon_for(locator: &str, size: u32) -> Option<crate::extensions::applications::IconRgba> {
+    #[cfg(target_os = "windows")]
+    return windows::icon_for(locator, size);
+    #[cfg(target_os = "macos")]
+    return macos::icon_for(locator, size);
+}
+
 /// The application indexer for this platform.
 pub fn app_indexer() -> std::sync::Arc<dyn crate::extensions::applications::AppIndexer> {
     #[cfg(target_os = "windows")]

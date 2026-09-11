@@ -55,7 +55,7 @@ impl AppIndexer for WindowsAppIndexer {
                 bring_to_foreground(hwnd);
                 return Ok(());
             }
-            let file = HSTRING::from(format!("shell:AppsFolder\\{}", app.id));
+            let file = HSTRING::from(apps_folder_path(&app.id));
             let instance = ShellExecuteW(
                 None,
                 PCWSTR::null(),
@@ -89,23 +89,31 @@ impl AppIndexer for WindowsAppIndexer {
     }
 
     fn icon(&self, app: &IndexedApp, size: u32) -> Option<IconRgba> {
-        unsafe {
-            init_com();
-            let item = resolve(app)?;
-            let factory: IShellItemImageFactory = item.cast().ok()?;
-            let bitmap = factory
-                .GetImage(
-                    SIZE {
-                        cx: size as i32,
-                        cy: size as i32,
-                    },
-                    SIIGBF_ICONONLY | SIIGBF_BIGGERSIZEOK,
-                )
-                .ok()?;
-            let rgba = bitmap_to_rgba(bitmap);
-            let _ = DeleteObject(bitmap.into());
-            rgba
-        }
+        icon_for(&apps_folder_path(&app.id), size)
+    }
+}
+
+/// Renders the icon the shell shows for a parsing name, which is an
+/// `shell:AppsFolder` entry for an indexed application and an executable path
+/// for a running one. Shared so neither extension depends on the other.
+pub fn icon_for(parsing_name: &str, size: u32) -> Option<IconRgba> {
+    unsafe {
+        init_com();
+        let item: IShellItem =
+            SHCreateItemFromParsingName(PCWSTR(HSTRING::from(parsing_name).as_ptr()), None).ok()?;
+        let factory: IShellItemImageFactory = item.cast().ok()?;
+        let bitmap = factory
+            .GetImage(
+                SIZE {
+                    cx: size as i32,
+                    cy: size as i32,
+                },
+                SIIGBF_ICONONLY | SIIGBF_BIGGERSIZEOK,
+            )
+            .ok()?;
+        let rgba = bitmap_to_rgba(bitmap);
+        let _ = DeleteObject(bitmap.into());
+        rgba
     }
 }
 
@@ -177,11 +185,6 @@ fn is_launchable(id: &str, target: Option<&str>) -> bool {
     }
     // A custom URL scheme such as steam:// is launchable; a plain document is not.
     matches!(lower.find("://"), Some(pos) if pos > 0)
-}
-
-unsafe fn resolve(app: &IndexedApp) -> Option<IShellItem> {
-    let path = HSTRING::from(format!("shell:AppsFolder\\{}", app.id));
-    SHCreateItemFromParsingName(PCWSTR(path.as_ptr()), None).ok()
 }
 
 struct Collector {
@@ -333,6 +336,10 @@ fn take_pwstr(p: PWSTR) -> String {
     let s = unsafe { p.to_string() }.unwrap_or_default();
     unsafe { CoTaskMemFree(Some(p.0 as _)) };
     s
+}
+
+fn apps_folder_path(app_id: &str) -> String {
+    format!("shell:AppsFolder\\{app_id}")
 }
 
 fn is_file_path(s: &str) -> bool {

@@ -109,6 +109,10 @@ impl AppIndex {
         self.indexer.fingerprint()
     }
 
+    pub fn indexer(&self) -> Arc<dyn AppIndexer> {
+        self.indexer.clone()
+    }
+
     fn persist(&self, apps: &[IndexedApp]) {
         if let Some(store) = &self.store {
             let rows: Vec<_> = apps
@@ -130,7 +134,6 @@ pub mod tests {
     pub struct FakeIndexer {
         apps: RwLock<Vec<IndexedApp>>,
         launch_not_found: AtomicBool,
-        with_icons: bool,
     }
 
     impl FakeIndexer {
@@ -146,7 +149,6 @@ pub mod tests {
                         .collect(),
                 ),
                 launch_not_found: AtomicBool::new(false),
-                with_icons: true,
             }
         }
 
@@ -163,11 +165,6 @@ pub mod tests {
 
         pub fn make_launch_fail_not_found(&self) {
             self.launch_not_found.store(true, Ordering::SeqCst);
-        }
-
-        pub fn without_icons(mut self) -> Self {
-            self.with_icons = false;
-            self
         }
     }
 
@@ -186,9 +183,6 @@ pub mod tests {
             Ok(())
         }
         fn icon(&self, _app: &IndexedApp, size: u32) -> Option<IconRgba> {
-            if !self.with_icons {
-                return None;
-            }
             Some(IconRgba {
                 width: size,
                 height: size,

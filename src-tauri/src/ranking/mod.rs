@@ -153,6 +153,7 @@ mod tests {
 
     fn candidate(id: &str, title: &str) -> Candidate {
         Candidate {
+            extension_id: "test".into(),
             id: id.into(),
             title: title.into(),
             subtitle: None,

@@ -3,12 +3,22 @@ pub mod registry;
 
 use std::collections::HashMap;
 use std::panic::{catch_unwind, AssertUnwindSafe};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 pub use manifest::{CommandDecl, InvocationMode, Manifest, ManifestError};
 pub use registry::{Collision, Host, RegisteredCommand, Registry};
 
 pub type ActivationResult = Result<(), Box<dyn std::error::Error + Send + Sync>>;
+
+/// What running an action on a result produced. `Done` means the work is
+/// finished and the launcher should get out of the way; a copy hands text back
+/// because only the webview can reach the clipboard.
+#[derive(Debug, PartialEq, Eq)]
+pub enum ActionOutcome {
+    Done,
+    CopyToClipboard(String),
+    Failed(String),
+}
 
 /// A native built-in. Its manifest is data; its behaviour is Rust. Third-party
 /// extensions will implement the same contract behind a sandboxed host later.
@@ -27,6 +37,16 @@ pub trait Extension: Send + Sync {
     /// The single per-keystroke root items provider, if the extension has one.
     fn root_provider(&self) -> Option<Arc<dyn crate::search::RootProvider>> {
         None
+    }
+    /// The code behind one of the extension's declared commands, by its
+    /// unqualified id. A declaration without an implementation is not
+    /// invocable, which the host reports rather than treating as a crash.
+    fn command(&self, _command_id: &str) -> Option<Arc<dyn crate::invocation::Command>> {
+        None
+    }
+    /// Runs an action on a result this extension contributed.
+    fn perform_action(&self, _item_id: &str, _action_id: &str) -> ActionOutcome {
+        ActionOutcome::Failed("this extension has no actions".into())
     }
 }
 
@@ -112,11 +132,41 @@ impl ExtensionHost {
             .collect()
     }
 
+    /// Finds the code behind a qualified command identity. A command whose
+    /// extension was disabled is gone from the registry, so this answers `None`
+    /// and the caller reports it as unavailable.
+    pub fn resolve_command(&self, qualified_id: &str) -> Option<crate::invocation::Resolved> {
+        let registered = self.registry.get(qualified_id)?;
+        let extension = self.extensions.get(&registered.extension_id)?;
+        Some(crate::invocation::Resolved {
+            command: extension.command(&registered.decl.id)?,
+            host: registered.host,
+        })
+    }
+
+    /// Runs an action through the extension that contributed the result. No
+    /// extension is the default handler.
+    pub fn perform_action(
+        &self,
+        extension_id: &str,
+        item_id: &str,
+        action_id: &str,
+    ) -> ActionOutcome {
+        if !self.is_active(extension_id) {
+            return ActionOutcome::Failed("that extension is not available".into());
+        }
+        match self.extensions.get(extension_id) {
+            Some(extension) => extension.perform_action(item_id, action_id),
+            None => ActionOutcome::Failed("that extension is not available".into()),
+        }
+    }
+
     /// Every registered command as a search candidate.
     pub fn command_candidates(&self) -> Vec<crate::search::Candidate> {
         self.registry
             .commands()
             .map(|command| crate::search::Candidate {
+                extension_id: command.extension_id.clone(),
                 id: command.qualified_id(),
                 title: command.decl.title.clone(),
                 subtitle: command.decl.subtitle.clone(),
@@ -222,6 +272,16 @@ impl ExtensionHost {
         if let Some(extension) = self.extensions.get(extension_id) {
             let _ = catch_unwind(AssertUnwindSafe(|| extension.deactivate()));
         }
+    }
+}
+
+/// Resolves through the live host, so enabling or disabling an extension takes
+/// effect without rebuilding the invoker.
+pub struct HostResolver(pub Arc<Mutex<ExtensionHost>>);
+
+impl crate::invocation::CommandResolver for HostResolver {
+    fn resolve(&self, qualified_id: &str) -> Option<crate::invocation::Resolved> {
+        self.0.lock().ok()?.resolve_command(qualified_id)
     }
 }
 
@@ -376,6 +436,65 @@ mod tests {
         Arc::get_mut(&mut ext).unwrap().manifest.manifest_version = 99;
         let error = host.register(ext).unwrap_err();
         assert!(matches!(error, HostError::Manifest(_)));
+    }
+
+    /// Two extensions that both claim to handle an action, so a test can tell
+    /// which one the host actually asked.
+    struct Owner(&'static str);
+
+    impl Extension for Owner {
+        fn manifest(&self) -> &Manifest {
+            // Leaked so the borrow lives as long as the test needs it; a real
+            // extension owns its manifest.
+            Box::leak(Box::new(Manifest {
+                manifest_version: 1,
+                id: self.0.into(),
+                name: self.0.into(),
+                icon: None,
+                commands: vec![],
+                preferences: vec![],
+                root_items: true,
+                services: false,
+            }))
+        }
+        fn perform_action(&self, item_id: &str, action_id: &str) -> ActionOutcome {
+            ActionOutcome::CopyToClipboard(format!("{}:{item_id}:{action_id}", self.0))
+        }
+    }
+
+    #[test]
+    fn an_action_is_dispatched_to_the_extension_that_owns_the_result() {
+        let mut host = host();
+        host.register(Arc::new(Owner("alpha"))).unwrap();
+        host.register(Arc::new(Owner("beta"))).unwrap();
+
+        assert_eq!(
+            host.perform_action("alpha", "item", "go"),
+            ActionOutcome::CopyToClipboard("alpha:item:go".into())
+        );
+        assert_eq!(
+            host.perform_action("beta", "item", "go"),
+            ActionOutcome::CopyToClipboard("beta:item:go".into())
+        );
+    }
+
+    #[test]
+    fn an_action_for_a_disabled_extension_fails_rather_than_running() {
+        let mut host = host();
+        host.register(Arc::new(Owner("alpha"))).unwrap();
+        host.set_enabled("alpha", false);
+        assert!(matches!(
+            host.perform_action("alpha", "item", "go"),
+            ActionOutcome::Failed(_)
+        ));
+    }
+
+    #[test]
+    fn a_command_of_a_disabled_extension_does_not_resolve() {
+        let mut host = host();
+        host.register(TestExtension::new("apps", "open")).unwrap();
+        host.set_enabled("apps", false);
+        assert!(host.resolve_command("apps.open").is_none());
     }
 
     #[derive(Default)]

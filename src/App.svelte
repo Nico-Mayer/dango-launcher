@@ -17,6 +17,9 @@
   let stack = $state<ViewTree[]>([]);
   let panelOpen = $state(false);
   let protocolError = $state(false);
+  /// The extension whose command pushed what is on the stack, so an action
+  /// chosen inside its view goes back to it.
+  let viewOwner = $state<string | null>(null);
   let failure = $state<string | null>(null);
   let inputEl = $state<HTMLInputElement | null>(null);
 
@@ -37,24 +40,68 @@
     query = "";
     results = [];
     stack = [];
+    viewOwner = null;
     panelOpen = false;
     protocolError = false;
     failure = null;
     runSearch("");
   }
 
-  async function runAction(itemId: string, actionId: string | undefined) {
+  async function runAction(item: ResultItem, actionId: string | undefined) {
     if (!actionId) return;
     failure = null;
     panelOpen = false;
-    const response = (await invoke("run_action", { itemId, actionId })) as ActionResponse;
+    const response = (await invoke("run_action", {
+      extensionId: item.extensionId,
+      itemId: item.id,
+      actionId,
+    })) as ActionResponse;
     if (response.kind === "copy") {
       await navigator.clipboard.writeText(response.text);
       invoke("dismiss");
     } else if (response.kind === "failed") {
       failure = response.message;
     }
-    // launched and revealed already hid the launcher in the backend.
+    // A plain success already hid the launcher in the backend.
+  }
+
+  /// An action chosen inside a pushed view goes to the extension that owns the
+  /// running command, through the same path a root result uses.
+  async function runViewAction(actionId: string, itemId: string | null) {
+    if (!viewOwner) return;
+    failure = null;
+    const response = (await invoke("run_action", {
+      extensionId: viewOwner,
+      itemId: itemId ?? "",
+      actionId,
+    })) as ActionResponse;
+    if (response.kind === "copy") {
+      await navigator.clipboard.writeText(response.text);
+      invoke("dismiss");
+    } else if (response.kind === "failed") {
+      failure = response.message;
+    }
+  }
+
+  /// Confirming a result acts on it: a command is invoked, anything else runs
+  /// its primary action. A command carries no actions, which is what tells the
+  /// two apart.
+  async function confirm(item: ResultItem | undefined) {
+    if (!item) return;
+    if (item.actions.length === 0) {
+      failure = null;
+      panelOpen = false;
+      const owner = await invoke<string>("invoke_command", { commandId: item.id }).then(
+        (id) => id,
+        (reason) => {
+          failure = String(reason);
+          return null;
+        },
+      );
+      if (owner) viewOwner = owner;
+      return;
+    }
+    runAction(item, item.actions[0].id);
   }
 
   // Keys the Command primitive does not own: Escape's two-stage dismiss, the
@@ -74,6 +121,8 @@
       event.preventDefault();
       if (stack.length > 0) {
         stack = stack.slice(0, -1);
+        failure = null;
+        if (stack.length === 0) viewOwner = null;
       } else if (query.length > 0) {
         query = "";
       } else {
@@ -86,7 +135,7 @@
       for (const action of selectedItem.actions) {
         if (action.shortcut && matchesShortcut(event, action.shortcut)) {
           event.preventDefault();
-          runAction(selectedItem.id, action.id);
+          runAction(selectedItem, action.id);
           break;
         }
       }
@@ -114,6 +163,7 @@
         );
       }),
       listen("dango://reset", () => resetToRoot()),
+      listen<string>("dango://failed", (event) => (failure = event.payload)),
       listen<ResultsPayload>("dango://results", (event) => {
         if (event.payload.query !== liveQuery) return;
         results = event.payload.items;
@@ -167,7 +217,17 @@
   <main
     class="border-border-card bg-background flex h-screen w-screen flex-col overflow-hidden rounded-[14px] border"
   >
-    <ProtocolView tree={stack[stack.length - 1]} onaction={() => {}} onsubmit={() => {}} />
+    <ProtocolView
+      tree={stack[stack.length - 1]}
+      onaction={runViewAction}
+      onsubmit={() => {}}
+    />
+    {#if failure}
+      <div class="text-destructive border-border-card shrink-0 border-t px-5 py-2 text-sm">
+        {failure}
+      </div>
+    {/if}
+    {@render footer("Select")}
   </main>
 {:else}
   <Command.Root
@@ -188,7 +248,7 @@
         {#each results as item (item.id)}
           <Command.Item
             value={item.id}
-            onSelect={() => runAction(item.id, item.actions[0]?.id)}
+            onSelect={() => confirm(item)}
             class="flex h-12 items-center gap-3 rounded-lg px-3 data-[selected]:bg-muted"
           >
             {#if iconSrc(item.icon)}
@@ -225,7 +285,7 @@
     {#if panelOpen && selectedItem}
       <ActionPanel
         actions={selectedItem.actions}
-        onrun={(id) => runAction(selectedItem.id, id)}
+        onrun={(id) => runAction(selectedItem, id)}
         onclose={() => (panelOpen = false)}
       />
     {/if}
