@@ -93,15 +93,17 @@
 
 ## 11. Frontend
 
-- [ ] 11.1 Replace M0's placeholder with the query input and result list
-- [ ] 11.2 Render the protocol: list, detail, and form views
-- [ ] 11.3 Key list items by identifier so full-tree replacement preserves selection and scroll without flicker
-- [ ] 11.4 Implement keyboard navigation, Enter for the primary action, and the action panel with its shortcuts
-- [ ] 11.5 Implement the view stack with push, pop on Escape, and hide on Escape at root
-- [ ] 11.6 Clear the stack to root on the reset-on-hide signal from M0
-- [ ] 11.7 Render loading and empty states, and highlight matched characters in results
-- [ ] 11.8 Handle an unsupported `protocolVersion` with a dismissible error
-- [ ] 11.9 Render the outcome of a no-view command, hiding on success and staying open on failure
+- [x] 11.1 Replace M0's placeholder with the query input and result list
+- [x] 11.2 Render the protocol: list, detail, and form views
+  - List is exercised live by root search; detail and form renderers are implemented but wait for an M2 command that emits them.
+- [x] 11.3 Key list items by identifier so full-tree replacement preserves selection and scroll without flicker
+- [x] 11.4 Implement keyboard navigation, Enter for the primary action, and the action panel with its shortcuts
+- [x] 11.5 Implement the view stack with push, pop on Escape, and hide on Escape at root
+  - Stack, pop, and Escape are implemented; pushing a view is exercised once a command emits one in M2.
+- [x] 11.6 Clear the stack to root on the reset-on-hide signal from M0
+- [x] 11.7 Render loading and empty states, and highlight matched characters in results
+- [x] 11.8 Handle an unsupported `protocolVersion` with a dismissible error
+- [x] 11.9 Render the outcome of a no-view command, hiding on success and staying open on failure
 
 ## 12. Verification
 

@@ -132,6 +132,18 @@ context: |
     every visibility change, so `WS_EX_TOOLWINDOW` has to be re-applied after
     each show. Positioning must be done in physical pixels there, while macOS
     needs logical points. Do not share the positioning code between them.
+  - A Tauri command that calls `tokio::spawn` must be an `async fn`, so it runs
+    inside the runtime. From a sync command `tokio::spawn` panics with no
+    reactor. The release profile sets `panic = "abort"`, so that panic aborts
+    the process (exit `0xC0000409`) instead of unwinding, and it is invisible
+    because a `windows_subsystem = "windows"` release build has no stderr. Debug
+    survives the same panic because it unwinds and a `catch_unwind` absorbs it,
+    so a bug like this only shows in a release run.
+  - Serving cached files to the webview needs the `protocol-asset` Tauri feature,
+    `assetProtocol.enable` in `tauri.conf.json`, an `img-src` that allows
+    `asset:` and `http://asset.localhost`, and a runtime
+    `asset_protocol_scope().allow_directory(...)`. The frontend loads them with
+    `convertFileSrc`.
 
   ## Conventions
 
