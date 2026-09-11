@@ -134,16 +134,34 @@
 
 <svelte:window onkeydown={onKeydown} onblur={() => invoke("dismiss")} />
 
+{#snippet footer(primaryLabel: string)}
+  <div
+    class="border-border-card text-muted-foreground flex h-10 shrink-0 items-center justify-between border-t px-4 text-xs"
+  >
+    <span class="text-foreground-alt font-medium">Dango</span>
+    <div class="flex items-center gap-4">
+      <span class="flex items-center gap-1.5">
+        {primaryLabel}
+        <kbd class="bg-muted rounded px-1.5 py-0.5 font-sans">↵</kbd>
+      </span>
+      <span class="flex items-center gap-1.5">
+        Actions
+        <kbd class="bg-muted rounded px-1.5 py-0.5 font-sans">Ctrl K</kbd>
+      </span>
+    </div>
+  </div>
+{/snippet}
+
 {#if protocolError}
   <main
-    class="border-border-card bg-background/85 flex h-screen w-screen flex-col justify-center gap-2 overflow-hidden rounded-[14px] border px-6 backdrop-blur-xl"
+    class="border-border-card bg-background flex h-screen w-screen flex-col justify-center gap-2 overflow-hidden rounded-[14px] border px-6"
   >
     <span class="text-foreground text-sm">This view needs a newer version of Dango.</span>
     <span class="text-muted-foreground text-xs">Press Escape to go back.</span>
   </main>
 {:else if stack.length > 0}
   <main
-    class="border-border-card bg-background/85 flex h-screen w-screen flex-col overflow-hidden rounded-[14px] border backdrop-blur-xl"
+    class="border-border-card bg-background flex h-screen w-screen flex-col overflow-hidden rounded-[14px] border"
   >
     <ProtocolView tree={stack[stack.length - 1]} onaction={() => {}} onsubmit={() => {}} />
   </main>
@@ -151,33 +169,30 @@
   <Command.Root
     shouldFilter={false}
     bind:value={selectedId}
-    class="border-border-card bg-background/85 flex h-screen w-screen flex-col overflow-hidden rounded-[14px] border backdrop-blur-xl"
+    class="border-border-card bg-background flex h-screen w-screen flex-col overflow-hidden rounded-[14px] border"
   >
     <Command.Input
       bind:ref={inputEl}
       bind:value={query}
-      placeholder="Search..."
+      placeholder="Search for apps and commands..."
       spellcheck={false}
       autocomplete="off"
-      class="text-foreground placeholder:text-muted-foreground h-16 w-full shrink-0 bg-transparent px-6 text-[26px] focus:outline-none"
+      class="text-foreground placeholder:text-muted-foreground h-16 w-full shrink-0 bg-transparent px-5 text-2xl focus:outline-none"
     />
-    {#if failure}
-      <div class="text-destructive border-border-card border-t px-6 py-2 text-sm">{failure}</div>
-    {/if}
     <Command.List class="border-border-card min-h-0 flex-1 overflow-y-auto border-t">
-      <Command.Viewport class="py-1">
+      <Command.Viewport class="p-2">
         {#each results as item (item.id)}
           <Command.Item
             value={item.id}
             onSelect={() => runAction(item.id, item.actions[0]?.id)}
-            class="mx-2 flex items-center gap-3 rounded-lg px-3 py-2 data-[selected]:bg-muted"
+            class="flex h-12 items-center gap-3 rounded-lg px-3 data-[selected]:bg-muted"
           >
             {#if iconSrc(item.icon)}
-              <img src={iconSrc(item.icon)} alt="" class="h-8 w-8 shrink-0" />
+              <img src={iconSrc(item.icon)} alt="" class="h-7 w-7 shrink-0" />
             {:else}
-              <div class="bg-muted h-8 w-8 shrink-0 rounded"></div>
+              <div class="bg-muted h-7 w-7 shrink-0 rounded"></div>
             {/if}
-            <div class="flex min-w-0 flex-col">
+            <div class="flex min-w-0 items-baseline gap-2">
               <span class="text-foreground truncate text-sm">
                 {#each highlight(item.title, item.matchPositions) as seg}
                   <span class={seg.matched ? "font-semibold" : ""}>{seg.text}</span>
@@ -190,10 +205,18 @@
           </Command.Item>
         {/each}
         {#if results.length === 0 && query.length > 0}
-          <div class="text-muted-foreground px-6 py-4 text-sm">No results</div>
+          <div class="text-muted-foreground px-3 py-4 text-sm">No results</div>
         {/if}
       </Command.Viewport>
     </Command.List>
+
+    {#if failure}
+      <div class="text-destructive border-border-card shrink-0 border-t px-5 py-2 text-sm">
+        {failure}
+      </div>
+    {/if}
+
+    {@render footer("Open")}
 
     {#if panelOpen && selectedItem}
       <ActionPanel

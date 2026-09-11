@@ -43,7 +43,7 @@
 </script>
 
 <div
-  class="border-border-card bg-background/95 absolute bottom-2 right-2 w-72 overflow-hidden rounded-[10px] border shadow-xl backdrop-blur-xl"
+  class="border-border-card bg-background-alt absolute bottom-12 right-2 w-72 overflow-hidden rounded-[10px] border shadow-xl"
 >
   {#each actions as action, i (action.id)}
     <button
