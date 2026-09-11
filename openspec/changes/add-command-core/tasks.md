@@ -35,12 +35,12 @@
 
 ## 5. View protocol
 
-- [ ] 5.1 Define the protocol types for list, detail, and form views with `protocolVersion`
-- [ ] 5.2 Define the action panel, primary action, and per-action shortcuts
-- [ ] 5.3 Define the declared filtering ownership, loading state, and empty state
-- [ ] 5.4 Define the no-view command result carrying success or failure
-- [ ] 5.5 Define the invocation channel carrying full view trees from a command to the frontend
-- [ ] 5.6 Generate or hand-maintain the matching TypeScript types and check them in CI
+- [x] 5.1 Define the protocol types for list, detail, and form views with `protocolVersion`
+- [x] 5.2 Define the action panel, primary action, and per-action shortcuts
+- [x] 5.3 Define the declared filtering ownership, loading state, and empty state
+- [x] 5.4 Define the no-view command result carrying success or failure
+- [x] 5.5 Define the invocation channel carrying full view trees from a command to the frontend
+- [x] 5.6 Generate or hand-maintain the matching TypeScript types and check them in CI
 
 ## 6. Search pipeline
 
