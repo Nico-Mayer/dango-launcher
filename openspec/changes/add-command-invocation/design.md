@@ -140,6 +140,28 @@ The Windows column is the risk. It is the unfamiliar side, it cannot be compiled
 locally, and CI is the only check, so it gets spiked first the way the shell
 enumeration was in M1.
 
+Symbols and features, read off the vendored `windows` 0.61 source rather than
+recalled, since Windows code cannot be compiled on the machine it is written on:
+
+| Call | Module | Crate feature |
+|---|---|---|
+| `LockWorkStation() -> Result<()>` | `Win32::System::Shutdown` | `Win32_System_Shutdown` |
+| `SetSuspendState(hibernate, force, wake_disabled) -> bool` | `Win32::System::Power` | `Win32_System_Power` |
+| `SHQueryRecycleBinW(root, *mut SHQUERYRBINFO) -> Result<()>` | `Win32::UI::Shell` | `Win32_UI_Shell` |
+| `SHEmptyRecycleBinW(hwnd, root, flags) -> Result<()>` | `Win32::UI::Shell` | `Win32_UI_Shell` |
+
+Notes that will otherwise cost an hour each. `SetSuspendState` returns a plain
+`bool`, not a `Result`. `SHQUERYRBINFO` needs `cbSize` set before the query and
+answers `i64NumItems`. Emptying passes
+`SHERB_NOCONFIRMATION | SHERB_NOPROGRESSUI | SHERB_NOSOUND`, because the
+launcher has already asked and a second native dialog would be the thing this
+design rejected. A null root path means every drive.
+
+The macOS lock is a warning for the Windows side: `CGSession`, the documented
+route for years, no longer ships on macOS 26 and had to be replaced during the
+walkthrough. Verify each of these against a running system rather than trusting
+that it still exists.
+
 ### Running-application icons reuse the platform extraction, not the extension
 
 Icon extraction moves to a shared platform helper that both `AppIndexer` and
