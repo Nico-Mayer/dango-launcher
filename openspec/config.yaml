@@ -154,9 +154,16 @@ context: |
     what the code does.
   - Rust: prefer borrowing over cloning, `Result` with typed errors over strings,
     and small focused modules.
-  - Svelte: runes only, no stores unless there is a concrete reason. Reach for a
-    Bits UI primitive before writing a bespoke component, and keep its markup
-    close to the documented example so upgrades stay cheap.
+  - Svelte: runes only, no stores unless there is a concrete reason.
+  - UI is built on primitives, not hand-rolled. Any interactive surface uses the
+    Bits UI primitive for its pattern, with its markup kept close to the
+    documented example so upgrades stay cheap. Keyboard navigation, focus
+    management, scroll-into-view, and accessibility come from the primitive; do
+    not reimplement them. The root search is the `Command` primitive with its
+    filtering disabled, since ranking happens in Rust. Only patch a primitive
+    for behaviour it genuinely does not provide, such as the launcher's
+    two-stage Escape, and say in the design what the primitive lacked and why
+    the patch was necessary.
 
 rules:
   proposal:
@@ -172,6 +179,7 @@ rules:
   design:
     - Record the alternatives that were rejected and why. Future sessions need the reasoning, not just the conclusion.
     - Call out anything that locks in the extension manifest or view protocol, since those are versioned contracts.
+    - A change that adds or reworks UI names the Bits UI primitive each surface is built on. If a primitive is patched or a surface is hand-rolled, state what the primitive lacked and why.
     - Skip the design artifact for changes that introduce no new architectural decision.
 
   tasks:
