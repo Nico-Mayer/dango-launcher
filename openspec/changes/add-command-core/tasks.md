@@ -54,12 +54,12 @@
 
 ## 7. Ranking
 
-- [ ] 7.1 Add fuzzy subsequence matching over title, keywords, and alias, returning a score and matched character positions
-- [ ] 7.2 Add the frecency score, updated on launch and decayed by age, persisted in the store
-- [ ] 7.3 Combine match quality and frecency into the final ordering, with exact alias match ranked first
-- [ ] 7.4 Implement empty-query behaviour showing bounded frecent items, and a sensible first-run list
-- [ ] 7.5 Add tests for ordering, including equal-match-different-frecency and equal-frecency-different-recency
-- [ ] 7.6 Benchmark ranking against 2000 candidates and confirm the 30ms budget
+- [x] 7.1 Add fuzzy subsequence matching over title, keywords, and alias, returning a score and matched character positions
+- [x] 7.2 Add the frecency score, updated on launch and decayed by age, persisted in the store
+- [x] 7.3 Combine match quality and frecency into the final ordering, with exact alias match ranked first
+- [x] 7.4 Implement empty-query behaviour showing bounded frecent items, and a sensible first-run list
+- [x] 7.5 Add tests for ordering, including equal-match-different-frecency and equal-frecency-different-recency
+- [x] 7.6 Benchmark ranking against 2000 candidates and confirm the 30ms budget
 
 ## 8. Applications extension: shared
 
