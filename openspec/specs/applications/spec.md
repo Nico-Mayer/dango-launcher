@@ -1,10 +1,12 @@
+# applications Specification
+
 ## Purpose
 
 The built-in extension that discovers installed applications on the machine,
 presents them in root search with icons, and launches them. It is also the first
 real consumer of the extension contract.
 
-## ADDED Requirements
+## Requirements
 
 ### Requirement: Applications are discoverable in root search
 

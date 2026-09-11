@@ -75,11 +75,16 @@
 
 ## 9. Applications extension: macOS
 
-- [ ] 9.1 Discover bundles in the system, user, and system-owned applications directories and their immediate subdirectories
-- [ ] 9.2 Read display names, honouring a declared display name over the bundle filename
-- [ ] 9.3 Extract icons at the required size
-- [ ] 9.4 Launch, bringing an already-running application to the foreground instead of starting a second instance
-- [ ] 9.5 Watch the applications directories for changes
+- [x] 9.1 Discover bundles in the system, user, and system-owned applications directories and their immediate subdirectories
+  - 117 applications enumerated in 26ms on the author's machine, including bundles in category subfolders such as `/System/Applications/Utilities`.
+- [x] 9.2 Read display names, honouring a declared display name over the bundle filename
+  - Taken from the file manager rather than `CFBundleDisplayName`, because macOS honours that key only as a localisation of the bundle filename. Find My and Voice Memos get their declared names; Visual Studio Code, which declares the unrelated "Code", keeps its filename. The spec scenario was reworded to match the system.
+- [x] 9.3 Extract icons at the required size
+  - Workspace icon drawn into a 64px RGBA bitmap context. All 117 applications produced a non-blank icon, 158ms for the full set.
+- [x] 9.4 Launch, bringing an already-running application to the foreground instead of starting a second instance
+  - `openApplicationAtURL` with `createsNewApplicationInstance` off. Verified by launching Calculator twice and confirming one process; the foreground handoff itself is group 12.1.
+- [x] 9.5 Watch the applications directories for changes
+  - A fingerprint over the applications directories' modification times, polled by the indexing service between sweeps. Verified against the running release build: a bundle added to `/Applications` reached the index in 2s, and removing it took it back out in 2s.
 
 ## 10. Applications extension: Windows
 
@@ -102,17 +107,23 @@
   - Stack, pop, and Escape are implemented; pushing a view is exercised once a command emits one in M2.
 - [x] 11.6 Clear the stack to root on the reset-on-hide signal from M0
 - [x] 11.7 Render loading and empty states, and highlight matched characters in results
+  - The empty-query search runs on mount rather than waiting for the first hide, so the frecent items are on screen from the first activation. See group 12.3.
 - [x] 11.8 Handle an unsupported `protocolVersion` with a dismissible error
 - [x] 11.9 Render the outcome of a no-view command, hiding on success and staying open on failure
 
 ## 12. Verification
 
 - [ ] 12.1 Walk every scenario in the five spec files on macOS
+  - Verified headlessly on the release build: the index builds in the background and persists all 117 applications, 117 icons land in the cache, a newly added bundle appears within 2s and a removed one disappears within 2s, and launching an already-running application reuses it. The unit and live test suites pass.
+  - Confirmed live on the release build: activation paints the frecent items with their icons from the first press of a session, and the 80ms budget holds with the index loaded.
+  - Not walked: the remaining interactive scenarios, which are search and ranking against typed queries, keyboard navigation, the action panel, reveal and copy path, the stale-entry failure message, and the view stack. Driving them needs synthesised input and screen capture, both of which need permission grants that were not available. Deferred to daily use rather than held open.
 - [x] 12.2 Walk every scenario in the five spec files on Windows
   - Verified live on the release build: packaged and Win32 apps both appear, uninstallers are excluded, launch by name plus Enter starts the app and hides the launcher, frecency persists across a restart and drives the empty-query recents, matched characters are highlighted, and the launcher-shell harness passes. Already-running foreground, reveal, and the periodic refresh are code-complete but not scripted here.
-  - macOS is group 12.1, pending the macOS indexer.
-- [ ] 12.3 Confirm activation still meets the 80ms budget on release builds on both platforms, with the index loaded
-  - Windows release, index loaded: cold 34.8ms, median 26.5ms, max 34.8ms over 20 activations, none over 80ms. macOS pending group 12.1.
+- [x] 12.3 Confirm activation still meets the 80ms budget on release builds on both platforms, with the index loaded
+  - Windows release, index loaded: cold 34.8ms, median 26.5ms, max 34.8ms over 20 activations, none over 80ms.
+  - macOS release, index loaded: cold 65.5ms, median 46.4ms, max 65.5ms over 52 activations, none over 80ms.
+  - The first measurement failed. Exactly one activation per session landed at 87 to 108ms while the rest sat between 29 and 50ms. Disabling the applications extension removed it entirely over 28 activations, placing the cost in the first paint of a populated result list rather than in the window. The frontend had never run the empty-query search until the first hide, so the first activation of a session both showed an empty list and paid for loading every icon at once. Running that search on mount, while the window is still parked offscreen for warmup, fixes both.
 - [x] 12.4 Confirm a deliberately slow root items provider does not delay the result list
   - Covered by the search pipeline unit test that streams a 5ms provider ahead of a 300ms one; the app ships only the fast apps provider, so this is not scripted against the live build.
 - [ ] 12.5 Use the launcher as the daily application launcher for a week on Windows and record what the contract got wrong
+  - Deferred, not done. The launcher is not yet a viable daily driver: too much of what the author reaches for lands in later milestones. This is the one exit criterion M1 does not meet, and it carries forward rather than blocking the archive.

@@ -122,9 +122,15 @@ migration, and the expensive part, matching, never touches the database.
 ### The index is background work, always
 
 Application indexing never runs on the activation path. It runs after startup,
-persists to the store, and refreshes on a schedule and on filesystem or shell
-notification. The launcher is usable during the first build, with applications
-appearing as they are found.
+persists to the store, and refreshes on a schedule. The launcher is usable
+during the first build, with applications appearing as they are found.
+
+Rather than a change notification per platform, the indexer may offer a cheap
+fingerprint of the places applications are installed, which the indexing service
+polls between sweeps. macOS hashes the modification time of the applications
+directories, so a drag into `/Applications` shows up in about two seconds.
+Windows has no equally cheap signal for the shell folder and waits for the
+sweep.
 
 This is what protects the M0 latency budget from every future feature: the rule
 is that activation reads memory, and everything expensive happens before or
