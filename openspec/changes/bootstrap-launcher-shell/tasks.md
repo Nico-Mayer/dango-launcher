@@ -65,7 +65,7 @@
 - [x] 10.1 Add a GitHub Actions workflow building on `windows-latest` and `macos-latest`
 - [x] 10.2 Run `cargo fmt --check`, `cargo clippy -- -D warnings`, and `cargo test` on both
 - [x] 10.3 Run `svelte-check` and the frontend build
-- [ ] 10.4 Confirm a deliberate Windows-only compile error fails the matrix
+- [x] 10.4 Confirm a deliberate Windows-only compile error fails the matrix
 
 ## 11. Verification
 
