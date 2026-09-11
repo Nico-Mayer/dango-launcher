@@ -7,14 +7,35 @@ use super::{RunningApp, SystemControl, SystemError};
 pub struct MacSystemControl;
 
 impl SystemControl for MacSystemControl {
-    /// The login window's own suspend entry point. It is the same call the
-    /// keyboard shortcut makes, so it honours whatever the user has configured
-    /// about requiring a password.
+    /// `CGSession -suspend`, the classic route, stopped shipping. This is what
+    /// the system's own lock menu item calls. It is private, so it is looked up
+    /// at run time and its absence is reported rather than assumed away.
     fn lock(&self) -> Result<(), SystemError> {
-        run(
-            "/System/Library/CoreServices/Menu Extras/User.menu/Contents/Resources/CGSession",
-            &["-suspend"],
-        )
+        const FRAMEWORK: &std::ffi::CStr =
+            c"/System/Library/PrivateFrameworks/login.framework/login";
+        const SYMBOL: &std::ffi::CStr = c"SACLockScreenImmediate";
+
+        unsafe {
+            let handle = libc::dlopen(FRAMEWORK.as_ptr(), libc::RTLD_LAZY);
+            if handle.is_null() {
+                return Err(SystemError::Failed(
+                    "this version of macOS has no lock entry point".into(),
+                ));
+            }
+            let symbol = libc::dlsym(handle, SYMBOL.as_ptr());
+            if symbol.is_null() {
+                return Err(SystemError::Failed(
+                    "this version of macOS has no lock entry point".into(),
+                ));
+            }
+            let lock_screen: extern "C" fn() -> i32 = std::mem::transmute(symbol);
+            match lock_screen() {
+                0 => Ok(()),
+                status => Err(SystemError::Failed(format!(
+                    "the system refused to lock ({status})"
+                ))),
+            }
+        }
     }
 
     fn sleep(&self) -> Result<(), SystemError> {

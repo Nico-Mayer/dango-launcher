@@ -1,23 +1,49 @@
 <script lang="ts">
   import { convertFileSrc } from "@tauri-apps/api/core";
+  import ActionPanel from "./ActionPanel.svelte";
+  import Icon, { namedIcon } from "./Icon.svelte";
   import type { ViewTree } from "../protocol/ViewTree";
+  import { matchesShortcut, type ActionDto } from "./types";
 
   interface Props {
     tree: ViewTree;
+    /// What the user has typed. Applied here only when the view declares that
+    /// the launcher owns filtering.
+    query: string;
     onaction: (actionId: string, itemId: string | null) => void;
     onsubmit: (values: Record<string, string>) => void;
   }
 
-  let { tree, onaction, onsubmit }: Props = $props();
+  let { tree, query, onaction, onsubmit }: Props = $props();
   let selected = $state(0);
+  let panelOpen = $state(false);
   let formValues = $state<Record<string, string>>({});
 
   const view = $derived(tree.view);
 
+  const items = $derived(
+    view.kind !== "list"
+      ? []
+      : view.filtering === "launcher" && query.length > 0
+        ? view.items.filter((item) => item.title.toLowerCase().includes(query.toLowerCase()))
+        : view.items,
+  );
+
+  // Narrowing the list can strand the cursor past its end.
+  $effect(() => {
+    if (selected >= items.length) selected = Math.max(items.length - 1, 0);
+  });
+
+  /// What the action panel offers. A list item's own actions win over the
+  /// view's, because the item is what the user has selected.
+  const actions = $derived<ActionDto[]>(
+    view.kind === "list" ? (items[selected]?.actions ?? []) : view.actions,
+  );
+
   /// Which item the action applies to. A detail or form view has none, and the
   /// command is expected to already know what it asked about.
   function selectedItemId(): string | null {
-    return view.kind === "list" ? (view.items[selected]?.id ?? null) : null;
+    return view.kind === "list" ? (items[selected]?.id ?? null) : null;
   }
 
   function primaryAction(): string | null {
@@ -26,10 +52,23 @@
   }
 
   function onKeydown(event: KeyboardEvent) {
+    if (panelOpen) return;
+    if (event.key.toLowerCase() === "k" && (event.ctrlKey || event.metaKey)) {
+      event.preventDefault();
+      if (actions.length > 0) panelOpen = true;
+      return;
+    }
+    for (const action of actions) {
+      if (action.shortcut && matchesShortcut(event, action.shortcut)) {
+        event.preventDefault();
+        onaction(action.id, selectedItemId());
+        return;
+      }
+    }
     if (view.kind === "list") {
       if (event.key === "ArrowDown") {
         event.preventDefault();
-        selected = Math.min(selected + 1, view.items.length - 1);
+        selected = Math.min(selected + 1, items.length - 1);
       } else if (event.key === "ArrowUp") {
         event.preventDefault();
         selected = Math.max(selected - 1, 0);
@@ -42,8 +81,8 @@
         return;
       }
       const action =
-        view.kind === "list" && view.items[selected]?.actions.length
-          ? view.items[selected].actions[0].id
+        view.kind === "list" && items[selected]?.actions.length
+          ? items[selected].actions[0].id
           : primaryAction();
       if (action) {
         event.preventDefault();
@@ -55,16 +94,17 @@
 
 <svelte:window onkeydown={onKeydown} />
 
+
 {#if view.kind === "list"}
-  {#if view.loading && view.items.length === 0}
+  {#if view.loading && items.length === 0}
     <div class="text-muted-foreground px-4 py-6 text-sm">Loading...</div>
-  {:else if view.items.length === 0}
+  {:else if items.length === 0}
     <div class="text-muted-foreground px-4 py-6 text-sm">
-      {view.emptyState?.title ?? "Nothing here"}
+      {query.length > 0 ? "No results" : (view.emptyState?.title ?? "Nothing here")}
     </div>
   {:else}
-    <ul class="max-h-[420px] overflow-y-auto py-1">
-      {#each view.items as item, i (item.id)}
+    <ul class="py-1">
+      {#each items as item, i (item.id)}
         <li>
           <button
             type="button"
@@ -75,7 +115,11 @@
             onmouseenter={() => (selected = i)}
             onclick={() => item.actions.length > 0 && onaction(item.actions[0].id, item.id)}
           >
-            {#if item.icon}
+            {#if namedIcon(item.icon)}
+              <div class="text-foreground-alt flex h-6 w-6 shrink-0 items-center justify-center">
+                <Icon name={namedIcon(item.icon)!} size={18} />
+              </div>
+            {:else if item.icon}
               <img src={convertFileSrc(item.icon)} alt="" class="h-6 w-6 shrink-0" />
             {:else}
               <div class="bg-muted h-6 w-6 shrink-0 rounded"></div>
@@ -92,7 +136,7 @@
     </ul>
   {/if}
 {:else if view.kind === "detail"}
-  <div class="text-foreground max-h-[420px] overflow-y-auto whitespace-pre-wrap px-4 py-3 text-sm">
+  <div class="text-foreground whitespace-pre-wrap px-4 py-3 text-sm">
     {view.markdown}
   </div>
 {:else if view.kind === "form"}
@@ -122,4 +166,15 @@
       </label>
     {/each}
   </form>
+{/if}
+
+{#if panelOpen}
+  <ActionPanel
+    {actions}
+    onrun={(id) => {
+      panelOpen = false;
+      onaction(id, selectedItemId());
+    }}
+    onclose={() => (panelOpen = false)}
+  />
 {/if}

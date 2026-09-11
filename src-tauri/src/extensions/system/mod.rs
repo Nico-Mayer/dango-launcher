@@ -4,7 +4,7 @@
 
 use std::sync::Arc;
 
-use crate::extension::{ActionOutcome, Extension, InvocationMode, Manifest};
+use crate::extension::{ActionOutcome, Extension, InvocationMode, Manifest, NAMED_ICON};
 use crate::extensions::applications::{IconCache, ICON_SIZE};
 use crate::invocation::{Command, InvocationContext};
 use crate::platform::{SystemControl, SystemError};
@@ -88,24 +88,28 @@ fn manifest() -> Manifest {
             command(
                 COMMAND_LOCK,
                 "Lock Screen",
+                "lock",
                 InvocationMode::NoView,
                 &["lock", "screen", "session", "secure"],
             ),
             command(
                 COMMAND_SLEEP,
                 "Sleep",
+                "moon",
                 InvocationMode::NoView,
                 &["sleep", "suspend", "standby"],
             ),
             command(
                 COMMAND_EMPTY_TRASH,
                 empty_trash_title(),
+                "trash-2",
                 InvocationMode::View,
                 &["trash", "bin", "delete", "empty", "recycle"],
             ),
             command(
                 COMMAND_QUIT,
                 "Quit Application",
+                "circle-power",
                 InvocationMode::View,
                 &["quit", "close", "exit", "kill"],
             ),
@@ -128,6 +132,7 @@ fn empty_trash_title() -> &'static str {
 fn command(
     id: &str,
     title: &str,
+    icon: &str,
     mode: InvocationMode,
     keywords: &[&str],
 ) -> crate::extension::CommandDecl {
@@ -136,7 +141,7 @@ fn command(
         title: title.into(),
         mode,
         subtitle: Some("System".into()),
-        icon: None,
+        icon: Some(format!("{NAMED_ICON}{icon}")),
         keywords: keywords.iter().map(|k| (*k).to_string()).collect(),
         alias: None,
     }
@@ -317,6 +322,18 @@ pub mod tests {
         assert_eq!(manifest.commands.len(), 4);
         assert!(manifest.validate().is_ok());
         assert!(manifest.preferences.is_empty());
+    }
+
+    #[test]
+    fn every_command_carries_a_named_icon() {
+        for declared in &manifest().commands {
+            let icon = declared.icon.as_deref().unwrap_or_default();
+            assert!(
+                icon.starts_with(NAMED_ICON),
+                "{} has no named icon",
+                declared.id
+            );
+        }
     }
 
     #[test]

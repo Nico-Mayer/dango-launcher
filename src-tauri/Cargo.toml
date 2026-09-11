@@ -57,6 +57,7 @@ windows = { version = "0.61", features = [
 
 [target.'cfg(target_os = "macos")'.dependencies]
 objc2 = "0.6"
+libc = "0.2"
 objc2-app-kit = { version = "0.3", features = [
   "NSWindow",
   "NSPanel",

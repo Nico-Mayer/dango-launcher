@@ -4,6 +4,7 @@
   import { Command } from "bits-ui";
   import { onMount } from "svelte";
   import ActionPanel from "./lib/ActionPanel.svelte";
+  import Icon, { namedIcon } from "./lib/Icon.svelte";
   import ProtocolView from "./lib/ProtocolView.svelte";
   import { highlight } from "./lib/highlight";
   import { matchesShortcut, type ActionResponse, type ResultItem, type ResultsPayload } from "./lib/types";
@@ -20,6 +21,10 @@
   /// The extension whose command pushed what is on the stack, so an action
   /// chosen inside its view goes back to it.
   let viewOwner = $state<string | null>(null);
+  /// The query inside a pushed view, kept apart from the root one so popping
+  /// back does not lose what was typed at the root.
+  let viewQuery = $state("");
+  let viewInputEl = $state<HTMLInputElement | null>(null);
   let failure = $state<string | null>(null);
   let inputEl = $state<HTMLInputElement | null>(null);
 
@@ -41,6 +46,7 @@
     results = [];
     stack = [];
     viewOwner = null;
+    viewQuery = "";
     panelOpen = false;
     protocolError = false;
     failure = null;
@@ -122,12 +128,16 @@
       if (stack.length > 0) {
         stack = stack.slice(0, -1);
         failure = null;
+        viewQuery = "";
         if (stack.length === 0) viewOwner = null;
       } else if (query.length > 0) {
         query = "";
       } else {
         invoke("dismiss");
       }
+    } else if (stack.length > 0) {
+      // A pushed view owns its own selection, so it owns its own action panel.
+      return;
     } else if (event.key.toLowerCase() === "k" && (event.ctrlKey || event.metaKey)) {
       event.preventDefault();
       if (selectedItem && selectedItem.actions.length > 0) panelOpen = true;
@@ -142,8 +152,10 @@
     }
   }
 
+  /// A named icon is handled by the icon component; anything else is a file an
+  /// extension extracted, which the webview reaches through the asset protocol.
   function iconSrc(path: string | null | undefined): string | null {
-    return path ? convertFileSrc(path) : null;
+    return path && !namedIcon(path) ? convertFileSrc(path) : null;
   }
 
   onMount(() => {
@@ -177,6 +189,11 @@
       }),
     ];
     return () => unlisten.forEach((p) => p.then((un) => un()));
+  });
+
+  // A view arriving takes the cursor, so typing narrows it without a click.
+  $effect(() => {
+    if (stack.length > 0) viewInputEl?.focus();
   });
 
   // Re-query on every keystroke; the backend cancels the previous run.
@@ -217,13 +234,27 @@
   <main
     class="border-border-card bg-background flex h-screen w-screen flex-col overflow-hidden rounded-[14px] border"
   >
-    <ProtocolView
-      tree={stack[stack.length - 1]}
-      onaction={runViewAction}
-      onsubmit={() => {}}
+    <input
+      bind:this={viewInputEl}
+      bind:value={viewQuery}
+      placeholder="Search..."
+      spellcheck={false}
+      autocomplete="off"
+      class="text-foreground placeholder:text-muted-foreground h-16 w-full shrink-0 bg-transparent px-5 text-2xl focus:outline-none"
     />
+    <div class="border-border-card min-h-0 flex-1 overflow-y-auto border-t">
+      <ProtocolView
+        tree={stack[stack.length - 1]}
+        query={viewQuery}
+        onaction={runViewAction}
+        onsubmit={() => {}}
+      />
+    </div>
     {#if failure}
-      <div class="text-destructive border-border-card shrink-0 border-t px-5 py-2 text-sm">
+      <div
+        class="text-destructive border-border-card flex shrink-0 items-center gap-2 border-t px-5 py-2 text-sm"
+      >
+        <Icon name="circle-alert" size={16} />
         {failure}
       </div>
     {/if}
@@ -251,7 +282,11 @@
             onSelect={() => confirm(item)}
             class="flex h-12 items-center gap-3 rounded-lg px-3 data-[selected]:bg-muted"
           >
-            {#if iconSrc(item.icon)}
+            {#if namedIcon(item.icon)}
+              <div class="text-foreground-alt flex h-7 w-7 shrink-0 items-center justify-center">
+                <Icon name={namedIcon(item.icon)!} size={20} />
+              </div>
+            {:else if iconSrc(item.icon)}
               <img src={iconSrc(item.icon)} alt="" class="h-7 w-7 shrink-0" />
             {:else}
               <div class="bg-muted h-7 w-7 shrink-0 rounded"></div>
@@ -275,7 +310,10 @@
     </Command.List>
 
     {#if failure}
-      <div class="text-destructive border-border-card shrink-0 border-t px-5 py-2 text-sm">
+      <div
+        class="text-destructive border-border-card flex shrink-0 items-center gap-2 border-t px-5 py-2 text-sm"
+      >
+        <Icon name="circle-alert" size={16} />
         {failure}
       </div>
     {/if}

@@ -17,6 +17,13 @@ context: |
   - Rust + Tauri v2 for the shell, all OS integration, and all business logic.
   - Svelte 5 (runes) + TypeScript on plain Vite. Not SvelteKit: a launcher is a
     view stack, not a router. The frontend is a renderer, not a place for logic.
+  - Lucide (`@lucide/svelte`) is the icon set, behind one provider at
+    `src/lib/Icon.svelte`. Never import a Lucide icon anywhere else and never
+    hand-roll an SVG: add the icon to that component's registry and use it by
+    name. Icons are imported individually, not as a barrel, so the bundle
+    carries only what is used. An extension names one as `icon:<name>`; an icon
+    value without that prefix is a path to an image file the extension
+    produced, such as an application's own icon.
   - Bits UI for interactive components, with Tailwind v4 for styling. Use Bits UI
     primitives rather than hand-rolling anything it already provides, especially
     `Command`, which is the command-palette primitive the root search is built
@@ -155,7 +162,10 @@ context: |
   - Rust: prefer borrowing over cloning, `Result` with typed errors over strings,
     and small focused modules.
   - Svelte: runes only, no stores unless there is a concrete reason.
-  - UI is built on primitives, not hand-rolled. Any interactive surface uses the
+  - Any interface element that needs an icon uses one. A bare placeholder square
+  is acceptable only where the icon is genuinely unknown, such as an
+  application whose icon could not be extracted.
+- UI is built on primitives, not hand-rolled. Any interactive surface uses the
     Bits UI primitive for its pattern, with its markup kept close to the
     documented example so upgrades stay cheap. Keyboard navigation, focus
     management, scroll-into-view, and accessibility come from the primitive; do

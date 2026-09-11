@@ -4,11 +4,17 @@ use serde::{Deserialize, Serialize};
 /// changes in a way older code cannot read.
 pub const SUPPORTED_MANIFEST_VERSION: u32 = 1;
 
+/// Prefix marking an icon as one of the launcher's own named icons rather than
+/// a file an extension produced. `icon:lock` is drawn from the icon set;
+/// anything without the prefix is a path to an image file.
+pub const NAMED_ICON: &str = "icon:";
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Manifest {
     pub manifest_version: u32,
     pub id: String,
     pub name: String,
+    /// Either `icon:<name>` for a named icon or a path to an image file.
     #[serde(default)]
     pub icon: Option<String>,
     #[serde(default)]
@@ -32,6 +38,7 @@ pub struct CommandDecl {
     pub mode: InvocationMode,
     #[serde(default)]
     pub subtitle: Option<String>,
+    /// Either `icon:<name>` for a named icon or a path to an image file.
     #[serde(default)]
     pub icon: Option<String>,
     #[serde(default)]
