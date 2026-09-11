@@ -1,7 +1,6 @@
 <script lang="ts">
   import { convertFileSrc, invoke } from "@tauri-apps/api/core";
   import { listen } from "@tauri-apps/api/event";
-  import { getCurrentWindow, LogicalSize } from "@tauri-apps/api/window";
   import { onMount } from "svelte";
   import ActionPanel from "./lib/ActionPanel.svelte";
   import ProtocolView from "./lib/ProtocolView.svelte";
@@ -19,14 +18,12 @@
   let protocolError = $state(false);
   let failure = $state<string | null>(null);
   let input = $state<HTMLInputElement | null>(null);
-  let surface = $state<HTMLElement | null>(null);
 
   // The query whose results we are willing to display; a late event for an
   // older query is dropped.
   let liveQuery = "";
 
   const selectedItem = $derived<ResultItem | undefined>(results[selected]);
-  const atRoot = $derived(stack.length === 0 && !protocolError);
 
   function runSearch(q: string) {
     liveQuery = q;
@@ -151,29 +148,12 @@
     const q = query;
     runSearch(q);
   });
-
-  // Grow and shrink the window to fit its content, so the transparent surface is
-  // never larger than what is drawn.
-  $effect(() => {
-    void results.length;
-    void stack.length;
-    void failure;
-    void protocolError;
-    void query;
-    requestAnimationFrame(() => {
-      if (!surface) return;
-      getCurrentWindow()
-        .setSize(new LogicalSize(720, surface.offsetHeight))
-        .catch(() => {});
-    });
-  });
 </script>
 
 <svelte:window onkeydown={onKeydown} onblur={() => invoke("dismiss")} />
 
 <main
-  bind:this={surface}
-  class="border-border-card bg-background/85 flex w-screen flex-col overflow-hidden rounded-[14px] border backdrop-blur-xl"
+  class="border-border-card bg-background/85 flex h-screen w-screen flex-col overflow-hidden rounded-[14px] border backdrop-blur-xl"
 >
   {#if protocolError}
     <div class="flex flex-col gap-2 px-6 py-5">
@@ -199,7 +179,7 @@
       <div class="text-destructive border-border-card border-t px-6 py-2 text-sm">{failure}</div>
     {/if}
     {#if results.length > 0}
-      <ul class="border-border-card max-h-[420px] overflow-y-auto border-t py-1">
+      <ul class="border-border-card min-h-0 flex-1 overflow-y-auto border-t py-1">
         {#each results as item, i (item.id)}
           <li>
             <button

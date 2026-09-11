@@ -15,7 +15,7 @@
         "label": "main",
         "title": "Dango",
         "width": 720,
-        "height": 64,
+        "height": 400,
         "visible": false,
         "decorations": false,
         "transparent": true,
