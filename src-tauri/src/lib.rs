@@ -1,10 +1,11 @@
 mod latency;
 mod platform;
+mod store;
 
 use std::sync::Mutex;
 
 use tauri::{
-    menu::{Menu, MenuItem},
+    menu::{IsMenuItem, Menu, MenuItem},
     tray::TrayIconBuilder,
     Emitter, Manager, WebviewWindow,
 };
@@ -12,6 +13,7 @@ use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut,
 
 use latency::LatencyProbe;
 use platform::LauncherWindow;
+use store::{Opened, Store};
 
 #[cfg(target_os = "macos")]
 const SHORTCUT_LABEL: &str = "Option+Space";
@@ -102,6 +104,11 @@ fn finish_warmup(app: &tauri::AppHandle) {
         .position_on_active_display(&window);
 }
 
+fn open_store(app: &tauri::App) -> Result<Opened, Box<dyn std::error::Error>> {
+    let path = app.path().app_data_dir()?.join("dango.sqlite");
+    Ok(Store::open(&path)?)
+}
+
 fn warm_up(app: &tauri::AppHandle, window: &WebviewWindow) {
     let _ = window.set_position(tauri::LogicalPosition::new(-10_000.0, -10_000.0));
     let _ = window.show();
@@ -153,31 +160,53 @@ pub fn run() {
                 launcher: Mutex::new(launcher),
             });
 
-            // Registration is attempted before the tray is built so the menu can
-            // report the failure. Another application holding the combination
-            // must not stop Dango from starting.
-            let shortcut_registered = match app.global_shortcut().register(shortcut) {
-                Ok(()) => true,
-                Err(error) => {
-                    eprintln!("[dango] could not register {SHORTCUT_LABEL}: {error}");
-                    false
-                }
-            };
+            // The tray menu is the only surface for startup problems, so they
+            // are collected before it is built. None of them stops Dango from
+            // starting.
+            let mut notices = Vec::new();
 
+            match open_store(app) {
+                Ok(Opened {
+                    store,
+                    recovered_from,
+                }) => {
+                    if let Some(aside) = recovered_from {
+                        eprintln!("[dango] database was corrupt, moved to {}", aside.display());
+                        notices.push("Database was corrupt, started empty".to_string());
+                    }
+                    eprintln!(
+                        "[dango] store ready at schema version {}",
+                        store.schema_version().unwrap_or(0)
+                    );
+                    app.manage(store);
+                }
+                Err(error) => {
+                    eprintln!("[dango] database unavailable: {error}");
+                    notices.push("Database unavailable, see log".to_string());
+                }
+            }
+
+            if let Err(error) = app.global_shortcut().register(shortcut) {
+                eprintln!("[dango] could not register {SHORTCUT_LABEL}: {error}");
+                notices.push(format!("{SHORTCUT_LABEL} unavailable, already in use"));
+            }
+
+            let notice_items = notices
+                .iter()
+                .enumerate()
+                .map(|(i, text)| {
+                    MenuItem::with_id(app, format!("notice-{i}"), text, false, None::<&str>)
+                })
+                .collect::<Result<Vec<_>, _>>()?;
             let toggle_item = MenuItem::with_id(app, "toggle", "Toggle Dango", true, None::<&str>)?;
             let quit_item = MenuItem::with_id(app, "quit", "Quit Dango", true, None::<&str>)?;
-            let menu = if shortcut_registered {
-                Menu::with_items(app, &[&toggle_item, &quit_item])?
-            } else {
-                let notice = MenuItem::with_id(
-                    app,
-                    "shortcut-unavailable",
-                    format!("{SHORTCUT_LABEL} unavailable, already in use"),
-                    false,
-                    None::<&str>,
-                )?;
-                Menu::with_items(app, &[&notice, &toggle_item, &quit_item])?
-            };
+            let mut items: Vec<&dyn IsMenuItem<tauri::Wry>> = notice_items
+                .iter()
+                .map(|item| item as &dyn IsMenuItem<tauri::Wry>)
+                .collect();
+            items.push(&toggle_item);
+            items.push(&quit_item);
+            let menu = Menu::with_items(app, &items)?;
 
             TrayIconBuilder::new()
                 .icon(app.default_window_icon().expect("bundled icon").clone())
