@@ -109,6 +109,48 @@ impl Store {
         })
     }
 
+    pub fn load_apps(&self) -> rusqlite::Result<Vec<(String, String, Option<String>)>> {
+        self.with(|c| {
+            let mut stmt =
+                c.prepare("SELECT app_id, name, target FROM local_app_index ORDER BY name")?;
+            let rows = stmt.query_map([], |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, Option<String>>(2)?,
+                ))
+            })?;
+            rows.collect()
+        })
+    }
+
+    /// Replaces the whole index in one transaction, so a reader never sees a
+    /// half-written index.
+    pub fn replace_apps(&self, apps: &[(String, String, Option<String>)]) -> rusqlite::Result<()> {
+        let now = now_millis();
+        self.with(|c| {
+            c.execute_batch("BEGIN; DELETE FROM local_app_index;")?;
+            {
+                let mut stmt = c.prepare(
+                    "INSERT INTO local_app_index (app_id, name, target, indexed_at) \
+                     VALUES (?1, ?2, ?3, ?4)",
+                )?;
+                for (id, name, target) in apps {
+                    stmt.execute(params![id, name, target, now])?;
+                }
+            }
+            c.execute_batch("COMMIT;")?;
+            Ok(())
+        })
+    }
+
+    pub fn delete_app(&self, app_id: &str) -> rusqlite::Result<()> {
+        self.with(|c| {
+            c.execute("DELETE FROM local_app_index WHERE app_id = ?1", [app_id])?;
+            Ok(())
+        })
+    }
+
     pub fn load_frecency(&self) -> rusqlite::Result<Vec<(String, u32, i64)>> {
         self.with(|c| {
             let mut stmt = c.prepare(

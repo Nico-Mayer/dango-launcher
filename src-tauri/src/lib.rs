@@ -1,4 +1,5 @@
 pub mod extension;
+pub mod extensions;
 mod latency;
 mod platform;
 pub mod protocol;

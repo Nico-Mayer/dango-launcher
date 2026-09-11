@@ -28,9 +28,9 @@ rusqlite = { version = "0.40.2", features = ["bundled"] }
 uuid = { version = "1.26.1", features = ["v4"] }
 thiserror = "2.0.20"
 async-trait = "0.1.92"
+png = "0.18"
 
 [dev-dependencies]
-png = "0.18"
 ts-rs = "12.0.1"
 
 [target.'cfg(target_os = "windows")'.dependencies]
