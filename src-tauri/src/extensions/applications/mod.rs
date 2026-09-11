@@ -101,6 +101,7 @@ impl Extension for ApplicationsExtension {
         vec![Arc::new(IndexingService {
             index: self.index.clone(),
             icons: self.icons.clone(),
+            running: Arc::new(std::sync::atomic::AtomicBool::new(false)),
         })]
     }
 }
@@ -133,24 +134,50 @@ impl RootProvider for AppProvider {
     }
 }
 
+/// How often the index is rebuilt so installs and uninstalls appear without a
+/// restart. A plain schedule rather than a native change watcher, which is
+/// enough for a personal launcher.
+const REFRESH_INTERVAL: std::time::Duration = std::time::Duration::from_secs(180);
+
 /// The background service: builds the index and extracts icons off the
-/// activation path, so the launcher stays responsive while it runs.
+/// activation path, so the launcher stays responsive, then re-indexes on a
+/// schedule. Stops cleanly when the extension is disabled.
 struct IndexingService {
     index: Arc<AppIndex>,
     icons: Arc<IconCache>,
+    running: Arc<std::sync::atomic::AtomicBool>,
 }
 
 impl Service for IndexingService {
     fn start(&self) -> crate::extension::ActivationResult {
+        use std::sync::atomic::Ordering;
+        self.running.store(true, Ordering::SeqCst);
         let index = self.index.clone();
         let icons = self.icons.clone();
+        let running = self.running.clone();
         std::thread::spawn(move || {
-            index.rebuild();
-            for app in index.snapshot() {
-                icons.ensure(&app);
+            while running.load(Ordering::SeqCst) {
+                index.rebuild();
+                for app in index.snapshot() {
+                    if !running.load(Ordering::SeqCst) {
+                        return;
+                    }
+                    icons.ensure(&app);
+                }
+                // Sleep in short slices so disabling stops the loop promptly.
+                let mut waited = std::time::Duration::ZERO;
+                while waited < REFRESH_INTERVAL && running.load(Ordering::SeqCst) {
+                    std::thread::sleep(std::time::Duration::from_millis(200));
+                    waited += std::time::Duration::from_millis(200);
+                }
             }
         });
         Ok(())
+    }
+
+    fn stop(&self) {
+        self.running
+            .store(false, std::sync::atomic::Ordering::SeqCst);
     }
 }
 

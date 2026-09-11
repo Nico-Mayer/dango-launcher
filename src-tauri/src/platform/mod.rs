@@ -22,6 +22,15 @@ pub fn launcher_window(window: &WebviewWindow) -> Box<dyn LauncherWindow> {
     return Box::new(windows::WindowsLauncherWindow::new(window));
 }
 
+/// The application indexer for this platform, or `None` where one does not
+/// exist yet. macOS returns `None` until its indexer lands.
+pub fn app_indexer() -> Option<std::sync::Arc<dyn crate::extensions::applications::AppIndexer>> {
+    #[cfg(target_os = "windows")]
+    return Some(std::sync::Arc::new(windows::WindowsAppIndexer));
+    #[cfg(target_os = "macos")]
+    return None;
+}
+
 /// The cursor is the most reliable signal for "the display the user is looking
 /// at". `current_monitor` cannot answer while the window is parked offscreen for
 /// warmup, and returning nothing there would leave the launcher unpositioned and

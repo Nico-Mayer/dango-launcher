@@ -1,3 +1,7 @@
+mod apps;
+
+pub use apps::WindowsAppIndexer;
+
 use tauri::WebviewWindow;
 use windows_sys::Win32::Foundation::{FALSE, HWND, TRUE};
 use windows_sys::Win32::System::Threading::{AttachThreadInput, GetCurrentThreadId};

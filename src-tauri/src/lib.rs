@@ -18,6 +18,7 @@ use tauri::{
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
 
 use extension::{EnabledStore, ExtensionHost};
+use extensions::applications::{AppIndex, ApplicationsExtension, IconCache};
 use latency::LatencyProbe;
 use platform::LauncherWindow;
 use store::{Opened, Store};
@@ -183,7 +184,7 @@ pub fn run() {
             // starting.
             let mut notices = Vec::new();
 
-            let enabled: Arc<dyn EnabledStore> = match open_store(app) {
+            let store: Option<Arc<Store>> = match open_store(app) {
                 Ok(Opened {
                     store,
                     recovered_from,
@@ -198,20 +199,40 @@ pub fn run() {
                     );
                     let store = Arc::new(store);
                     app.manage(store.clone());
-                    store
+                    Some(store)
                 }
                 Err(error) => {
                     eprintln!("[dango] database unavailable: {error}");
                     notices.push("Database unavailable, see log".to_string());
-                    // Without a store, extensions default to enabled and their
-                    // state simply does not persist.
-                    Arc::new(AlwaysEnabled)
+                    None
                 }
             };
 
-            // The host is empty until the first extension is registered in a
-            // later milestone; it exists now so registration needs no restart.
-            app.manage(Mutex::new(ExtensionHost::new(enabled)));
+            // Without a store, extensions default to enabled and their state
+            // simply does not persist.
+            let enabled: Arc<dyn EnabledStore> = match &store {
+                Some(store) => store.clone(),
+                None => Arc::new(AlwaysEnabled),
+            };
+            let mut host = ExtensionHost::new(enabled);
+
+            if let Some(indexer) = platform::app_indexer() {
+                let index = AppIndex::new(indexer.clone(), store.clone());
+                let cache_dir = app
+                    .path()
+                    .app_cache_dir()
+                    .unwrap_or_else(|_| std::env::temp_dir())
+                    .join("icons");
+                let icons = IconCache::new(cache_dir, indexer);
+                let extension = Arc::new(ApplicationsExtension::new(index, icons));
+                match host.register(extension) {
+                    Ok(report) if report.is_clean() => {}
+                    Ok(report) => eprintln!("[dango] applications loaded with issues: {report:?}"),
+                    Err(error) => eprintln!("[dango] applications failed to load: {error}"),
+                }
+            }
+
+            app.manage(Mutex::new(host));
 
             if let Err(error) = app.global_shortcut().register(shortcut) {
                 eprintln!("[dango] could not register {SHORTCUT_LABEL}: {error}");
