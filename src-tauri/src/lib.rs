@@ -18,10 +18,59 @@ use tauri::{
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
 
 use extension::{EnabledStore, ExtensionHost};
-use extensions::applications::{AppIndex, ApplicationsExtension, IconCache};
+use extensions::applications::{ActionOutcome, AppIndex, ApplicationsExtension, IconCache};
 use latency::LatencyProbe;
 use platform::LauncherWindow;
+use ranking::{now_millis, DangoRanker, FrecencyTable};
+use search::{Candidate, SearchPipeline, StaticCommandSource};
 use store::{Opened, Store};
+
+/// The most results streamed to the frontend for one query.
+const RESULT_LIMIT: usize = 50;
+
+/// Event carrying a streamed search snapshot to the frontend.
+const EVENT_RESULTS: &str = "dango://results";
+
+#[derive(Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ResultItem {
+    id: String,
+    title: String,
+    subtitle: Option<String>,
+    icon: Option<String>,
+    actions: Vec<protocol::Action>,
+    match_positions: Vec<usize>,
+}
+
+impl From<Candidate> for ResultItem {
+    fn from(c: Candidate) -> Self {
+        Self {
+            id: c.id,
+            title: c.title,
+            subtitle: c.subtitle,
+            icon: c.icon,
+            actions: c.actions,
+            match_positions: c.match_positions,
+        }
+    }
+}
+
+#[derive(Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ResultsPayload {
+    query: String,
+    items: Vec<ResultItem>,
+    complete: bool,
+}
+
+#[derive(serde::Serialize)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+enum ActionResponse {
+    Launched,
+    Revealed,
+    Copy { text: String },
+    Failed { message: String },
+}
 
 /// Fallback enabled store used only when the database could not be opened, so
 /// extensions still load with their default state.
@@ -96,6 +145,66 @@ fn dismiss(app: tauri::AppHandle) {
     }
 }
 
+/// Runs a query and streams merged snapshots to the frontend as providers
+/// answer. Async so it executes on Tauri's tokio runtime, where the pipeline
+/// can spawn its per-query task. Returns at once; results arrive on the event.
+#[tauri::command]
+async fn search(app: tauri::AppHandle, query: String) {
+    let Some(pipeline) = app.try_state::<SearchPipeline>() else {
+        return;
+    };
+    let mut rx = pipeline.query(query);
+    tauri::async_runtime::spawn(async move {
+        while let Some(results) = rx.recv().await {
+            let payload = ResultsPayload {
+                query: results.query,
+                items: results.items.into_iter().map(ResultItem::from).collect(),
+                complete: results.complete,
+            };
+            if app.emit_to("main", EVENT_RESULTS, payload).is_err() {
+                break;
+            }
+        }
+    });
+}
+
+/// Runs an item's action. Launch and reveal hide the launcher; copy hands the
+/// text back for the frontend to place on the clipboard; failure keeps the
+/// launcher open with a message.
+#[tauri::command]
+fn run_action(app: tauri::AppHandle, item_id: String, action_id: String) -> ActionResponse {
+    let Some(extension) = app.try_state::<Arc<ApplicationsExtension>>() else {
+        return ActionResponse::Failed {
+            message: "no application handler is available".into(),
+        };
+    };
+    match extension.perform(&item_id, &action_id) {
+        ActionOutcome::Launched => {
+            if let Some(frecency) = app.try_state::<Arc<FrecencyTable>>() {
+                frecency.record_launch(&item_id, now_millis());
+            }
+            hide_after_launch(&app);
+            ActionResponse::Launched
+        }
+        ActionOutcome::Revealed => {
+            hide_after_launch(&app);
+            ActionResponse::Revealed
+        }
+        ActionOutcome::CopyToClipboard(text) => ActionResponse::Copy { text },
+        ActionOutcome::Failed(message) => ActionResponse::Failed { message },
+    }
+}
+
+/// Hides the launcher without restoring the previous foreground, because the
+/// just-launched application should keep focus rather than the window that was
+/// in front before.
+fn hide_after_launch(app: &tauri::AppHandle) {
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.hide();
+    }
+    let _ = app.emit_to("main", "dango://reset", ());
+}
+
 /// The webview does not allocate its drawing surface until the window is shown
 /// once, and paying that cost on the user's first hotkey pushed cold activation
 /// to the edge of the budget. Showing far offscreen at startup pays it early
@@ -168,7 +277,13 @@ pub fn run() {
                 .build(),
         )
         .manage(LatencyProbe::default())
-        .invoke_handler(tauri::generate_handler![report_paint, dismiss, warmup_done])
+        .invoke_handler(tauri::generate_handler![
+            report_paint,
+            dismiss,
+            warmup_done,
+            search,
+            run_action
+        ])
         .setup(move |app| {
             #[cfg(target_os = "macos")]
             app.set_activation_policy(tauri::ActivationPolicy::Accessory);
@@ -223,15 +338,32 @@ pub fn run() {
                     .app_cache_dir()
                     .unwrap_or_else(|_| std::env::temp_dir())
                     .join("icons");
+                // The webview loads cached icon files through the asset protocol.
+                let _ = app.asset_protocol_scope().allow_directory(&cache_dir, true);
                 let icons = IconCache::new(cache_dir, indexer);
                 let extension = Arc::new(ApplicationsExtension::new(index, icons));
-                match host.register(extension) {
+                match host.register(extension.clone()) {
                     Ok(report) if report.is_clean() => {}
                     Ok(report) => eprintln!("[dango] applications loaded with issues: {report:?}"),
                     Err(error) => eprintln!("[dango] applications failed to load: {error}"),
                 }
+                app.manage(extension);
             }
 
+            let frecency = Arc::new(match &store {
+                Some(store) => FrecencyTable::load(Box::new(store.clone())),
+                None => FrecencyTable::in_memory(),
+            });
+            let ranker = Arc::new(DangoRanker::new(frecency.clone()));
+            let commands = StaticCommandSource(host.command_candidates());
+            let pipeline = SearchPipeline::new(
+                Arc::new(commands),
+                host.root_providers(),
+                ranker,
+                RESULT_LIMIT,
+            );
+            app.manage(pipeline);
+            app.manage(frecency);
             app.manage(Mutex::new(host));
 
             if let Err(error) = app.global_shortcut().register(shortcut) {

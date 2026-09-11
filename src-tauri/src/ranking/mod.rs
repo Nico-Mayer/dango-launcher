@@ -7,7 +7,7 @@ mod fuzzy;
 
 use std::sync::Arc;
 
-pub use frecency::{FrecencyPersistence, FrecencyTable};
+pub use frecency::{now_millis, FrecencyPersistence, FrecencyTable};
 pub use fuzzy::{fuzzy_match, Match};
 
 use crate::search::{Candidate, Ranker};
@@ -160,6 +160,7 @@ mod tests {
             keywords: vec![],
             alias: None,
             source: Source::Command,
+            actions: vec![],
             match_positions: vec![],
         }
     }

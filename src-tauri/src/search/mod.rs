@@ -28,9 +28,22 @@ pub struct Candidate {
     pub keywords: Vec<String>,
     pub alias: Option<String>,
     pub source: Source,
+    /// The item's action panel; the first action is primary. Carried on the
+    /// candidate so a provider declares what its results can do.
+    pub actions: Vec<crate::protocol::Action>,
     /// Character offsets in the title that matched the query, filled by the
     /// ranker so the frontend can highlight them. Empty until ranked.
     pub match_positions: Vec<usize>,
+}
+
+/// A fixed set of commands snapshotted from the registry. Rebuilt when
+/// extensions are enabled or disabled.
+pub struct StaticCommandSource(pub Vec<Candidate>);
+
+impl CommandSource for StaticCommandSource {
+    fn candidates(&self) -> Vec<Candidate> {
+        self.0.clone()
+    }
 }
 
 /// A merged, ranked, bounded snapshot for one query. Emitted repeatedly as
@@ -190,6 +203,7 @@ mod tests {
             keywords: vec![],
             alias: None,
             source,
+            actions: vec![],
             match_positions: vec![],
         }
     }

@@ -24,6 +24,10 @@ pub trait Extension: Send + Sync {
     fn services(&self) -> Vec<Arc<dyn Service>> {
         Vec::new()
     }
+    /// The single per-keystroke root items provider, if the extension has one.
+    fn root_provider(&self) -> Option<Arc<dyn crate::search::RootProvider>> {
+        None
+    }
 }
 
 pub trait Service: Send + Sync {
@@ -98,6 +102,32 @@ impl ExtensionHost {
 
     pub fn is_active(&self, extension_id: &str) -> bool {
         self.active.contains_key(extension_id)
+    }
+
+    /// Root providers of every active extension, for the search pipeline.
+    pub fn root_providers(&self) -> Vec<Arc<dyn crate::search::RootProvider>> {
+        self.active
+            .keys()
+            .filter_map(|id| self.extensions.get(id)?.root_provider())
+            .collect()
+    }
+
+    /// Every registered command as a search candidate.
+    pub fn command_candidates(&self) -> Vec<crate::search::Candidate> {
+        self.registry
+            .commands()
+            .map(|command| crate::search::Candidate {
+                id: command.qualified_id(),
+                title: command.decl.title.clone(),
+                subtitle: command.decl.subtitle.clone(),
+                icon: command.decl.icon.clone(),
+                keywords: command.decl.keywords.clone(),
+                alias: command.decl.alias.clone(),
+                source: crate::search::Source::Command,
+                actions: Vec::new(),
+                match_positions: Vec::new(),
+            })
+            .collect()
     }
 
     /// Adds an extension and activates it when its persisted state says

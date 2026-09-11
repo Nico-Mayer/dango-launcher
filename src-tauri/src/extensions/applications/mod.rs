@@ -13,6 +13,7 @@ use std::sync::Arc;
 use async_trait::async_trait;
 
 use crate::extension::{Extension, Manifest, Service};
+use crate::protocol::{Action, Modifier, Shortcut};
 use crate::search::{Candidate, RootProvider, Source};
 
 pub const EXTENSION_ID: &str = "dango.applications";
@@ -104,6 +105,10 @@ impl Extension for ApplicationsExtension {
             running: Arc::new(std::sync::atomic::AtomicBool::new(false)),
         })]
     }
+
+    fn root_provider(&self) -> Option<Arc<dyn RootProvider>> {
+        Some(self.provider.clone())
+    }
 }
 
 /// Feeds every indexed application into the search pipeline. Filtering and
@@ -120,18 +125,51 @@ impl RootProvider for AppProvider {
         self.index
             .snapshot()
             .into_iter()
-            .map(|app| Candidate {
-                icon: self.icons.path(&app.id),
-                subtitle: app.target.clone(),
-                title: app.name,
-                id: app.id,
-                keywords: vec![],
-                alias: None,
-                source: Source::RootItem,
-                match_positions: vec![],
+            .map(|app| {
+                let has_path = app.target.is_some();
+                Candidate {
+                    icon: self.icons.path(&app.id),
+                    subtitle: app.target.clone(),
+                    title: app.name,
+                    id: app.id,
+                    keywords: vec![],
+                    alias: None,
+                    source: Source::RootItem,
+                    actions: app_actions(has_path),
+                    match_positions: vec![],
+                }
             })
             .collect()
     }
+}
+
+/// The action panel for an application result. Launch is primary; reveal and
+/// copy are offered only when the app has a filesystem path.
+fn app_actions(has_path: bool) -> Vec<Action> {
+    let mut actions = vec![Action {
+        id: ACTION_LAUNCH.into(),
+        title: "Launch".into(),
+        shortcut: None,
+    }];
+    if has_path {
+        actions.push(Action {
+            id: ACTION_REVEAL.into(),
+            title: "Reveal in File Explorer".into(),
+            shortcut: Some(Shortcut {
+                key: "r".into(),
+                modifiers: vec![Modifier::Ctrl],
+            }),
+        });
+        actions.push(Action {
+            id: ACTION_COPY_PATH.into(),
+            title: "Copy Path".into(),
+            shortcut: Some(Shortcut {
+                key: "c".into(),
+                modifiers: vec![Modifier::Ctrl],
+            }),
+        });
+    }
+    actions
 }
 
 /// How often the index is rebuilt so installs and uninstalls appear without a
