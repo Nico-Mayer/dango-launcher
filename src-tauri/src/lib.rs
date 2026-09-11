@@ -1,6 +1,7 @@
 pub mod extension;
 mod latency;
 mod platform;
+pub mod protocol;
 pub mod store;
 
 use std::sync::Arc;

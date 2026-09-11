@@ -56,3 +56,10 @@ jobs:
       - name: Test
         working-directory: src-tauri
         run: cargo test
+
+      # cargo test regenerates the ts-rs protocol bindings. A diff here means
+      # the checked-in TypeScript is out of sync with the Rust source of truth.
+      # Run on one platform only, to avoid CRLF noise from the Windows runner.
+      - name: Protocol bindings are in sync
+        if: matrix.os == 'macos-latest'
+        run: git diff --exit-code src/protocol
