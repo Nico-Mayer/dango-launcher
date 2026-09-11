@@ -139,11 +139,21 @@ clears then dismisses, blur dismisses, the launcher is absent from Command+Tab,
 and the tray menu works. Activation was measured at a median of 46.7ms with a
 cold first activation of 61.3ms.
 
-Windows compiles in CI but has never been run. Everything in the Windows module
-is therefore unverified behaviour, and the foreground-restore path is the part
-most likely to be wrong: `AttachThreadInput` was written without the ability to
-execute it. Expect the launcher to take focus correctly and to be uncertain
-about handing it back.
+Windows is verified on a release build driven by a Win32 harness that sends the
+hotkey through `SendInput`, reads window styles and rectangles, and tracks the
+foreground window across two displays at 150% and 100% scaling. Focus returns to
+the previous window in another process on every dismissal path. Activation over
+36 presses: cold 35.7ms, median 27.8ms, maximum 35.7ms, none over budget.
+
+The first Windows run found four defects that CI could not: `cargo build
+--release` produces a dev-mode binary that loads the Vite URL, so the frontend
+never ran; tao rewrote the extended style on every show and dropped the tool
+window bit; positioning through logical coordinates landed the window half off
+the secondary display; and calling `SetFocus` on the top-level window after
+activation pulled focus off the webview for an instant, which fired blur and
+dismissed the launcher immediately. All four are fixed. What remains manual on
+Windows is the tray menu, quit from the tray, display disconnection, and the
+shortcut after sleep.
 
 CI itself is verified. A real `AttachThreadInput` import error produced macOS
 success alongside Windows failure, which is exactly the Windows-only breakage

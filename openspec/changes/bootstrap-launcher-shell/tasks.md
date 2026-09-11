@@ -30,7 +30,7 @@
 - [x] 5.1 Apply the tool window extended style and topmost z-order, and confirm absence from the taskbar and Alt+Tab
 - [x] 5.2 Capture the foreground window before showing and implement focus restore on hide, handling foreground lock
 - [x] 5.3 Implement positioning on the display holding the foreground window, using per-monitor DPI aware work area geometry
-- [ ] 5.4 Verify correct physical size and placement across two displays with different scaling factors
+- [x] 5.4 Verify correct physical size and placement across two displays with different scaling factors
 
 ## 6. Tray and lifecycle
 
@@ -51,7 +51,7 @@
 - [x] 8.1 Build the empty prompt: a borderless rounded surface with a single text input and no results
 - [x] 8.2 Hide on Escape and on window blur
 - [x] 8.3 Handle the reset signal by clearing the input and returning to root state
-- [ ] 8.4 Confirm the frontend loads exactly once across repeated show and hide cycles (`[dango] frontend mounted` must appear once in a session with many activations)
+- [x] 8.4 Confirm the frontend loads exactly once across repeated show and hide cycles (`[dango] frontend mounted` must appear once in a session with many activations)
 
 ## 9. Latency instrumentation
 
@@ -59,7 +59,7 @@
 - [x] 9.2 Report back from the frontend on the animation frame following render
 - [x] 9.3 Compute and log the elapsed time from the backend monotonic clock, in development builds only
 - [x] 9.4 Record release-build measurements for cold and warm activation on macOS
-- [ ] 9.5 Record release-build measurements for cold and warm activation on Windows
+- [x] 9.5 Record release-build measurements for cold and warm activation on Windows
 
 ## 10. CI
 
@@ -74,6 +74,10 @@
 - [x] 11.2 Walk every scenario in `specs/global-activation/spec.md` on macOS
 - [x] 11.3 Confirm cold and warm activation meet the 80ms budget on a macOS release build
 - [ ] 11.4 Walk every scenario in `specs/launcher-shell/spec.md` on Windows
+  - Scripted and passing: startup hidden without stealing focus, tool window and topmost styles while shown, show over a maximized window, two-stage Escape, blur and hotkey dismissal, reset on hide, placement and physical size on 144 and 96 DPI displays, second launch redirected, frontend mounted once
+  - Still manual: tray right-click menu, display disconnected between invocations, quit from the tray menu
 - [ ] 11.5 Walk every scenario in `specs/global-activation/spec.md` on Windows
-- [ ] 11.6 Confirm cold and warm activation meet the 80ms budget on a Windows release build
-- [ ] 11.7 Confirm the launcher hands focus back to the previous window on Windows dismiss, including when that window belongs to another process
+  - Scripted and passing: summon from another application, combination already taken keeps Dango running, shortcut released on exit
+  - Still manual: summon with the desktop focused, shortcut after wake from sleep
+- [x] 11.6 Confirm cold and warm activation meet the 80ms budget on a Windows release build
+- [x] 11.7 Confirm the launcher hands focus back to the previous window on Windows dismiss, including when that window belongs to another process

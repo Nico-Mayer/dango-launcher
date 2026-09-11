@@ -124,6 +124,14 @@ context: |
     Use `env VAR=value cmd`.
   - Set `DANGO_MEASURE=1` to enable activation timing in a release build. Timing
     logs go to stderr.
+  - Build release binaries with `npx tauri build --no-bundle`, never a bare
+    `cargo build --release`. Tauri only leaves dev mode when the CLI enables the
+    `custom-protocol` feature; without it the binary loads the Vite dev URL and
+    shows a browser error page while the tray and hotkey appear to work.
+  - On Windows, tao rewrites the extended window style from its own flags on
+    every visibility change, so `WS_EX_TOOLWINDOW` has to be re-applied after
+    each show. Positioning must be done in physical pixels there, while macOS
+    needs logical points. Do not share the positioning code between them.
 
   ## Conventions
 
