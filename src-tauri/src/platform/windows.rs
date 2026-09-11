@@ -5,7 +5,8 @@ use windows_sys::Win32::UI::Input::KeyboardAndMouse::SetFocus;
 use windows_sys::Win32::UI::WindowsAndMessaging::{
     AllowSetForegroundWindow, GetForegroundWindow, GetWindowLongPtrW, GetWindowThreadProcessId,
     SetForegroundWindow, SetWindowLongPtrW, SetWindowPos, GWL_EXSTYLE, HWND_TOPMOST,
-    SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, WS_EX_TOOLWINDOW, WS_EX_TOPMOST,
+    SWP_FRAMECHANGED, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, WS_EX_APPWINDOW, WS_EX_TOOLWINDOW,
+    WS_EX_TOPMOST,
 };
 
 use super::LauncherWindow;
@@ -20,25 +21,7 @@ pub struct WindowsLauncherWindow {
 impl WindowsLauncherWindow {
     pub fn new(window: &WebviewWindow) -> Self {
         if let Some(hwnd) = hwnd(window) {
-            unsafe {
-                // A tool window is absent from the taskbar and from Alt+Tab,
-                // which is the closest Windows gets to macOS accessory policy.
-                let style = GetWindowLongPtrW(hwnd, GWL_EXSTYLE) as u32;
-                SetWindowLongPtrW(
-                    hwnd,
-                    GWL_EXSTYLE,
-                    (style | WS_EX_TOOLWINDOW | WS_EX_TOPMOST) as isize,
-                );
-                SetWindowPos(
-                    hwnd,
-                    HWND_TOPMOST,
-                    0,
-                    0,
-                    0,
-                    0,
-                    SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE,
-                );
-            }
+            unsafe { apply_tool_window_style(hwnd) };
         }
         Self {
             previous_foreground: None,
@@ -59,15 +42,7 @@ impl LauncherWindow for WindowsLauncherWindow {
 
         if let Some(hwnd) = hwnd(window) {
             unsafe {
-                SetWindowPos(
-                    hwnd,
-                    HWND_TOPMOST,
-                    0,
-                    0,
-                    0,
-                    0,
-                    SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE,
-                );
+                apply_tool_window_style(hwnd);
                 force_foreground(hwnd);
             }
         }
@@ -91,6 +66,24 @@ impl LauncherWindow for WindowsLauncherWindow {
             force_foreground(hwnd);
         }
     }
+}
+
+/// tao rewrites the extended style from its own flags whenever visibility
+/// changes, which restores WS_EX_APPWINDOW and drops the tool window bit. So
+/// this runs after every show, not once at startup.
+unsafe fn apply_tool_window_style(hwnd: HWND) {
+    let style = GetWindowLongPtrW(hwnd, GWL_EXSTYLE) as u32;
+    let style = (style | WS_EX_TOOLWINDOW | WS_EX_TOPMOST) & !WS_EX_APPWINDOW;
+    SetWindowLongPtrW(hwnd, GWL_EXSTYLE, style as isize);
+    SetWindowPos(
+        hwnd,
+        HWND_TOPMOST,
+        0,
+        0,
+        0,
+        0,
+        SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_FRAMECHANGED,
+    );
 }
 
 /// Windows refuses SetForegroundWindow from a process that does not own the
