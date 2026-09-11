@@ -151,9 +151,9 @@ never ran; tao rewrote the extended style on every show and dropped the tool
 window bit; positioning through logical coordinates landed the window half off
 the secondary display; and calling `SetFocus` on the top-level window after
 activation pulled focus off the webview for an instant, which fired blur and
-dismissed the launcher immediately. All four are fixed. What remains manual on
-Windows is the tray menu, quit from the tray, display disconnection, and the
-shortcut after sleep.
+dismissed the launcher immediately. All four are fixed. The tray menu, quit from
+the tray, display disconnection, and the shortcut after sleep were then checked
+by hand on Windows and behave as specified.
 
 CI itself is verified. A real `AttachThreadInput` import error produced macOS
 success alongside Windows failure, which is exactly the Windows-only breakage

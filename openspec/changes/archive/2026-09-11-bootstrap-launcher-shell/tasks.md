@@ -44,7 +44,7 @@
 - [x] 7.1 Register the default shortcut, Option+Space on macOS and Alt+Space on Windows
 - [x] 7.2 Toggle visibility from the shortcut, including hiding when already visible
 - [x] 7.3 Handle registration failure by starting anyway, marking the tray menu, and keeping the launcher openable from the tray
-- [ ] 7.4 Verify the shortcut still works after the machine wakes from sleep
+- [x] 7.4 Verify the shortcut still works after the machine wakes from sleep
 
 ## 8. Frontend placeholder
 
@@ -73,11 +73,11 @@
 - [x] 11.1 Walk every scenario in `specs/launcher-shell/spec.md` on macOS
 - [x] 11.2 Walk every scenario in `specs/global-activation/spec.md` on macOS
 - [x] 11.3 Confirm cold and warm activation meet the 80ms budget on a macOS release build
-- [ ] 11.4 Walk every scenario in `specs/launcher-shell/spec.md` on Windows
+- [x] 11.4 Walk every scenario in `specs/launcher-shell/spec.md` on Windows
   - Scripted and passing: startup hidden without stealing focus, tool window and topmost styles while shown, show over a maximized window, two-stage Escape, blur and hotkey dismissal, reset on hide, placement and physical size on 144 and 96 DPI displays, second launch redirected, frontend mounted once
-  - Still manual: tray right-click menu, display disconnected between invocations, quit from the tray menu
-- [ ] 11.5 Walk every scenario in `specs/global-activation/spec.md` on Windows
+  - Verified by hand: tray right-click menu, display disconnected between invocations, quit from the tray menu
+- [x] 11.5 Walk every scenario in `specs/global-activation/spec.md` on Windows
   - Scripted and passing: summon from another application, combination already taken keeps Dango running, shortcut released on exit
-  - Still manual: summon with the desktop focused, shortcut after wake from sleep
+  - Verified by hand: summon with the desktop focused, shortcut after wake from sleep
 - [x] 11.6 Confirm cold and warm activation meet the 80ms budget on a Windows release build
 - [x] 11.7 Confirm the launcher hands focus back to the previous window on Windows dismiss, including when that window belongs to another process
