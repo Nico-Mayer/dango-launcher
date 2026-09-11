@@ -98,6 +98,10 @@
   }
 
   onMount(() => {
+    // Runs while the window is still parked offscreen, so the first activation
+    // already has the frecent items and their icons painted. Leaving it until
+    // the first activation cost 40ms of icon loading and showed an empty list.
+    runSearch("");
     invoke("warmup_done");
     const unlisten = [
       listen<number | null>("dango://activate", (event) => {
