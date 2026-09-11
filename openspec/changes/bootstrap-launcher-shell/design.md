@@ -82,6 +82,13 @@ it would be a real migration.
 **Rejected:** keeping SvelteKit because it is already wired. Sunk cost against a
 permanent tax on every build.
 
+The frontend uses Bits UI on Tailwind v4 rather than hand-rolled markup. Bits UI
+ships a `Command` primitive that is exactly a command palette, including the
+selection and filtering behaviour the root search needs in M1, so hand-rolling
+it would mean rebuilding a solved problem and its accessibility. Bits UI is
+headless, so the look comes from the token set published with its documentation,
+copied into `src/app.css`.
+
 ### Latency is measured with one clock
 
 Cross-boundary timing is easy to get wrong when Rust and JavaScript each use

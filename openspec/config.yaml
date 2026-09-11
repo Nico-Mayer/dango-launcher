@@ -15,8 +15,13 @@ context: |
   ## Tech stack
 
   - Rust + Tauri v2 for the shell, all OS integration, and all business logic.
-  - Svelte 5 (runes) + TypeScript for the frontend, deliberately minimal. No
-    component library. The frontend is a renderer, not a place for logic.
+  - Svelte 5 (runes) + TypeScript on plain Vite. Not SvelteKit: a launcher is a
+    view stack, not a router. The frontend is a renderer, not a place for logic.
+  - Bits UI for interactive components, with Tailwind v4 for styling. Use Bits UI
+    primitives rather than hand-rolling anything it already provides, especially
+    `Command`, which is the command-palette primitive the root search is built
+    on. Styling follows the token set from the Bits UI documentation site
+    (`src/app.css`); prefer those tokens over ad-hoc colours.
   - SQLite for local persistence.
   - Node 24 and the OpenSpec CLI are pinned via mise (`mise.toml`).
   - Prefer official Tauri v2 plugins over hand-rolled equivalents.
@@ -110,7 +115,9 @@ context: |
     what the code does.
   - Rust: prefer borrowing over cloning, `Result` with typed errors over strings,
     and small focused modules.
-  - Svelte: runes only, no stores unless there is a concrete reason.
+  - Svelte: runes only, no stores unless there is a concrete reason. Reach for a
+    Bits UI primitive before writing a bespoke component, and keep its markup
+    close to the documented example so upgrades stay cheap.
 
 rules:
   proposal:
