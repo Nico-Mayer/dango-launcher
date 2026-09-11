@@ -63,13 +63,15 @@
 
 ## 8. Applications extension: shared
 
-- [ ] 8.1 Define the `AppIndexer` trait and the indexed application record
-- [ ] 8.2 Declare the extension manifest and its root items provider
-- [ ] 8.3 Run indexing in the background at startup, persist results, and keep the launcher usable while it runs
-- [ ] 8.4 Add the refresh path so installs and uninstalls are picked up without a restart
-- [ ] 8.5 Remove a stale entry when launching it fails because it no longer exists
-- [ ] 8.6 Add the reveal in file manager and copy path actions
-- [ ] 8.7 Cache extracted icons off the search path and show a placeholder when extraction fails
+- [x] 8.1 Define the `AppIndexer` trait and the indexed application record
+- [x] 8.2 Declare the extension manifest and its root items provider
+  - Provider is defined and exposed; feeding it into the pipeline is wired in group 11.
+- [x] 8.3 Run indexing in the background at startup, persist results, and keep the launcher usable while it runs
+- [x] 8.4 Add the refresh path so installs and uninstalls are picked up without a restart
+- [x] 8.5 Remove a stale entry when launching it fails because it no longer exists
+- [x] 8.6 Add the reveal in file manager and copy path actions
+  - Action logic and outcomes are here; the platform reveal call is groups 9 and 10, and the clipboard write for copy-path is group 11.
+- [x] 8.7 Cache extracted icons off the search path and show a placeholder when extraction fails
 
 ## 9. Applications extension: macOS
 
