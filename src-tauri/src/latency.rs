@@ -26,6 +26,12 @@ impl LatencyProbe {
         Some(id)
     }
 
+    pub fn note(&self, message: &str) {
+        if Self::enabled() {
+            eprintln!("[dango] {message}");
+        }
+    }
+
     pub fn finish(&self, id: u64) {
         let Some(started) = self.pending.lock().unwrap().remove(&id) else {
             return;

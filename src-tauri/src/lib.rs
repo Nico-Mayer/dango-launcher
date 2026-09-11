@@ -33,18 +33,24 @@ fn show(app: &tauri::AppHandle, probe_id: Option<u64>) {
     let _ = app.emit_to("main", "dango://activate", probe_id);
 }
 
-fn hide(app: &tauri::AppHandle) {
+fn hide(app: &tauri::AppHandle) -> bool {
     let Some(window) = app.get_webview_window("main") else {
-        return;
+        return false;
     };
+    // Hiding drops the webview's focus, which fires blur and a second dismiss
+    // from the frontend. Nothing must happen twice for that.
+    if !window.is_visible().unwrap_or(false) {
+        return false;
+    }
     let state = app.state::<AppState>();
     let mut launcher = state.launcher.lock().unwrap();
     launcher.hide(&window);
     launcher.restore_previous_focus();
     let _ = app.emit_to("main", "dango://reset", ());
+    true
 }
 
-fn toggle(app: &tauri::AppHandle, probe_id: Option<u64>) {
+fn toggle(app: &tauri::AppHandle) {
     let visible = app
         .get_webview_window("main")
         .and_then(|w| w.is_visible().ok())
@@ -52,6 +58,7 @@ fn toggle(app: &tauri::AppHandle, probe_id: Option<u64>) {
     if visible {
         hide(app);
     } else {
+        let probe_id = app.state::<LatencyProbe>().start();
         show(app, probe_id);
     }
 }
@@ -63,7 +70,9 @@ fn report_paint(app: tauri::AppHandle, id: u64) {
 
 #[tauri::command]
 fn dismiss(app: tauri::AppHandle) {
-    hide(&app);
+    if hide(&app) {
+        app.state::<LatencyProbe>().note("dismissed by frontend");
+    }
 }
 
 /// The webview does not allocate its drawing surface until the window is shown
@@ -75,6 +84,10 @@ fn warmup_done(app: tauri::AppHandle) {
     // Called once per frontend mount. More than one line here across a session
     // means the webview reloaded, which would defeat the warm-window design.
     eprintln!("[dango] frontend mounted");
+    finish_warmup(&app);
+}
+
+fn finish_warmup(app: &tauri::AppHandle) {
     let Some(window) = app.get_webview_window("main") else {
         return;
     };
@@ -104,7 +117,8 @@ fn warm_up(app: &tauri::AppHandle, window: &WebviewWindow) {
             .and_then(|w| w.is_visible().ok())
             .unwrap_or(false);
         if visible {
-            warmup_done(app);
+            eprintln!("[dango] frontend never reported mounting; hiding warmup window");
+            finish_warmup(&app);
         }
     });
 }
@@ -123,8 +137,7 @@ pub fn run() {
                     if received != &shortcut || event.state() != ShortcutState::Pressed {
                         return;
                     }
-                    let id = app.state::<LatencyProbe>().start();
-                    toggle(app, id);
+                    toggle(app);
                 })
                 .build(),
         )
@@ -171,7 +184,7 @@ pub fn run() {
                 .menu(&menu)
                 .show_menu_on_left_click(true)
                 .on_menu_event(|app, event| match event.id().as_ref() {
-                    "toggle" => toggle(app, None),
+                    "toggle" => toggle(app),
                     "quit" => {
                         // Hand the combination back before going away, or it
                         // stays claimed until the session ends.
