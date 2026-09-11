@@ -28,6 +28,9 @@ pub struct Candidate {
     pub keywords: Vec<String>,
     pub alias: Option<String>,
     pub source: Source,
+    /// Character offsets in the title that matched the query, filled by the
+    /// ranker so the frontend can highlight them. Empty until ranked.
+    pub match_positions: Vec<usize>,
 }
 
 /// A merged, ranked, bounded snapshot for one query. Emitted repeatedly as
@@ -187,6 +190,7 @@ mod tests {
             keywords: vec![],
             alias: None,
             source,
+            match_positions: vec![],
         }
     }
 

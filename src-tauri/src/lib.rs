@@ -2,6 +2,7 @@ pub mod extension;
 mod latency;
 mod platform;
 pub mod protocol;
+pub mod ranking;
 pub mod search;
 pub mod store;
 

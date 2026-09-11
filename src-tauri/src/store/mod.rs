@@ -109,6 +109,49 @@ impl Store {
         })
     }
 
+    pub fn load_frecency(&self) -> rusqlite::Result<Vec<(String, u32, i64)>> {
+        self.with(|c| {
+            let mut stmt = c.prepare(
+                "SELECT item_id, launch_count, last_launched_at \
+                 FROM frecency WHERE deleted_at IS NULL",
+            )?;
+            let rows = stmt.query_map([], |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, i64>(1)? as u32,
+                    row.get::<_, i64>(2)?,
+                ))
+            })?;
+            rows.collect()
+        })
+    }
+
+    pub fn save_frecency(
+        &self,
+        item_id: &str,
+        launch_count: u32,
+        last_launched_at: i64,
+    ) -> rusqlite::Result<()> {
+        let now = now_millis();
+        self.with(|c| {
+            c.execute(
+                "INSERT INTO frecency \
+                 (id, item_id, launch_count, last_launched_at, updated_at) \
+                 VALUES (?1, ?2, ?3, ?4, ?5) \
+                 ON CONFLICT(item_id) DO UPDATE SET \
+                 launch_count = ?3, last_launched_at = ?4, updated_at = ?5, deleted_at = NULL",
+                params![
+                    uuid::Uuid::new_v4().to_string(),
+                    item_id,
+                    launch_count as i64,
+                    last_launched_at,
+                    now
+                ],
+            )?;
+            Ok(())
+        })
+    }
+
     pub fn set_extension_enabled(&self, extension_id: &str, enabled: bool) -> rusqlite::Result<()> {
         let now = now_millis();
         self.with(|c| {
