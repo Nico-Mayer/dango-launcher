@@ -97,8 +97,21 @@ activation id to the frontend, and the frontend calls back on the next animation
 frame after render. The backend computes the elapsed time from its own monotonic
 clock. One clock, no skew.
 
-The number is recorded in development builds only. It exists to catch
-regressions in later milestones, not as a user-facing feature.
+The number is recorded in development builds only, or when `DANGO_MEASURE` is
+set. It exists to catch regressions in later milestones, not as a user-facing
+feature.
+
+The measurement is deliberately pessimistic: waiting two animation frames adds up
+to roughly 33ms of scheduling at 60Hz on top of the real paint. Treat the
+recorded figure as an upper bound, and compare like with like across milestones
+rather than reading it as true paint latency.
+
+Measured on an Apple Silicon release build, 16 activations: minimum 34.0ms,
+median 46.7ms, maximum 83.2ms, cold first activation 61.3ms. Before the offscreen
+warmup, cold activation reached 80.4ms; paying the webview's surface allocation
+at startup is what brought it down. One sample of sixteen exceeded the budget,
+which given the measurement's built-in pessimism is scheduling noise rather than
+a design problem.
 
 ### Reset on hide is an explicit signal
 

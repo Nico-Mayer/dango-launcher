@@ -23,7 +23,7 @@ pub fn launcher_window(window: &WebviewWindow) -> Box<dyn LauncherWindow> {
 }
 
 fn position_centred(window: &WebviewWindow) {
-    let Ok(Some(monitor)) = window.current_monitor() else {
+    let Some(monitor) = active_monitor(window) else {
         return;
     };
     let scale = monitor.scale_factor();
@@ -43,6 +43,22 @@ fn position_centred(window: &WebviewWindow) {
         size.height,
     );
     let _ = window.set_position(tauri::LogicalPosition::new(x, y));
+}
+
+/// The cursor is the most reliable signal for "the display the user is looking
+/// at". `current_monitor` cannot answer while the window is parked offscreen for
+/// warmup, and returning nothing there would leave the launcher unpositioned and
+/// invisible.
+fn active_monitor(window: &WebviewWindow) -> Option<tauri::Monitor> {
+    if let Ok(cursor) = window.cursor_position() {
+        if let Ok(Some(monitor)) = window.monitor_from_point(cursor.x, cursor.y) {
+            return Some(monitor);
+        }
+    }
+    if let Ok(Some(monitor)) = window.current_monitor() {
+        return Some(monitor);
+    }
+    window.primary_monitor().ok().flatten()
 }
 
 /// Horizontal centre, above vertical centre, in the display's work area.

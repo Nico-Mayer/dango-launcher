@@ -67,14 +67,38 @@ fn dismiss(app: tauri::AppHandle) {
 /// without a visible flash.
 #[tauri::command]
 fn warmup_done(app: tauri::AppHandle) {
-    if let Some(window) = app.get_webview_window("main") {
-        let _ = window.hide();
-    }
+    let Some(window) = app.get_webview_window("main") else {
+        return;
+    };
+    let _ = window.hide();
+    // Leaving the window parked offscreen would strand it there if positioning
+    // ever fails on the next show.
+    let state = app.state::<AppState>();
+    state
+        .launcher
+        .lock()
+        .unwrap()
+        .position_on_active_display(&window);
 }
 
-fn warm_up(window: &WebviewWindow) {
+fn warm_up(app: &tauri::AppHandle, window: &WebviewWindow) {
     let _ = window.set_position(tauri::LogicalPosition::new(-10_000.0, -10_000.0));
     let _ = window.show();
+
+    // Backstop: if the frontend never reports back, the window must not be left
+    // shown offscreen, because every later toggle would flip an invisible
+    // window instead of presenting the launcher.
+    let app = app.clone();
+    tauri::async_runtime::spawn(async move {
+        tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+        let visible = app
+            .get_webview_window("main")
+            .and_then(|w| w.is_visible().ok())
+            .unwrap_or(false);
+        if visible {
+            warmup_done(app);
+        }
+    });
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -124,7 +148,7 @@ pub fn run() {
                 .build(app)?;
 
             app.global_shortcut().register(shortcut)?;
-            warm_up(&window);
+            warm_up(&app.handle().clone(), &window);
 
             Ok(())
         })
