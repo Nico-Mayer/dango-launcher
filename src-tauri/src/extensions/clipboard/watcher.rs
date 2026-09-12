@@ -18,9 +18,14 @@ pub trait ClipboardSource: Send + Sync {
     /// Whether the current contents are marked as not for history. Asked before
     /// any content is read, so excluded content never enters memory.
     fn is_excluded(&self) -> bool;
-    /// The application that put the current contents there, when the platform
-    /// can say. macOS cannot, and answers with the frontmost application.
-    fn source_application(&self) -> Option<String>;
+    /// Every application that could have put the current contents there.
+    ///
+    /// Windows can name the owner exactly and answers with one. macOS cannot,
+    /// and answers with every application that was frontmost across the
+    /// interval the change fell in, because the spike showed that asking at the
+    /// instant of noticing attributes a password to whatever the user switched
+    /// to.
+    fn candidate_applications(&self) -> Vec<String>;
     fn text(&self) -> Option<String>;
     /// The current contents as encoded PNG bytes, when there is an image.
     fn image(&self) -> Option<Vec<u8>>;
@@ -120,15 +125,18 @@ impl Watcher {
         }
     }
 
+    /// Any candidate being excluded is enough. Deliberately asymmetric: this
+    /// will sometimes decline to record something it could have kept, which is
+    /// a nuisance, rather than keep a password, which is a liability.
     fn copied_from_excluded_application(&self) -> bool {
         let excluded = self.policy.excluded_applications();
         if excluded.is_empty() {
             return false;
         }
-        self.source.source_application().is_some_and(|name| {
+        self.source.candidate_applications().iter().any(|name| {
             excluded
                 .iter()
-                .any(|candidate| candidate.eq_ignore_ascii_case(&name))
+                .any(|candidate| candidate.eq_ignore_ascii_case(name))
         })
     }
 
@@ -187,7 +195,7 @@ mod tests {
         text: Mutex<Option<String>>,
         image: Mutex<Option<Vec<u8>>>,
         excluded: AtomicBool,
-        application: Mutex<Option<String>>,
+        applications: Mutex<Vec<String>>,
         /// Every read of content, so a test can prove excluded content was
         /// never looked at.
         reads: Mutex<Vec<&'static str>>,
@@ -207,7 +215,13 @@ mod tests {
         }
 
         fn from(&self, application: &str) {
-            *self.application.lock().unwrap() = Some(application.into());
+            *self.applications.lock().unwrap() = vec![application.into()];
+        }
+
+        /// The user copied in one application and switched to another before
+        /// the change was noticed, so both are candidates.
+        fn copied_in_then_switched_to(&self, copied_in: &str, switched_to: &str) {
+            *self.applications.lock().unwrap() = vec![copied_in.into(), switched_to.into()];
         }
     }
 
@@ -218,8 +232,8 @@ mod tests {
         fn is_excluded(&self) -> bool {
             self.excluded.load(Ordering::SeqCst)
         }
-        fn source_application(&self) -> Option<String> {
-            self.application.lock().unwrap().clone()
+        fn candidate_applications(&self) -> Vec<String> {
+            self.applications.lock().unwrap().clone()
         }
         fn text(&self) -> Option<String> {
             self.reads.lock().unwrap().push("text");
@@ -358,6 +372,35 @@ mod tests {
         assert!(!watcher.poll(2));
 
         assert_eq!(texts(&history), ["first"]);
+    }
+
+    /// The case the macOS spike exposed: a password copied from a manager the
+    /// user leaves immediately, which attribution at an instant blamed on
+    /// whatever they switched to.
+    #[test]
+    fn an_excluded_application_left_before_the_copy_was_noticed_still_excludes() {
+        let (clipboard, policy, history, watcher) = setup();
+        policy.excluded.lock().unwrap().push("Proton Pass".into());
+        clipboard.copied_in_then_switched_to("Proton Pass", "Ghostty");
+        clipboard.copy_text("a password");
+
+        assert!(!watcher.poll(1));
+        assert!(history.entries().unwrap().is_empty());
+        assert!(
+            clipboard.reads.lock().unwrap().is_empty(),
+            "the password must not be read just because the user switched away"
+        );
+    }
+
+    #[test]
+    fn switching_between_two_allowed_applications_still_records() {
+        let (clipboard, policy, history, watcher) = setup();
+        policy.excluded.lock().unwrap().push("Proton Pass".into());
+        clipboard.copied_in_then_switched_to("Notes", "Ghostty");
+        clipboard.copy_text("something ordinary");
+
+        assert!(watcher.poll(1));
+        assert_eq!(texts(&history), ["something ordinary"]);
     }
 
     #[test]

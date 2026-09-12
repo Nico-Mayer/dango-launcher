@@ -59,6 +59,16 @@ beyond the check itself.
 - **WHEN** content is copied from an application the user has added to the exclusion list
 - **THEN** nothing is recorded
 
+#### Scenario: Excluded application left before the copy was noticed
+
+- **WHEN** content is copied from an excluded application and the user switches to another application before the copy is noticed
+- **THEN** nothing is recorded, because any application frontmost around the copy is enough to exclude it
+
+#### Scenario: Exclusion list is populated out of the box
+
+- **WHEN** the user has never edited the exclusion list
+- **THEN** mainstream password managers are already excluded
+
 #### Scenario: Exclusion list is read at run time
 
 - **WHEN** the user changes the exclusion list while Dango is running

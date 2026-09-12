@@ -1,12 +1,18 @@
 ## 1. Spike: reading the clipboard on both platforms
 
-- [ ] 1.1 On macOS, read the change counter, the text, and an image, and confirm the counter moves exactly once per copy
+- [x] 1.1 On macOS, read the change counter, the text, and an image, and confirm the counter moves exactly once per copy
+  - macOS: the counter does **not** move exactly once per copy. It advanced by two on ordinary copies, because clearing and writing each bump it. Text and images both read correctly; a PNG came back in 6.3ms.
 - [ ] 1.2 On Windows, read the sequence number, the text, and an image, and confirm it moves exactly once per copy
-- [ ] 1.3 On macOS, copy from a password manager and confirm the concealed marker is present before any content is read
+- [x] 1.3 On macOS, copy from a password manager and confirm the concealed marker is present before any content is read
+  - macOS: **failed**. Proton Pass offers a copied password as `public.utf8-plain-text` and `NSStringPboardType` and nothing else. No concealed marker, no auto-generated marker, nothing to check.
 - [ ] 1.4 On Windows, copy from a password manager and confirm the exclusion formats are present before any content is read
 - [ ] 1.5 On Windows, identify the copying application through the clipboard owner, and on macOS through the frontmost application, and record how often macOS attributes wrongly
-- [ ] 1.6 Measure what reading a large image costs, to size the poll interval against it
-- [ ] 1.7 If any of the above does not work, revisit the design before building on it
+  - The macOS half is done; the Windows half is open.
+  - macOS: **failed**. A Proton Pass password was attributed to the terminal, because the copy was followed by switching away inside the poll interval. That is the normal password flow, not an edge case, so attribution at an instant is systematically wrong where it matters most.
+- [x] 1.6 Measure what reading a large image costs, to size the poll interval against it
+  - Reading the type list took 0.3 to 2.5ms warm and 9.5ms on the first call. Text read in under 1ms. A small PNG plus its TIFF took 6.3ms. A 250ms poll has ample room. TIFF was 37,482 bytes against 1,571 for the same image as PNG, so PNG is read first and TIFF only as a fallback.
+- [x] 1.7 If any of the above does not work, revisit the design before building on it
+  - Fired. Two design decisions were overturned and the design was revised before group 5: the marker is demoted from the defence to a bonus, attribution now covers the whole interval a change fell in rather than an instant, and the exclusion list ships with mainstream password managers already in it.
 
 ## 2. Preference storage
 

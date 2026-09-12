@@ -72,6 +72,7 @@ objc2-app-kit = { version = "0.3", features = [
   "NSImage",
   "NSImageRep",
   "NSGraphicsContext",
+  "NSPasteboard",
   "block2",
   "objc2-core-graphics",
 ] }
