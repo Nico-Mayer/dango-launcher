@@ -33,6 +33,11 @@ template, change either afterwards, and delete it, without leaving the launcher.
 - **WHEN** the user edits a quicklink's name or URL template and submits
 - **THEN** the stored quicklink reflects the change
 
+#### Scenario: The form shows what the quicklink will ask for
+
+- **WHEN** the user is writing a quicklink's URL template
+- **THEN** the form shows the arguments it will ask for, updating as the template is edited
+
 #### Scenario: Removing a quicklink
 
 - **WHEN** the user removes a quicklink

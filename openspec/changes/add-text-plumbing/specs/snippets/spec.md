@@ -40,6 +40,38 @@ change either afterwards, and delete it, without leaving the launcher.
 - **WHEN** the user saves a snippet whose template cannot be parsed
 - **THEN** it is refused with a message and nothing is stored
 
+### Requirement: The create and edit forms show what a snippet will ask for
+
+While the user is writing a snippet's template, the form SHALL show the
+arguments that template will ask for when it is used, so that text which is a
+placeholder by accident is visible while it is still being edited.
+
+#### Scenario: A template with arguments shows them
+
+- **WHEN** the user's template references two names that are not reserved
+- **THEN** the form shows both as arguments the snippet will ask for
+
+#### Scenario: The preview follows the template as it is edited
+
+- **WHEN** the user changes the template
+- **THEN** the arguments shown change to match
+
+#### Scenario: A template with no arguments says so
+
+- **WHEN** the user's template references only reserved names, or none
+- **THEN** the form shows that the snippet will ask for nothing
+
+#### Scenario: Pasted text that is a placeholder by accident is visible
+
+- **WHEN** the user pastes text containing a doubled-brace expression from another templating system
+- **THEN** the form shows the argument it would ask for
+- **AND** the user can see it before saving
+
+#### Scenario: A template that cannot be parsed says so while it is typed
+
+- **WHEN** the template cannot be parsed
+- **THEN** the form says so instead of showing arguments
+
 ### Requirement: Snippets are found in root search
 
 Every snippet the user has created SHALL appear as a result in root search,

@@ -105,12 +105,23 @@ is the same `objc2` family this project already depends on. Its
 types from `objc2-core-foundation` 0.3, which is already in the tree via
 `objc2-app-kit`. Nothing converts at a boundary because there is no boundary.
 
+It does not export the attribute name constants, so `AXFocusedUIElement` and
+`AXSelectedText` are written as string literals. They are documented and stable,
+and the spike confirmed both against a live element.
+
 Rejected: `axuielement` 0.9.1. The nicest API of the four, with safe wrappers
 and the `AXSelectedText` constants named, and it was the first choice until its
 manifest was read: it depends on `apple-cf`, a separate Core Foundation binding
 stack. Taking it means two incompatible `CFString` types in one binary and
 conversions wherever AX meets AppKit. That is a real cost paid forever for
 convenience in one module.
+
+An honesty note, since the spike made it visible: `enigo` pulls a second Core
+Foundation stack anyway, `core-foundation` 0.10 and `core-graphics` 0.25. The
+distinction that matters is narrower than "one stack in the binary". Those types
+never surface in our code, because `enigo`'s API is its own `Key` enum, whereas
+AX values would have crossed into our own AppKit code on every selection read.
+The reasoning holds; it was stated too broadly.
 
 Rejected: `accessibility` 0.2.0. Depends on `cocoa` 0.26, the pre-`objc2`
 generation the whole ecosystem has moved off. Same two-stack problem, older.
@@ -233,10 +244,12 @@ So there is no `{{ argument(name="City") }}` syntax to learn. `{{ city }}` is an
 argument because nothing else claims the name. One rule, and the engine already
 computes the set.
 
-The features taken are narrow: `default-features = false`, plus `builtins` and
-`urlencode`, because quicklinks need a query put into a URL safely and
-`minijinja::filters::urlencode` is that, behind its own feature flag. No loader
-is installed, so `include` and `extends` have nothing to reach.
+The features taken are narrow: `default-features = false`, plus `builtins`,
+`serde`, and `urlencode`. Quicklinks need a query put into a URL safely and
+`minijinja::filters::urlencode` is that, behind its own feature flag. `serde` is
+not optional in practice: without it `Environment::new` is deprecated, and CI
+turns that warning into a failure. No loader is installed, so `include` and
+`extends` have nothing to reach.
 
 Rejected: `upon` 0.11.0. Genuinely close, and the runner-up: minimal
 dependencies, configurable delimiters, filters, a clean API. It has no way to
@@ -257,24 +270,57 @@ Rejected: `strfmt` 0.2.5. Substitution into `{name}` and nothing more, so date
 formatting and URL encoding would be hand-rolled around it. It is the closest
 thing to writing it ourselves while still taking a dependency.
 
-### Delimiters stay `{{ }}`, and control flow is neither used nor blocked
+### Delimiters stay `{{ }}`, and the save form says what a template will ask for
+
+Revised after the spike, which half disproved the original argument.
 
 `minijinja` can change its delimiters behind the `custom_syntax` feature, and
 single braces were tempting because `{clipboard}` reads better than
 `{{ clipboard }}`.
 
-Rejected, for what snippets are actually for. A large share of them are code,
-and code is full of single braces. Making `{` significant means every C-like
-snippet needs escaping, which is a tax on the common case to save two characters
-in the rare one. `{{ }}` is also a convention the author will recognise from
+Single braces stay rejected, and the spike confirmed the reason: a snippet of
+code full of `{` reports no placeholders under `{{ }}`, so the common case is
+already free. Making `{` significant would tax it to save two characters.
+
+What the original argument missed is that doubled braces are not rare in the
+text an author stores as a snippet, and they fail in two different ways:
+
+- `printf("{{%d}}", x)` does not parse, so the snippet is refused at save.
+  Annoying, but visible.
+- `runs-on: ${{ matrix.os }}` parses and reports an argument named `matrix`.
+  `<p>{{ user.name }}</p>` reports `user`. These save cleanly and then ask the
+  wrong question every single time they are used. GitHub Actions, Vue, Angular,
+  and Handlebars all land here.
+
+The silent one is the problem, so the fix is to remove the silence rather than
+the syntax: the create and edit forms show the arguments the template will ask
+for, live, as the template is typed. Pasting a workflow file and seeing "this
+will ask you for: matrix" puts the surprise at the one moment the user is
+already editing the thing and can fix it.
+
+`minijinja`'s escapes both work and were confirmed: `{% raw %}...{% endraw %}`
+and `{{ '{{' }}` each parse to no placeholders. So there is a fix available once
+the user knows there is something to fix, which is exactly what the preview
+gives them.
+
+Rejected: switching to `<<name>>` or `[[name]]` under `custom_syntax`. It costs
+no new dependency, since `aho-corasick` is already in the tree, but every
+delimiter pair collides with something. `[[` is bash test syntax and Lua long
+strings; `<<` is heredocs and Erlang binaries. Moving the collision is not
+removing it, and `{{ }}` is at least a convention the author already reads
 elsewhere.
 
-The consequence is that `{% if %}` and `{% for %}` are reachable, because block
-syntax comes from the parser and no feature flag removes it. They are not
-specified, not documented, and not tested, and they are not blocked either:
-rejecting a template the engine would render happily is a validator we would own
-and a rule we would have to explain. The specs cover placeholders. Anything else
-a template does is between the author and the engine.
+Rejected: rejecting any template whose arguments look like they came from code.
+There is no honest rule for that, and a validator that guesses is worse than a
+preview that shows.
+
+The other consequence of `{{ }}` is that `{% if %}` and `{% for %}` are
+reachable, because block syntax comes from the parser and no feature flag
+removes it. They are not specified, not documented, and not tested, and they are
+not blocked either: rejecting a template the engine would render happily is a
+validator we would own and a rule we would have to explain. The specs cover
+placeholders. Anything else a template does is between the author and the
+engine.
 
 ### Arguments are a form, and a form submit is an action carrying values
 
@@ -302,6 +348,39 @@ Field order is by first occurrence in the template source, because
 `undeclared_variables` returns a `HashSet` and a form whose fields shuffle
 between openings is unusable. That is a scan of the source for ordering only;
 the set of names still comes from the engine.
+
+### The argument preview is a field kind, not a live form round trip
+
+The preview decided above has to update as the user types, and the view protocol
+has no way for a form to tell a command that a field changed.
+
+Three routes were considered.
+
+Rejected: a per-field "notify on change" flag, so the command is told and pushes
+a replaced view. It is the most consistent with the architecture, since
+`Filtering::Command` already means exactly this for lists and the protocol is
+full-tree replace anyway. It loses on one detail: `ProtocolView` keeps the
+entered values in local state, so replacing the tree on every keystroke would
+fight the user's own typing and caret. A round trip per keystroke to rebuild the
+form the user is currently inside is the wrong shape.
+
+Rejected: showing the arguments only after a save attempt. That is where the
+surprise already is, and moving it nowhere is not a fix.
+
+Chosen: `FieldKind` gains a `Template` variant next to `Text`, `Password`, and
+`Toggle`. A field declared as a template renders with its argument preview
+beneath it, fed by a Tauri command that parses the text and answers with the
+arguments in order, or with the parse error. No view tree is replaced, the
+user's typing is untouched, and any extension that stores a template gets the
+same affordance for free.
+
+This is additive to the view protocol: a new enum variant, no change to any
+existing shape, and nothing that was valid before stops being valid.
+`protocolVersion` does not move. It is recorded here because the protocol is a
+versioned contract and even additive changes to it should be deliberate.
+
+The command is the only new surface, and it is pure: text in, argument names and
+a possible parse error out. Nothing is stored and nothing is rendered.
 
 ### `query` is a reserved argument name, not a second mechanism
 

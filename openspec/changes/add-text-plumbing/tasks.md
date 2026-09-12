@@ -21,7 +21,11 @@ expensive to answer late.
     - `<p>{{ user.name }}</p>` does the same with `user`, so Vue, Angular, and Handlebars snippets all misbehave silently.
   - Escapes exist and work: `{% raw %}...{% endraw %}` and `{{ '{{' }}` both parse to no placeholders. Both require editing text the user pasted in.
   - See 1.8. This needs a decision before group 2.
-- [ ] 1.8 If any of the above does not work, revise design.md before building on it
+- [x] 1.8 If any of the above does not work, revise design.md before building on it
+  - Fired, on 1.7. The delimiter decision is revised: `{{ }}` stays, and the silent failure is removed rather than the syntax. The create and edit forms now show the arguments a template will ask for as it is typed, so text that is a placeholder by accident is visible while the user is still editing it. Switching to `<<name>>` or `[[name]]` was rejected, since every delimiter pair collides with something.
+  - A second decision came with it: the preview is a new `FieldKind::Template` fed by a pure parse command, not a per-keystroke form round trip, which would fight the user's own typing. Additive to the view protocol, so `protocolVersion` does not move.
+  - Two smaller corrections folded in: `minijinja` also needs its `serde` feature, and the `axuielement` rejection was stated too broadly, since `enigo` pulls a second Core Foundation stack anyway.
+  - Specs updated: snippets gains a requirement for the preview, quicklinks a scenario.
 
 ## 2. The template engine
 
@@ -47,6 +51,8 @@ since M1. Nothing else in this change works without it.
 - [ ] 3.2 Carry the values through `ExtensionHost::perform_action` and the `run_action` command, with a test that an extension receives what was submitted
 - [ ] 3.3 Wire `ProtocolView`'s `onsubmit` to `run_action` with the form's primary action, replacing the empty function in `App.svelte`, and verify a form submit reaches the backend
 - [ ] 3.4 Verify submitting a form that returns `ActionOutcome::Replaced` leaves the user on the replaced view rather than closing the launcher
+- [ ] 3.5 Add `FieldKind::Template` and a pure `inspect_template` command answering with the arguments in order or the parse error, with tests over a template with arguments, one with none, and one that will not parse
+- [ ] 3.6 Render a template field with its argument preview beneath it in `ProtocolView`, updating as the field is edited, and verify by typing a doubled-brace expression that the argument it would ask for is shown
 
 ## 4. Selection and paste behind traits
 
@@ -89,11 +95,12 @@ closes on the Windows machine, the way the clipboard change did.
 - [ ] 7.4 Refuse a snippet with an empty name or template, or a template that will not parse, with tests and a message the form shows
 - [ ] 7.5 Contribute snippets as root items matched on name, with a test, and verify the provider answers within 50ms with 500 snippets stored
 - [ ] 7.6 Build the create and edit forms on the `Form` view kind, reusing the submit path from group 3, verified by creating a snippet from the launcher
-- [ ] 7.7 Insert a snippet's rendered text on confirm, with a test over a template needing no arguments
-- [ ] 7.8 Push an argument form when the template needs arguments, in template order, and insert on submit, with a test
-- [ ] 7.9 Leave nothing inserted and the clipboard untouched when the argument form is dismissed, with a test
-- [ ] 7.10 Add the copy action as an alternative to inserting, and verify the copied text is recorded in the clipboard history as the user's own copy
-- [ ] 7.11 Add the remove action leaving the list open, with a test
+- [ ] 7.7 Declare the template field as `FieldKind::Template` so the create and edit forms show what the snippet will ask for, verified by pasting a GitHub Actions expression and seeing `matrix` listed before saving
+- [ ] 7.8 Insert a snippet's rendered text on confirm, with a test over a template needing no arguments
+- [ ] 7.9 Push an argument form when the template needs arguments, in template order, and insert on submit, with a test
+- [ ] 7.10 Leave nothing inserted and the clipboard untouched when the argument form is dismissed, with a test
+- [ ] 7.11 Add the copy action as an alternative to inserting, and verify the copied text is recorded in the clipboard history as the user's own copy
+- [ ] 7.12 Add the remove action leaving the list open, with a test
 
 ## 8. Quicklinks
 
@@ -102,11 +109,12 @@ closes on the Windows machine, the way the clipboard change did.
 - [ ] 8.3 Store, update, and soft-delete a quicklink, with tests including that a removed quicklink stays removed across a reopen
 - [ ] 8.4 Refuse a quicklink with an empty name or URL, or a template that cannot form a valid URL, with tests
 - [ ] 8.5 Contribute quicklinks as root items matched on name, with a test, and verify the provider answers within 50ms with 500 quicklinks stored
-- [ ] 8.6 Open the rendered URL in the default browser on confirm, with a test over the rendering and a check by hand that it opens
-- [ ] 8.7 Push a query form when the template uses `query`, and open on submit with the query encoded, with tests over spaces and reserved characters
-- [ ] 8.8 Resolve `clipboard` and `selection` in a quicklink without asking the user, with a test
-- [ ] 8.9 Report a URL that could not be opened without closing the launcher, with a test
-- [ ] 8.10 Add the copy-URL action, with a test
+- [ ] 8.6 Declare the URL field as `FieldKind::Template` so the create and edit forms show what the quicklink will ask for, verified by hand
+- [ ] 8.7 Open the rendered URL in the default browser on confirm, with a test over the rendering and a check by hand that it opens
+- [ ] 8.8 Push a query form when the template uses `query`, and open on submit with the query encoded, with tests over spaces and reserved characters
+- [ ] 8.9 Resolve `clipboard` and `selection` in a quicklink without asking the user, with a test
+- [ ] 8.10 Report a URL that could not be opened without closing the launcher, with a test
+- [ ] 8.11 Add the copy-URL action, with a test
 
 ## 9. Verification
 
@@ -120,3 +128,4 @@ closes on the Windows machine, the way the clipboard change did.
 - [ ] 9.8 Confirm on macOS that revoking the Accessibility permission produces the explained failure and the prompt action, and that granting it restores normal behaviour without a restart
 - [ ] 9.9 Confirm on Windows that pasting into an elevated window fails visibly and leaves the clipboard alone
 - [ ] 9.10 Confirm on both platforms that snippets and quicklinks survive a restart with their names and templates intact
+- [ ] 9.11 Confirm on both platforms that the save form's argument preview catches a pasted doubled-brace expression before it is stored
