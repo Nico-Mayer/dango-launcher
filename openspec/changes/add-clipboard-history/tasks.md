@@ -86,7 +86,9 @@
 - [ ] 8.1 Walk every scenario in the two spec files on macOS
 - [ ] 8.2 Walk every scenario in the two spec files on Windows
 - [ ] 8.3 Confirm activation still meets the 80ms budget on release builds on both platforms, with the watcher running
-  - macOS: **fails**. 27 activations, median 41.2ms and p90 54.9ms, but one at 95.9ms. Not the cold first activation this time: it was late in the session, while a large image was being copied and the launcher opened immediately after, which is the contention the spec explicitly forbids. Needs chasing before this change is done.
+  - macOS: **passes**. 46 activations, median 41.9ms, p90 49.5ms, max 70.0ms, none over 80ms, including copying a large image and opening the launcher immediately after.
+  - It failed before the move to `clipboard-rs`: one activation in 27 reached 95.9ms under exactly that contention. The rework removed the cause rather than the symptom. Nothing polls any more, so there is no thread waking four times a second to contend with; the crate delivers a change event instead.
+  - Windows is open.
 - [x] 8.4 Confirm root search stays responsive while a large image is recorded, on both platforms
   - macOS: confirmed by hand. Root search stayed responsive to typing. The activation budget during the same contention did not, which is group 8.3.
 - [x] 8.5 Confirm the history survives a restart with its order intact, on both platforms
