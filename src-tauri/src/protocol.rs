@@ -22,7 +22,7 @@ macro_rules! protocol_types {
         $(
             #[cfg_attr(test, derive(TS))]
             #[cfg_attr(test, ts(export, export_to = "../../src/protocol/"))]
-            #[derive(Clone, Debug, Serialize, Deserialize)]
+            #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
             $item
         )*
     };

@@ -6,7 +6,10 @@ use std::collections::HashMap;
 use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::sync::{Arc, Mutex};
 
-pub use manifest::{CommandDecl, InvocationMode, Manifest, ManifestError, NAMED_ICON};
+pub use manifest::{
+    CommandDecl, InvocationMode, Manifest, ManifestError, PreferenceDecl, PreferenceKind,
+    NAMED_ICON,
+};
 pub use preferences::{PreferenceStore, Preferences};
 pub use registry::{Collision, Host, RegisteredCommand, Registry};
 
@@ -15,10 +18,15 @@ pub type ActivationResult = Result<(), Box<dyn std::error::Error + Send + Sync>>
 /// What running an action on a result produced. `Done` means the work is
 /// finished and the launcher should get out of the way; a copy hands text back
 /// because only the webview can reach the clipboard.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq)]
 pub enum ActionOutcome {
     Done,
     CopyToClipboard(String),
+    /// The action changed what the view was showing, so the view is replaced
+    /// and the user stays where they are. Removing one of a list of things is
+    /// the case that needs it: hiding the launcher after each one would make
+    /// clearing several a chore.
+    Replaced(Box<crate::protocol::ViewTree>),
     Failed(String),
 }
 

@@ -1,8 +1,10 @@
 //! The `clipboard-history` built-in extension.
 
+mod extension;
 mod history;
 mod watcher;
 
+pub use extension::{preference_declarations, ClipboardExtension, PreferencePolicy, EXTENSION_ID};
 pub use history::{Bounds, Content, Entry, History, HistoryError, Kind};
 pub use watcher::{ClipboardSource, Policy, WatchService, Watcher, POLL_INTERVAL};
 

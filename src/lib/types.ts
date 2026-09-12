@@ -1,4 +1,5 @@
 import type { Shortcut } from "../protocol/Shortcut";
+import type { ViewTree } from "../protocol/ViewTree";
 
 export interface ActionDto {
   id: string;
@@ -27,6 +28,9 @@ export interface ResultsPayload {
 export type ActionResponse =
   | { kind: "done" }
   | { kind: "copy"; text: string }
+  /// The action changed what the view was showing, so it is replaced and the
+  /// user stays where they are.
+  | { kind: "replaced"; tree: ViewTree }
   | { kind: "failed"; message: string };
 
 /// True when the pressed key event matches a declared shortcut.

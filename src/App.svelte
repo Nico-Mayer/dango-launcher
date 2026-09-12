@@ -88,6 +88,8 @@
     if (response.kind === "copy") {
       await navigator.clipboard.writeText(response.text);
       invoke("dismiss");
+    } else if (response.kind === "replaced") {
+      stack = [...stack.slice(0, -1), response.tree];
     } else if (response.kind === "failed") {
       failure = response.message;
     }

@@ -125,13 +125,19 @@
             onclick={() => item.actions.length > 0 && onaction(item.actions[0].id, item.id)}
           >
             {#if namedIcon(item.icon)}
-              <div class="text-foreground-alt flex h-6 w-6 shrink-0 items-center justify-center">
+              <div class="text-foreground-alt flex h-10 w-10 shrink-0 items-center justify-center">
                 <Icon name={namedIcon(item.icon)!} size={18} />
               </div>
             {:else if item.icon}
-              <img src={convertFileSrc(item.icon)} alt="" class="h-6 w-6 shrink-0" />
+              <!-- Big enough to tell one copied image from another, which a
+                   row-height thumbnail is not. -->
+              <img
+                src={convertFileSrc(item.icon)}
+                alt=""
+                class="border-border-card h-10 w-10 shrink-0 rounded border object-cover"
+              />
             {:else}
-              <div class="bg-muted h-6 w-6 shrink-0 rounded"></div>
+              <div class="bg-muted h-10 w-10 shrink-0 rounded"></div>
             {/if}
             <div class="flex min-w-0 flex-col">
               <span class="text-foreground truncate text-sm">{item.title}</span>

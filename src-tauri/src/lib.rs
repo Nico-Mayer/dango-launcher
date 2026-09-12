@@ -22,6 +22,7 @@ use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut,
 
 use extension::{ActionOutcome, EnabledStore, ExtensionHost, HostResolver};
 use extensions::applications::{AppIndex, ApplicationsExtension, IconCache};
+use extensions::clipboard::{ClipboardExtension, History, PreferencePolicy, Watcher};
 use extensions::system::SystemExtension;
 use invocation::{InvokeError, Invoker, Outcome, Output};
 use latency::LatencyProbe;
@@ -79,6 +80,7 @@ struct ResultsPayload {
 enum ActionResponse {
     Done,
     Copy { text: String },
+    Replaced { tree: protocol::ViewTree },
     Failed { message: String },
 }
 
@@ -218,6 +220,7 @@ fn run_action(
             ActionResponse::Done
         }
         ActionOutcome::CopyToClipboard(text) => ActionResponse::Copy { text },
+        ActionOutcome::Replaced(tree) => ActionResponse::Replaced { tree: *tree },
         ActionOutcome::Failed(message) => ActionResponse::Failed { message },
     }
 }
@@ -424,6 +427,35 @@ pub fn run() {
                 Err(error) => eprintln!("[dango] applications failed to load: {error}"),
             }
             app.manage(extension);
+
+            // Registering for application activations needs the main thread,
+            // which this is; the watcher itself runs on its own.
+            let clipboard_source = platform::clipboard_source();
+            if let Some(store) = &store {
+                let images = app
+                    .path()
+                    .app_cache_dir()
+                    .unwrap_or_else(|_| std::env::temp_dir())
+                    .join("clipboard");
+                // The webview loads image thumbnails through the asset protocol.
+                let _ = app.asset_protocol_scope().allow_directory(&images, true);
+
+                let history = Arc::new(History::new(store.clone(), images));
+                let policy = Arc::new(PreferencePolicy(extension::Preferences::new(
+                    extensions::clipboard::EXTENSION_ID,
+                    extensions::clipboard::preference_declarations(),
+                    store.clone(),
+                )));
+                let watcher = Arc::new(Watcher::new(clipboard_source, history.clone(), policy));
+                let clipboard = Arc::new(ClipboardExtension::new(history, watcher));
+                match host.register(clipboard) {
+                    Ok(report) if report.is_clean() => {}
+                    Ok(report) => eprintln!("[dango] clipboard loaded with issues: {report:?}"),
+                    Err(error) => eprintln!("[dango] clipboard failed to load: {error}"),
+                }
+            } else {
+                eprintln!("[dango] no database, so clipboard history is off");
+            }
 
             let system = Arc::new(SystemExtension::new(
                 platform::system_control(),

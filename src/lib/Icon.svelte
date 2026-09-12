@@ -2,6 +2,7 @@
   import AppWindow from "@lucide/svelte/icons/app-window";
   import CircleAlert from "@lucide/svelte/icons/circle-alert";
   import CirclePower from "@lucide/svelte/icons/circle-power";
+  import ClipboardList from "@lucide/svelte/icons/clipboard-list";
   import LoaderCircle from "@lucide/svelte/icons/loader-circle";
   import Lock from "@lucide/svelte/icons/lock";
   import Moon from "@lucide/svelte/icons/moon";
@@ -16,6 +17,7 @@
     "app-window": AppWindow,
     "circle-alert": CircleAlert,
     "circle-power": CirclePower,
+    "clipboard-list": ClipboardList,
     "loader-circle": LoaderCircle,
     lock: Lock,
     moon: Moon,
