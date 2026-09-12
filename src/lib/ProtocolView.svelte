@@ -1,28 +1,30 @@
 <script lang="ts">
-  import { convertFileSrc } from "@tauri-apps/api/core";
+  import { Command } from "bits-ui";
   import ActionPanel from "./ActionPanel.svelte";
-  import Icon, { namedIcon } from "./Icon.svelte";
+  import ResultRow from "./ResultRow.svelte";
   import { pointerOwnsSelection } from "./pointer.svelte";
   import type { ViewTree } from "../protocol/ViewTree";
   import { matchesShortcut, type ActionDto } from "./types";
 
   interface Props {
     tree: ViewTree;
-    /// What the user has typed. Applied here only when the view declares that
-    /// the launcher owns filtering.
-    query: string;
     onaction: (actionId: string, itemId: string | null) => void;
     onsubmit: (values: Record<string, string>) => void;
   }
 
-  let { tree, query, onaction, onsubmit }: Props = $props();
-  let selected = $state(0);
+  let { tree, onaction, onsubmit }: Props = $props();
+
+  let query = $state("");
+  let selectedId = $state("");
   let panelOpen = $state(false);
-  let listEl = $state<HTMLUListElement | null>(null);
+  let inputEl = $state<HTMLInputElement | null>(null);
   let formValues = $state<Record<string, string>>({});
 
   const view = $derived(tree.view);
 
+  /// Narrowing happens here only when the view says the launcher owns it. A
+  /// view that owns its own filtering gets each query change instead, which no
+  /// command needs yet.
   const items = $derived(
     view.kind !== "list"
       ? []
@@ -31,35 +33,35 @@
         : view.items,
   );
 
-  // Narrowing the list can strand the cursor past its end.
-  $effect(() => {
-    if (selected >= items.length) selected = Math.max(items.length - 1, 0);
-  });
-
-  // Arrowing past the visible edge has to bring the selection with it. The
-  // root list gets this from its primitive; a pushed view has none.
-  $effect(() => {
-    const index = selected;
-    listEl?.children[index]?.scrollIntoView({ block: "nearest" });
-  });
+  const selectedItem = $derived(items.find((item) => item.id === selectedId) ?? items[0]);
 
   /// What the action panel offers. A list item's own actions win over the
   /// view's, because the item is what the user has selected.
   const actions = $derived<ActionDto[]>(
-    view.kind === "list" ? (items[selected]?.actions ?? []) : view.actions,
+    view.kind === "list" ? (selectedItem?.actions ?? []) : view.actions,
   );
 
   /// Which item the action applies to. A detail or form view has none, and the
   /// command is expected to already know what it asked about.
   function selectedItemId(): string | null {
-    return view.kind === "list" ? (items[selected]?.id ?? null) : null;
+    return view.kind === "list" ? (selectedItem?.id ?? null) : null;
   }
 
   function primaryAction(): string | null {
-    const actions = "actions" in view ? view.actions : [];
-    return actions.length > 0 ? actions[0].id : null;
+    const available = "actions" in view ? view.actions : [];
+    return available.length > 0 ? available[0].id : null;
   }
 
+  /// A view arriving takes the cursor, so typing narrows it without a click,
+  /// and the action panel closing hands it back.
+  $effect(() => {
+    if (panelOpen) return;
+    inputEl?.focus();
+  });
+
+  /// Keys the Command primitive does not own. Arrow navigation, Enter on a list
+  /// item, and scroll-into-view all come from it, so only the action panel,
+  /// per-action shortcuts, and submitting a form are handled here.
   function onKeydown(event: KeyboardEvent) {
     if (panelOpen) return;
     if (event.key.toLowerCase() === "k" && (event.ctrlKey || event.metaKey)) {
@@ -74,29 +76,18 @@
         return;
       }
     }
-    if (view.kind === "list") {
-      if (event.key === "ArrowDown") {
-        event.preventDefault();
-        selected = Math.min(selected + 1, items.length - 1);
-      } else if (event.key === "ArrowUp") {
-        event.preventDefault();
-        selected = Math.max(selected - 1, 0);
-      }
+    if (event.key !== "Enter") return;
+    if (view.kind === "form") {
+      event.preventDefault();
+      onsubmit(formValues);
+      return;
     }
-    if (event.key === "Enter") {
-      if (view.kind === "form") {
-        event.preventDefault();
-        onsubmit(formValues);
-        return;
-      }
-      const action =
-        view.kind === "list" && items[selected]?.actions.length
-          ? items[selected].actions[0].id
-          : primaryAction();
-      if (action) {
-        event.preventDefault();
-        onaction(action, selectedItemId());
-      }
+    // A list's Enter belongs to the primitive, which calls onSelect.
+    if (view.kind === "list") return;
+    const action = primaryAction();
+    if (action) {
+      event.preventDefault();
+      onaction(action, null);
     }
   }
 </script>
@@ -105,51 +96,53 @@
 
 
 {#if view.kind === "list"}
-  {#if view.loading && items.length === 0}
-    <div class="text-muted-foreground px-4 py-6 text-sm">Loading...</div>
-  {:else if items.length === 0}
-    <div class="text-muted-foreground px-4 py-6 text-sm">
-      {query.length > 0 ? "No results" : (view.emptyState?.title ?? "Nothing here")}
-    </div>
-  {:else}
-    <ul bind:this={listEl} class="py-1">
-      {#each items as item, i (item.id)}
-        <li>
-          <button
-            type="button"
-            class="mx-2 flex w-[calc(100%-1rem)] items-center gap-3 rounded-lg px-3 py-2 text-left {i ===
-            selected
-              ? 'bg-muted'
-              : ''}"
-            onpointermove={() => pointerOwnsSelection() && (selected = i)}
-            onclick={() => item.actions.length > 0 && onaction(item.actions[0].id, item.id)}
+  <Command.Root
+    shouldFilter={false}
+    disablePointerSelection={!pointerOwnsSelection()}
+    bind:value={selectedId}
+    class="flex min-h-0 flex-1 flex-col"
+  >
+    <Command.Input
+      bind:ref={inputEl}
+      bind:value={query}
+      placeholder="Search..."
+      spellcheck={false}
+      autocomplete="off"
+      class="text-foreground placeholder:text-muted-foreground h-16 w-full shrink-0 bg-transparent px-5 text-2xl focus:outline-none"
+    />
+    <Command.List class="border-border-card min-h-0 flex-1 overflow-y-auto border-t">
+      <Command.Viewport class="p-2">
+        {#each items as item (item.id)}
+          <Command.Item
+            value={item.id}
+            onSelect={() => item.actions.length > 0 && onaction(item.actions[0].id, item.id)}
+            class="data-[selected]:bg-muted flex h-14 items-center gap-3 rounded-lg px-3"
           >
-            {#if namedIcon(item.icon)}
-              <div class="text-foreground-alt flex h-10 w-10 shrink-0 items-center justify-center">
-                <Icon name={namedIcon(item.icon)!} size={18} />
-              </div>
-            {:else if item.icon}
-              <!-- Big enough to tell one copied image from another, which a
-                   row-height thumbnail is not. -->
-              <img
-                src={convertFileSrc(item.icon)}
-                alt=""
-                class="border-border-card h-10 w-10 shrink-0 rounded border object-cover"
-              />
+            <ResultRow
+              title={item.title}
+              subtitle={item.subtitle}
+              icon={item.icon}
+              iconIsContent
+            />
+          </Command.Item>
+        {/each}
+        {#if items.length === 0}
+          <div class="text-muted-foreground px-3 py-4 text-sm">
+            {#if view.loading}
+              Loading...
+            {:else if query.length > 0}
+              No results
             {:else}
-              <div class="bg-muted h-10 w-10 shrink-0 rounded"></div>
-            {/if}
-            <div class="flex min-w-0 flex-col">
-              <span class="text-foreground truncate text-sm">{item.title}</span>
-              {#if item.subtitle}
-                <span class="text-muted-foreground truncate text-xs">{item.subtitle}</span>
+              {view.emptyState?.title ?? "Nothing here"}
+              {#if view.emptyState?.description}
+                <p class="mt-1 text-xs">{view.emptyState.description}</p>
               {/if}
-            </div>
-          </button>
-        </li>
-      {/each}
-    </ul>
-  {/if}
+            {/if}
+          </div>
+        {/if}
+      </Command.Viewport>
+    </Command.List>
+  </Command.Root>
 {:else if view.kind === "detail"}
   <div class="text-foreground whitespace-pre-wrap px-4 py-3 text-sm">
     {view.markdown}

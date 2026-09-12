@@ -43,6 +43,9 @@
   }
 </script>
 
+<!-- mousedown is prevented on each entry: these are real buttons, and letting
+     one take focus would strand the cursor outside the search input once the
+     panel closes. -->
 <div
   class="border-border-card bg-background-alt absolute bottom-12 right-2 w-72 overflow-hidden rounded-[10px] border shadow-xl"
 >
@@ -53,6 +56,7 @@
         ? 'bg-muted text-foreground'
         : 'text-foreground-alt'}"
       onpointermove={() => pointerOwnsSelection() && (selected = i)}
+      onmousedown={(event) => event.preventDefault()}
       onclick={() => onrun(action.id)}
     >
       <span>{action.title}</span>

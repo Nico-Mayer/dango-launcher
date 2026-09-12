@@ -1,13 +1,13 @@
 <script lang="ts">
-  import { convertFileSrc, invoke } from "@tauri-apps/api/core";
+  import { invoke } from "@tauri-apps/api/core";
   import { listen } from "@tauri-apps/api/event";
   import { Command } from "bits-ui";
   import { onMount } from "svelte";
   import ActionPanel from "./lib/ActionPanel.svelte";
-  import Icon, { namedIcon } from "./lib/Icon.svelte";
+  import Icon from "./lib/Icon.svelte";
   import { pointerOwnsSelection } from "./lib/pointer.svelte";
   import ProtocolView from "./lib/ProtocolView.svelte";
-  import { highlight } from "./lib/highlight";
+  import ResultRow from "./lib/ResultRow.svelte";
   import { matchesShortcut, type ActionResponse, type ResultItem, type ResultsPayload } from "./lib/types";
   import type { ViewTree } from "./protocol/ViewTree";
 
@@ -22,10 +22,6 @@
   /// The extension whose command pushed what is on the stack, so an action
   /// chosen inside its view goes back to it.
   let viewOwner = $state<string | null>(null);
-  /// The query inside a pushed view, kept apart from the root one so popping
-  /// back does not lose what was typed at the root.
-  let viewQuery = $state("");
-  let viewInputEl = $state<HTMLInputElement | null>(null);
   let failure = $state<string | null>(null);
   // A view command has been invoked and its first tree has not arrived yet.
   let working = $state(false);
@@ -49,7 +45,6 @@
     results = [];
     stack = [];
     viewOwner = null;
-    viewQuery = "";
     panelOpen = false;
     protocolError = false;
     failure = null;
@@ -136,7 +131,6 @@
       if (stack.length > 0) {
         stack = stack.slice(0, -1);
         failure = null;
-        viewQuery = "";
         if (stack.length === 0) viewOwner = null;
       } else if (query.length > 0) {
         query = "";
@@ -158,12 +152,6 @@
         }
       }
     }
-  }
-
-  /// A named icon is handled by the icon component; anything else is a file an
-  /// extension extracted, which the webview reaches through the asset protocol.
-  function iconSrc(path: string | null | undefined): string | null {
-    return path && !namedIcon(path) ? convertFileSrc(path) : null;
   }
 
   onMount(() => {
@@ -203,9 +191,16 @@
     return () => unlisten.forEach((p) => p.then((un) => un()));
   });
 
-  // A view arriving takes the cursor, so typing narrows it without a click.
+  /// Who owns the cursor, in one place.
+  ///
+  /// The root input holds it unless something else is on screen that does: a
+  /// pushed view focuses its own input, the action panel and the protocol error
+  /// own the keyboard while they are up. Every one of those going away has to
+  /// hand the cursor back, or the launcher is left unable to type, which is how
+  /// popping a view used to strand it on the body.
   $effect(() => {
-    if (stack.length > 0) viewInputEl?.focus();
+    if (stack.length > 0 || panelOpen || protocolError) return;
+    inputEl?.focus();
   });
 
   // Re-query on every keystroke; the backend cancels the previous run.
@@ -246,22 +241,7 @@
   <main
     class="border-border-card bg-background flex h-screen w-screen flex-col overflow-hidden rounded-[14px] border"
   >
-    <input
-      bind:this={viewInputEl}
-      bind:value={viewQuery}
-      placeholder="Search..."
-      spellcheck={false}
-      autocomplete="off"
-      class="text-foreground placeholder:text-muted-foreground h-16 w-full shrink-0 bg-transparent px-5 text-2xl focus:outline-none"
-    />
-    <div class="border-border-card min-h-0 flex-1 overflow-y-auto border-t">
-      <ProtocolView
-        tree={stack[stack.length - 1]}
-        query={viewQuery}
-        onaction={runViewAction}
-        onsubmit={() => {}}
-      />
-    </div>
+    <ProtocolView tree={stack[stack.length - 1]} onaction={runViewAction} onsubmit={() => {}} />
     {#if failure}
       <div
         class="text-destructive border-border-card flex shrink-0 items-center gap-2 border-t px-5 py-2 text-sm"
@@ -293,27 +273,14 @@
           <Command.Item
             value={item.id}
             onSelect={() => confirm(item)}
-            class="flex h-12 items-center gap-3 rounded-lg px-3 data-[selected]:bg-muted"
+            class="data-[selected]:bg-muted flex h-14 items-center gap-3 rounded-lg px-3"
           >
-            {#if namedIcon(item.icon)}
-              <div class="text-foreground-alt flex h-7 w-7 shrink-0 items-center justify-center">
-                <Icon name={namedIcon(item.icon)!} size={20} />
-              </div>
-            {:else if iconSrc(item.icon)}
-              <img src={iconSrc(item.icon)} alt="" class="h-7 w-7 shrink-0" />
-            {:else}
-              <div class="bg-muted h-7 w-7 shrink-0 rounded"></div>
-            {/if}
-            <div class="flex min-w-0 items-baseline gap-2">
-              <span class="text-foreground truncate text-sm">
-                {#each highlight(item.title, item.matchPositions) as seg}
-                  <span class={seg.matched ? "font-semibold" : ""}>{seg.text}</span>
-                {/each}
-              </span>
-              {#if item.subtitle}
-                <span class="text-muted-foreground truncate text-xs">{item.subtitle}</span>
-              {/if}
-            </div>
+            <ResultRow
+              title={item.title}
+              subtitle={item.subtitle}
+              icon={item.icon}
+              matchPositions={item.matchPositions}
+            />
           </Command.Item>
         {/each}
         {#if results.length === 0 && query.length > 0}

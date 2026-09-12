@@ -71,12 +71,14 @@
 - [x] 7.1 Declare the manifest with its command, its service, and its preferences for the bounds and the exclusion list, and test that it validates
 - [x] 7.2 Implement the history command pushing the list newest first with launcher-side filtering, tested against a fake store
 - [x] 7.3 Show text entries on one line with whitespace collapsed, with a test over multi-line and indented text
-- [ ] 7.4 Show image entries with a thumbnail of themselves
+- [x] 7.4 Show image entries with a thumbnail of themselves
+  - The entry's own file is the thumbnail, which is the only way to tell one copied image from another. Confirmed live: copying a PNG writes the file and the row points at it.
 - [x] 7.5 Put the chosen entry back on the clipboard and hide the launcher, tested for both content types
 - [x] 7.6 Add the remove action, leaving the list open, with a test
   - `ActionOutcome` had no way to leave the user where they were: it could hide, copy, or fail. Adds `Replaced`, which hands back the rebuilt view, so clearing several entries is not a chore of reopening the history between each one.
 - [x] 7.7 Render the empty state when nothing has been copied, with a test
 - [ ] 7.8 Grow the list row enough for a thumbnail to be legible, checked by eye on both platforms
+  - Rows are 56px with a 32px icon in both lists. The two lists had drifted apart, so the row was extracted into one shared component and the pushed list rebuilt on the same `Command` primitive root search uses, rather than the hand-rolled list it had. macOS looks right; Windows is unchecked.
 
 ## 8. Verification
 
