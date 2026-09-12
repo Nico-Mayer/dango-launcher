@@ -111,6 +111,8 @@ since M1. Nothing else in this change works without it.
   - Written with `independent_of_keyboard_state` on and the prompt off. Needs 1.3 to confirm.
 - [x] 5.4 Hide the panel and wait for it to resign key before injecting, verified by confirming the text never lands in the launcher's own field
   - Verified by hand: with a text field focused in another application, confirming a snippet from root search lands the text there and never in the launcher's own field. This is what the three ordering bugs broke.
+  - **A second crash of the same family, found by driving the application rather than the exchange.** Launching the binary again, which the single-instance plugin turns into a show, aborted the running instance with SIGTRAP: `NSWindow _doOrderWindow` on a `tokio-rt-worker` thread. Making `run_action` async moved window operations off the main thread as well as the keystrokes, and AppKit traps rather than misbehaving.
+  - Every show and hide now marshals to the main thread, running inline when already there. The insertion path was only surviving because its hide was usually a no-op; the show that genuinely reordered a window was not.
 - [x] 5.5 Restore the clipboard after the delay measured in 1.3, verified by checking the clipboard's contents after a paste into a slow application
   - Verified: the clipboard holds what the user had after an insertion, and the insertion declares exactly two writes to the history, the text going out and the restore coming back.
 - [ ] 5.6 Report the missing Accessibility permission through `AXIsProcessTrusted` and offer the prompt as an action, verified by revoking the permission and pasting
@@ -180,6 +182,9 @@ closes on the Windows machine, the way the clipboard change did.
 ## 9. Verification
 
 - [ ] 9.1 Walk every scenario in the four spec files on macOS
+  - Mostly covered by the driven harness, at 11 of 11 against a real application: text arrives, the caret lands where asked, the clipboard survives for text and for a PNG, both borrowed writes are declared, a selection is read and given back, and an empty document reports no selection.
+  - **What a harness cannot reach, and why.** Driving the launcher's own interface was tried and abandoned twice. A synthesised Option+Space never reaches the global shortcut. Launching the binary again does open the launcher, but keystrokes do not arrive at the panel, and there is no asking whether it is up either, because a non-activating panel never becomes the frontmost application. So root search, Enter, and the action dispatch stay a manual check.
+  - Two conditions the harness needs, both learned the hard way: the application must not be running, or two clipboard owners fight and every check reads empty; and TextEdit must be quit between runs, because rewriting the scratch file does not reset a window it already has open.
 - [ ] 9.2 Walk every scenario in the four spec files on Windows
 - [x] 9.3 Confirm on both platforms that the user's clipboard is identical before and after a paste, for text and for an image
   - macOS: verified by the driven harness for both content types. Text comes back identical, and a PNG on the clipboard is still there, byte for byte, after an insertion. The image path is a separate branch from text and had never been run live.
