@@ -23,6 +23,7 @@ use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut,
 use extension::{ActionOutcome, EnabledStore, ExtensionHost, FormValues, HostResolver};
 use extensions::applications::{AppIndex, ApplicationsExtension, IconCache};
 use extensions::clipboard::{ClipboardExtension, History, PreferencePolicy, Watcher};
+use extensions::snippets::{self, SnippetsExtension};
 use extensions::system::SystemExtension;
 use invocation::{InvokeError, Invoker, Outcome, Output};
 use latency::LatencyProbe;
@@ -30,6 +31,7 @@ use platform::LauncherWindow;
 use ranking::{now_millis, DangoRanker, FrecencyTable};
 use search::{Candidate, SearchPipeline, StaticCommandSource};
 use store::{Opened, Store};
+use text::TextExchange;
 
 /// The most results streamed to the frontend for one query.
 const RESULT_LIMIT: usize = 50;
@@ -82,6 +84,21 @@ enum ActionResponse {
     Copy { text: String },
     Replaced { tree: protocol::ViewTree },
     Failed { message: String },
+}
+
+/// Opening a quicklink through the official plugin rather than by shelling out
+/// to `open` or `cmd /c start`, which is the project's standing preference and
+/// also the only route that behaves the same on both platforms.
+struct DefaultBrowser(tauri::AppHandle);
+
+impl snippets::OpenUrl for DefaultBrowser {
+    fn open(&self, url: &str) -> Result<(), String> {
+        use tauri_plugin_opener::OpenerExt;
+        self.0
+            .opener()
+            .open_url(url, None::<&str>)
+            .map_err(|error| error.to_string())
+    }
 }
 
 /// Fallback enabled store used only when the database could not be opened, so
@@ -244,7 +261,7 @@ struct TemplateInspection {
 fn inspect_template(source: String) -> TemplateInspection {
     match templates::Template::parse(&source) {
         Ok(template) => TemplateInspection {
-            arguments: template.arguments().to_vec(),
+            arguments: template.prompts(),
             error: None,
         },
         Err(error) => TemplateInspection {
@@ -408,6 +425,7 @@ pub fn run() {
     let shortcut = Shortcut::new(Some(Modifiers::ALT), Code::Space);
 
     tauri::Builder::default()
+        .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
             show(app, None);
         }))
@@ -543,6 +561,31 @@ pub fn run() {
                 }
             } else {
                 eprintln!("[dango] no database, so clipboard history is off");
+            }
+
+            if let Some(store) = &store {
+                // Both kinds share one store and one extension type; they
+                // differ in which table they own and what they do on confirm.
+                let exchange: Option<Arc<dyn text::TextTarget>> = app
+                    .try_state::<Arc<TextExchange>>()
+                    .map(|state| state.inner().clone() as Arc<dyn text::TextTarget>);
+                let opener: Arc<dyn snippets::OpenUrl> =
+                    Arc::new(DefaultBrowser(app.handle().clone()));
+                for kind in [snippets::Kind::Snippet, snippets::Kind::Quicklink] {
+                    let records = Arc::new(snippets::Records::new(store.clone(), kind));
+                    let extension = Arc::new(SnippetsExtension::new(
+                        records,
+                        exchange.clone(),
+                        Some(opener.clone()),
+                    ));
+                    match host.register(extension) {
+                        Ok(report) if report.is_clean() => {}
+                        Ok(report) => eprintln!("[dango] {kind:?} loaded with issues: {report:?}"),
+                        Err(error) => eprintln!("[dango] {kind:?} failed to load: {error}"),
+                    }
+                }
+            } else {
+                eprintln!("[dango] no database, so snippets and quicklinks are off");
             }
 
             let system = Arc::new(SystemExtension::new(

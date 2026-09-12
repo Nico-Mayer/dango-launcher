@@ -64,6 +64,11 @@
     if (response.kind === "copy") {
       await navigator.clipboard.writeText(response.text);
       invoke("dismiss");
+    } else if (response.kind === "replaced") {
+      // A root action that produces a view opens it. A snippet needing
+      // arguments has to ask before it can do anything.
+      viewOwner = item.extensionId;
+      stack = [response.tree];
     } else if (response.kind === "failed") {
       failure = response.message;
     }

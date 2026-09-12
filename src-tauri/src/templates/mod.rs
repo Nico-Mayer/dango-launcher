@@ -92,9 +92,20 @@ impl Template {
         &self.source
     }
 
-    /// The names the user has to supply, in the order the template uses them.
+    /// Names with no source but the user, in the order the template uses them.
     pub fn arguments(&self) -> &[String] {
         &self.arguments
+    }
+
+    /// Everything the user has to be asked for. That is the arguments plus
+    /// `query`, which is reserved so that a quicklink can rely on its meaning,
+    /// but which nothing can resolve on the user's behalf.
+    pub fn prompts(&self) -> Vec<String> {
+        self.referenced
+            .iter()
+            .filter(|name| name.as_str() == "query" || !is_reserved(name))
+            .cloned()
+            .collect()
     }
 
     pub fn uses(&self, name: &str) -> bool {
@@ -357,6 +368,29 @@ mod tests {
         assert_eq!(
             arguments("{{ username }} {{ user }}"),
             vec!["username".to_string(), "user".into()]
+        );
+    }
+
+    #[test]
+    fn query_is_prompted_for_even_though_it_is_reserved() {
+        let template = Template::parse("https://example.com/s?q={{ query }}").unwrap();
+        assert!(
+            template.arguments().is_empty(),
+            "it is reserved, so it is not an argument"
+        );
+        assert_eq!(
+            template.prompts(),
+            vec!["query".to_string()],
+            "but nothing else can supply it"
+        );
+    }
+
+    #[test]
+    fn prompts_keep_template_order_alongside_arguments() {
+        let template = Template::parse("{{ city }} {{ query }} {{ date }} {{ name }}").unwrap();
+        assert_eq!(
+            template.prompts(),
+            vec!["city".to_string(), "query".into(), "name".into()]
         );
     }
 

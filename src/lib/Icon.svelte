@@ -3,8 +3,10 @@
   import CircleAlert from "@lucide/svelte/icons/circle-alert";
   import CirclePower from "@lucide/svelte/icons/circle-power";
   import ClipboardList from "@lucide/svelte/icons/clipboard-list";
+  import ClipboardType from "@lucide/svelte/icons/clipboard-type";
   import LoaderCircle from "@lucide/svelte/icons/loader-circle";
   import Lock from "@lucide/svelte/icons/lock";
+  import Link from "@lucide/svelte/icons/link";
   import Moon from "@lucide/svelte/icons/moon";
   import Terminal from "@lucide/svelte/icons/terminal";
   import Trash2 from "@lucide/svelte/icons/trash-2";
@@ -18,7 +20,9 @@
     "circle-alert": CircleAlert,
     "circle-power": CirclePower,
     "clipboard-list": ClipboardList,
+    "clipboard-type": ClipboardType,
     "loader-circle": LoaderCircle,
+    link: Link,
     lock: Lock,
     moon: Moon,
     terminal: Terminal,

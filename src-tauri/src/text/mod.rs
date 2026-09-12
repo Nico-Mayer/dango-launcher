@@ -72,6 +72,29 @@ impl OwnWrites for Unwatched {
     fn expect(&self, _content: &Content) {}
 }
 
+/// What a consumer of this actually needs. A trait so an extension depends on
+/// three methods rather than on the whole round trip, and so it can be tested
+/// without a clipboard, a keyboard, or a window.
+pub trait TextTarget: Send + Sync {
+    fn insert(&self, text: &str, caret: Option<usize>) -> Result<(), TextError>;
+    fn selection(&self) -> Result<Option<String>, TextError>;
+    fn clipboard_text(&self) -> Option<String>;
+}
+
+impl TextTarget for TextExchange {
+    fn insert(&self, text: &str, caret: Option<usize>) -> Result<(), TextError> {
+        TextExchange::insert(self, text, caret)
+    }
+
+    fn selection(&self) -> Result<Option<String>, TextError> {
+        TextExchange::selection(self)
+    }
+
+    fn clipboard_text(&self) -> Option<String> {
+        TextExchange::clipboard_text(self)
+    }
+}
+
 /// The shared round trip. Both directions borrow the clipboard, so both live
 /// here rather than in either platform.
 pub struct TextExchange {
@@ -105,6 +128,12 @@ impl TextExchange {
 
     pub fn request_permission(&self) {
         self.keys.request_permission();
+    }
+
+    /// The clipboard's text, for a template that asks for it. Reading is free
+    /// and touches nothing, unlike the selection.
+    pub fn clipboard_text(&self) -> Option<String> {
+        self.clipboard.text().filter(|text| !text.is_empty())
     }
 
     /// What the user has selected in the frontmost application. `None` means

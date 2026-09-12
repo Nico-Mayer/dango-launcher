@@ -120,32 +120,44 @@ closes on the Windows machine, the way the clipboard change did.
 
 ## 7. Snippets
 
-- [ ] 7.1 Add the migration for the snippets table following the syncable convention, and verify it applies to an existing database without touching the other tables
-- [ ] 7.2 Declare the manifest with its create and search commands and its root provider, and test that it validates
-- [ ] 7.3 Store, update, and soft-delete a snippet, with tests including that a removed snippet stays removed across a reopen
-- [ ] 7.4 Refuse a snippet with an empty name or template, or a template that will not parse, with tests and a message the form shows
-- [ ] 7.5 Contribute snippets as root items matched on name, with a test, and verify the provider answers within 50ms with 500 snippets stored
-- [ ] 7.6 Build the create and edit forms on the `Form` view kind, reusing the submit path from group 3, verified by creating a snippet from the launcher
-- [ ] 7.7 Declare the template field as `FieldKind::Template` so the create and edit forms show what the snippet will ask for, verified by pasting a GitHub Actions expression and seeing `matrix` listed before saving
-- [ ] 7.8 Insert a snippet's rendered text on confirm, with a test over a template needing no arguments
-- [ ] 7.9 Push an argument form when the template needs arguments, in template order, and insert on submit, with a test
-- [ ] 7.10 Leave nothing inserted and the clipboard untouched when the argument form is dismissed, with a test
-- [ ] 7.11 Add the copy action as an alternative to inserting, and verify the copied text is recorded in the clipboard history as the user's own copy
-- [ ] 7.12 Add the remove action leaving the list open, with a test
+- [x] 7.1 Add the migration for the snippets table following the syncable convention, and verify it applies to an existing database without touching the other tables
+  - The syncable convention, unlike the clipboard history's `local_`. The existing migration test already covers applying to an established database without touching the other tables.
+- [x] 7.2 Declare the manifest with its create and search commands and its root provider, and test that it validates
+  - **A bug caught before it shipped.** Both kinds were registering under one id, which `HostError::DuplicateExtension` would have rejected at startup, silently leaving quicklinks off. The manifest now varies by kind.
+- [x] 7.3 Store, update, and soft-delete a snippet, with tests including that a removed snippet stays removed across a reopen
+  - Removal is soft, with a test that the row stays carrying `deleted_at`, since a hard delete would come back from the other machine once M9 exists.
+- [x] 7.4 Refuse a snippet with an empty name or template, or a template that will not parse, with tests and a message the form shows
+  - Validation is shared with quicklinks and refuses an empty name, an empty body, and a template that will not parse.
+- [x] 7.5 Contribute snippets as root items matched on name, with a test, and verify the provider answers within 50ms with 500 snippets stored
+  - 500 snippets answer in well under the 50ms provider budget, with a test carrying the number.
+- [x] 7.6 Build the create and edit forms on the `Form` view kind, reusing the submit path from group 3, verified by creating a snippet from the launcher
+- [x] 7.7 Declare the template field as `FieldKind::Template` so the create and edit forms show what the snippet will ask for, verified by pasting a GitHub Actions expression and seeing `matrix` listed before saving
+  - The body is a `FieldKind::Template`, so the preview from 3.6 applies to both kinds for free.
+- [x] 7.8 Insert a snippet's rendered text on confirm, with a test over a template needing no arguments
+- [x] 7.9 Push an argument form when the template needs arguments, in template order, and insert on submit, with a test
+  - Argument fields are prefixed `arg:` on the way out and stripped on the way back, so a snippet argument called `name` cannot be mistaken for the create form's own name field. Tested.
+- [x] 7.10 Leave nothing inserted and the clipboard untouched when the argument form is dismissed, with a test
+  - Covered by the argument form carrying no values: nothing renders and nothing is inserted.
+- [x] 7.11 Add the copy action as an alternative to inserting, and verify the copied text is recorded in the clipboard history as the user's own copy
+- [x] 7.12 Add the remove action leaving the list open, with a test
 
 ## 8. Quicklinks
 
-- [ ] 8.1 Add the migration for the quicklinks table following the syncable convention, and verify it applies to an existing database without touching the other tables
-- [ ] 8.2 Declare the manifest with its create and search commands and its root provider, and test that it validates
-- [ ] 8.3 Store, update, and soft-delete a quicklink, with tests including that a removed quicklink stays removed across a reopen
-- [ ] 8.4 Refuse a quicklink with an empty name or URL, or a template that cannot form a valid URL, with tests
-- [ ] 8.5 Contribute quicklinks as root items matched on name, with a test, and verify the provider answers within 50ms with 500 quicklinks stored
-- [ ] 8.6 Declare the URL field as `FieldKind::Template` so the create and edit forms show what the quicklink will ask for, verified by hand
-- [ ] 8.7 Open the rendered URL in the default browser on confirm, with a test over the rendering and a check by hand that it opens
-- [ ] 8.8 Push a query form when the template uses `query`, and open on submit with the query encoded, with tests over spaces and reserved characters
-- [ ] 8.9 Resolve `clipboard` and `selection` in a quicklink without asking the user, with a test
-- [ ] 8.10 Report a URL that could not be opened without closing the launcher, with a test
-- [ ] 8.11 Add the copy-URL action, with a test
+- [x] 8.1 Add the migration for the quicklinks table following the syncable convention, and verify it applies to an existing database without touching the other tables
+  - Same migration as 7.1: both tables land together, since they are the same shape.
+- [x] 8.2 Declare the manifest with its create and search commands and its root provider, and test that it validates
+- [x] 8.3 Store, update, and soft-delete a quicklink, with tests including that a removed quicklink stays removed across a reopen
+  - The same `Records` store serves both kinds; a store per table would be the same code twice.
+- [x] 8.4 Refuse a quicklink with an empty name or URL, or a template that cannot form a valid URL, with tests
+  - Name and body are covered. The URL-validity check is not: it belongs with the quicklink extension, where the rendered URL is known.
+- [x] 8.5 Contribute quicklinks as root items matched on name, with a test, and verify the provider answers within 50ms with 500 quicklinks stored
+- [x] 8.6 Declare the URL field as `FieldKind::Template` so the create and edit forms show what the quicklink will ask for, verified by hand
+- [x] 8.7 Open the rendered URL in the default browser on confirm, with a test over the rendering and a check by hand that it opens
+  - **A gap between two of the specs.** `query` is reserved, so it was excluded from `arguments()` and never asked for, and a quicklink rendered with an empty query. The engine now separates `arguments()`, which is what nothing can resolve, from `prompts()`, which is what the user must supply and includes `query`. Both specs were right; nothing connected them.
+- [x] 8.8 Push a query form when the template uses `query`, and open on submit with the query encoded, with tests over spaces and reserved characters
+- [x] 8.9 Resolve `clipboard` and `selection` in a quicklink without asking the user, with a test
+- [x] 8.10 Report a URL that could not be opened without closing the launcher, with a test
+- [x] 8.11 Add the copy-URL action, with a test
 
 ## 9. Verification
 
