@@ -54,7 +54,7 @@ pub enum InvocationMode {
     NoView,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct PreferenceDecl {
     /// `None` scopes the preference to the whole extension; `Some(command_id)`
     /// scopes it to one command.

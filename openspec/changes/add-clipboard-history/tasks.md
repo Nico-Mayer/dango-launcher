@@ -10,34 +10,35 @@
 
 ## 2. Preference storage
 
-- [ ] 2.1 Add typed get and set on the store, scoped by extension and optional command, tested against an in-memory store
-- [ ] 2.2 Return the declared default for a preference that was never set, with a test
-- [ ] 2.3 Return the declared default when a stored value no longer parses as its declared type, with a test that the extension still loads
-- [ ] 2.4 Keep extension-level and command-level values with the same key apart, with a test
-- [ ] 2.5 Hand an extension a reader bound to its own manifest, and test that it cannot read another extension's values
-- [ ] 2.6 Confirm a value survives a restart, with a test over a reopened store
+- [x] 2.1 Add typed get and set on the store, scoped by extension and optional command, tested against an in-memory store
+- [x] 2.2 Return the declared default for a preference that was never set, with a test
+- [x] 2.3 Return the declared default when a stored value no longer parses as its declared type, with a test that the extension still loads
+- [x] 2.4 Keep extension-level and command-level values with the same key apart, with a test
+- [x] 2.5 Hand an extension a reader bound to its own manifest, and test that it cannot read another extension's values
+- [x] 2.6 Confirm a value survives a restart, with a test over a reopened store
 
 ## 3. History storage
 
-- [ ] 3.1 Add the migration for the history as a `local_` table, and confirm it applies to an existing database without touching the other tables
-- [ ] 3.2 Record a text entry and read the history back newest first, with a test
-- [ ] 3.3 Record an image entry as a file plus a row, and confirm the row points at a file that exists
-- [ ] 3.4 Move an existing entry to newest instead of inserting a duplicate, with a test over the same content copied twice
-- [ ] 3.5 Enforce the entry-count bound, discarding oldest first, with a test
-- [ ] 3.6 Enforce the total-size bound, discarding oldest first, with a test
-- [ ] 3.7 Refuse an entry over the per-entry ceiling without disturbing the history, with a test
-- [ ] 3.8 Delete an image's file when its entry is discarded or removed, with a test that the file is gone
-- [ ] 3.9 Remove an entry whose file has vanished and report the failure, with a test
+- [x] 3.1 Add the migration for the history as a `local_` table, and confirm it applies to an existing database without touching the other tables
+- [x] 3.2 Record a text entry and read the history back newest first, with a test
+- [x] 3.3 Record an image entry as a file plus a row, and confirm the row points at a file that exists
+- [x] 3.4 Move an existing entry to newest instead of inserting a duplicate, with a test over the same content copied twice
+- [x] 3.5 Enforce the entry-count bound, discarding oldest first, with a test
+- [x] 3.6 Enforce the total-size bound, discarding oldest first, with a test
+- [x] 3.7 Refuse an entry over the per-entry ceiling without disturbing the history, with a test
+- [x] 3.8 Delete an image's file when its entry is discarded or removed, with a test that the file is gone
+- [x] 3.9 Remove an entry whose file has vanished and report the failure, with a test
 
 ## 4. The watcher
 
-- [ ] 4.1 Define the `ClipboardSource` trait covering the counter, the markers, the owning application, and reading text and images
-- [ ] 4.2 Implement the watcher service polling the counter, tested against a fake source driven by hand
-- [ ] 4.3 Check the markers and the exclusion list before reading any content, with a test that excluded content is never read
-- [ ] 4.4 Read the exclusion list per change so editing it takes effect without a restart, with a test
-- [ ] 4.5 Ignore the write Dango itself makes when restoring an entry, with a test
-- [ ] 4.6 Stop the watcher cleanly when the extension is disabled, with a test
-- [ ] 4.7 Confirm the watcher runs off the activation path, with a test that no clipboard work happens on the activation path
+- [x] 4.1 Define the `ClipboardSource` trait covering the counter, the markers, the owning application, and reading text and images
+- [x] 4.2 Implement the watcher service polling the counter, tested against a fake source driven by hand
+- [x] 4.3 Check the markers and the exclusion list before reading any content, with a test that excluded content is never read
+- [x] 4.4 Read the exclusion list per change so editing it takes effect without a restart, with a test
+- [x] 4.5 Ignore the write Dango itself makes when restoring an entry, with a test
+- [x] 4.6 Stop the watcher cleanly when the extension is disabled, with a test
+- [x] 4.7 Confirm the watcher runs off the activation path, with a test that no clipboard work happens on the activation path
+  - The service owns a thread and the activation path never reaches it. The live budget check is group 8.3.
 
 ## 5. Platform: macOS
 

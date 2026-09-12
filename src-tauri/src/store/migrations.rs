@@ -1,6 +1,9 @@
 use rusqlite::Connection;
 
-pub const MIGRATIONS: &[&str] = &[include_str!("migrations/0001_initial.sql")];
+pub const MIGRATIONS: &[&str] = &[
+    include_str!("migrations/0001_initial.sql"),
+    include_str!("migrations/0002_clipboard_history.sql"),
+];
 
 #[derive(Debug, thiserror::Error)]
 pub enum MigrationError {
@@ -70,9 +73,38 @@ mod tests {
             "preferences",
             "frecency",
             "local_app_index",
+            "local_clipboard_history",
         ] {
             assert!(table_exists(&connection, table), "{table} missing");
         }
+    }
+
+    /// Upgrading a database that predates a migration must add only what the
+    /// migration adds, leaving what the user already has alone.
+    #[test]
+    fn an_existing_database_upgrades_without_disturbing_its_tables() {
+        let mut connection = Connection::open_in_memory().unwrap();
+        run_all(&mut connection, &MIGRATIONS[..1]).unwrap();
+        connection
+            .execute(
+                "INSERT INTO preferences (id, extension_id, key, value, updated_at) \
+                 VALUES ('a', 'ext', 'limit', '20', 1)",
+                [],
+            )
+            .unwrap();
+        assert!(!table_exists(&connection, "local_clipboard_history"));
+
+        run(&mut connection).unwrap();
+
+        assert!(table_exists(&connection, "local_clipboard_history"));
+        let kept: String = connection
+            .query_row(
+                "SELECT value FROM preferences WHERE key = 'limit'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(kept, "20", "the upgrade must not touch existing rows");
     }
 
     #[test]

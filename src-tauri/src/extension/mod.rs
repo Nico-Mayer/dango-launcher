@@ -1,4 +1,5 @@
 pub mod manifest;
+pub mod preferences;
 pub mod registry;
 
 use std::collections::HashMap;
@@ -6,6 +7,7 @@ use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::sync::{Arc, Mutex};
 
 pub use manifest::{CommandDecl, InvocationMode, Manifest, ManifestError, NAMED_ICON};
+pub use preferences::{PreferenceStore, Preferences};
 pub use registry::{Collision, Host, RegisteredCommand, Registry};
 
 pub type ActivationResult = Result<(), Box<dyn std::error::Error + Send + Sync>>;
