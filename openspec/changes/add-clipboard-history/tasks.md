@@ -48,10 +48,16 @@
 
 ## 5. Platform: macOS
 
-- [ ] 5.1 Read the change counter, verified against copying by hand
-- [ ] 5.2 Detect the concealed and auto-generated markers, verified against a password manager
-- [ ] 5.3 Read text and images, verified against copying each by hand
-- [ ] 5.4 Name the frontmost application as the copying application, verified against copying from a known application
+- [x] 5.1 Read the change counter, verified against copying by hand
+  - Live test confirms the counter moves when Dango writes, and reading it costs nothing.
+- [x] 5.2 Detect the concealed and auto-generated markers, verified against a password manager
+  - Both markers are checked. Nothing depends on them: the spike found Proton Pass setting neither, so this is a bonus over the exclusion list.
+- [x] 5.3 Read text and images, verified against copying each by hand
+  - Live tests round-trip text and an image. PNG is read in preference to TIFF and comes back byte-identical; TIFF is converted only when PNG is absent.
+- [x] 5.4 Name the frontmost application as the copying application, verified against copying from a known application
+  - Not the frontmost application: activations are recorded as they happen and a change is attributed to everything frontmost around it.
+  - Verified live against Proton Pass, which is what the first spike could not catch. Copying a password and switching straight back now yields candidates `["Proton Pass"]` and the content is never read. The same action under the old design attributed it to the terminal.
+  - One finding on the way: workspace activation notifications only arrive while a run loop is pumping. The first probe blocked the main thread in a sleep loop and saw no activations at all, which looked like the fix failing. The real application runs AppKit's loop on the main thread and polls on another, which is what the probe now does too.
 
 ## 6. Platform: Windows
 

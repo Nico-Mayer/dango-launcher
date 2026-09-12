@@ -61,6 +61,7 @@ windows = { version = "0.61", features = [
 
 [target.'cfg(target_os = "macos")'.dependencies]
 objc2 = "0.6"
+block2 = "0.6"
 libc = "0.2"
 objc2-app-kit = { version = "0.3", features = [
   "NSWindow",
@@ -72,11 +73,23 @@ objc2-app-kit = { version = "0.3", features = [
   "NSImage",
   "NSImageRep",
   "NSGraphicsContext",
+  "NSBitmapImageRep",
   "NSPasteboard",
   "block2",
   "objc2-core-graphics",
 ] }
-objc2-foundation = { version = "0.3", features = ["NSArray", "NSFileManager", "NSGeometry", "NSString", "NSURL"] }
+objc2-foundation = { version = "0.3", features = [
+  "NSArray",
+  "NSFileManager",
+  "NSGeometry",
+  "NSNotification",
+  "NSDate",
+  "NSOperation",
+  "NSRunLoop",
+  "NSString",
+  "NSURL",
+  "block2",
+] }
 objc2-core-foundation = { version = "0.3", features = ["CFCGTypes"] }
 objc2-core-graphics = { version = "0.3", features = ["CGBitmapContext", "CGColorSpace", "CGContext", "CGImage"] }
 

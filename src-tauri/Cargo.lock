@@ -627,6 +627,7 @@ name = "dango"
 version = "0.1.0"
 dependencies = [
  "async-trait",
+ "block2",
  "libc",
  "objc2",
  "objc2-app-kit",

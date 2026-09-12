@@ -3,6 +3,8 @@ pub mod extensions;
 pub mod invocation;
 mod latency;
 mod platform;
+#[doc(hidden)]
+pub use platform::clipboard_source as platform_clipboard_source;
 pub mod protocol;
 pub mod ranking;
 pub mod search;

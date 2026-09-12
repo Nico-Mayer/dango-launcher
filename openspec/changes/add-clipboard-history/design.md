@@ -190,6 +190,12 @@ styling change in `ProtocolView`, not a contract change.
   only thing that could catch it, and the spike showed a manager that sets none.
 - **The window trail will decline to record things it could have kept.** → The
   trade is deliberate and stated above.
+- **The trail depends on a run loop.** Workspace activation notifications arrive
+  only while one is pumping, so an arrangement that parks the main thread would
+  leave the trail empty and silently stop excluding anything. → The application
+  runs AppKit's loop on the main thread and polls on another, which is the
+  arrangement this needs anyway. It cost a probe that looked like the fix
+  failing, which is worth remembering.
 - **Polling has a window.** Something copied and replaced within the interval is
   missed entirely. → Accepted; the alternative is the Windows-only event route
   and a second concurrency model.

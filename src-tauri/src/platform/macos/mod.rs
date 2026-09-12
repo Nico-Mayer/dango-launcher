@@ -1,8 +1,10 @@
 mod apps;
+mod clipboard;
 mod icons;
 mod system;
 
 pub use apps::MacAppIndexer;
+pub use clipboard::MacClipboard;
 pub use icons::icon_for;
 pub use system::MacSystemControl;
 
