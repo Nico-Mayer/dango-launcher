@@ -7,6 +7,7 @@ pub mod protocol;
 pub mod ranking;
 pub mod search;
 pub mod store;
+pub mod templates;
 
 use std::sync::Arc;
 use std::sync::Mutex;

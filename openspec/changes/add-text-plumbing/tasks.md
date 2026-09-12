@@ -31,16 +31,22 @@ expensive to answer late.
 
 Pure Rust with no platform and no UI, so it can be finished and tested first.
 
-- [ ] 2.1 Add the `templates` module wrapping `minijinja` with no loader, and verify a template with no placeholders renders back to itself, including one containing single braces
-- [ ] 2.2 Resolve the reserved vocabulary (`clipboard`, `selection`, `date`, `uuid`, `cursor`, `query`) from a values source the caller supplies, with a test per name
-- [ ] 2.3 Render a missing `clipboard` or `selection` as empty text rather than failing, with a test
-- [ ] 2.4 Report a template's arguments as every referenced name that is not reserved, with tests for none, one, two, and a repeated name
-- [ ] 2.5 Order reported arguments by first occurrence in the source, with a test that the order is stable across repeated calls
-- [ ] 2.6 Render with supplied argument values, and render a blank argument as empty text, with tests
-- [ ] 2.7 Resolve `cursor` to a caret offset and strip it from the output, honouring the first only, with tests for none, one, and two
-- [ ] 2.8 Encode a value placed into a URL, with tests over spaces and over `&`, `?`, and `#`
-- [ ] 2.9 Reject a template that cannot be parsed with a message naming the problem, with a test over an unclosed placeholder
-- [ ] 2.10 Verify a 1,000-character template with 10 placeholders renders in under 5ms, with a test carrying the budget
+- [x] 2.1 Add the `templates` module wrapping `minijinja` with no loader, and verify a template with no placeholders renders back to itself, including one containing single braces
+  - `Template::parse` wraps `minijinja` with no loader. A template of code full of single braces reports no placeholders and renders back byte for byte, which is the property the delimiter decision rests on.
+- [x] 2.2 Resolve the reserved vocabulary (`clipboard`, `selection`, `date`, `uuid`, `cursor`, `query`) from a values source the caller supplies, with a test per name
+  - `date` is an ISO date through `time`, which was already in the tree transitively, so it cost no new compilation. `uuid` reuses the crate the store already depends on.
+- [x] 2.3 Render a missing `clipboard` or `selection` as empty text rather than failing, with a test
+- [x] 2.4 Report a template's arguments as every referenced name that is not reserved, with tests for none, one, two, and a repeated name
+- [x] 2.5 Order reported arguments by first occurrence in the source, with a test that the order is stable across repeated calls
+  - Ordering walks the `{{ ... }}` spans rather than the whole source, so a name that merely appears in prose does not decide the order, and a name is matched as a whole identifier so `user` is not found inside `username`. Asserted stable over 20 repeats.
+- [x] 2.6 Render with supplied argument values, and render a blank argument as empty text, with tests
+- [x] 2.7 Resolve `cursor` to a caret offset and strip it from the output, honouring the first only, with tests for none, one, and two
+  - The sentinel is a private use area character, so it cannot collide with anything the user wrote, and the caret is counted in characters. Covered by a test over `däng☃`.
+- [x] 2.8 Encode a value placed into a URL, with tests over spaces and over `&`, `?`, and `#`
+  - Encoding is applied to the values going in, not to the template's own punctuation, so a query of `a&b?c#d` cannot add a parameter or a fragment.
+- [x] 2.9 Reject a template that cannot be parsed with a message naming the problem, with a test over an unclosed placeholder
+- [x] 2.10 Verify a 1,000-character template with 10 placeholders renders in under 5ms, with a test carrying the budget
+  - A 1,120-character template with 10 placeholders renders well inside 5ms. The first version of this test was wrong: its template was 970 characters, so it failed its own precondition rather than the budget.
 
 ## 3. The form submit path
 
