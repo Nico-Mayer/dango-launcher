@@ -59,6 +59,29 @@ proper is expensive and, on macOS, reading it is observable by other
 applications; a launcher should not be seen touching the clipboard several times
 a second.
 
+### The clipboard is read directly, not through a crate
+
+`tauri-plugin-clipboard-manager`, `arboard`, and `clipboard-rs` all read and
+write text and images well, and the project's own convention is to prefer an
+official plugin over a hand-rolled equivalent. None of them was chosen anyway.
+
+They cover the content half. None exposes the change counter, the pasteboard
+types, or the clipboard owner, which is everything the privacy design rests on;
+a portable clipboard abstraction has no place for concepts that are not
+portable.
+
+A crate could still have served the content half, with the markers hand-rolled
+around it. That is what was rejected, and the reason is not missing features: the
+marker check and the content read have to see the same clipboard state. Split
+across two libraries they are two separate trips, and the gap between them is
+exactly where a password slips through. On Windows it is sharper, because
+inspecting formats and reading them belong inside one `OpenClipboard` session
+and a crate opens its own.
+
+The macOS cost is small because the project already depends on `objc2` for the
+window and the system commands. The Windows cost is real, and is the strongest
+argument the other way.
+
 ### Exclusion is checked before the content is read, not after
 
 The privacy markers are their own clipboard types. The watcher asks whether any
