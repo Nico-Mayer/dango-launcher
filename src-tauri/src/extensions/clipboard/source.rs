@@ -95,7 +95,10 @@ mod tests {
         clipboard.set_text("dango round trip");
         assert_eq!(clipboard.text().as_deref(), Some("dango round trip"));
         assert!(
-            clipboard.formats().iter().any(|f| f.contains("text")),
+            clipboard
+                .formats()
+                .iter()
+                .any(|f| f.to_ascii_lowercase().contains("text")),
             "the format list is what the privacy check reads"
         );
     }
