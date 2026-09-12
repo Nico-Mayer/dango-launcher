@@ -67,20 +67,59 @@ mod spike {
         }
     }
 
-    fn frontmost_application() -> String {
+    fn frontmost_application() -> (String, i32) {
         NSWorkspace::sharedWorkspace()
             .frontmostApplication()
-            .and_then(|app| app.localizedName())
-            .map(|name| name.to_string())
-            .unwrap_or_else(|| "<unknown>".into())
+            .map(|app| {
+                let name = app
+                    .localizedName()
+                    .map(|name| name.to_string())
+                    .unwrap_or_else(|| "<unknown>".into());
+                (name, app.processIdentifier())
+            })
+            .unwrap_or_else(|| ("<unknown>".into(), -1))
+    }
+
+    /// The number alone says nothing. `-25204` is `CannotComplete`, which means
+    /// the application did not answer, and is a completely different finding
+    /// from `APIDisabled`, which would mean the permission.
+    fn error_name(error: AXError) -> String {
+        let name = match error {
+            AXError::Failure => "Failure",
+            AXError::IllegalArgument => "IllegalArgument",
+            AXError::InvalidUIElement => "InvalidUIElement",
+            AXError::CannotComplete => "CannotComplete (the app did not answer)",
+            AXError::AttributeUnsupported => "AttributeUnsupported",
+            AXError::NotImplemented => "NotImplemented (no accessibility support)",
+            AXError::APIDisabled => "APIDisabled (the permission is off)",
+            AXError::NoValue => "NoValue",
+            _ => "unknown",
+        };
+        format!("{name} [{}]", error.0)
     }
 
     /// 1.2. System-wide element, focused element, selected text. Reports the
     /// error rather than flattening it, because "no selection" and "this
     /// application does not answer" are different findings.
     fn read_selection() -> Result<Option<String>, AXError> {
+        unsafe { read_from(AXUIElement::new_system_wide()) }
+    }
+
+    /// The same question asked of the application directly rather than through
+    /// the system-wide element. Worth measuring separately: if this answers
+    /// where the system-wide route does not, the implementation should use it.
+    fn read_selection_via_app(pid: i32) -> Result<Option<String>, AXError> {
+        if pid < 0 {
+            return Ok(None);
+        }
+        unsafe { read_from(AXUIElement::new_application(pid)) }
+    }
+
+    unsafe fn read_from(
+        root: objc2_core_foundation::CFRetained<AXUIElement>,
+    ) -> Result<Option<String>, AXError> {
         unsafe {
-            let system = AXUIElement::new_system_wide();
+            let system = root;
             let focused = copy_attribute(&system, FOCUSED_ELEMENT)?;
             let Some(focused) = focused else {
                 return Ok(None);
@@ -134,14 +173,16 @@ mod spike {
                 format!("answered, {} chars{shown}", text.chars().count())
             }
             Ok(None) => "did not answer (no attribute, or nothing focused)".into(),
-            Err(error) => format!("error {}", error.0),
+            Err(error) => error_name(error),
         }
     }
 
     fn read_selection_once() {
         println!("\n-- 1.2 selection, one read --");
-        println!("frontmost: {}", frontmost_application());
-        println!("  {}", describe(read_selection()));
+        let (app, pid) = frontmost_application();
+        println!("frontmost: {app}");
+        println!("  system-wide:  {}", describe(read_selection()));
+        println!("  application:  {}", describe(read_selection_via_app(pid)));
     }
 
     /// Select text in one application, switch to the next, and let this print a
@@ -151,8 +192,12 @@ mod spike {
         println!("select text in a native app, a browser, an Electron app, and a terminal.");
         let mut last = String::new();
         loop {
-            let app = frontmost_application();
-            let line = format!("{app}: {}", describe(read_selection()));
+            let (app, pid) = frontmost_application();
+            let line = format!(
+                "{app}\n    system-wide: {}\n    application: {}",
+                describe(read_selection()),
+                describe(read_selection_via_app(pid))
+            );
             if line != last {
                 println!("{line}");
                 last = line;
@@ -171,7 +216,7 @@ mod spike {
         println!("switch to an editable field in another application. Starting in 5s.");
         std::thread::sleep(Duration::from_secs(5));
 
-        let target = frontmost_application();
+        let (target, _) = frontmost_application();
         let Some(clipboard) = CrateClipboard::new() else {
             eprintln!("no clipboard");
             return;

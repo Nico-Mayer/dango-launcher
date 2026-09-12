@@ -101,6 +101,7 @@ objc2-application-services = { version = "0.3", default-features = false, featur
   "AXError",
   "AXUIElement",
   "HIServices",
+  "libc",
 ] }
 
 
