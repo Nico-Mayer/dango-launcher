@@ -32,6 +32,14 @@ context: |
   - SQLite for local persistence.
   - Node 24 and the OpenSpec CLI are pinned via mise (`mise.toml`).
   - Prefer official Tauri v2 plugins over hand-rolled equivalents.
+  - Off-the-shelf before hand-rolled, as a hard requirement. Before writing code
+    that does a general job, look for a maintained crate or package that already
+    does it, and pick it unless it genuinely cannot do the job. Hand-rolling is
+    allowed only when nothing suitable exists or the candidate provably falls
+    short, and the design must then say which candidates were evaluated and what
+    they could not do. "I did not look" is not a reason, and neither is a
+    guess about what a library probably lacks: check its API before ruling it
+    out. A lean codebase built on curated projects beats a large one we own.
 
   ## Platform stance
 

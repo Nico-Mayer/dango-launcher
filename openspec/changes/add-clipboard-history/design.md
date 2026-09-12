@@ -59,28 +59,32 @@ proper is expensive and, on macOS, reading it is observable by other
 applications; a launcher should not be seen touching the clipboard several times
 a second.
 
-### The clipboard is read directly, not through a crate
+### `clipboard-rs` does the clipboard; only attribution is ours
 
-`tauri-plugin-clipboard-manager`, `arboard`, and `clipboard-rs` all read and
-write text and images well, and the project's own convention is to prefer an
-official plugin over a hand-rolled equivalent. None of them was chosen anyway.
+Evaluated: `tauri-plugin-clipboard-manager`, `arboard`, and `clipboard-rs`.
 
-They cover the content half. None exposes the change counter, the pasteboard
-types, or the clipboard owner, which is everything the privacy design rests on;
-a portable clipboard abstraction has no place for concepts that are not
-portable.
+The official plugin reads and writes text and images and nothing else. No change
+notification, so a history built on it would have to poll the *contents*
+several times a second, reading every password into memory to find out whether
+it was a password. That is worse than what it replaces.
 
-A crate could still have served the content half, with the markers hand-rolled
-around it. That is what was rejected, and the reason is not missing features: the
-marker check and the content read have to see the same clipboard state. Split
-across two libraries they are two separate trips, and the gap between them is
-exactly where a password slips through. On Windows it is sharper, because
-inspecting formats and reading them belong inside one `OpenClipboard` session
-and a crate opens its own.
+`clipboard-rs` is the one. It gives an event-driven watcher, `available_formats`
+returning the pasteboard type identifiers, `get_buffer` for an arbitrary format,
+and text and image read and write. Confirmed against a real clipboard: the
+format list matches what the hand-rolled source sees, including on a password
+copied from Proton Pass.
 
-The macOS cost is small because the project already depends on `objc2` for the
-window and the system commands. The Windows cost is real, and is the strongest
-argument the other way.
+So the counter, the poll loop, the pasteboard reads, and the TIFF to PNG
+conversion all stop being ours. The one thing no crate offers is which
+application did the copying, and that is exactly what the exclusion list needs,
+so attribution stays hand-rolled: the activation trail on macOS and the
+clipboard owner on Windows.
+
+An earlier version of this design argued that a crate could not be trusted
+because the marker check and the content read must see the same clipboard state.
+That was wrong twice over. The crate does expose the types, and the hand-rolled
+code never had the property it claimed: it calls `types()` and then
+`stringForType()`, which are already two separate trips.
 
 ### Exclusion is checked before the content is read, not after
 
