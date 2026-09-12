@@ -128,7 +128,9 @@ closes on the Windows machine, the way the clipboard change did.
   - Written as `SendMessageTimeoutW` with `WM_NULL` and `SMTO_ABORTIFHUNG`, the clipboard change's trick pointed the other way.
 - [ ] 6.6 Report the elevated-window ceiling as a clear failure rather than a silent one, verified by pasting into an elevated window
   - Written as an `OpenProcess` probe with `PROCESS_QUERY_LIMITED_INFORMATION`: a refusal is the answer, since a non-elevated process cannot open an elevated one.
-- [ ] 6.7 Check symbol names and module paths against the vendored crate source before pushing, and verify CI's `cargo clippy -- -D warnings` passes on `windows-latest`
+- [x] 6.7 Check symbol names and module paths against the vendored crate source before pushing, and verify CI's `cargo clippy -- -D warnings` passes on `windows-latest`
+  - Green on the first run, which is not what the project's own notes would predict: the context warns that symbol names and module paths are the usual way Windows code fails here, and `AttachThreadInput` living in `Win32::System::Threading` is recorded as a trap. Checking them against the vendored source before pushing is what made it uneventful.
+  - Run 34710561144, both jobs. That run covers `platform/windows/text.rs` and both extensions.
 
 ## 7. Snippets
 
