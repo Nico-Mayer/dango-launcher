@@ -19,6 +19,10 @@ use clipboard_rs::{Clipboard, ClipboardContext, RustImageData};
 /// user switched to.
 pub trait Attribution: Send + Sync {
     fn candidate_applications(&self) -> Vec<String>;
+    /// Called when a change arrives, before anything is read. A platform that
+    /// can tell the copying application is still busy finishing its copy
+    /// waits here for it.
+    fn wait_for_copy_to_finish(&self) {}
 }
 
 /// Reading and writing the clipboard. A trait so the watcher can be tested

@@ -168,6 +168,7 @@ struct Handler(Arc<Watcher>);
 
 impl clipboard_rs::ClipboardHandler for Handler {
     fn on_clipboard_change(&mut self) {
+        self.0.attribution.wait_for_copy_to_finish();
         self.0.handle_change(crate::ranking::now_millis());
     }
 }

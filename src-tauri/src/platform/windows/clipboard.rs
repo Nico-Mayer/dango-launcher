@@ -12,11 +12,21 @@
 //! this feature, so it is a stated limitation rather than a guess at who it
 //! might have been.
 
+use std::time::Duration;
+
+use windows::Win32::Foundation::{LPARAM, WPARAM};
 use windows::Win32::System::DataExchange::GetClipboardOwner;
+use windows::Win32::UI::WindowsAndMessaging::{SendMessageTimeoutW, SMTO_ABORTIFHUNG, WM_NULL};
 
 use super::apps::init_com;
 use super::system::{identify, owning_pid};
 use crate::extensions::clipboard::Attribution;
+
+/// How long the owner gets to answer a no-op message before it counts as
+/// busy, and how long to wait between asking again.
+const OWNER_REPLY: u32 = 50;
+const OWNER_RETRY: Duration = Duration::from_millis(100);
+const OWNER_ATTEMPTS: u32 = 15;
 
 pub struct WindowsAttribution;
 
@@ -24,6 +34,39 @@ impl Attribution for WindowsAttribution {
     fn candidate_applications(&self) -> Vec<String> {
         unsafe { owner_name() }.into_iter().collect()
     }
+
+    /// A .NET application copies by announcing delayed-rendered formats and
+    /// then, still on the same thread and without pumping messages, flushing
+    /// them for real. Reading in that gap asks the thread to render while it
+    /// is stuck retrying to open a clipboard we hold, and after a second of
+    /// that the copy fails in the copying application with
+    /// CLIPBRD_E_CANT_OPEN. So the owner is asked to answer a no-op message
+    /// first: once it does, it is back in its message loop and the copy is
+    /// complete.
+    fn wait_for_copy_to_finish(&self) {
+        for _ in 0..OWNER_ATTEMPTS {
+            if unsafe { owner_is_idle() } {
+                return;
+            }
+            std::thread::sleep(OWNER_RETRY);
+        }
+    }
+}
+
+unsafe fn owner_is_idle() -> bool {
+    let Ok(owner) = GetClipboardOwner() else {
+        return true;
+    };
+    SendMessageTimeoutW(
+        owner,
+        WM_NULL,
+        WPARAM(0),
+        LPARAM(0),
+        SMTO_ABORTIFHUNG,
+        OWNER_REPLY,
+        None,
+    )
+    .0 != 0
 }
 
 /// Named the same way the running applications list names things, so the
