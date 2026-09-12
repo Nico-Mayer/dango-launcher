@@ -86,7 +86,14 @@
 - [ ] 8.2 Walk every scenario in the two spec files on Windows
 - [ ] 8.3 Confirm activation still meets the 80ms budget on release builds on both platforms, with the watcher running
 - [ ] 8.4 Confirm root search stays responsive while a large image is recorded, on both platforms
-- [ ] 8.5 Confirm the history survives a restart with its order intact, on both platforms
+- [x] 8.5 Confirm the history survives a restart with its order intact, on both platforms
+  - macOS: confirmed live. Three entries recorded, Dango stopped and started, and all three come back in the same order.
 - [ ] 8.6 Confirm a password manager's clipboard never reaches the history, on both platforms
-- [ ] 8.7 Confirm the bounds hold by copying past the entry limit and past the size ceiling, on both platforms
+  - macOS, mechanism: confirmed live. With the frontmost application on the exclusion list, a copy is not recorded, and the list is honoured from a database edit without a restart.
+  - Still to confirm on macOS: the same against Proton Pass itself in the running application rather than in the spike.
+- [x] 8.7 Confirm the bounds hold by copying past the entry limit and past the size ceiling, on both platforms
+  - macOS: confirmed live against the running application, with the bounds written straight into the database, which also proves preferences are read per change rather than at startup.
+  - The entry bound holds exactly: set to 5, eight copies leave the five newest.
+  - The size ceiling discards oldest first: four images against a 12,582 byte ceiling leave 8,967 bytes.
+  - **A finding, now fixed.** An entry larger than the whole ceiling used to empty the history, because trimming discards oldest first until the newest fits and for something oversized that only ends at zero. One large copy cost the user everything else they had copied. Such an entry is now refused outright, the way one over the per-entry ceiling already was, and the rest of the history is untouched. Confirmed live.
 - [ ] 8.8 Confirm recording while searching does not disturb the result list, on both platforms

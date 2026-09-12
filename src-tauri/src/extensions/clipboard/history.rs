@@ -131,7 +131,12 @@ impl History {
     /// Already-present content is moved to newest rather than added again.
     pub fn record(&self, content: Content, bounds: Bounds, now: i64) -> Result<(), HistoryError> {
         let bytes = content.bytes();
-        if bytes > bounds.entry_bytes {
+        // An entry that cannot fit the whole budget is refused rather than
+        // recorded: trimming discards oldest first until it fits, and for
+        // something larger than the ceiling that only ends with an empty
+        // history. Copying one large thing must not cost the user everything
+        // else they copied.
+        if bytes > bounds.entry_bytes || bytes > bounds.total_bytes {
             return Err(HistoryError::TooLarge);
         }
 
@@ -418,6 +423,26 @@ mod tests {
             titles(&history),
             ["kept"],
             "refusing an item must leave the history alone"
+        );
+    }
+
+    #[test]
+    fn an_item_larger_than_the_whole_budget_is_refused_rather_than_emptying_it() {
+        let history = history();
+        let bounds = Bounds {
+            total_bytes: 500,
+            ..Bounds::default()
+        };
+        history.record(text("worth keeping"), bounds, 1).unwrap();
+
+        let error = history
+            .record(distinct_image(9, 4096), bounds, 2)
+            .unwrap_err();
+        assert!(matches!(error, HistoryError::TooLarge));
+        assert_eq!(
+            titles(&history),
+            ["worth keeping"],
+            "one oversized copy must not cost the user the rest of the history"
         );
     }
 
