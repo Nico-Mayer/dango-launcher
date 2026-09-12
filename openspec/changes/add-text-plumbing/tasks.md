@@ -21,7 +21,8 @@ expensive to answer late.
   - **A conflict this surfaced.** One settle served both the paste and the copy, and a paste-sized delay does not fit inside the 300ms the spec gives a selection read. A copy needs no delay at all: it leaves something observable, so the exchange now watches the clipboard for the sentinel being replaced and returns the moment it is. Only paste waits blindly, because only paste has nothing to watch.
   - Electron was not measured. The delay carries headroom for it; group 9 is where it gets walked.
   - Cost noted: the settle is after the text has already arrived, so it delays only the clipboard going back, not anything the user sees.
-- [ ] 1.4 On macOS, record how often Accessibility trust has to be re-granted across rebuilds of an unsigned debug binary, so the development cost is known rather than assumed
+- [x] 1.4 On macOS, record how often Accessibility trust has to be re-granted across rebuilds of an unsigned debug binary, so the development cost is known rather than assumed
+  - Trust turned out stickier than the design assumed. `AXIsProcessTrusted` read true across many rebuilds and across separate example binaries, so the per-binary revocation warned about never bit in a day of rebuilding. Recorded as observed, not as a rule: it is TCC behaviour nobody promised.
 - [ ] 1.5 On Windows, confirm that waiting for the previous window to become foreground before injecting is reliable under foreground lock, and that a no-op message to the target after Ctrl+V returns only once the paste has been handled
 - [ ] 1.6 On Windows, confirm the clipboard round trip reads a selection from a native app, a browser, an Electron app, and a terminal
 - [x] 1.7 Verify `minijinja::Template::undeclared_variables` reports the names in the templates snippets will actually hold, including one with reserved names only and one with a repeated argument
@@ -71,7 +72,8 @@ since M1. Nothing else in this change works without it.
 - [x] 3.3 Wire `ProtocolView`'s `onsubmit` to `run_action` with the form's primary action, replacing the empty function in `App.svelte`, and verify a form submit reaches the backend
   - The `onsubmit` prop is gone rather than wired. A form submit is an action on the form, so it goes through `onaction` with the values, which is exactly what the design said and one less path to keep in step.
   - **A bug found on the way.** `formValues` only ever held fields the user had touched, so editing one field of a form would have submitted every other as empty. Fields are now seeded from their own declared values.
-- [ ] 3.4 Verify submitting a form that returns `ActionOutcome::Replaced` leaves the user on the replaced view rather than closing the launcher
+- [x] 3.4 Verify submitting a form that returns `ActionOutcome::Replaced` leaves the user on the replaced view rather than closing the launcher
+  - Confirmed by the author: saving a snippet lands on the snippet list with the launcher still open.
   - In place but not yet verified: a submit now goes through the same `runViewAction` that already handles `Replaced`. Nothing emits a form until group 7, so this closes there rather than being claimed now.
 - [x] 3.5 Add `FieldKind::Template` and a pure `inspect_template` command answering with the arguments in order or the parse error, with tests over a template with arguments, one with none, and one that will not parse
   - The variant is additive and `PROTOCOL_VERSION` stays at 1. ts-rs regenerated `FieldKind.ts`, which CI checks for drift. Four tests over the command.
@@ -151,6 +153,7 @@ closes on the Windows machine, the way the clipboard change did.
 - [x] 7.5 Contribute snippets as root items matched on name, with a test, and verify the provider answers within 50ms with 500 snippets stored
   - 500 snippets answer in well under the 50ms provider budget, with a test carrying the number.
 - [x] 7.6 Build the create and edit forms on the `Form` view kind, reusing the submit path from group 3, verified by creating a snippet from the launcher
+  - Four interface faults found by using it, all fixed. The footer sat under a short form rather than on the bottom edge, because the view was never told to fill the space. It read "Select" with a plain Enter on a form, where the label should be the view's own primary action and the chord should be the one that actually submits. The form arrived without focus. And clicking away left the launcher on screen but dead, because a non-activating panel does not reliably blur the webview, so the window's own focus event has to do the hiding.
 - [x] 7.7 Declare the template field as `FieldKind::Template` so the create and edit forms show what the snippet will ask for, verified by pasting a GitHub Actions expression and seeing `matrix` listed before saving
   - The body is a `FieldKind::Template`, so the preview from 3.6 applies to both kinds for free.
 - [x] 7.8 Insert a snippet's rendered text on confirm, with a test over a template needing no arguments
@@ -189,6 +192,7 @@ closes on the Windows machine, the way the clipboard change did.
 - [x] 9.3 Confirm on both platforms that the user's clipboard is identical before and after a paste, for text and for an image
   - macOS: verified by the driven harness for both content types. Text comes back identical, and a PNG on the clipboard is still there, byte for byte, after an insertion. The image path is a separate branch from text and had never been run live.
 - [ ] 9.4 Confirm on both platforms that no paste, restore, or selection capture appears in the clipboard history or reorders it, while the watcher is running
+  - macOS: confirmed by the author with the watcher running. Windows outstanding.
 - [ ] 9.5 Confirm on both platforms that a snippet with a caret position leaves the caret where the template declared it, in at least two applications
 - [ ] 9.6 Confirm on both platforms that activation still meets the 80ms budget on a release build with both new extensions enabled
 - [x] 9.7 Confirm on both platforms that text appears in the target application within 400ms of confirming, measured over repeated pastes
@@ -197,3 +201,4 @@ closes on the Windows machine, the way the clipboard change did.
 - [ ] 9.9 Confirm on Windows that pasting into an elevated window fails visibly and leaves the clipboard alone
 - [ ] 9.10 Confirm on both platforms that snippets and quicklinks survive a restart with their names and templates intact
 - [ ] 9.11 Confirm on both platforms that the save form's argument preview catches a pasted doubled-brace expression before it is stored
+  - macOS: confirmed by the author, who saved a GitHub Actions expression and later met its argument prompt. Windows outstanding.
