@@ -60,6 +60,7 @@
       extensionId: item.extensionId,
       itemId: item.id,
       actionId,
+      values: null,
     })) as ActionResponse;
     if (response.kind === "copy") {
       await navigator.clipboard.writeText(response.text);

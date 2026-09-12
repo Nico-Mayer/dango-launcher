@@ -71,6 +71,7 @@ pub fn system_control() -> std::sync::Arc<dyn SystemControl> {
 pub fn text_exchange(
     clipboard: std::sync::Arc<dyn crate::extensions::clipboard::ClipboardSource>,
     own_writes: std::sync::Arc<dyn crate::text::OwnWrites>,
+    launcher: std::sync::Arc<dyn crate::text::Launcher>,
 ) -> Option<crate::text::TextExchange> {
     #[cfg(target_os = "macos")]
     {
@@ -81,6 +82,7 @@ pub fn text_exchange(
             std::sync::Arc::new(macos::MacHandoff),
             Some(std::sync::Arc::new(macos::MacSelection)),
             own_writes,
+            launcher,
         ))
     }
     #[cfg(target_os = "windows")]
@@ -95,6 +97,7 @@ pub fn text_exchange(
             // clipboard round trip has to be right anyway.
             None,
             own_writes,
+            launcher,
         ))
     }
 }

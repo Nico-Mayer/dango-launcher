@@ -86,6 +86,20 @@ enum ActionResponse {
     Failed { message: String },
 }
 
+/// Getting the launcher off screen before a keystroke is sent to another
+/// application. The window has to be hidden from the main thread, and the
+/// insertion runs off it, so this hops back.
+struct HideLauncher(tauri::AppHandle);
+
+impl text::Launcher for HideLauncher {
+    fn dismiss(&self) {
+        let app = self.0.clone();
+        let _ = self.0.run_on_main_thread(move || {
+            hide_after_launch(&app);
+        });
+    }
+}
+
 /// Opening a quicklink through the official plugin rather than by shelling out
 /// to `open` or `cmd /c start`, which is the project's standing preference and
 /// also the only route that behaves the same on both platforms.
@@ -211,7 +225,7 @@ async fn search(app: tauri::AppHandle, query: String) {
 /// Success hides the launcher; copy hands the text back for the frontend to
 /// place on the clipboard; failure keeps the launcher open with a message.
 #[tauri::command]
-fn run_action(
+async fn run_action(
     app: tauri::AppHandle,
     extension_id: String,
     item_id: String,
@@ -542,7 +556,10 @@ pub fn run() {
                         ));
                         // The watcher is what keeps a paste out of the history,
                         // so the exchange is built against this one.
-                        if let Some(exchange) = platform::text_exchange(clipboard, watcher.clone())
+                        let dismisser: Arc<dyn text::Launcher> =
+                            Arc::new(HideLauncher(app.handle().clone()));
+                        if let Some(exchange) =
+                            platform::text_exchange(clipboard, watcher.clone(), dismisser)
                         {
                             app.manage(Arc::new(exchange));
                         } else {

@@ -14,10 +14,9 @@ use std::sync::Mutex;
 use std::time::Duration;
 
 use enigo::{Direction, Enigo, Key, Keyboard as _, Settings};
-use objc2_app_kit::{NSApplication, NSWorkspace};
+use objc2_app_kit::NSWorkspace;
 use objc2_application_services::{AXError, AXUIElement};
 use objc2_core_foundation::{CFBoolean, CFDictionary, CFRetained, CFString, CFType};
-use objc2_foundation::MainThreadMarker;
 
 use crate::text::{DirectSelection, Handoff, Keys, TextError};
 
@@ -35,10 +34,10 @@ const SELECTED_TEXT: &str = "AXSelectedText";
 /// the clipboard going back is waiting.
 const PASTE_SETTLE: Duration = Duration::from_millis(300);
 
-/// How long to wait for the panel to stop being the key window before a
-/// keystroke is posted, and how often to look.
-const KEY_RESIGN_TIMEOUT: Duration = Duration::from_millis(400);
-const KEY_RESIGN_POLL: Duration = Duration::from_millis(10);
+/// How long the hide needs before a keystroke can be posted. The panel is
+/// dismissed on the main thread and this runs off it, so this is time for that
+/// to land rather than a check that it has.
+const HIDE_SETTLE: Duration = Duration::from_millis(60);
 
 pub struct MacKeys {
     enigo: Mutex<Enigo>,
@@ -117,52 +116,23 @@ impl Keys for MacKeys {
 }
 
 /// The launcher is a non-activating panel, so the application the user was in
-/// never stopped being the active one and there is nothing to restore. What
-/// does have to be true is that the panel is no longer the key window, or the
-/// keystroke lands in Dango's own search field.
+/// never stopped being the active one and there is nothing to restore. What has
+/// to be true is that the panel is off screen and no longer taking keys, which
+/// the caller has already asked for by the time this runs.
 pub struct MacHandoff;
 
 impl Handoff for MacHandoff {
+    /// A settle, not a check. Asking AppKit whether the panel is still the key
+    /// window only works on the main thread, and this runs off it by design:
+    /// the hide that just happened needs the main thread's run loop to take
+    /// effect, so blocking there would prevent the very thing being waited for.
     fn yield_to_previous(&self) -> Result<(), TextError> {
-        let Some(marker) = MainThreadMarker::new() else {
-            // Called from a command thread, which is where actions run. The
-            // panel is hidden by the caller on the main thread before this, so
-            // the wait below is the only part that needs the check.
-            return wait_for_key_resign();
-        };
-        let app = NSApplication::sharedApplication(marker);
-        if app.keyWindow().is_some() {
-            return wait_for_key_resign();
-        }
+        std::thread::sleep(HIDE_SETTLE);
         Ok(())
     }
 
     fn settle_after_paste(&self) {
         std::thread::sleep(PASTE_SETTLE);
-    }
-}
-
-/// Polls rather than waits on a notification, because this runs off the main
-/// thread and AppKit's notifications arrive on it.
-fn wait_for_key_resign() -> Result<(), TextError> {
-    let deadline = std::time::Instant::now() + KEY_RESIGN_TIMEOUT;
-    loop {
-        let still_key = MainThreadMarker::new()
-            .map(|marker| {
-                NSApplication::sharedApplication(marker)
-                    .keyWindow()
-                    .is_some()
-            })
-            .unwrap_or(false);
-        if !still_key {
-            return Ok(());
-        }
-        if std::time::Instant::now() >= deadline {
-            return Err(TextError::TargetUnavailable(
-                "the launcher would not give up focus".into(),
-            ));
-        }
-        std::thread::sleep(KEY_RESIGN_POLL);
     }
 }
 

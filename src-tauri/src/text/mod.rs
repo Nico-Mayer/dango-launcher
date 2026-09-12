@@ -74,6 +74,13 @@ pub trait OwnWrites: Send + Sync {
     fn expect(&self, content: &Content);
 }
 
+/// Getting the launcher off screen. Inserting has to happen after the launcher
+/// is gone, or the keystroke lands in Dango's own search field, so the exchange
+/// owns that ordering rather than trusting a caller to hide first.
+pub trait Launcher: Send + Sync {
+    fn dismiss(&self);
+}
+
 /// Nothing to tell, because nothing is listening.
 pub struct Unwatched;
 
@@ -112,6 +119,7 @@ pub struct TextExchange {
     handoff: Arc<dyn Handoff>,
     direct: Option<Arc<dyn DirectSelection>>,
     own_writes: Arc<dyn OwnWrites>,
+    launcher: Arc<dyn Launcher>,
 }
 
 impl TextExchange {
@@ -121,6 +129,7 @@ impl TextExchange {
         handoff: Arc<dyn Handoff>,
         direct: Option<Arc<dyn DirectSelection>>,
         own_writes: Arc<dyn OwnWrites>,
+        launcher: Arc<dyn Launcher>,
     ) -> Self {
         Self {
             clipboard,
@@ -128,6 +137,7 @@ impl TextExchange {
             handoff,
             direct,
             own_writes,
+            launcher,
         }
     }
 
@@ -170,6 +180,7 @@ impl TextExchange {
     fn selection_through_clipboard(&self) -> Result<Option<String>, TextError> {
         let saved = self.read_clipboard();
 
+        self.launcher.dismiss();
         self.handoff.yield_to_previous()?;
 
         let sentinel = format!("dango-selection-{}", uuid::Uuid::new_v4());
@@ -214,6 +225,9 @@ impl TextExchange {
         }
 
         let saved = self.read_clipboard();
+        // Before anything is sent. A keystroke goes wherever the focus is, and
+        // until this returns the focus is still Dango's own search field.
+        self.launcher.dismiss();
         self.handoff.yield_to_previous()?;
 
         let outgoing = Content::Text(text.to_string());
@@ -418,6 +432,21 @@ mod tests {
     }
 
     #[derive(Default)]
+    struct FakeLauncher(Mutex<usize>);
+
+    impl FakeLauncher {
+        fn dismissals(&self) -> usize {
+            *self.0.lock().unwrap()
+        }
+    }
+
+    impl Launcher for FakeLauncher {
+        fn dismiss(&self) {
+            *self.0.lock().unwrap() += 1;
+        }
+    }
+
+    #[derive(Default)]
     struct RecordingWrites(Mutex<Vec<Content>>);
 
     impl RecordingWrites {
@@ -438,11 +467,13 @@ mod tests {
         keys: Arc<FakeKeys>,
         handoff: Arc<FakeHandoff>,
         writes: Arc<RecordingWrites>,
+        launcher: Arc<FakeLauncher>,
     }
 
     fn fixture(clipboard: Arc<FakeClipboard>, keys: Arc<FakeKeys>) -> Fixture {
         let handoff = FakeHandoff::working();
         let writes = Arc::new(RecordingWrites::default());
+        let launcher = Arc::new(FakeLauncher::default());
         Fixture {
             exchange: TextExchange::new(
                 clipboard.clone(),
@@ -450,11 +481,13 @@ mod tests {
                 handoff.clone(),
                 None,
                 writes.clone(),
+                launcher.clone(),
             ),
             clipboard,
             keys,
             handoff,
             writes,
+            launcher,
         }
     }
 
@@ -481,6 +514,37 @@ mod tests {
         let f = fixture(holding("saved"), FakeKeys::working());
         f.exchange.insert("text", None).unwrap();
         assert_eq!(*f.handoff.yielded.lock().unwrap(), 1);
+        assert_eq!(
+            f.launcher.dismissals(),
+            1,
+            "a keystroke sent while the launcher is up lands in its own search field"
+        );
+    }
+
+    #[test]
+    fn reading_a_selection_also_dismisses_first() {
+        let clipboard = holding("what the user had");
+        let keys = Arc::new(FakeKeys {
+            permitted: true,
+            pastes_into: Some(clipboard.clone()),
+            ..Default::default()
+        });
+        let f = fixture(clipboard, keys);
+
+        f.exchange.selection().unwrap();
+
+        assert_eq!(f.launcher.dismissals(), 1, "the copy is a keystroke too");
+    }
+
+    #[test]
+    fn nothing_is_dismissed_when_the_permission_is_missing() {
+        let f = fixture(holding("saved"), Arc::new(FakeKeys::default()));
+        assert!(f.exchange.insert("text", None).is_err());
+        assert_eq!(
+            f.launcher.dismissals(),
+            0,
+            "hiding for an insertion that cannot happen loses the message"
+        );
     }
 
     #[test]
@@ -608,6 +672,7 @@ mod tests {
             handoff,
             None,
             Arc::new(RecordingWrites::default()),
+            Arc::new(FakeLauncher::default()),
         );
 
         assert_eq!(exchange.insert("text", None), Err(TextError::NoTarget));
@@ -671,6 +736,7 @@ mod tests {
             FakeHandoff::working(),
             None,
             Arc::new(RecordingWrites::default()),
+            Arc::new(FakeLauncher::default()),
         );
 
         exchange.selection().unwrap();
@@ -740,6 +806,7 @@ mod tests {
             FakeHandoff::working(),
             Some(Arc::new(FakeDirect(Some("selected directly".into())))),
             Arc::new(RecordingWrites::default()),
+            Arc::new(FakeLauncher::default()),
         );
 
         assert_eq!(
@@ -767,6 +834,7 @@ mod tests {
             FakeHandoff::working(),
             Some(Arc::new(FakeDirect(None))),
             Arc::new(RecordingWrites::default()),
+            Arc::new(FakeLauncher::default()),
         );
 
         assert_eq!(
