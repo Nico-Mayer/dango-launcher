@@ -30,11 +30,13 @@
   - Confirmed live: a command result reaches the backend and runs.
 - [x] 3.2 Emit view trees on `dango://render` and confirm the existing frontend stack renders one without frontend changes
   - Confirmed live: the quit-application list renders from a view tree with no frontend change beyond what the walkthrough exposed as missing.
-- [ ] 3.3 Return no-view outcomes so success hides the launcher and failure keeps it open with the message, confirmed by running both cases
+- [x] 3.3 Return no-view outcomes so success hides the launcher and failure keeps it open with the message, confirmed by running both cases
+  - Confirmed on Windows: a successful quit hides the launcher and resets it to root, and a lock made to fail keeps it open with the message under the result.
 - [x] 3.4 Generalise `run_action` to dispatch by owning extension, and test that two extensions' results are each handled by their owner
 - [x] 3.5 Drop the hardwired `ApplicationsExtension` lookup and confirm application results still launch, reveal, and copy
   - Confirmed live: applications still launch, reveal, and copy path.
-- [ ] 3.6 Discard output from an abandoned invocation when the launcher hides, confirmed by dismissing during a deliberately slow command
+- [x] 3.6 Discard output from an abandoned invocation when the launcher hides, confirmed by dismissing during a deliberately slow command
+  - Confirmed on Windows with quit-application slowed to four seconds: dismissing while it worked hid the launcher, and its list never appeared afterwards.
 
 ## 4. Shared platform groundwork
 
