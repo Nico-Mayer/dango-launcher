@@ -3,7 +3,7 @@ mod clipboard;
 mod system;
 
 pub use apps::{icon_for, WindowsAppIndexer};
-pub use clipboard::WindowsClipboard;
+pub use clipboard::WindowsAttribution;
 pub use system::WindowsSystemControl;
 
 use tauri::WebviewWindow;

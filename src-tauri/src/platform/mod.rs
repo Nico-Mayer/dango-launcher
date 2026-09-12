@@ -63,19 +63,20 @@ pub fn system_control() -> std::sync::Arc<dyn SystemControl> {
     return std::sync::Arc::new(macos::MacSystemControl);
 }
 
-/// This platform's clipboard.
+/// Which application did the copying. The clipboard itself is a crate; this is
+/// the one question it cannot answer.
 ///
 /// On macOS this also starts recording application activations, which must
 /// happen on the main thread, so it is called during setup rather than from the
 /// extension's background service.
-pub fn clipboard_source() -> std::sync::Arc<dyn crate::extensions::clipboard::ClipboardSource> {
+pub fn attribution() -> std::sync::Arc<dyn crate::extensions::clipboard::Attribution> {
     #[cfg(target_os = "windows")]
-    return std::sync::Arc::new(windows::WindowsClipboard);
+    return std::sync::Arc::new(windows::WindowsAttribution);
     #[cfg(target_os = "macos")]
     {
-        let clipboard = macos::MacClipboard::new();
-        clipboard.watch_activations();
-        std::sync::Arc::new(clipboard)
+        let attribution = macos::MacAttribution::new();
+        attribution.watch_activations();
+        std::sync::Arc::new(attribution)
     }
 }
 

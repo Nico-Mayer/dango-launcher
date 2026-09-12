@@ -3,8 +3,6 @@ pub mod extensions;
 pub mod invocation;
 mod latency;
 mod platform;
-#[doc(hidden)]
-pub use platform::clipboard_source as platform_clipboard_source;
 pub mod protocol;
 pub mod ranking;
 pub mod search;
@@ -430,7 +428,7 @@ pub fn run() {
 
             // Registering for application activations needs the main thread,
             // which this is; the watcher itself runs on its own.
-            let clipboard_source = platform::clipboard_source();
+            let attribution = platform::attribution();
             if let Some(store) = &store {
                 let images = app
                     .path()
@@ -446,12 +444,24 @@ pub fn run() {
                     extensions::clipboard::preference_declarations(),
                     store.clone(),
                 )));
-                let watcher = Arc::new(Watcher::new(clipboard_source, history.clone(), policy));
-                let clipboard = Arc::new(ClipboardExtension::new(history, watcher));
-                match host.register(clipboard) {
-                    Ok(report) if report.is_clean() => {}
-                    Ok(report) => eprintln!("[dango] clipboard loaded with issues: {report:?}"),
-                    Err(error) => eprintln!("[dango] clipboard failed to load: {error}"),
+                match extensions::clipboard::CrateClipboard::new() {
+                    Some(clipboard) => {
+                        let watcher = Arc::new(Watcher::new(
+                            clipboard,
+                            attribution,
+                            history.clone(),
+                            policy,
+                        ));
+                        let extension = Arc::new(ClipboardExtension::new(history, watcher));
+                        match host.register(extension) {
+                            Ok(report) if report.is_clean() => {}
+                            Ok(report) => {
+                                eprintln!("[dango] clipboard loaded with issues: {report:?}")
+                            }
+                            Err(error) => eprintln!("[dango] clipboard failed to load: {error}"),
+                        }
+                    }
+                    None => eprintln!("[dango] no clipboard available, so history is off"),
                 }
             } else {
                 eprintln!("[dango] no database, so clipboard history is off");

@@ -1,41 +1,21 @@
-//! The Windows clipboard.
+//! Which application did the copying, on Windows.
 //!
-//! Not implemented yet. The design calls for spiking the sequence number, the
-//! exclusion formats, and the clipboard owner against a real Windows desktop
-//! before building on them, and this project cannot compile or run Windows code
-//! from the machine development happens on.
+//! The clipboard itself is `clipboard-rs`, which works here too. Only the
+//! owner lookup is platform code, and it is not written yet: the design calls
+//! for spiking it against a real Windows desktop, and this project cannot
+//! compile or run Windows code from the machine development happens on.
 //!
-//! Until that spike runs, the sequence never moves, so the watcher sees no
-//! changes and records nothing. An empty history is the right failure here: the
-//! alternative is recording without being able to check the exclusions, and
-//! this is the one feature where that costs a password.
+//! Until then it claims every application is a candidate, so anything on the
+//! exclusion list keeps its clipboard out. That errs towards recording less,
+//! which is the right direction for the one feature where the other mistake
+//! costs a password.
 
-use crate::extensions::clipboard::ClipboardSource;
+use crate::extensions::clipboard::Attribution;
 
-pub struct WindowsClipboard;
+pub struct WindowsAttribution;
 
-impl ClipboardSource for WindowsClipboard {
-    fn sequence(&self) -> i64 {
-        0
-    }
-
-    fn is_excluded(&self) -> bool {
-        true
-    }
-
+impl Attribution for WindowsAttribution {
     fn candidate_applications(&self) -> Vec<String> {
         Vec::new()
     }
-
-    fn text(&self) -> Option<String> {
-        None
-    }
-
-    fn image(&self) -> Option<Vec<u8>> {
-        None
-    }
-
-    fn set_text(&self, _text: &str) {}
-
-    fn set_image(&self, _png: &[u8]) {}
 }

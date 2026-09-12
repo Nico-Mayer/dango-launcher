@@ -2,11 +2,13 @@
 
 mod extension;
 mod history;
+mod source;
 mod watcher;
 
 pub use extension::{preference_declarations, ClipboardExtension, PreferencePolicy, EXTENSION_ID};
 pub use history::{Bounds, Content, Entry, History, HistoryError, Kind};
-pub use watcher::{ClipboardSource, Policy, WatchService, Watcher, POLL_INTERVAL};
+pub use source::{Attribution, ClipboardSource, CrateClipboard};
+pub use watcher::{Policy, WatchService, Watcher};
 
 /// Applications excluded until the user says otherwise.
 ///

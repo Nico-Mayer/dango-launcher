@@ -291,17 +291,13 @@ mod tests {
         }
     }
 
+    /// Records what was put back on the clipboard, which is all the extension's
+    /// tests need from one.
     #[derive(Default)]
     struct StubClipboard(Mutex<Option<Content>>);
 
     impl ClipboardSource for StubClipboard {
-        fn sequence(&self) -> i64 {
-            0
-        }
-        fn is_excluded(&self) -> bool {
-            false
-        }
-        fn candidate_applications(&self) -> Vec<String> {
+        fn formats(&self) -> Vec<String> {
             Vec::new()
         }
         fn text(&self) -> Option<String> {
@@ -315,6 +311,14 @@ mod tests {
         }
         fn set_image(&self, png: &[u8]) {
             *self.0.lock().unwrap() = Some(Content::Image(png.to_vec()));
+        }
+    }
+
+    struct NoAttribution;
+
+    impl crate::extensions::clipboard::Attribution for NoAttribution {
+        fn candidate_applications(&self) -> Vec<String> {
+            Vec::new()
         }
     }
 
@@ -335,9 +339,11 @@ mod tests {
         let clipboard = Arc::new(StubClipboard::default());
         let watcher = Arc::new(Watcher::new(
             clipboard.clone(),
+            Arc::new(NoAttribution),
             history.clone(),
             Arc::new(policy(Arc::new(MemoryPreferences::default()))),
         ));
+        watcher.start();
         (
             ClipboardExtension::new(history.clone(), watcher),
             history,
