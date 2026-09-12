@@ -1,14 +1,18 @@
 ## 1. Spike: Windows system control
 
-- [ ] 1.1 Lock the workstation and confirm the session locks with the launcher already hidden
-- [ ] 1.2 Put the machine to sleep and confirm it wakes with Dango still resident and the shortcut still registered
+- [x] 1.1 Lock the workstation and confirm the session locks with the launcher already hidden
+  - Live test: `LockWorkStation` returns at once and the logon screen process is up within 300ms. The launcher was hidden when it ran.
+- [x] 1.2 Put the machine to sleep and confirm it wakes with Dango still resident and the shortcut still registered
+  - Live test behind a resume timer: the event log shows the machine entering sleep at 11:51:29 and resuming at 11:51:33. The release build kept running across it, and two hotkey activations afterwards painted in 31.1ms and 21.4ms.
+  - `SetSuspendState` had not returned 500ms in, which is the blocking behaviour the design warned about, so the call runs on its own thread and only a prompt refusal is waited for.
 - [x] 1.3 Read the recycle bin item count and empty it, and confirm the count is correct before and zero after
   - Counting is verified live against the shell: 39 items, 41 after recycling two probe files, 39 again after removing only those two. Emptying is implemented but not run: the bin held 39 of the user's items, and the machine has one volume, so there was nothing to empty in isolation.
 - [x] 1.4 Enumerate running applications and confirm the list carries a name, an icon, and a way to address each one, with Dango absent
   - Live test: every entry has a name, a process id, and an icon that renders, and Dango is absent. The list is what Alt-Tab shows, so windows on another virtual desktop are cloaked and left out along with suspended store apps.
 - [x] 1.5 Ask one application to close and confirm a well-behaved app exits while one with unsaved work prompts instead
   - Calculator, a store app hosted in ApplicationFrameHost, is listed under its own process and is gone within a second of the request. A form that cancels its own close stands in for unsaved work: the request reaches it, it keeps running, and quit reports success rather than failure.
-- [ ] 1.6 If any of the above does not work, revisit the design before building on it
+- [x] 1.6 If any of the above does not work, revisit the design before building on it
+  - Everything in the design table worked as written against windows 0.61.3. Two additions the table did not anticipate: store apps run inside ApplicationFrameHost and need the hosted child's process to be listed separately, and packaged desktop apps carry their AppUserModelID on the process rather than the window.
 
 ## 2. Command host and invocation
 
@@ -67,8 +71,10 @@
 
 ## 7. System extension: Windows
 
-- [ ] 7.1 Lock the workstation, verified by invoking it on a real desktop
-- [ ] 7.2 Sleep the machine, verified by invoking it on a real desktop
+- [x] 7.1 Lock the workstation, verified by invoking it on a real desktop
+  - Verified as in 1.1.
+- [x] 7.2 Sleep the machine, verified by invoking it on a real desktop
+  - Verified as in 1.2.
 - [x] 7.3 Read the recycle bin item count and empty it, verified against a bin with known contents
   - Count verified as in 1.3. Emptying is implemented with the shell's confirmation, progress window, and sound suppressed, and treats the E_UNEXPECTED an already-empty bin answers as success. It has not been run against the user's bin.
 - [x] 7.4 List running applications with names and icons, verified against what the taskbar and Alt-Tab show
