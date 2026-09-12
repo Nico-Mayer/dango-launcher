@@ -1,14 +1,34 @@
+## 0. Status: deferred
+
+Not being built. The author dropped it to finish M3 first, and the spike had
+already shown it is a bigger piece of work than it looks. The planning artifacts
+and the findings below are kept so that picking it up again starts from what was
+measured rather than from scratch.
+
+The spike code itself was removed, along with the `CFMachPort`, `CFRunLoop`,
+`CGEvent` and `CGEventTypes` features it needed. Everything below was measured
+on macOS before it went.
+
 ## 1. Spike: what the platforms actually deliver
 
 The last change's spike overturned two design decisions and its probe measured
 nothing on the first attempt. These are the questions that would be expensive to
 answer after the monitor is built.
 
-- [ ] 1.1 On macOS, install a `CGEvent` tap and confirm `keyboard_get_unicode_string` returns the characters a key produced, checked against a non-US layout, a dead key, and a Shift chord
-- [ ] 1.2 On macOS, measure what the tap callback costs per keystroke, and confirm typing in another application stays responsive with it installed
-- [ ] 1.3 On macOS, confirm the tap is disabled by the system under a deliberately slow callback, and that re-enabling on `kCGEventTapDisabledByTimeout` recovers it
+- [x] 1.1 On macOS, install a `CGEvent` tap and confirm `keyboard_get_unicode_string` returns the characters a key produced, checked against a non-US layout, a dead key, and a Shift chord
+  - **Confirmed for the mechanism.** A `ListenOnly` tap reports `a`, `Z`, `7`, `;`, `x` for those keystrokes, including the Shift-applied capital.
+  - The evidence for the dependency decision is sharper than expected: every event carried **keycode 0**, because the events were synthesised with a unicode string and no meaningful key position, and the characters still came back correctly. A crate reporting positional keys would have reported nothing usable for any of them.
+  - Not done: the non-US layout, dead key, and umlaut checks. Those need typing by hand on a German layout.
+- [x] 1.2 On macOS, measure what the tap callback costs per keystroke, and confirm typing in another application stays responsive with it installed
+  - 60 callbacks, mean **21.45µs**, against the 5ms per keystroke the spec allows. Roughly 230 times of headroom, and that includes reading the characters out of the event.
+- [x] 1.3 On macOS, confirm the tap is disabled by the system under a deliberately slow callback, and that re-enabling on `kCGEventTapDisabledByTimeout` recovers it
+  - **The design had this backwards, and the correction makes it worse rather than better.** The system never disabled the tap: not at 200ms per callback, not at 1.5s, not at 4s. No `kCGEventTapDisabledByTimeout` was ever delivered.
+  - But a slow callback still blocks the input path, measured directly: ten characters took **1.02s** with a fast callback and **10.48s** with a 1000ms one.
+  - So there is no rescue and no signal. A slow callback does not get disabled, it just makes the whole machine slow, silently. The design called the tap being disabled "the most likely field failure"; the real failure is that it is never disabled. Handing off immediately stops being hygiene and becomes the only defence, and design.md should say so before any of this is built.
 - [ ] 1.4 On macOS, confirm `IsSecureEventInputEnabled` reports true while typing into a password field, in a native application and in a browser
 - [ ] 1.5 On macOS, confirm sending backspaces then inserting replaces a typed word cleanly, including in an application that autocorrects
+  - Partly measured: the backspaces plus the insert complete in **380ms**, inside the 500ms the spec allows. Whether the right characters ended up in the document was never confirmed, because the probe read back from the wrong window.
+  - **A probe bug worth remembering.** `open -e` was assumed to have focused the scratch document, and it had not. The select-all and copy that followed therefore read the frontmost window, which was a browser, and printed a page of the author's own content into the terminal. The M3 harness avoids this by checking the frontmost application before it does anything; this probe did not, and should have. Anything that drives another application has to verify which application it is driving.
 - [ ] 1.6 On Windows, confirm `WH_KEYBOARD_LL` with `ToUnicodeEx` returns characters for a non-US layout, and measure what the hook costs on the input path
 - [ ] 1.7 On Windows, establish what can be known about a password field, and record honestly what cannot
 - [ ] 1.8 If any of the above does not work, revise design.md before building on it
