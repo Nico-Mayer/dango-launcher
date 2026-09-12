@@ -2,6 +2,7 @@
   import AppWindow from "@lucide/svelte/icons/app-window";
   import CircleAlert from "@lucide/svelte/icons/circle-alert";
   import CirclePower from "@lucide/svelte/icons/circle-power";
+  import LoaderCircle from "@lucide/svelte/icons/loader-circle";
   import Lock from "@lucide/svelte/icons/lock";
   import Moon from "@lucide/svelte/icons/moon";
   import Terminal from "@lucide/svelte/icons/terminal";
@@ -15,6 +16,7 @@
     "app-window": AppWindow,
     "circle-alert": CircleAlert,
     "circle-power": CirclePower,
+    "loader-circle": LoaderCircle,
     lock: Lock,
     moon: Moon,
     terminal: Terminal,

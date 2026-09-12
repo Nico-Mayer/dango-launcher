@@ -27,6 +27,8 @@
   let viewQuery = $state("");
   let viewInputEl = $state<HTMLInputElement | null>(null);
   let failure = $state<string | null>(null);
+  // A view command has been invoked and its first tree has not arrived yet.
+  let working = $state(false);
   let inputEl = $state<HTMLInputElement | null>(null);
 
   // The query whose results we will display; a late event for an older query is
@@ -51,6 +53,7 @@
     panelOpen = false;
     protocolError = false;
     failure = null;
+    working = false;
     runSearch("");
   }
 
@@ -98,10 +101,12 @@
     if (item.actions.length === 0) {
       failure = null;
       panelOpen = false;
+      working = true;
       const owner = await invoke<string>("invoke_command", { commandId: item.id }).then(
         (id) => id,
         (reason) => {
           failure = String(reason);
+          working = false;
           return null;
         },
       );
@@ -176,12 +181,16 @@
         );
       }),
       listen("dango://reset", () => resetToRoot()),
-      listen<string>("dango://failed", (event) => (failure = event.payload)),
+      listen<string>("dango://failed", (event) => {
+        failure = event.payload;
+        working = false;
+      }),
       listen<ResultsPayload>("dango://results", (event) => {
         if (event.payload.query !== liveQuery) return;
         results = event.payload.items;
       }),
       listen<ViewTree>("dango://render", (event) => {
+        working = false;
         if (event.payload.protocolVersion !== PROTOCOL_VERSION) {
           protocolError = true;
           return;
@@ -311,6 +320,14 @@
       </Command.Viewport>
     </Command.List>
 
+    {#if working}
+      <div
+        class="text-muted-foreground border-border-card flex shrink-0 items-center gap-2 border-t px-5 py-2 text-sm"
+      >
+        <Icon name="loader-circle" size={16} class="animate-spin" />
+        Working...
+      </div>
+    {/if}
     {#if failure}
       <div
         class="text-destructive border-border-card flex shrink-0 items-center gap-2 border-t px-5 py-2 text-sm"
