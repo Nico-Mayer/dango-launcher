@@ -128,6 +128,28 @@ the feature being a liability.
 
 Windows can still name the owner exactly through `GetClipboardOwner`, and uses
 it. The window trail is the macOS answer to a question Windows does not have.
+The owner is named the way the running applications list names things, so the
+exclusion list can be filled from what the user already sees there. Confirmed
+live: the Proton Pass process identifies as `Proton Pass`.
+
+Two Windows cases have no owner to name and so are recorded: a program that
+opens the clipboard without a window, which `clip.exe` does, and a program that
+exits before the change is read. A password manager is neither.
+
+### Windows waits for the copying application before reading
+
+Verification found every .NET copy failing with `CLIPBRD_E_CANT_OPEN` while
+Dango ran. A .NET application announces delayed-rendered formats and then, on
+the same thread and without pumping messages, flushes them for real. Reading in
+between asks that thread to render while it is stuck retrying to open a
+clipboard we hold; after a second it gives up and the copy fails in the copying
+application. Any clipboard monitor that reads on the change event does this,
+which is why .NET developers know the failure by name.
+
+So before anything is read, the owner window is asked to answer a no-op message
+with a short timeout, and the read waits until it does. Once it answers it is
+back in its message loop and the copy is complete. A fixed delay was tried first
+and lost the race under a cold process.
 
 ### The exclusion list ships with defaults
 
@@ -228,6 +250,9 @@ styling change in `ProtocolView`, not a contract change.
   and a second concurrency model.
 - **macOS attribution is approximate.** → Bounded by the marker check running
   first. Recorded above.
+- **Windows attribution needs an owner window.** A copy made without one, or
+  by a process that has already exited when the change is read, is recorded.
+  → Accepted; the applications this feature guards against are neither.
 - **The size ceiling is enforced after writing, not before.** The image has to
   be encoded to know how big it is. → Transient overshoot of one entry, which
   the per-entry ceiling already bounds.
