@@ -219,11 +219,28 @@
     const q = query;
     runSearch(q);
   });
+  /// The footer should say what Enter does here rather than always "Select".
+  /// A view declares its primary action, so the label comes from the tree.
+  function stackPrimaryLabel(): string {
+    const view = stack[stack.length - 1]?.view;
+    if (!view) return "Select";
+    if ("actions" in view && view.actions.length > 0) return view.actions[0].title;
+    return "Select";
+  }
+
+  /// A template field needs plain Enter for a newline, so the footer has to
+  /// advertise the chord that actually submits.
+  function stackConfirmKey(): string {
+    const view = stack[stack.length - 1]?.view;
+    const hasTemplate =
+      view?.kind === "form" && view.fields.some((field) => field.kind === "template");
+    return hasTemplate ? "⌘↵" : "↵";
+  }
 </script>
 
 <svelte:window onkeydown={onKeydown} onblur={() => invoke("dismiss")} />
 
-{#snippet footer(primaryLabel: string)}
+{#snippet footer(primaryLabel: string, confirmKey: string = "↵")}
   <div
     class="border-border-card text-muted-foreground flex h-10 shrink-0 items-center justify-between border-t px-4 text-xs"
   >
@@ -231,7 +248,7 @@
     <div class="flex items-center gap-4">
       <span class="flex items-center gap-1.5">
         {primaryLabel}
-        <kbd class="bg-muted rounded px-1.5 py-0.5 font-sans">↵</kbd>
+        <kbd class="bg-muted rounded px-1.5 py-0.5 font-sans">{confirmKey}</kbd>
       </span>
       <span class="flex items-center gap-1.5">
         Actions
@@ -252,7 +269,11 @@
   <main
     class="border-border-card bg-background flex h-screen w-screen flex-col overflow-hidden rounded-[14px] border"
   >
-    <ProtocolView tree={stack[stack.length - 1]} onaction={runViewAction} />
+    <!-- Fills the space so the footer sits on the bottom edge rather than
+         directly under a short form. -->
+    <div class="flex min-h-0 flex-1 flex-col">
+      <ProtocolView tree={stack[stack.length - 1]} onaction={runViewAction} />
+    </div>
     {#if failure}
       <div
         class="text-destructive border-border-card flex shrink-0 items-center gap-2 border-t px-5 py-2 text-sm"
@@ -261,7 +282,7 @@
         {failure}
       </div>
     {/if}
-    {@render footer("Select")}
+    {@render footer(stackPrimaryLabel(), stackConfirmKey())}
   </main>
 {:else}
   <Command.Root

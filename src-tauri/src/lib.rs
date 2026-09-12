@@ -522,6 +522,19 @@ pub fn run() {
                 launcher: Mutex::new(launcher),
             });
 
+            // Clicking away from a non-activating panel does not reliably blur
+            // the webview, so the frontend's own blur handler is not enough on
+            // its own: the launcher would stay on screen without keyboard focus,
+            // visible but dead. The window's focus event is the reliable signal.
+            {
+                let handle = app.handle().clone();
+                window.on_window_event(move |event| {
+                    if let tauri::WindowEvent::Focused(false) = event {
+                        hide_after_launch(&handle);
+                    }
+                });
+            }
+
             // The tray menu is the only surface for startup problems, so they
             // are collected before it is built. None of them stops Dango from
             // starting.

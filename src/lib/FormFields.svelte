@@ -35,6 +35,19 @@
     }
   });
 
+  /// The launcher is summoned to be typed into, so a form that arrives without
+  /// focus costs a click every time. The caret goes to the end rather than
+  /// selecting, because an edit form is usually being adjusted, not replaced.
+  function takeFocus(node: HTMLInputElement | HTMLTextAreaElement) {
+    node.focus();
+    node.setSelectionRange(node.value.length, node.value.length);
+  }
+
+  /// Stable identities. An attachment re-runs whenever its expression changes,
+  /// and an inline arrow is a new function every render, which would refocus
+  /// the field and jump the caret to the end on every keystroke.
+  const nothing = () => {};
+
   function submit() {
     onsubmit(values);
   }
@@ -53,31 +66,34 @@
 
 <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
 <form
-  class="flex flex-col gap-3 px-4 py-3"
+  class="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-5 py-4"
   onkeydown={onKeydown}
   onsubmit={(event) => {
     event.preventDefault();
     submit();
   }}
 >
-  {#each view.fields as field (field.id)}
-    <label class="flex flex-col gap-1">
-      <span class="text-foreground-alt text-xs">{field.label}</span>
+  {#each view.fields as field, index (field.id)}
+    <label class="flex flex-col gap-1.5">
+      <span class="text-foreground-alt text-xs font-medium">{field.label}</span>
       {#if field.kind === "toggle"}
         <input
           type="checkbox"
+          class="accent-foreground h-4 w-4 self-start"
           checked={values[field.id] === "true"}
           onchange={(e) => (values[field.id] = e.currentTarget.checked ? "true" : "false")}
         />
       {:else if field.kind === "template"}
         <textarea
-          rows="4"
-          class="border-border-input bg-background/60 text-foreground rounded-md border px-2 py-1 font-mono text-sm focus:outline-none"
+          rows="5"
+          spellcheck="false"
+          class="border-border-input bg-background/60 text-foreground focus:border-foreground-alt resize-none rounded-md border px-2.5 py-2 font-mono text-sm outline-none"
           value={values[field.id] ?? ""}
           oninput={(e) => (values[field.id] = e.currentTarget.value)}
+          {@attach index === 0 ? takeFocus : nothing}
         ></textarea>
         {#if inspections[field.id]?.error}
-          <span class="text-destructive flex items-center gap-1 text-xs">
+          <span class="text-destructive flex items-center gap-1.5 text-xs">
             <Icon name="circle-alert" size={12} />
             {inspections[field.id].error}
           </span>
@@ -91,9 +107,11 @@
       {:else}
         <input
           type={field.kind === "password" ? "password" : "text"}
-          class="border-border-input bg-background/60 text-foreground rounded-md border px-2 py-1 text-sm focus:outline-none"
+          spellcheck="false"
+          class="border-border-input bg-background/60 text-foreground focus:border-foreground-alt rounded-md border px-2.5 py-2 text-sm outline-none"
           value={values[field.id] ?? ""}
           oninput={(e) => (values[field.id] = e.currentTarget.value)}
+          {@attach index === 0 ? takeFocus : nothing}
         />
       {/if}
     </label>

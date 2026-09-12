@@ -149,7 +149,7 @@
     </Command.List>
   </Command.Root>
 {:else if view.kind === "detail"}
-  <div class="text-foreground whitespace-pre-wrap px-4 py-3 text-sm">
+  <div class="text-foreground min-h-0 flex-1 overflow-y-auto px-5 py-4 text-sm whitespace-pre-wrap">
     {view.markdown}
   </div>
 {:else if view.kind === "form"}
