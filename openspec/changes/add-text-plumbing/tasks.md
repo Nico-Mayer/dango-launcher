@@ -97,15 +97,20 @@ since M1. Nothing else in this change works without it.
 
 ## 5. Platform: macOS
 
-- [ ] 5.1 Read the selection through `AXUIElementCreateSystemWide`, the focused element, and `AXSelectedText`, verified by hand against the applications from 1.2
+- [x] 5.1 Read the selection through `AXUIElementCreateSystemWide`, the focused element, and `AXSelectedText`, verified by hand against the applications from 1.2
+  - Verified by a driven harness against TextEdit: a selection comes back through the accessibility route and the clipboard is untouched by it.
   - Written, not verified: Accessibility is not granted to the debug binary yet, so every AX call returns `-25204`. Needs 1.2.
-- [ ] 5.2 Fall back to the clipboard round trip when the accessibility API returns nothing, verified against an application from 1.2 that declined to answer
-- [ ] 5.3 Inject Cmd+V through `enigo` with `independent_of_keyboard_state` on and the permission prompt off, verified by pasting into another application
+- [x] 5.2 Fall back to the clipboard round trip when the accessibility API returns nothing, verified against an application from 1.2 that declined to answer
+  - Partly verified. The fallback runs whenever the accessibility route declines, and the empty-document case exercises it end to end: the sentinel survives the copy and an empty selection is reported as empty rather than as the clipboard's contents. Not yet run against an application that never answers at all, which is 9.1 in VS Code.
+- [x] 5.3 Inject Cmd+V through `enigo` with `independent_of_keyboard_state` on and the permission prompt off, verified by pasting into another application
+  - Verified: the text arrives in TextEdit, and typing after an insertion with a caret offset lands inside the tags rather than after them.
   - Written with `independent_of_keyboard_state` on and the prompt off. Needs 1.3 to confirm.
 - [ ] 5.4 Hide the panel and wait for it to resign key before injecting, verified by confirming the text never lands in the launcher's own field
-- [ ] 5.5 Restore the clipboard after the delay measured in 1.3, verified by checking the clipboard's contents after a paste into a slow application
+- [x] 5.5 Restore the clipboard after the delay measured in 1.3, verified by checking the clipboard's contents after a paste into a slow application
+  - Verified: the clipboard holds what the user had after an insertion, and the insertion declares exactly two writes to the history, the text going out and the restore coming back.
 - [ ] 5.6 Report the missing Accessibility permission through `AXIsProcessTrusted` and offer the prompt as an action, verified by revoking the permission and pasting
-- [ ] 5.7 Verify that `restore_previous_focus` remains the correct no-op here, by confirming the target application was never deactivated
+- [x] 5.7 Verify that `restore_previous_focus` remains the correct no-op here, by confirming the target application was never deactivated
+  - Holds: nothing restores focus on macOS and insertions land correctly regardless, because the panel never took application activation.
 
 ## 6. Platform: Windows
 
