@@ -4,13 +4,23 @@ The clipboard change was rescued by its spike overturning two design decisions
 before group 5. The same three questions here are the ones that would be
 expensive to answer late.
 
-- [ ] 1.1 Add `enigo`, `objc2-application-services`, and `minijinja` with the features design.md names, and verify `cargo build` and `cargo clippy -- -D warnings` pass on macOS with no Linux dependency pulled in
+- [x] 1.1 Add `enigo`, `objc2-application-services`, and `minijinja` with the features design.md names, and verify `cargo build` and `cargo clippy -- -D warnings` pass on macOS with no Linux dependency pulled in
+  - Builds and `cargo clippy --all-targets -- -D warnings` is clean. `cargo tree -i` finds no `x11rb`, `wayland-client`, `xkbcommon`, or `ashpd`, so nothing Linux entered the build.
+  - One correction to the design's feature list: `minijinja` needs `serde` as well as `builtins` and `urlencode`. `Environment::new` is deprecated without it and the deprecation is a warning, which CI turns into a failure.
+  - One thing the design got half right. It rejected `axuielement` for pulling a second Core Foundation stack, and `enigo` pulls one anyway: `core-foundation` 0.10 and `core-graphics` 0.25. The difference is real but narrower than the design implies: those types stay inside `enigo`, since its API is its own `Key` enum, whereas AX values would have crossed into our own AppKit code. Confirmed absent: `apple-cf` and `cocoa`.
 - [ ] 1.2 On macOS, read `AXSelectedText` from the focused element of the frontmost application, and record which applications answer and which return nothing: a native app, a browser, an Electron app, and a terminal
 - [ ] 1.3 On macOS, inject Cmd+V into another application after hiding the panel, and measure how long after the keystroke the clipboard can safely be restored, across a fast native app and a slow Electron one
 - [ ] 1.4 On macOS, record how often Accessibility trust has to be re-granted across rebuilds of an unsigned debug binary, so the development cost is known rather than assumed
 - [ ] 1.5 On Windows, confirm that waiting for the previous window to become foreground before injecting is reliable under foreground lock, and that a no-op message to the target after Ctrl+V returns only once the paste has been handled
 - [ ] 1.6 On Windows, confirm the clipboard round trip reads a selection from a native app, a browser, an Electron app, and a terminal
-- [ ] 1.7 Verify `minijinja::Template::undeclared_variables` reports the names in the templates snippets will actually hold, including one with reserved names only and one with a repeated argument
+- [x] 1.7 Verify `minijinja::Template::undeclared_variables` reports the names in the templates snippets will actually hold, including one with reserved names only and one with a repeated argument
+  - Works exactly as the design needs. Reserved-only reports only reserved names, a repeated argument is reported once, and an unclosed placeholder fails to parse so it can be refused at save.
+  - **A finding that contradicts the delimiter decision.** Single braces are safe, as the design argued: `fn main() { let x = Foo { a: 1 }; }` reports no placeholders. Doubled braces are not, and they are common in exactly the text an author stores as a snippet.
+    - `printf("{{%d}}", x)` is a parse error, so the snippet is refused outright.
+    - `runs-on: ${{ matrix.os }}` parses and reports an argument named `matrix`. A GitHub Actions snippet saves cleanly and then asks the wrong question every time it is used.
+    - `<p>{{ user.name }}</p>` does the same with `user`, so Vue, Angular, and Handlebars snippets all misbehave silently.
+  - Escapes exist and work: `{% raw %}...{% endraw %}` and `{{ '{{' }}` both parse to no placeholders. Both require editing text the user pasted in.
+  - See 1.8. This needs a decision before group 2.
 - [ ] 1.8 If any of the above does not work, revise design.md before building on it
 
 ## 2. The template engine
