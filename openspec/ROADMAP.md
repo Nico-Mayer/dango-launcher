@@ -16,9 +16,9 @@ M1  core        registry + manifest v1 + view protocol v1 + search/rank
 M2  builtins    command invocation + system commands; clipboard-history
 M3  plumbing    selection capture, paste + focus restore, template engine
                 -> snippets + quicklinks
-M4  ai          BYOK providers, keychain, streaming, user-defined AI commands
-M5  windows     window-management extension
-M6  keys        hotkey binding UI, conflict detection, hyperkey
+M4  windows     window-management extension
+M5  keys        hotkey binding UI, conflict detection, hyperkey
+M6  ai          BYOK providers, keychain, streaming, user-defined AI commands
 M7  polish      preferences window, permission onboarding, autostart
 M8  3rd party   script commands, then a sandboxed extension runtime
 M9  sync        file-based, deliberately small
@@ -71,7 +71,22 @@ frontmost app, focus restore, and a shared template and placeholder engine.
 Ships `snippets` and `quicklinks` as its first consumers. M4, M5, and M6 all
 depend on parts of it.
 
-### M4 - ai
+### M4 - windows
+
+The `window-management` extension: halves, quarters, thirds, maximize, center,
+move to next display, and per-command hotkeys. Straightforward on Windows,
+gated behind the Accessibility permission on macOS.
+
+### M5 - keys
+
+Bind any command to a global hotkey, with a recorder UI and conflict detection.
+Then hyperkey as a background service.
+
+Check first whether PowerToys Keyboard Manager already covers the Windows side.
+Injected modifiers from a low-level hook have real edge cases with games and
+raw-input applications, and this is a hobby project.
+
+### M6 - ai
 
 Bring-your-own-key AI commands: highlighted text in, transformed text out.
 A small provider trait with a native Anthropic adapter plus an
@@ -83,21 +98,6 @@ User-defined AI commands come almost free from the M3 template engine: a named
 prompt template with placeholders, a hotkey, and an output action.
 
 Explicitly not a chat interface. One-shot transforms only.
-
-### M5 - windows
-
-The `window-management` extension: halves, quarters, thirds, maximize, center,
-move to next display, and per-command hotkeys. Straightforward on Windows,
-gated behind the Accessibility permission on macOS.
-
-### M6 - keys
-
-Bind any command to a global hotkey, with a recorder UI and conflict detection.
-Then hyperkey as a background service.
-
-Check first whether PowerToys Keyboard Manager already covers the Windows side.
-Injected modifiers from a low-level hook have real edge cases with games and
-raw-input applications, and this is a hobby project.
 
 ### M7 - polish
 
@@ -123,12 +123,12 @@ real sync engine possible if that ever changes.
 
 ## Deferred, with reasons
 
-| Item | Why not |
-|---|---|
-| Calculator | Dropped from M2. The author does not use one. |
-| Linux and Wayland | No Linux desktop. Wayland would break four features. |
-| Accounts and cloud sync | Weeks of work so two machines agree on snippets. |
-| Code signing, notarization, auto-update | No external users. |
-| AI chat interface | A different product. Transforms first. |
-| Grid views, menu-bar commands | Add once a real command needs them. |
-| Elevated window support on Windows | Hard ceiling of a non-elevated process. Accept it. |
+| Item                                    | Why not                                              |
+| --------------------------------------- | ---------------------------------------------------- |
+| Calculator                              | Dropped from M2. The author does not use one.        |
+| Linux and Wayland                       | No Linux desktop. Wayland would break four features. |
+| Accounts and cloud sync                 | Weeks of work so two machines agree on snippets.     |
+| Code signing, notarization, auto-update | No external users.                                   |
+| AI chat interface                       | A different product. Transforms first.               |
+| Grid views, menu-bar commands           | Add once a real command needs them.                  |
+| Elevated window support on Windows      | Hard ceiling of a non-elevated process. Accept it.   |
