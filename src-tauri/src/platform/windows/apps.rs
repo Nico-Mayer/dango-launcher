@@ -76,10 +76,14 @@ impl AppIndexer for WindowsAppIndexer {
         }
     }
 
+    /// The path is quoted on its own. Quoting the whole `/select,` argument, as
+    /// `arg` does for anything with a space, makes Explorer ignore it and open
+    /// the default folder instead.
     fn reveal(&self, app: &IndexedApp) -> std::io::Result<()> {
+        use std::os::windows::process::CommandExt;
         match &app.target {
             Some(target) if is_file_path(target) => std::process::Command::new("explorer.exe")
-                .arg(format!("/select,{target}"))
+                .raw_arg(format!("/select,\"{target}\""))
                 .spawn()
                 .map(|_| ()),
             _ => Err(std::io::Error::other(
@@ -119,7 +123,7 @@ pub fn icon_for(parsing_name: &str, size: u32) -> Option<IconRgba> {
 
 /// Ignores the result: a second apartment-threaded init on the same thread
 /// returns S_FALSE, and a background thread has no prior state to disturb.
-unsafe fn init_com() {
+pub(super) unsafe fn init_com() {
     let _ = CoInitializeEx(None, COINIT_APARTMENTTHREADED);
 }
 
@@ -228,7 +232,7 @@ unsafe fn find_running_window(app: &IndexedApp) -> Option<HWND> {
     None
 }
 
-unsafe fn window_aumid(hwnd: HWND) -> Option<String> {
+pub(super) unsafe fn window_aumid(hwnd: HWND) -> Option<String> {
     let store: IPropertyStore = SHGetPropertyStoreForWindow(hwnd).ok()?;
     let mut value = store.GetValue(&PKEY_AppUserModel_ID).ok()?;
     let text = PropVariantToStringAlloc(&value).ok().map(take_pwstr);
@@ -242,6 +246,10 @@ unsafe fn window_process_path(hwnd: HWND) -> Option<String> {
     if pid == 0 {
         return None;
     }
+    process_image_path(pid)
+}
+
+pub(super) unsafe fn process_image_path(pid: u32) -> Option<String> {
     let process: HANDLE = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid).ok()?;
     let mut buffer = [0u16; 512];
     let mut len = buffer.len() as u32;
@@ -332,7 +340,7 @@ unsafe fn bitmap_to_rgba(hbitmap: HBITMAP) -> Option<IconRgba> {
 
 /// Reads a COM-allocated wide string and frees it. Safe wrapper: every caller
 /// passes a pointer the shell just handed back.
-fn take_pwstr(p: PWSTR) -> String {
+pub(super) fn take_pwstr(p: PWSTR) -> String {
     let s = unsafe { p.to_string() }.unwrap_or_default();
     unsafe { CoTaskMemFree(Some(p.0 as _)) };
     s

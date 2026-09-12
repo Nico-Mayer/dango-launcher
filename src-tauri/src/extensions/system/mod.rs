@@ -175,7 +175,9 @@ fn confirmation(count: usize) -> ViewTree {
 /// The running applications, filtered by the launcher because the list is small
 /// and complete when it is pushed. Icons are rendered here rather than in the
 /// background, because the list is short and it is on screen only once asked
-/// for, unlike root search.
+/// for, unlike root search. They are cached by locator rather than by the
+/// application's id, because the cache outlives the session and process ids
+/// are reused.
 fn running_list(apps: Vec<crate::platform::RunningApp>, icons: &IconCache) -> ViewTree {
     ViewTree {
         protocol_version: PROTOCOL_VERSION,
@@ -190,10 +192,10 @@ fn running_list(apps: Vec<crate::platform::RunningApp>, icons: &IconCache) -> Vi
                 .into_iter()
                 .map(|app| ListItem {
                     icon: app.icon.and_then(|locator| {
-                        icons.ensure_with(&app.id, || {
+                        icons.ensure_with(&locator, || {
                             crate::platform::icon_for(&locator, ICON_SIZE)
                         });
-                        icons.path(&app.id)
+                        icons.path(&locator)
                     }),
                     id: app.id,
                     title: app.name,
