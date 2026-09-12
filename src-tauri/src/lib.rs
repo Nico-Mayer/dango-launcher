@@ -334,6 +334,12 @@ fn warm_up(app: &tauri::AppHandle, window: &WebviewWindow) {
     });
 }
 
+/// The platform's answer to which application did the copying, for spikes
+/// that need to exercise the real one outside the application.
+pub fn platform_attribution() -> Arc<dyn extensions::clipboard::Attribution> {
+    platform::attribution()
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let shortcut = Shortcut::new(Some(Modifiers::ALT), Code::Space);
