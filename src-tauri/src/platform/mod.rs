@@ -63,6 +63,42 @@ pub fn system_control() -> std::sync::Arc<dyn SystemControl> {
     return std::sync::Arc::new(macos::MacSystemControl);
 }
 
+/// The selection and paste path for this platform, or `None` when key injection
+/// is unavailable and nothing here can work.
+///
+/// `own_writes` is how the clipboard history is told to ignore what this
+/// borrows. Pass `crate::text::Unwatched` when the clipboard extension is off.
+pub fn text_exchange(
+    clipboard: std::sync::Arc<dyn crate::extensions::clipboard::ClipboardSource>,
+    own_writes: std::sync::Arc<dyn crate::text::OwnWrites>,
+) -> Option<crate::text::TextExchange> {
+    #[cfg(target_os = "macos")]
+    {
+        let keys = std::sync::Arc::new(macos::MacKeys::new()?);
+        Some(crate::text::TextExchange::new(
+            clipboard,
+            keys,
+            std::sync::Arc::new(macos::MacHandoff),
+            Some(std::sync::Arc::new(macos::MacSelection)),
+            own_writes,
+        ))
+    }
+    #[cfg(target_os = "windows")]
+    {
+        let keys = std::sync::Arc::new(windows::WindowsKeys::new()?);
+        Some(crate::text::TextExchange::new(
+            clipboard,
+            keys,
+            std::sync::Arc::new(windows::WindowsHandoff),
+            // No accessibility route worth having here: the UI Automation text
+            // pattern only answers in applications that implement it, and the
+            // clipboard round trip has to be right anyway.
+            None,
+            own_writes,
+        ))
+    }
+}
+
 /// Which application did the copying. The clipboard itself is a crate; this is
 /// the one question it cannot answer.
 ///

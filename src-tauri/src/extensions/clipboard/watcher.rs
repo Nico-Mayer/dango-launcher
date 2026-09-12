@@ -230,6 +230,14 @@ impl crate::extension::Service for WatchService {
     }
 }
 
+/// The clipboard history's side of the bargain with the selection and paste
+/// path: whatever that borrows, the history never sees.
+impl crate::text::OwnWrites for Watcher {
+    fn expect(&self, content: &Content) {
+        self.expect_own_write(content);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

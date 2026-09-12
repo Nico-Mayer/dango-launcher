@@ -87,8 +87,10 @@ since M1. Nothing else in this change works without it.
 ## 5. Platform: macOS
 
 - [ ] 5.1 Read the selection through `AXUIElementCreateSystemWide`, the focused element, and `AXSelectedText`, verified by hand against the applications from 1.2
+  - Written, not verified: Accessibility is not granted to the debug binary yet, so every AX call returns `-25204`. Needs 1.2.
 - [ ] 5.2 Fall back to the clipboard round trip when the accessibility API returns nothing, verified against an application from 1.2 that declined to answer
 - [ ] 5.3 Inject Cmd+V through `enigo` with `independent_of_keyboard_state` on and the permission prompt off, verified by pasting into another application
+  - Written with `independent_of_keyboard_state` on and the prompt off. Needs 1.3 to confirm.
 - [ ] 5.4 Hide the panel and wait for it to resign key before injecting, verified by confirming the text never lands in the launcher's own field
 - [ ] 5.5 Restore the clipboard after the delay measured in 1.3, verified by checking the clipboard's contents after a paste into a slow application
 - [ ] 5.6 Report the missing Accessibility permission through `AXIsProcessTrusted` and offer the prompt as an action, verified by revoking the permission and pasting
@@ -101,10 +103,14 @@ closes on the Windows machine, the way the clipboard change did.
 
 - [ ] 6.1 Read the selection through the shared clipboard round trip, verified by hand against the applications from 1.6
 - [ ] 6.2 Inject Ctrl+V through `enigo` with `windows_dw_extra_info` set so the injected events are identifiable, verified by pasting into another application
+  - Written with `windows_dw_extra_info` set to a Dango marker. Cannot be compiled here; CI is the first check.
 - [ ] 6.3 Hide the launcher, call `restore_previous_focus`, and wait for `GetForegroundWindow` to return the target before injecting, verified by pasting immediately after activation
+  - Written as a poll of `GetForegroundWindow` against the remembered window, not a delay.
 - [ ] 6.4 Fail with a message when the previous window never becomes foreground, verified by holding foreground elsewhere
 - [ ] 6.5 Wait for the target window to answer a no-op message after Ctrl+V before restoring the clipboard, verified by checking the clipboard after pasting into a .NET application
+  - Written as `SendMessageTimeoutW` with `WM_NULL` and `SMTO_ABORTIFHUNG`, the clipboard change's trick pointed the other way.
 - [ ] 6.6 Report the elevated-window ceiling as a clear failure rather than a silent one, verified by pasting into an elevated window
+  - Written as an `OpenProcess` probe with `PROCESS_QUERY_LIMITED_INFORMATION`: a refusal is the answer, since a non-elevated process cannot open an elevated one.
 - [ ] 6.7 Check symbol names and module paths against the vendored crate source before pushing, and verify CI's `cargo clippy -- -D warnings` passes on `windows-latest`
 
 ## 7. Snippets

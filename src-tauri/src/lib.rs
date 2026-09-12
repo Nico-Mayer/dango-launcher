@@ -517,11 +517,19 @@ pub fn run() {
                 match extensions::clipboard::CrateClipboard::new() {
                     Some(clipboard) => {
                         let watcher = Arc::new(Watcher::new(
-                            clipboard,
+                            clipboard.clone(),
                             attribution,
                             history.clone(),
                             policy,
                         ));
+                        // The watcher is what keeps a paste out of the history,
+                        // so the exchange is built against this one.
+                        if let Some(exchange) = platform::text_exchange(clipboard, watcher.clone())
+                        {
+                            app.manage(Arc::new(exchange));
+                        } else {
+                            eprintln!("[dango] no key injection, so pasting is off");
+                        }
                         let extension = Arc::new(ClipboardExtension::new(history, watcher));
                         match host.register(extension) {
                             Ok(report) if report.is_clean() => {}

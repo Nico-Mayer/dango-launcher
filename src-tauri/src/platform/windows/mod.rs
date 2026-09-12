@@ -1,10 +1,12 @@
 mod apps;
 mod clipboard;
 mod system;
+mod text;
 
 pub use apps::{icon_for, WindowsAppIndexer};
 pub use clipboard::WindowsAttribution;
 pub use system::WindowsSystemControl;
+pub use text::{WindowsHandoff, WindowsKeys};
 
 use tauri::WebviewWindow;
 use windows_sys::Win32::Foundation::{FALSE, HWND, TRUE};
@@ -42,6 +44,7 @@ impl LauncherWindow for WindowsLauncherWindow {
             let foreground = GetForegroundWindow();
             if !foreground.is_null() {
                 self.previous_foreground = Some(foreground as isize);
+                text::remember_previous_foreground(foreground as isize);
             }
         }
 
@@ -128,7 +131,7 @@ unsafe fn apply_tool_window_style(hwnd: HWND) {
 /// the WebView2 child, and re-focusing the top-level window afterwards pulls it
 /// away for an instant, which fires blur in the page and dismisses the launcher
 /// as soon as it shows.
-unsafe fn force_foreground(target: HWND) {
+pub(super) unsafe fn force_foreground(target: HWND) {
     let foreground = GetForegroundWindow();
     if foreground.is_null() {
         SetForegroundWindow(target);

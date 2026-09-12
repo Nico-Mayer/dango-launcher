@@ -1,0 +1,199 @@
+//! The macOS half of selection and paste.
+//!
+//! Three things live here and nothing else does: the keystrokes, the wait for
+//! the panel to stop being key, and reading the selection through the
+//! accessibility API. Everything about borrowing the clipboard is shared.
+//!
+//! All of it is gated behind the Accessibility permission. Without it, a posted
+//! event is discarded silently by the system, which is the worst failure
+//! available, so nothing is sent until `AXIsProcessTrusted` says it is worth
+//! sending.
+
+use std::ptr::NonNull;
+use std::sync::Mutex;
+use std::time::Duration;
+
+use enigo::{Direction, Enigo, Key, Keyboard as _, Settings};
+use objc2_app_kit::NSApplication;
+use objc2_application_services::{AXError, AXUIElement};
+use objc2_core_foundation::{CFBoolean, CFDictionary, CFRetained, CFString, CFType};
+use objc2_foundation::MainThreadMarker;
+
+use crate::text::{DirectSelection, Handoff, Keys, TextError};
+
+const FOCUSED_ELEMENT: &str = "AXFocusedUIElement";
+const SELECTED_TEXT: &str = "AXSelectedText";
+
+/// How long to wait for the target application to take the paste before the
+/// clipboard is put back. macOS offers no signal that a paste has been handled,
+/// unlike Windows, so this is a measured delay rather than an answer.
+const PASTE_SETTLE: Duration = Duration::from_millis(120);
+
+/// How long to wait for the panel to stop being the key window before a
+/// keystroke is posted, and how often to look.
+const KEY_RESIGN_TIMEOUT: Duration = Duration::from_millis(400);
+const KEY_RESIGN_POLL: Duration = Duration::from_millis(10);
+
+pub struct MacKeys {
+    enigo: Mutex<Enigo>,
+}
+
+impl MacKeys {
+    pub fn new() -> Option<Self> {
+        let settings = Settings {
+            // The user got here by pressing a hotkey and may still be holding
+            // its modifiers. Without this, those modifiers ride along with the
+            // injected paste.
+            independent_of_keyboard_state: true,
+            // Dango asks for the permission deliberately, through an action the
+            // user chose. A dialog appearing by itself the first time they
+            // paste, from a process they cannot see, is worse.
+            open_prompt_to_get_permissions: false,
+            ..Default::default()
+        };
+        match Enigo::new(&settings) {
+            Ok(enigo) => Some(Self {
+                enigo: Mutex::new(enigo),
+            }),
+            Err(error) => {
+                eprintln!("[dango] no key injection available: {error}");
+                None
+            }
+        }
+    }
+
+    fn chord(&self, letter: char) -> Result<(), TextError> {
+        let mut enigo = self.enigo.lock().unwrap();
+        let send = |enigo: &mut Enigo| -> Result<(), enigo::InputError> {
+            enigo.key(Key::Meta, Direction::Press)?;
+            let pressed = enigo.key(Key::Unicode(letter), Direction::Click);
+            enigo.key(Key::Meta, Direction::Release)?;
+            pressed
+        };
+        send(&mut enigo).map_err(|error| TextError::TargetUnavailable(error.to_string()))
+    }
+}
+
+impl Keys for MacKeys {
+    fn copy(&self) -> Result<(), TextError> {
+        self.chord('c')
+    }
+
+    fn paste(&self) -> Result<(), TextError> {
+        self.chord('v')
+    }
+
+    fn caret_left(&self, times: usize) -> Result<(), TextError> {
+        let mut enigo = self.enigo.lock().unwrap();
+        for _ in 0..times {
+            enigo
+                .key(Key::LeftArrow, Direction::Click)
+                .map_err(|error| TextError::TargetUnavailable(error.to_string()))?;
+        }
+        Ok(())
+    }
+
+    fn permitted(&self) -> bool {
+        unsafe { objc2_application_services::AXIsProcessTrusted() }
+    }
+
+    fn request_permission(&self) {
+        let prompt = CFString::from_static_str("AXTrustedCheckOptionPrompt");
+        unsafe {
+            let Some(yes) = objc2_core_foundation::kCFBooleanTrue else {
+                return;
+            };
+            let options: CFRetained<CFDictionary<CFString, CFBoolean>> =
+                CFDictionary::from_slices(&[prompt.as_ref()], &[yes]);
+            objc2_application_services::AXIsProcessTrustedWithOptions(Some(options.as_opaque()));
+        }
+    }
+}
+
+/// The launcher is a non-activating panel, so the application the user was in
+/// never stopped being the active one and there is nothing to restore. What
+/// does have to be true is that the panel is no longer the key window, or the
+/// keystroke lands in Dango's own search field.
+pub struct MacHandoff;
+
+impl Handoff for MacHandoff {
+    fn yield_to_previous(&self) -> Result<(), TextError> {
+        let Some(marker) = MainThreadMarker::new() else {
+            // Called from a command thread, which is where actions run. The
+            // panel is hidden by the caller on the main thread before this, so
+            // the wait below is the only part that needs the check.
+            return wait_for_key_resign();
+        };
+        let app = NSApplication::sharedApplication(marker);
+        if app.keyWindow().is_some() {
+            return wait_for_key_resign();
+        }
+        Ok(())
+    }
+
+    fn settle_after_paste(&self) {
+        std::thread::sleep(PASTE_SETTLE);
+    }
+}
+
+/// Polls rather than waits on a notification, because this runs off the main
+/// thread and AppKit's notifications arrive on it.
+fn wait_for_key_resign() -> Result<(), TextError> {
+    let deadline = std::time::Instant::now() + KEY_RESIGN_TIMEOUT;
+    loop {
+        let still_key = MainThreadMarker::new()
+            .map(|marker| {
+                NSApplication::sharedApplication(marker)
+                    .keyWindow()
+                    .is_some()
+            })
+            .unwrap_or(false);
+        if !still_key {
+            return Ok(());
+        }
+        if std::time::Instant::now() >= deadline {
+            return Err(TextError::TargetUnavailable(
+                "the launcher would not give up focus".into(),
+            ));
+        }
+        std::thread::sleep(KEY_RESIGN_POLL);
+    }
+}
+
+/// The accessibility route: system-wide element, focused element, selected
+/// text. Touches nothing, so it is tried before the clipboard round trip.
+pub struct MacSelection;
+
+impl DirectSelection for MacSelection {
+    fn selected_text(&self) -> Option<String> {
+        unsafe {
+            let system = AXUIElement::new_system_wide();
+            let focused = copy_attribute(&system, FOCUSED_ELEMENT)
+                .ok()
+                .flatten()?
+                .downcast::<AXUIElement>()
+                .ok()?;
+            let selected = copy_attribute(&focused, SELECTED_TEXT).ok().flatten()?;
+            let text = selected.downcast::<CFString>().ok()?.to_string();
+            (!text.is_empty()).then_some(text)
+        }
+    }
+}
+
+/// `None` covers both "this element has no such attribute" and "it has no
+/// value", which are the same answer here: ask the clipboard instead.
+unsafe fn copy_attribute(
+    element: &AXUIElement,
+    attribute: &str,
+) -> Result<Option<CFRetained<CFType>>, AXError> {
+    let name = CFString::from_str(attribute);
+    let mut value: *const CFType = std::ptr::null();
+    let status = unsafe { element.copy_attribute_value(&name, NonNull::from(&mut value)) };
+    match status {
+        AXError::Success => {
+            Ok(NonNull::new(value.cast_mut()).map(|value| unsafe { CFRetained::from_raw(value) }))
+        }
+        AXError::NoValue | AXError::AttributeUnsupported => Ok(None),
+        other => Err(other),
+    }
+}
