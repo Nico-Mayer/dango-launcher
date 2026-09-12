@@ -29,6 +29,7 @@ mod harness {
     use std::sync::Arc;
     use std::time::{Duration, Instant};
 
+    use clipboard_rs::common::RustImage;
     use clipboard_rs::{Clipboard, ClipboardContext};
     use enigo::{Direction, Enigo, Key, Keyboard, Settings};
     use objc2_app_kit::NSWorkspace;
@@ -130,6 +131,7 @@ mod harness {
 
         harness.text_reaches_the_application();
         harness.the_users_clipboard_survives();
+        harness.an_image_on_the_clipboard_survives();
         harness.both_writes_are_declared();
         harness.the_caret_lands_where_asked();
         harness.the_selection_is_read();
@@ -245,6 +247,66 @@ mod harness {
             );
         }
 
+        /// A different branch from text: the exchange reads an image when there
+        /// is no text, and has to put the image back rather than nothing.
+        fn an_image_on_the_clipboard_survives(&mut self) {
+            println!("-- an image on the clipboard survives an insertion");
+            self.clear();
+
+            let png = std::fs::read(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/../static/favicon.png"
+            ))
+            .expect("the repo's favicon");
+            let Ok(image) = clipboard_rs::RustImageData::from_bytes(&png) else {
+                self.check(
+                    "an image can be put on the clipboard",
+                    false,
+                    "decode failed".into(),
+                );
+                return;
+            };
+            if self.clipboard.set_image(image).is_err() {
+                self.check(
+                    "an image can be put on the clipboard",
+                    false,
+                    "set failed".into(),
+                );
+                return;
+            }
+            std::thread::sleep(Duration::from_millis(200));
+            let before = self
+                .clipboard
+                .get_image()
+                .ok()
+                .and_then(|image| image.to_png().ok())
+                .map(|png| png.get_bytes().len());
+
+            self.focus();
+            let _ = self.exchange.insert("over an image", None);
+            std::thread::sleep(Duration::from_millis(300));
+
+            let after = self
+                .clipboard
+                .get_image()
+                .ok()
+                .and_then(|image| image.to_png().ok())
+                .map(|png| png.get_bytes().len());
+
+            self.check(
+                "the image is still on the clipboard afterwards",
+                after.is_some() && after == before,
+                format!("held {before:?} bytes of PNG before, {after:?} after"),
+            );
+
+            let landed = self.contents();
+            self.check(
+                "and the text still arrived",
+                landed.contains("over an image"),
+                format!("the document holds {landed:?}"),
+            );
+        }
+
         fn both_writes_are_declared(&mut self) {
             println!("-- every borrowed write is declared to the history");
             self.clear();
@@ -290,15 +352,20 @@ mod harness {
             self.focus();
             let _ = self.enigo.text("quoted material");
             std::thread::sleep(Duration::from_millis(300));
-            self.chord('a');
+            // The clipboard is set before selecting, and nothing refocuses
+            // afterwards: reopening the document to bring it forward drops the
+            // selection, which made this flake.
             self.set_user_clipboard();
-            self.focus();
+            self.chord('a');
+            std::thread::sleep(Duration::from_millis(250));
 
             let read = self.exchange.selection();
 
             match read {
                 Ok(Some(text)) => {
-                    let right = text.contains("quoted material");
+                    // Case-insensitive: TextEdit autocapitalises what is typed
+                    // into it, so the document does not hold what was sent.
+                    let right = text.to_lowercase().contains("quoted material");
                     self.check("the selection comes back", right, format!("read {text:?}"));
                     let after = self.clipboard.get_text().unwrap_or_default();
                     self.check(
