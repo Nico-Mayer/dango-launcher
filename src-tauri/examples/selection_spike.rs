@@ -31,6 +31,7 @@ mod spike {
     use objc2_app_kit::NSWorkspace;
     use objc2_application_services::{AXError, AXUIElement};
     use objc2_core_foundation::{CFRetained, CFString, CFType};
+    use objc2_foundation::{NSDate, NSRunLoop};
 
     use dango_lib::extensions::clipboard::{ClipboardSource, CrateClipboard};
 
@@ -202,7 +203,12 @@ mod spike {
                 println!("{line}");
                 last = line;
             }
-            std::thread::sleep(Duration::from_millis(1000));
+            // Not a sleep. NSWorkspace only updates which application is
+            // frontmost while a run loop is pumping, so sleeping here pins the
+            // answer to whatever was in front when the probe started. The
+            // clipboard change recorded this exact trap and it was walked into
+            // again.
+            NSRunLoop::currentRunLoop().runUntilDate(&NSDate::dateWithTimeIntervalSinceNow(1.0));
         }
     }
 

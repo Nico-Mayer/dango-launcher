@@ -14,7 +14,7 @@ use std::sync::Mutex;
 use std::time::Duration;
 
 use enigo::{Direction, Enigo, Key, Keyboard as _, Settings};
-use objc2_app_kit::NSApplication;
+use objc2_app_kit::{NSApplication, NSWorkspace};
 use objc2_application_services::{AXError, AXUIElement};
 use objc2_core_foundation::{CFBoolean, CFDictionary, CFRetained, CFString, CFType};
 use objc2_foundation::MainThreadMarker;
@@ -160,23 +160,40 @@ fn wait_for_key_resign() -> Result<(), TextError> {
     }
 }
 
-/// The accessibility route: system-wide element, focused element, selected
-/// text. Touches nothing, so it is tried before the clipboard round trip.
+/// The accessibility route: focused element, then selected text. Touches
+/// nothing, so it is tried before the clipboard round trip.
+///
+/// The application's own element is asked first, and the system-wide one only
+/// as a fallback. The spike found Ghostty answering through the application
+/// element on every selection while the system-wide element returned
+/// `CannotComplete` every single time, which is the opposite of what the
+/// documentation's usual example suggests.
 pub struct MacSelection;
 
 impl DirectSelection for MacSelection {
     fn selected_text(&self) -> Option<String> {
-        unsafe {
-            let system = AXUIElement::new_system_wide();
-            let focused = copy_attribute(&system, FOCUSED_ELEMENT)
-                .ok()
-                .flatten()?
-                .downcast::<AXUIElement>()
-                .ok()?;
-            let selected = copy_attribute(&focused, SELECTED_TEXT).ok().flatten()?;
-            let text = selected.downcast::<CFString>().ok()?.to_string();
-            (!text.is_empty()).then_some(text)
-        }
+        frontmost_pid()
+            .and_then(|pid| selected_text_from(unsafe { AXUIElement::new_application(pid) }))
+            .or_else(|| selected_text_from(unsafe { AXUIElement::new_system_wide() }))
+    }
+}
+
+fn frontmost_pid() -> Option<i32> {
+    NSWorkspace::sharedWorkspace()
+        .frontmostApplication()
+        .map(|app| app.processIdentifier())
+}
+
+fn selected_text_from(root: CFRetained<AXUIElement>) -> Option<String> {
+    unsafe {
+        let focused = copy_attribute(&root, FOCUSED_ELEMENT)
+            .ok()
+            .flatten()?
+            .downcast::<AXUIElement>()
+            .ok()?;
+        let selected = copy_attribute(&focused, SELECTED_TEXT).ok().flatten()?;
+        let text = selected.downcast::<CFString>().ok()?.to_string();
+        (!text.is_empty()).then_some(text)
     }
 }
 
