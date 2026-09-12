@@ -86,10 +86,12 @@
 
 ## 8. Verification
 
-- [ ] 8.1 Walk every scenario in the three spec files on macOS
+- [x] 8.1 Walk every scenario in the three spec files on macOS
   - Walked and passing: commands are searchable by name and keyword, the quit list renders with icons and excludes Dango, it narrows as the user types, Escape pops back to root, the trash confirmation names the count and defaults to cancel, confirming empties it, and an application holding an unsaved document prompts rather than being reported as a failure.
   - Four findings, all fixed: locking used an entry point macOS 26 removed; the trash needed Finder rather than Full Disk Access; a pushed view had no query input, so a list declaring launcher-side filtering could not be narrowed; and a pushed view had no action panel, which left the trash confirmation unreachable.
-  - Not yet walked: a no-view command reporting a failure, one invocation superseding another, an unsupported protocol version, and abandoning a slow command.
+  - The four scenarios needing a fault were walked with the same temporary local patch used on Windows, which made lock fail, made quit-application take four seconds, and made sleep push a version-99 tree. The patch was reverted, not committed.
+  - All four pass: a no-view failure keeps the launcher open with its message; a slow command leaves root search responsive and is superseded cleanly, with the stale tree never appearing; dismissing during a slow command discards its output; and an unsupported protocol version shows the dismissible error that Escape clears.
+  - The "Working..." line was confirmed here too: it appears for the length of the slowed quit-application and goes when its list arrives.
 - [x] 8.2 Walk every scenario in the three spec files on Windows
   - Driven through the webview over CDP with the dev build, and passing: commands found by name and keyword; the quit list renders with icons and without Dango, narrows as the user types, and pops back to root on Escape with the root query intact; the recycle bin confirmation names the count, has cancel as its primary action, and Enter returns to root with nothing deleted; a no-view failure keeps the launcher open with its message; a slow command leaves root search responsive; a second invocation supersedes the first and the stale tree never appears; dismissing during a slow command discards its output; an unsupported protocol version shows the dismissible error and Escape clears it.
   - The four scenarios needing a fault were walked with a temporary local patch that made lock fail, made quit-application take four seconds, and made sleep push a version-99 tree. The patch was reverted, not committed.
@@ -98,8 +100,8 @@
 - [x] 8.3 Confirm activation still meets the 80ms budget on release builds on both platforms, with the system extension loaded
   - macOS release, both extensions loaded: cold 55.2ms, median 42.0ms, p90 51.7ms over 26 activations, none over 80ms.
   - Windows release, both extensions loaded: cold 31.7ms, median 22.9ms, p90 26.8ms over 26 hotkey activations, none over 80ms.
-- [ ] 8.4 Confirm the view stack pops back to root search on Escape and clears on hide, on both platforms
-  - Popping on Escape is confirmed on macOS, with the root query intact behind it. Clearing on hide on macOS is open.
+- [x] 8.4 Confirm the view stack pops back to root search on Escape and clears on hide, on both platforms
+  - macOS: both confirmed. Escape pops with the root query intact, and dismissing with the trash confirmation up comes back to root search with the stack empty.
   - Windows: both confirmed. Escape pops with the root query intact, and dismissing with a view up comes back to root search with the stack empty.
 - [ ] 8.5 Confirm disabling the `system` extension removes its commands from search without a restart, on both platforms
   - Not walkable yet on either platform: the enabled state lives in the store and is read when extensions load, and nothing in the running app calls `set_enabled`. It needs a settings surface, which is a later change.
