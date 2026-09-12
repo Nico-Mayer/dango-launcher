@@ -1,0 +1,144 @@
+## Purpose
+
+The built-in extension that keeps the pieces of text the user types again and
+again, finds them by name from the launcher's main surface, and puts them into
+whatever they were working in.
+
+## ADDED Requirements
+
+### Requirement: A snippet is created, edited, and removed from the launcher
+
+The extension SHALL let the user create a snippet with a name and a template,
+change either afterwards, and delete it, without leaving the launcher.
+
+#### Scenario: Creating a snippet
+
+- **WHEN** the user completes the create form with a name and a template
+- **THEN** the snippet is stored
+- **AND** it can be found in root search straight away
+
+#### Scenario: A snippet needs a name and a template
+
+- **WHEN** the user submits the create form with either one empty
+- **THEN** the snippet is not stored
+- **AND** the form says what is missing
+
+#### Scenario: Editing a snippet
+
+- **WHEN** the user edits a snippet's name or template and submits
+- **THEN** the stored snippet reflects the change
+- **AND** the old version is not kept
+
+#### Scenario: Removing a snippet
+
+- **WHEN** the user removes a snippet
+- **THEN** it no longer appears in root search
+- **AND** the list the user was looking at stays open
+
+#### Scenario: A snippet whose template cannot be parsed is refused
+
+- **WHEN** the user saves a snippet whose template cannot be parsed
+- **THEN** it is refused with a message and nothing is stored
+
+### Requirement: Snippets are found in root search
+
+Every snippet the user has created SHALL appear as a result in root search,
+matched on its name, and SHALL be distinguishable from other results.
+
+#### Scenario: A snippet is found by its name
+
+- **WHEN** the user types part of a snippet's name
+- **THEN** that snippet appears in the results
+
+#### Scenario: A snippet shows what it is
+
+- **WHEN** a snippet appears in the results
+- **THEN** its name is shown along with an indication of what its text is
+
+#### Scenario: Snippets do not crowd out applications
+
+- **WHEN** the user types a query matching both an application and a snippet
+- **THEN** both appear, ordered by the launcher's usual ranking
+
+#### Scenario: Snippets stay inside the provider budget
+
+- **WHEN** root search queries the snippets provider with 500 snippets stored
+- **THEN** it answers within the 50ms provider budget
+
+### Requirement: Confirming a snippet inserts its text
+
+Confirming a snippet SHALL render its template and insert the result into the
+application the user was in.
+
+#### Scenario: A snippet with no arguments
+
+- **WHEN** the user confirms a snippet whose template needs no arguments
+- **THEN** the launcher closes and the rendered text appears in the frontmost application
+
+#### Scenario: A snippet using the clipboard or the selection
+
+- **WHEN** the user confirms a snippet whose template uses `clipboard` or `selection`
+- **THEN** the inserted text contains the clipboard's text or the text that was selected
+
+#### Scenario: A snippet declaring a caret position
+
+- **WHEN** the user confirms a snippet whose template declares a caret position
+- **THEN** the caret is left at that position in the inserted text
+
+#### Scenario: Insertion is not possible
+
+- **WHEN** the text cannot be inserted
+- **THEN** the launcher stays open with a message explaining why
+- **AND** nothing is inserted anywhere
+
+### Requirement: A snippet with arguments asks before it inserts
+
+A snippet whose template needs arguments SHALL ask the user for them, in the
+order the template uses them, before rendering.
+
+#### Scenario: The user is asked for arguments
+
+- **WHEN** the user confirms a snippet whose template needs two arguments
+- **THEN** a form is shown with one field per argument, in the order the template uses them
+
+#### Scenario: Submitting the arguments inserts the text
+
+- **WHEN** the user fills in the form and submits it
+- **THEN** the template is rendered with those values and the result is inserted
+
+#### Scenario: Abandoning the form inserts nothing
+
+- **WHEN** the user dismisses the form without submitting
+- **THEN** nothing is inserted
+- **AND** the clipboard is unchanged
+
+### Requirement: A snippet can be copied instead of inserted
+
+Every snippet SHALL offer copying its rendered text to the clipboard as an
+alternative to inserting it, for the cases where inserting is not wanted or not
+possible.
+
+#### Scenario: Copying a snippet
+
+- **WHEN** the user chooses to copy a snippet rather than insert it
+- **THEN** its rendered text is on the clipboard
+- **AND** the launcher closes
+
+#### Scenario: A copied snippet is the user's own copy
+
+- **WHEN** the user copies a snippet's text
+- **THEN** it is recorded in the clipboard history like any copy they made themselves
+
+### Requirement: Snippets survive a restart
+
+A snippet SHALL persist across restarts, unchanged in name and template.
+
+#### Scenario: Snippets come back after a restart
+
+- **WHEN** Dango is stopped and started again
+- **THEN** every snippet the user created is still there with the same name and template
+
+#### Scenario: A removed snippet stays removed
+
+- **WHEN** a snippet is removed and Dango is restarted
+- **THEN** it does not come back
