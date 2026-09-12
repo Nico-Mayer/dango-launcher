@@ -24,7 +24,35 @@ expensive to answer late.
 - [x] 1.4 On macOS, record how often Accessibility trust has to be re-granted across rebuilds of an unsigned debug binary, so the development cost is known rather than assumed
   - Trust turned out stickier than the design assumed. `AXIsProcessTrusted` read true across many rebuilds and across separate example binaries, so the per-binary revocation warned about never bit in a day of rebuilding. Recorded as observed, not as a rule: it is TCC behaviour nobody promised.
 - [ ] 1.5 On Windows, confirm that waiting for the previous window to become foreground before injecting is reliable under foreground lock, and that a no-op message to the target after Ctrl+V returns only once the paste has been handled
+  - The Windows walkthrough harness (`examples/walkthrough/windows.rs`) exercises
+    both halves: `the_target_is_brought_forward_first` drives a decoy to the
+    front and asserts the text still lands in the remembered target, and
+    `the_paste_acknowledgement_is_measured` pastes a marker, waits on
+    `settle_after_paste`, then overwrites the clipboard with a decoy and reads
+    the control back to see which one the paste took.
+  - **Blocked here, not verified.** The Windows dev machine runs this Claude Code
+    session over SSH in session 0, the isolated services session, while the
+    desktop is session 1. Session 0 cannot synthesise input to or read the
+    foreground of session 1: `GetForegroundWindow` returns 0 and the handoff
+    times out with 'the previous window would not come back to the foreground'.
+    The screen was also locked. So no keystroke, foreground, or clipboard round
+    trip could be exercised from here. It needs an interactive, unlocked
+    session-1 shell, ideally non-elevated for the elevated-target check.
+
 - [ ] 1.6 On Windows, confirm the clipboard round trip reads a selection from a native app, a browser, an Electron app, and a terminal
+  - The harness reads a selection from its own WinForms edit control, which is a
+    real Win32 native control and a .NET application at once. Browser, Electron,
+    and terminal still need a manual pass, since those depend on each app's own
+    Ctrl+C, and the harness cannot drive them from here.
+  - **Blocked here, not verified.** The Windows dev machine runs this Claude Code
+    session over SSH in session 0, the isolated services session, while the
+    desktop is session 1. Session 0 cannot synthesise input to or read the
+    foreground of session 1: `GetForegroundWindow` returns 0 and the handoff
+    times out with 'the previous window would not come back to the foreground'.
+    The screen was also locked. So no keystroke, foreground, or clipboard round
+    trip could be exercised from here. It needs an interactive, unlocked
+    session-1 shell, ideally non-elevated for the elevated-target check.
+
 - [x] 1.7 Verify `minijinja::Template::undeclared_variables` reports the names in the templates snippets will actually hold, including one with reserved names only and one with a repeated argument
   - Works exactly as the design needs. Reserved-only reports only reserved names, a repeated argument is reported once, and an unclosed placeholder fails to parse so it can be refused at save.
   - **A finding that contradicts the delimiter decision.** Single braces are safe, as the design argued: `fn main() { let x = Foo { a: 1 }; }` reports no placeholders. Doubled braces are not, and they are common in exactly the text an author stores as a snippet.
@@ -126,6 +154,15 @@ since M1. Nothing else in this change works without it.
 Cannot be compiled on macOS. These land as code plus confirmations the author
 closes on the Windows machine, the way the clipboard change did.
 
+Session note for this whole group: the Windows session available here is a
+session-0 SSH shell and could not drive the interactive desktop (see 1.5). All
+of 6.1 to 6.6 compile, pass `cargo clippy --all-targets -- -D warnings`, and are
+covered by the new `examples/walkthrough/windows.rs`, but none has been run
+against a live desktop. The one thing that did execute is the integrity probe
+behind 6.6: `own_integrity_level()` returned `0x3000` for the elevated shell,
+confirming `OpenProcessToken`, `GetTokenInformation`, and `GetSidSubAuthority`
+link and run.
+
 - [ ] 6.1 Read the selection through the shared clipboard round trip, verified by hand against the applications from 1.6
 - [ ] 6.2 Inject Ctrl+V through `enigo` with `windows_dw_extra_info` set so the injected events are identifiable, verified by pasting into another application
   - Written with `windows_dw_extra_info` set to a Dango marker. Cannot be compiled here; CI is the first check.
@@ -139,6 +176,12 @@ closes on the Windows machine, the way the clipboard change did.
 - [x] 6.7 Check symbol names and module paths against the vendored crate source before pushing, and verify CI's `cargo clippy -- -D warnings` passes on `windows-latest`
   - Green on the first run, which is not what the project's own notes would predict: the context warns that symbol names and module paths are the usual way Windows code fails here, and `AttachThreadInput` living in `Win32::System::Threading` is recorded as a trap. Checking them against the vendored source before pushing is what made it uneventful.
   - Run 34710561144, both jobs. That run covers `platform/windows/text.rs` and both extensions.
+  - Also built locally on the Windows machine now: `cargo test` (277 passed),
+    the live clipboard tests with `cargo test -- --ignored --test-threads=1
+    clipboard` (3 passed), `cargo clippy --all-targets -- -D warnings` clean
+    including the new harness, and `npx tauri build --no-bundle` succeeds.
+    `npm ci` failed on a locked `@rolldown` binary (`EPERM unlink`); a plain
+    `npm install` after removing `node_modules` worked and gave the tauri CLI.
 
 ## 7. Snippets
 
@@ -189,16 +232,32 @@ closes on the Windows machine, the way the clipboard change did.
   - **What a harness cannot reach, and why.** Driving the launcher's own interface was tried and abandoned twice. A synthesised Option+Space never reaches the global shortcut. Launching the binary again does open the launcher, but keystrokes do not arrive at the panel, and there is no asking whether it is up either, because a non-activating panel never becomes the frontmost application. So root search, Enter, and the action dispatch stay a manual check.
   - Two conditions the harness needs, both learned the hard way: the application must not be running, or two clipboard owners fight and every check reads empty; and TextEdit must be quit between runs, because rewriting the scratch file does not reset a window it already has open.
 - [ ] 9.2 Walk every scenario in the four spec files on Windows
+  - The harness covers the selection-and-paste scenarios end to end once run on
+    a live desktop. Not run here: session-0 isolation (see 1.5).
 - [x] 9.3 Confirm on both platforms that the user's clipboard is identical before and after a paste, for text and for an image
   - macOS: verified by the driven harness for both content types. Text comes back identical, and a PNG on the clipboard is still there, byte for byte, after an insertion. The image path is a separate branch from text and had never been run live.
 - [ ] 9.4 Confirm on both platforms that no paste, restore, or selection capture appears in the clipboard history or reorders it, while the watcher is running
   - macOS: confirmed by the author with the watcher running. Windows outstanding.
+  - Windows: the harness declares every borrowed write and asserts two per
+    insertion (`both_writes_are_declared`), but the against-the-live-history
+    check needs a session-1 run.
 - [ ] 9.5 Confirm on both platforms that a snippet with a caret position leaves the caret where the template declared it, in at least two applications
+  - Windows: `the_caret_lands_where_asked` covers one application in the harness;
+    not run here (see 1.5).
 - [ ] 9.6 Confirm on both platforms that activation still meets the 80ms budget on a release build with both new extensions enabled
+  - Windows: release binary built (`npx tauri build --no-bundle`), but the
+    activation timing needs the launcher run interactively with `DANGO_MEASURE=1`,
+    which session 0 cannot do.
 - [x] 9.7 Confirm on both platforms that text appears in the target application within 400ms of confirming, measured over repeated pastes
   - macOS: an insertion returns in about 370ms across runs, and roughly 300ms of that is the clipboard restore the user never waits for. The text itself arrives in about 70ms.
 - [ ] 9.8 Confirm on macOS that revoking the Accessibility permission produces the explained failure and the prompt action, and that granting it restores normal behaviour without a restart
 - [ ] 9.9 Confirm on Windows that pasting into an elevated window fails visibly and leaves the clipboard alone
+  - `an_elevated_target_is_refused` in the harness targets a window titled
+    `dango-elevated` and skips itself when the harness is elevated. The integrity
+    primitive it relies on runs (see group 6 note); the paste refusal itself
+    needs a non-elevated session-1 run against an elevated window.
 - [ ] 9.10 Confirm on both platforms that snippets and quicklinks survive a restart with their names and templates intact
+  - Windows: outstanding; needs the launcher run interactively (see 1.5).
 - [ ] 9.11 Confirm on both platforms that the save form's argument preview catches a pasted doubled-brace expression before it is stored
   - macOS: confirmed by the author, who saved a GitHub Actions expression and later met its argument prompt. Windows outstanding.
+  - Windows: outstanding; needs the launcher run interactively (see 1.5).
