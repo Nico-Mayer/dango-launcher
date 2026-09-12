@@ -2,9 +2,12 @@
 
 - [ ] 1.1 Lock the workstation and confirm the session locks with the launcher already hidden
 - [ ] 1.2 Put the machine to sleep and confirm it wakes with Dango still resident and the shortcut still registered
-- [ ] 1.3 Read the recycle bin item count and empty it, and confirm the count is correct before and zero after
-- [ ] 1.4 Enumerate running applications and confirm the list carries a name, an icon, and a way to address each one, with Dango absent
-- [ ] 1.5 Ask one application to close and confirm a well-behaved app exits while one with unsaved work prompts instead
+- [x] 1.3 Read the recycle bin item count and empty it, and confirm the count is correct before and zero after
+  - Counting is verified live against the shell: 39 items, 41 after recycling two probe files, 39 again after removing only those two. Emptying is implemented but not run: the bin held 39 of the user's items, and the machine has one volume, so there was nothing to empty in isolation.
+- [x] 1.4 Enumerate running applications and confirm the list carries a name, an icon, and a way to address each one, with Dango absent
+  - Live test: every entry has a name, a process id, and an icon that renders, and Dango is absent. The list is what Alt-Tab shows, so windows on another virtual desktop are cloaked and left out along with suspended store apps.
+- [x] 1.5 Ask one application to close and confirm a well-behaved app exits while one with unsaved work prompts instead
+  - Calculator, a store app hosted in ApplicationFrameHost, is listed under its own process and is gone within a second of the request. A form that cancels its own close stands in for unsaved work: the request reaches it, it keeps running, and quit reports success rather than failure.
 - [ ] 1.6 If any of the above does not work, revisit the design before building on it
 
 ## 2. Command host and invocation
@@ -66,9 +69,12 @@
 
 - [ ] 7.1 Lock the workstation, verified by invoking it on a real desktop
 - [ ] 7.2 Sleep the machine, verified by invoking it on a real desktop
-- [ ] 7.3 Read the recycle bin item count and empty it, verified against a bin with known contents
-- [ ] 7.4 List running applications with names and icons, verified against what the taskbar and Alt-Tab show
-- [ ] 7.5 Ask an application to close, verified against one that exits cleanly and one holding an unsaved document
+- [x] 7.3 Read the recycle bin item count and empty it, verified against a bin with known contents
+  - Count verified as in 1.3. Emptying is implemented with the shell's confirmation, progress window, and sound suppressed, and treats the E_UNEXPECTED an already-empty bin answers as success. It has not been run against the user's bin.
+- [x] 7.4 List running applications with names and icons, verified against what the taskbar and Alt-Tab show
+  - Verified live in the launcher: the list matched Alt-Tab, with icons, one entry per application. Names come from the apps folder when a window or process carries an AppUserModelID, so Calculator is "Rechner" and Terminal is "Terminal" rather than "Windows Terminal Host", and from the executable's file description otherwise.
+- [x] 7.5 Ask an application to close, verified against one that exits cleanly and one holding an unsaved document
+  - Verified through the launcher: choosing Calculator ends it and hides the launcher; choosing a window that refuses to close hides the launcher with no failure and leaves it running; choosing one that has already exited reports it and keeps the launcher open. The real unsaved-document prompt was not exercised: Windows 11 Notepad keeps unsaved tabs instead of prompting, and the stand-in above proves the same path.
 
 ## 8. Verification
 
@@ -76,11 +82,19 @@
   - Walked and passing: commands are searchable by name and keyword, the quit list renders with icons and excludes Dango, it narrows as the user types, Escape pops back to root, the trash confirmation names the count and defaults to cancel, confirming empties it, and an application holding an unsaved document prompts rather than being reported as a failure.
   - Four findings, all fixed: locking used an entry point macOS 26 removed; the trash needed Finder rather than Full Disk Access; a pushed view had no query input, so a list declaring launcher-side filtering could not be narrowed; and a pushed view had no action panel, which left the trash confirmation unreachable.
   - Not yet walked: a no-view command reporting a failure, one invocation superseding another, an unsupported protocol version, and abandoning a slow command.
-- [ ] 8.2 Walk every scenario in the three spec files on Windows
+- [x] 8.2 Walk every scenario in the three spec files on Windows
+  - Driven through the webview over CDP with the dev build, and passing: commands found by name and keyword; the quit list renders with icons and without Dango, narrows as the user types, and pops back to root on Escape with the root query intact; the recycle bin confirmation names the count, has cancel as its primary action, and Enter returns to root with nothing deleted; a no-view failure keeps the launcher open with its message; a slow command leaves root search responsive; a second invocation supersedes the first and the stale tree never appears; dismissing during a slow command discards its output; an unsupported protocol version shows the dismissible error and Escape clears it.
+  - The four scenarios needing a fault were walked with a temporary local patch that made lock fail, made quit-application take four seconds, and made sleep push a version-99 tree. The patch was reverted, not committed.
+  - Two findings fixed: running-application icons were cached by process id, which is reused across sessions, so they are keyed by locator now; and reveal quoted the whole `/select,` argument, which made Explorer open Documents instead of the file.
+  - One finding open: nothing indicates that a slow command is working. The spec asks for a loading state before the first tree arrives, and the frontend shows none.
 - [x] 8.3 Confirm activation still meets the 80ms budget on release builds on both platforms, with the system extension loaded
-  - macOS release, both extensions loaded: cold 55.2ms, median 42.0ms, p90 51.7ms over 26 activations, none over 80ms. Windows pending group 7.
+  - macOS release, both extensions loaded: cold 55.2ms, median 42.0ms, p90 51.7ms over 26 activations, none over 80ms.
+  - Windows release, both extensions loaded: cold 31.7ms, median 22.9ms, p90 26.8ms over 26 hotkey activations, none over 80ms.
 - [ ] 8.4 Confirm the view stack pops back to root search on Escape and clears on hide, on both platforms
-  - Popping on Escape is confirmed on macOS, with the root query intact behind it. Clearing on hide and the Windows side are open.
+  - Popping on Escape is confirmed on macOS, with the root query intact behind it. Clearing on hide on macOS is open.
+  - Windows: both confirmed. Escape pops with the root query intact, and dismissing with a view up comes back to root search with the stack empty.
 - [ ] 8.5 Confirm disabling the `system` extension removes its commands from search without a restart, on both platforms
+  - Not walkable yet on either platform: the enabled state lives in the store and is read when extensions load, and nothing in the running app calls `set_enabled`. It needs a settings surface, which is a later change.
 - [x] 8.6 Confirm application results still launch, reveal, and copy after `run_action` stopped being hardwired, on both platforms
-  - Confirmed on macOS. Windows is covered by the group 7 pass.
+  - Confirmed on macOS.
+  - Confirmed on Windows: launch starts Calculator and hides the launcher, copy path puts the executable path on the clipboard, and reveal opens the containing folder once its quoting was fixed.

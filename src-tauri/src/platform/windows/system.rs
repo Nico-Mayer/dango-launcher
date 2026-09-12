@@ -469,6 +469,62 @@ mod tests {
             }
         }
 
+        /// Locks this session, so run it only when ready to type a password.
+        /// The logon screen is a process of its own, which is the evidence.
+        #[test]
+        #[ignore]
+        fn the_session_locks() {
+            fn logon_screen_showing() -> bool {
+                let output = std::process::Command::new("tasklist")
+                    .args(["/FI", "IMAGENAME eq LogonUI.exe", "/NH"])
+                    .output()
+                    .unwrap();
+                String::from_utf8_lossy(&output.stdout).contains("LogonUI.exe")
+            }
+            WindowsSystemControl.lock().unwrap();
+            for _ in 0..20 {
+                std::thread::sleep(Duration::from_millis(250));
+                if logon_screen_showing() {
+                    return;
+                }
+            }
+            panic!("the logon screen did not appear");
+        }
+
+        /// Puts this machine to sleep. A helper process arms a resume timer for
+        /// a minute later and stays alive across the gap to keep it armed, so
+        /// the test can also report how long the suspend call itself blocked.
+        #[test]
+        #[ignore]
+        fn the_machine_sleeps_and_wakes() {
+            const ARM_RESUME_TIMER: &str = r#"
+                Add-Type -Name T -Namespace W -MemberDefinition '
+                  [DllImport("kernel32.dll")] public static extern IntPtr CreateWaitableTimer(IntPtr a, bool manual, string name);
+                  [DllImport("kernel32.dll")] public static extern bool SetWaitableTimer(IntPtr t, ref long due, int period, IntPtr f, IntPtr arg, bool resume);
+                  [DllImport("kernel32.dll")] public static extern uint WaitForSingleObject(IntPtr h, uint ms);'
+                $t = [W.T]::CreateWaitableTimer([IntPtr]::Zero, $true, $null)
+                [long]$due = -60 * 10000000
+                if (-not [W.T]::SetWaitableTimer($t, [ref]$due, 0, [IntPtr]::Zero, [IntPtr]::Zero, $true)) { exit 2 }
+                [W.T]::WaitForSingleObject($t, 180000) | Out-Null
+            "#;
+            let mut helper = std::process::Command::new("powershell")
+                .args(["-NoProfile", "-Command", ARM_RESUME_TIMER])
+                .spawn()
+                .unwrap();
+            std::thread::sleep(Duration::from_secs(3));
+            assert!(
+                helper.try_wait().unwrap().is_none(),
+                "the resume timer was refused"
+            );
+
+            let started = std::time::Instant::now();
+            let result = WindowsSystemControl.sleep();
+            eprintln!("sleep() returned {result:?} after {:?}", started.elapsed());
+            result.unwrap();
+            let status = helper.wait().unwrap();
+            eprintln!("awake after {:?} (helper {status})", started.elapsed());
+        }
+
         #[test]
         #[ignore]
         fn quitting_something_that_is_not_running_reports_it_as_gone() {
