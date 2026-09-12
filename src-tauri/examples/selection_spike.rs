@@ -182,8 +182,23 @@ mod spike {
         println!("\n-- 1.2 selection, one read --");
         let (app, pid) = frontmost_application();
         println!("frontmost: {app}");
-        println!("  system-wide:  {}", describe(read_selection()));
-        println!("  application:  {}", describe(read_selection_via_app(pid)));
+        // What a failing route costs matters as much as whether it works: it
+        // sits in front of the clipboard fallback on the slowest path.
+        for (label, read) in [
+            (
+                "system-wide",
+                Box::new(read_selection) as Box<dyn Fn() -> _>,
+            ),
+            ("application", Box::new(move || read_selection_via_app(pid))),
+        ] {
+            let start = Instant::now();
+            let result = read();
+            println!(
+                "  {label}:  {:>7.1?}  {}",
+                start.elapsed(),
+                describe(result)
+            );
+        }
     }
 
     /// Select text in one application, switch to the next, and let this print a

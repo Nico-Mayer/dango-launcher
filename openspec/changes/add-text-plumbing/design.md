@@ -132,8 +132,16 @@ for one function call that is already in the tree.
 
 ### Reading the selection is AX first, clipboard round trip as the shared fallback
 
-macOS asks the accessibility API: system-wide element, focused UI element,
+macOS asks the accessibility API for the focused element and then its
 `AXSelectedText`. Nothing is copied, the clipboard is untouched, and it is fast.
+
+Which element to start from was settled by measurement rather than by the usual
+example. The system-wide element, which every tutorial reaches for first,
+answered in none of the applications tried and returned `CannotComplete` every
+time. The application's own element answers for native applications and for a
+terminal. So the application element is asked first, and the system-wide one is
+kept only as a fallback because failing costs it around 15µs, against roughly
+35ms for the application element when it declines.
 
 It does not always answer. An application that has not turned its accessibility
 tree on, or a control that implements no text attribute, returns nothing, and
