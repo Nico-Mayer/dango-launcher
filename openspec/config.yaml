@@ -163,9 +163,9 @@ context: |
     and small focused modules.
   - Svelte: runes only, no stores unless there is a concrete reason.
   - Any interface element that needs an icon uses one. A bare placeholder square
-  is acceptable only where the icon is genuinely unknown, such as an
-  application whose icon could not be extracted.
-- UI is built on primitives, not hand-rolled. Any interactive surface uses the
+    is acceptable only where the icon is genuinely unknown, such as an
+    application whose icon could not be extracted.
+  - UI is built on primitives, not hand-rolled. Any interactive surface uses the
     Bits UI primitive for its pattern, with its markup kept close to the
     documented example so upgrades stay cheap. Keyboard navigation, focus
     management, scroll-into-view, and accessibility come from the primitive; do
