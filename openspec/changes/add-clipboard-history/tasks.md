@@ -49,11 +49,12 @@
 ## 5. Platform: macOS
 
 - [x] 5.1 Read the change counter, verified against copying by hand
-  - Live test confirms the counter moves when Dango writes, and reading it costs nothing.
+  - Superseded: there is no counter any more. `clipboard-rs` delivers a change event, so nothing polls. Confirmed live against a real clipboard.
 - [x] 5.2 Detect the concealed and auto-generated markers, verified against a password manager
-  - Both markers are checked. Nothing depends on them: the spike found Proton Pass setting neither, so this is a bonus over the exclusion list.
+  - Now read from the crate's format list, which was confirmed to return the same types the hand-rolled code saw, including on a Proton Pass password. Nothing depends on them: Proton Pass sets neither.
 - [x] 5.3 Read text and images, verified against copying each by hand
-  - Live tests round-trip text and an image. PNG is read in preference to TIFF and comes back byte-identical; TIFF is converted only when PNG is absent.
+  - The crate's job now, on both platforms. Live tests round-trip text and an image, and recording both was confirmed against the running application.
+  - One cost: the crate decodes and re-encodes, so the same PNG came back 5,427 bytes against 1,571 through the hand-rolled path. It spends the size budget faster.
 - [x] 5.4 Name the frontmost application as the copying application, verified against copying from a known application
   - Not the frontmost application: activations are recorded as they happen and a change is attributed to everything frontmost around it.
   - Verified live against Proton Pass, which is what the first spike could not catch. Copying a password and switching straight back now yields candidates `["Proton Pass"]` and the content is never read. The same action under the old design attributed it to the terminal.
@@ -91,8 +92,9 @@
 - [x] 8.5 Confirm the history survives a restart with its order intact, on both platforms
   - macOS: confirmed live. Three entries recorded, Dango stopped and started, and all three come back in the same order.
 - [ ] 8.6 Confirm a password manager's clipboard never reaches the history, on both platforms
-  - macOS, mechanism: confirmed live. With the frontmost application on the exclusion list, a copy is not recorded, and the list is honoured from a database edit without a restart.
-  - Still to confirm on macOS: the same against Proton Pass itself in the running application rather than in the spike.
+  - macOS: confirmed live against Proton Pass itself, in the running application, after the move to `clipboard-rs` changed the whole read path. The password does not reach the history.
+  - Also confirmed earlier with an arbitrary application on the list, and that the list is honoured from a database edit without a restart.
+  - Windows is open.
 - [x] 8.7 Confirm the bounds hold by copying past the entry limit and past the size ceiling, on both platforms
   - macOS: confirmed live against the running application, with the bounds written straight into the database, which also proves preferences are read per change rather than at startup.
   - The entry bound holds exactly: set to 5, eight copies leave the five newest.
