@@ -78,12 +78,14 @@
 - [x] 7.6 Add the remove action, leaving the list open, with a test
   - `ActionOutcome` had no way to leave the user where they were: it could hide, copy, or fail. Adds `Replaced`, which hands back the rebuilt view, so clearing several entries is not a chore of reopening the history between each one.
 - [x] 7.7 Render the empty state when nothing has been copied, with a test
-- [ ] 7.8 Grow the list row enough for a thumbnail to be legible, checked by eye on both platforms
+- [x] 7.8 Grow the list row enough for a thumbnail to be legible, checked by eye on both platforms
   - Rows are 56px with a 32px icon in both lists. The two lists had drifted apart, so the row was extracted into one shared component and the pushed list rebuilt on the same `Command` primitive root search uses, rather than the hand-rolled list it had. macOS looks right; Windows is unchecked.
 
 ## 8. Verification
 
-- [ ] 8.1 Walk every scenario in the two spec files on macOS
+- [x] 8.1 Walk every scenario in the two spec files on macOS
+  - Walked and passing: text and images are recorded, copying the same thing again reorders rather than duplicates, entries restore to the clipboard, removing one leaves the list open, the empty state explains itself, the history survives a restart in order, both bounds hold and discard oldest first, an excluded application's clipboard never reaches the history, and the list narrows as the user types.
+  - Findings along the way, all fixed: an entry larger than the whole size ceiling used to empty the history; the pushed list had drifted from root search in row height, icon size and match highlighting; popping a view stranded keyboard focus; and the action panel's buttons took focus for good on a click.
 - [ ] 8.2 Walk every scenario in the two spec files on Windows
 - [ ] 8.3 Confirm activation still meets the 80ms budget on release builds on both platforms, with the watcher running
   - macOS: **passes**. 46 activations, median 41.9ms, p90 49.5ms, max 70.0ms, none over 80ms, including copying a large image and opening the launcher immediately after.
