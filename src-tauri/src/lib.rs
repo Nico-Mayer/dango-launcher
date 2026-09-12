@@ -116,10 +116,7 @@ struct HideLauncher(tauri::AppHandle);
 
 impl text::Launcher for HideLauncher {
     fn dismiss(&self) {
-        let app = self.0.clone();
-        let _ = self.0.run_on_main_thread(move || {
-            hide_after_launch(&app);
-        });
+        hide_after_launch(&self.0);
     }
 }
 
@@ -158,17 +155,40 @@ struct AppState {
     launcher: Mutex<Box<dyn LauncherWindow>>,
 }
 
-fn show(app: &tauri::AppHandle, probe_id: Option<u64>) {
-    let Some(window) = app.get_webview_window("main") else {
+/// Runs window work on the main thread, inline when already there.
+///
+/// Tauri does not marshal this for you, and AppKit traps rather than
+/// misbehaving: ordering a window from another thread aborts the process. Every
+/// show and hide goes through here, because `run_action` is async and so runs
+/// on a worker, and a hide that happens to be a no-op will not trap while the
+/// one that actually moves a window will.
+fn on_main_thread(app: &tauri::AppHandle, work: impl FnOnce(&tauri::AppHandle) + Send + 'static) {
+    #[cfg(target_os = "macos")]
+    if objc2_foundation::MainThreadMarker::new().is_some() {
+        work(app);
         return;
-    };
-    let state = app.state::<AppState>();
-    let mut launcher = state.launcher.lock().unwrap();
-    launcher.position_on_active_display(&window);
-    launcher.show(&window);
-    let _ = app.emit_to("main", "dango://activate", probe_id);
+    }
+    let handle = app.clone();
+    if app.run_on_main_thread(move || work(&handle)).is_err() {
+        eprintln!("[dango] could not reach the main thread for a window operation");
+    }
 }
 
+fn show(app: &tauri::AppHandle, probe_id: Option<u64>) {
+    on_main_thread(app, move |app| {
+        let Some(window) = app.get_webview_window("main") else {
+            return;
+        };
+        let state = app.state::<AppState>();
+        let mut launcher = state.launcher.lock().unwrap();
+        launcher.position_on_active_display(&window);
+        launcher.show(&window);
+        let _ = app.emit_to("main", "dango://activate", probe_id);
+    });
+}
+
+/// Caller must already be on the main thread; `toggle` and `dismiss` are what
+/// guarantee that. Returning a value is why this cannot marshal itself.
 fn hide(app: &tauri::AppHandle) -> bool {
     let Some(window) = app.get_webview_window("main") else {
         return false;
@@ -197,16 +217,18 @@ fn abandon_running_command(app: &tauri::AppHandle) {
 }
 
 fn toggle(app: &tauri::AppHandle) {
-    let visible = app
-        .get_webview_window("main")
-        .and_then(|w| w.is_visible().ok())
-        .unwrap_or(false);
-    if visible {
-        hide(app);
-    } else {
-        let probe_id = app.state::<LatencyProbe>().start();
-        show(app, probe_id);
-    }
+    on_main_thread(app, |app| {
+        let visible = app
+            .get_webview_window("main")
+            .and_then(|w| w.is_visible().ok())
+            .unwrap_or(false);
+        if visible {
+            hide(app);
+        } else {
+            let probe_id = app.state::<LatencyProbe>().start();
+            show(app, probe_id);
+        }
+    });
 }
 
 #[tauri::command]
@@ -216,9 +238,11 @@ fn report_paint(app: tauri::AppHandle, id: u64) {
 
 #[tauri::command]
 fn dismiss(app: tauri::AppHandle) {
-    if hide(&app) {
-        app.state::<LatencyProbe>().note("dismissed by frontend");
-    }
+    on_main_thread(&app, |app| {
+        if hide(app) {
+            app.state::<LatencyProbe>().note("dismissed by frontend");
+        }
+    });
 }
 
 /// Runs a query and streams merged snapshots to the frontend as providers
@@ -391,11 +415,13 @@ async fn invoke_command(app: tauri::AppHandle, command_id: String) -> Result<Str
 /// just-launched application should keep focus rather than the window that was
 /// in front before.
 fn hide_after_launch(app: &tauri::AppHandle) {
-    if let Some(window) = app.get_webview_window("main") {
-        let _ = window.hide();
-    }
-    abandon_running_command(app);
-    let _ = app.emit_to("main", "dango://reset", ());
+    on_main_thread(app, |app| {
+        if let Some(window) = app.get_webview_window("main") {
+            let _ = window.hide();
+        }
+        abandon_running_command(app);
+        let _ = app.emit_to("main", "dango://reset", ());
+    });
 }
 
 /// The webview does not allocate its drawing surface until the window is shown

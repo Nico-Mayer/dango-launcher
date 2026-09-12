@@ -1,11 +1,16 @@
 //! Exercises the macOS selection and paste path against a real application.
 //!
-//! It drives `TextExchange` directly rather than the launcher's interface. That
-//! is deliberate: the uncertain part is the platform layer, and driving a
-//! launcher designed to overlay whatever is frontmost, from a harness that also
-//! needs focus, mostly tests the harness. What this cannot cover is the path
-//! from a keystroke in root search to the action being dispatched, which is a
-//! few seconds by hand.
+//! It drives `TextExchange` directly rather than the launcher's interface.
+//!
+//! Driving the interface was tried and abandoned twice. A synthesised
+//! Option+Space never reaches the global shortcut, and launching the binary
+//! again does open the launcher through the single-instance plugin but does not
+//! deliver keystrokes to it: the typing goes nowhere the harness can observe,
+//! and Enter produces no action. The panel is non-activating, so there is also
+//! no asking whether it is up, because the frontmost application never changes.
+//!
+//! So the path from a keystroke in root search to an action stays a manual
+//! check. Everything below the action is covered here.
 //!
 //! It synthesises keystrokes, so it needs the Accessibility permission and must
 //! not be interrupted. A scratch TextEdit document is the target; nothing else
@@ -169,6 +174,13 @@ mod harness {
         }
 
         fn open_scratch(&mut self) {
+            // Rewriting the file does not reset a window TextEdit already has
+            // open with unsaved changes, so the previous run's text survives
+            // into this one. Quitting first is the only reliable reset.
+            let _ = Command::new("osascript")
+                .args(["-e", "tell application \"TextEdit\" to quit saving no"])
+                .status();
+            std::thread::sleep(Duration::from_millis(1200));
             let _ = std::fs::write(SCRATCH, "");
             let _ = Command::new("open").arg("-e").arg(SCRATCH).status();
             std::thread::sleep(Duration::from_millis(2000));
