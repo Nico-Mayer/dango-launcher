@@ -19,7 +19,7 @@ use tauri::{
 };
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
 
-use extension::{ActionOutcome, EnabledStore, ExtensionHost, HostResolver};
+use extension::{ActionOutcome, EnabledStore, ExtensionHost, FormValues, HostResolver};
 use extensions::applications::{AppIndex, ApplicationsExtension, IconCache};
 use extensions::clipboard::{ClipboardExtension, History, PreferencePolicy, Watcher};
 use extensions::system::SystemExtension;
@@ -198,16 +198,19 @@ fn run_action(
     extension_id: String,
     item_id: String,
     action_id: String,
+    values: Option<FormValues>,
 ) -> ActionResponse {
     let Some(host) = app.try_state::<Arc<Mutex<ExtensionHost>>>() else {
         return ActionResponse::Failed {
             message: "no extensions are loaded".into(),
         };
     };
-    let outcome = host
-        .lock()
-        .unwrap()
-        .perform_action(&extension_id, &item_id, &action_id);
+    let outcome = host.lock().unwrap().perform_action(
+        &extension_id,
+        &item_id,
+        &action_id,
+        &values.unwrap_or_default(),
+    );
     match outcome {
         ActionOutcome::Done => {
             // Any successful action counts as use. Revealing an application is
@@ -221,6 +224,64 @@ fn run_action(
         ActionOutcome::CopyToClipboard(text) => ActionResponse::Copy { text },
         ActionOutcome::Replaced(tree) => ActionResponse::Replaced { tree: *tree },
         ActionOutcome::Failed(message) => ActionResponse::Failed { message },
+    }
+}
+
+/// What a template field's text will ask for. Pure: nothing is stored and
+/// nothing is rendered, so the form can call it on every keystroke.
+#[derive(Debug, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct TemplateInspection {
+    arguments: Vec<String>,
+    error: Option<String>,
+}
+
+/// Parses a template and answers with the arguments it would ask for, or why it
+/// cannot be read. This is what makes a doubled-brace expression pasted from
+/// another templating system visible before it is saved.
+#[tauri::command]
+fn inspect_template(source: String) -> TemplateInspection {
+    match templates::Template::parse(&source) {
+        Ok(template) => TemplateInspection {
+            arguments: template.arguments().to_vec(),
+            error: None,
+        },
+        Err(error) => TemplateInspection {
+            arguments: Vec::new(),
+            error: Some(error.to_string()),
+        },
+    }
+}
+
+#[cfg(test)]
+mod inspect_tests {
+    use super::inspect_template;
+
+    #[test]
+    fn a_template_with_arguments_reports_them_in_order() {
+        let inspection = inspect_template("{{ zebra }} and {{ apple }}".into());
+        assert_eq!(inspection.arguments, vec!["zebra", "apple"]);
+        assert_eq!(inspection.error, None);
+    }
+
+    #[test]
+    fn a_template_with_no_arguments_reports_none() {
+        let inspection = inspect_template("just {{ date }}, no questions".into());
+        assert!(inspection.arguments.is_empty());
+        assert_eq!(inspection.error, None);
+    }
+
+    #[test]
+    fn a_template_that_will_not_parse_reports_why() {
+        let inspection = inspect_template("unclosed {{ name".into());
+        assert!(inspection.arguments.is_empty());
+        assert!(inspection.error.is_some());
+    }
+
+    #[test]
+    fn a_pasted_doubled_brace_expression_is_visible_before_it_is_saved() {
+        let inspection = inspect_template("runs-on: ${{ matrix.os }}".into());
+        assert_eq!(inspection.arguments, vec!["matrix"]);
     }
 }
 
@@ -366,7 +427,8 @@ pub fn run() {
             warmup_done,
             search,
             run_action,
-            invoke_command
+            invoke_command,
+            inspect_template
         ])
         .setup(move |app| {
             #[cfg(target_os = "macos")]

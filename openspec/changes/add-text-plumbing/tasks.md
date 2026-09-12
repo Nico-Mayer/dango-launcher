@@ -53,12 +53,21 @@ Pure Rust with no platform and no UI, so it can be finished and tested first.
 Closes a `view-protocol` requirement that has been specified and unimplemented
 since M1. Nothing else in this change works without it.
 
-- [ ] 3.1 Widen `Extension::perform_action` to carry the submitted field values, update the three existing extensions to ignore them, and verify the existing test suite passes unchanged
-- [ ] 3.2 Carry the values through `ExtensionHost::perform_action` and the `run_action` command, with a test that an extension receives what was submitted
-- [ ] 3.3 Wire `ProtocolView`'s `onsubmit` to `run_action` with the form's primary action, replacing the empty function in `App.svelte`, and verify a form submit reaches the backend
+- [x] 3.1 Widen `Extension::perform_action` to carry the submitted field values, update the three existing extensions to ignore them, and verify the existing test suite passes unchanged
+  - All 210 tests pass unchanged. The three built-ins ignore the parameter, which is the whole cost of doing this while there are three rather than after M8.
+- [x] 3.2 Carry the values through `ExtensionHost::perform_action` and the `run_action` command, with a test that an extension receives what was submitted
+  - `run_action` takes `values: Option<FormValues>`, so a list action sends nothing and still works. Two tests: values reach the extension, and an action with no form carries none.
+- [x] 3.3 Wire `ProtocolView`'s `onsubmit` to `run_action` with the form's primary action, replacing the empty function in `App.svelte`, and verify a form submit reaches the backend
+  - The `onsubmit` prop is gone rather than wired. A form submit is an action on the form, so it goes through `onaction` with the values, which is exactly what the design said and one less path to keep in step.
+  - **A bug found on the way.** `formValues` only ever held fields the user had touched, so editing one field of a form would have submitted every other as empty. Fields are now seeded from their own declared values.
 - [ ] 3.4 Verify submitting a form that returns `ActionOutcome::Replaced` leaves the user on the replaced view rather than closing the launcher
-- [ ] 3.5 Add `FieldKind::Template` and a pure `inspect_template` command answering with the arguments in order or the parse error, with tests over a template with arguments, one with none, and one that will not parse
-- [ ] 3.6 Render a template field with its argument preview beneath it in `ProtocolView`, updating as the field is edited, and verify by typing a doubled-brace expression that the argument it would ask for is shown
+  - In place but not yet verified: a submit now goes through the same `runViewAction` that already handles `Replaced`. Nothing emits a form until group 7, so this closes there rather than being claimed now.
+- [x] 3.5 Add `FieldKind::Template` and a pure `inspect_template` command answering with the arguments in order or the parse error, with tests over a template with arguments, one with none, and one that will not parse
+  - The variant is additive and `PROTOCOL_VERSION` stays at 1. ts-rs regenerated `FieldKind.ts`, which CI checks for drift. Four tests over the command.
+- [x] 3.6 Render a template field with its argument preview beneath it in `ProtocolView`, updating as the field is edited, and verify by typing a doubled-brace expression that the argument it would ask for is shown
+  - The form moved out of `ProtocolView` into `FormFields.svelte`, keyed on the view. The Svelte autofixer flagged seeding state inside an `$effect`; a keyed component owns its state from birth instead, which is the idiomatic answer and removes the reset entirely.
+  - **A second thing the textarea broke.** Enter used to submit the form, which in a multi-line template field has to make a newline instead. Enter now submits everywhere except inside a template field, where Cmd or Ctrl with Enter does.
+  - The preview reads `Will ask for: matrix` on a pasted GitHub Actions expression, which is the finding from 1.7 made visible.
 
 ## 4. Selection and paste behind traits
 

@@ -164,10 +164,7 @@ fn today() -> String {
 /// fields shuffle between openings is unusable. Ordering is recovered by
 /// walking the `{{ ... }}` spans in the source, so a name that merely appears
 /// in prose does not decide the order.
-fn order_by_first_use(
-    source: &str,
-    names: std::collections::HashSet<String>,
-) -> Vec<String> {
+fn order_by_first_use(source: &str, names: std::collections::HashSet<String>) -> Vec<String> {
     let mut ordered: Vec<String> = Vec::with_capacity(names.len());
     let mut rest: Vec<String> = names.iter().cloned().collect();
     rest.sort();
@@ -278,7 +275,10 @@ mod tests {
             selection: Some("chosen".into()),
             ..Default::default()
         };
-        assert_eq!(arguments("{{ clipboard }} {{ selection }}"), Vec::<String>::new());
+        assert_eq!(
+            arguments("{{ clipboard }} {{ selection }}"),
+            Vec::<String>::new()
+        );
         assert_eq!(
             render("{{ clipboard }} {{ selection }}", &values).text,
             "copied chosen"
@@ -313,7 +313,10 @@ mod tests {
 
     #[test]
     fn a_template_of_reserved_names_has_no_arguments() {
-        assert_eq!(arguments("{{ date }} {{ uuid }} {{ cursor }}"), Vec::<String>::new());
+        assert_eq!(
+            arguments("{{ date }} {{ uuid }} {{ cursor }}"),
+            Vec::<String>::new()
+        );
     }
 
     #[test]

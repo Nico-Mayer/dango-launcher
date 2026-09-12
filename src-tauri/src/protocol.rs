@@ -104,6 +104,10 @@ protocol_types! {
         Text,
         Password,
         Toggle,
+        /// A field holding a template. Renders with the arguments it will ask
+        /// for shown beneath it, so text that became a placeholder by accident
+        /// is visible while it is still being edited.
+        Template,
     }
 
     #[serde(rename_all = "camelCase")]

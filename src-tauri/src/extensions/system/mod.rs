@@ -4,7 +4,9 @@
 
 use std::sync::Arc;
 
-use crate::extension::{ActionOutcome, Extension, InvocationMode, Manifest, NAMED_ICON};
+use crate::extension::{
+    ActionOutcome, Extension, FormValues, InvocationMode, Manifest, NAMED_ICON,
+};
 use crate::extensions::applications::{IconCache, ICON_SIZE};
 use crate::invocation::{Command, InvocationContext};
 use crate::platform::{SystemControl, SystemError};
@@ -62,7 +64,12 @@ impl Extension for SystemExtension {
     /// Actions arriving from a view one of these commands pushed. The item id
     /// says what was chosen; nothing is remembered between pushing the view and
     /// hearing back, because neither command needs to be.
-    fn perform_action(&self, item_id: &str, action_id: &str) -> ActionOutcome {
+    fn perform_action(
+        &self,
+        item_id: &str,
+        action_id: &str,
+        _values: &FormValues,
+    ) -> ActionOutcome {
         match action_id {
             ACTION_CONFIRM => match self.control.empty_trash() {
                 Ok(()) => ActionOutcome::Done,
@@ -427,13 +434,13 @@ pub mod tests {
         let extension = SystemExtension::new(control.clone(), IconCache::in_temp());
 
         assert_eq!(
-            extension.perform_action("", ACTION_CANCEL),
+            extension.perform_action("", ACTION_CANCEL, &FormValues::new()),
             ActionOutcome::Done
         );
         assert!(control.calls.lock().unwrap().is_empty());
 
         assert_eq!(
-            extension.perform_action("", ACTION_CONFIRM),
+            extension.perform_action("", ACTION_CONFIRM, &FormValues::new()),
             ActionOutcome::Done
         );
         assert_eq!(*control.calls.lock().unwrap(), ["empty_trash"]);
@@ -463,7 +470,7 @@ pub mod tests {
         let control = FakeControl::new();
         let extension = SystemExtension::new(control.clone(), IconCache::in_temp());
         assert_eq!(
-            extension.perform_action("42", ACTION_QUIT),
+            extension.perform_action("42", ACTION_QUIT, &FormValues::new()),
             ActionOutcome::Done
         );
         assert_eq!(*control.calls.lock().unwrap(), ["quit:42"]);
@@ -475,7 +482,7 @@ pub mod tests {
         *control.quit_gone.lock().unwrap() = true;
         let extension = SystemExtension::new(control, IconCache::in_temp());
         assert!(matches!(
-            extension.perform_action("42", ACTION_QUIT),
+            extension.perform_action("42", ACTION_QUIT, &FormValues::new()),
             ActionOutcome::Failed(_)
         ));
     }
@@ -484,7 +491,7 @@ pub mod tests {
     fn an_unknown_action_fails_cleanly() {
         let extension = SystemExtension::new(FakeControl::new(), IconCache::in_temp());
         assert!(matches!(
-            extension.perform_action("", "nope"),
+            extension.perform_action("", "nope", &FormValues::new()),
             ActionOutcome::Failed(_)
         ));
     }

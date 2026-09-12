@@ -1,6 +1,7 @@
 <script lang="ts">
   import { Command } from "bits-ui";
   import ActionPanel from "./ActionPanel.svelte";
+  import FormFields from "./FormFields.svelte";
   import ResultRow from "./ResultRow.svelte";
   import { pointerOwnsSelection } from "./pointer.svelte";
   import type { ViewTree } from "../protocol/ViewTree";
@@ -8,19 +9,25 @@
 
   interface Props {
     tree: ViewTree;
-    onaction: (actionId: string, itemId: string | null) => void;
-    onsubmit: (values: Record<string, string>) => void;
+    onaction: (actionId: string, itemId: string | null, values?: Record<string, string>) => void;
   }
 
-  let { tree, onaction, onsubmit }: Props = $props();
+  let { tree, onaction }: Props = $props();
 
   let query = $state("");
   let selectedId = $state("");
   let panelOpen = $state(false);
   let inputEl = $state<HTMLInputElement | null>(null);
-  let formValues = $state<Record<string, string>>({});
 
   const view = $derived(tree.view);
+
+  /// A form submit is an action on the form carrying the field values, which is
+  /// the same path every other action takes. The fields own their own state, so
+  /// this only forwards.
+  function submitForm(values: Record<string, string>) {
+    const action = primaryAction();
+    if (action) onaction(action, null, values);
+  }
 
   /// Narrowing happens here only when the view says the launcher owns it. A
   /// view that owns its own filtering gets each query change instead, which no
@@ -77,11 +84,9 @@
       }
     }
     if (event.key !== "Enter") return;
-    if (view.kind === "form") {
-      event.preventDefault();
-      onsubmit(formValues);
-      return;
-    }
+    // A form's Enter belongs to its own fields, where a template field has to
+    // be able to make a newline.
+    if (view.kind === "form") return;
     // A list's Enter belongs to the primitive, which calls onSelect.
     if (view.kind === "list") return;
     const action = primaryAction();
@@ -148,32 +153,9 @@
     {view.markdown}
   </div>
 {:else if view.kind === "form"}
-  <form
-    class="flex flex-col gap-3 px-4 py-3"
-    onsubmit={(e) => {
-      e.preventDefault();
-      onsubmit(formValues);
-    }}
-  >
-    {#each view.fields as field (field.id)}
-      <label class="flex flex-col gap-1">
-        <span class="text-foreground-alt text-xs">{field.label}</span>
-        {#if field.kind === "toggle"}
-          <input
-            type="checkbox"
-            onchange={(e) => (formValues[field.id] = e.currentTarget.checked ? "true" : "false")}
-          />
-        {:else}
-          <input
-            type={field.kind === "password" ? "password" : "text"}
-            class="border-border-input bg-background/60 text-foreground rounded-md border px-2 py-1 text-sm focus:outline-none"
-            value={field.value ?? ""}
-            oninput={(e) => (formValues[field.id] = e.currentTarget.value)}
-          />
-        {/if}
-      </label>
-    {/each}
-  </form>
+  {#key tree}
+    <FormFields {view} onsubmit={submitForm} />
+  {/key}
 {/if}
 
 {#if panelOpen}

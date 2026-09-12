@@ -5,7 +5,7 @@
 use std::sync::Arc;
 
 use crate::extension::{
-    ActionOutcome, CommandDecl, Extension, InvocationMode, Manifest, PreferenceDecl,
+    ActionOutcome, CommandDecl, Extension, FormValues, InvocationMode, Manifest, PreferenceDecl,
     PreferenceKind, Preferences, Service, NAMED_ICON,
 };
 use crate::invocation::{Command, InvocationContext};
@@ -78,7 +78,12 @@ impl Extension for ClipboardExtension {
         }
     }
 
-    fn perform_action(&self, item_id: &str, action_id: &str) -> ActionOutcome {
+    fn perform_action(
+        &self,
+        item_id: &str,
+        action_id: &str,
+        _values: &FormValues,
+    ) -> ActionOutcome {
         match action_id {
             ACTION_RESTORE => match self.history.content(item_id) {
                 Ok(content) => {
@@ -498,7 +503,7 @@ mod tests {
         let id = history.entries().unwrap()[0].id.clone();
 
         assert_eq!(
-            extension.perform_action(&id, ACTION_RESTORE),
+            extension.perform_action(&id, ACTION_RESTORE, &FormValues::new()),
             ActionOutcome::Done
         );
         assert_eq!(
@@ -516,7 +521,7 @@ mod tests {
         let id = history.entries().unwrap()[0].id.clone();
 
         assert_eq!(
-            extension.perform_action(&id, ACTION_RESTORE),
+            extension.perform_action(&id, ACTION_RESTORE, &FormValues::new()),
             ActionOutcome::Done
         );
         assert_eq!(
@@ -536,7 +541,7 @@ mod tests {
             .unwrap();
         let id = history.entries().unwrap()[0].id.clone();
 
-        let outcome = extension.perform_action(&id, ACTION_REMOVE);
+        let outcome = extension.perform_action(&id, ACTION_REMOVE, &FormValues::new());
         let ActionOutcome::Replaced(tree) = outcome else {
             panic!("removing must leave the user in the list, got {outcome:?}");
         };
@@ -552,7 +557,7 @@ mod tests {
     fn choosing_an_entry_that_has_gone_reports_it() {
         let (extension, _, _) = setup();
         assert!(matches!(
-            extension.perform_action("nope", ACTION_RESTORE),
+            extension.perform_action("nope", ACTION_RESTORE, &FormValues::new()),
             ActionOutcome::Failed(_)
         ));
     }
@@ -561,7 +566,7 @@ mod tests {
     fn an_unknown_action_fails_cleanly() {
         let (extension, _, _) = setup();
         assert!(matches!(
-            extension.perform_action("whatever", "nope"),
+            extension.perform_action("whatever", "nope", &FormValues::new()),
             ActionOutcome::Failed(_)
         ));
     }
@@ -573,7 +578,7 @@ mod tests {
             .record(Content::Text("hello".into()), Bounds::default(), 1)
             .unwrap();
         let id = history.entries().unwrap()[0].id.clone();
-        extension.perform_action(&id, ACTION_RESTORE);
+        extension.perform_action(&id, ACTION_RESTORE, &FormValues::new());
         assert_eq!(
             history.entries().unwrap().len(),
             1,
@@ -591,7 +596,7 @@ mod tests {
         std::fs::remove_file(entry.path.as_deref().unwrap()).unwrap();
 
         assert!(matches!(
-            extension.perform_action(&entry.id, ACTION_RESTORE),
+            extension.perform_action(&entry.id, ACTION_RESTORE, &FormValues::new()),
             ActionOutcome::Failed(_)
         ));
         assert!(history.entries().unwrap().is_empty());

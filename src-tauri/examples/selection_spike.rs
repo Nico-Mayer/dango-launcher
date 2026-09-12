@@ -85,7 +85,9 @@ mod spike {
             let Some(focused) = focused else {
                 return Ok(None);
             };
-            let focused = focused.downcast::<AXUIElement>().map_err(|_| AXError(-25200))?;
+            let focused = focused
+                .downcast::<AXUIElement>()
+                .map_err(|_| AXError(-25200))?;
 
             let selected = copy_attribute(&focused, SELECTED_TEXT)?;
             let Some(selected) = selected else {
@@ -104,9 +106,7 @@ mod spike {
     ) -> Result<Option<CFRetained<CFType>>, AXError> {
         let name = CFString::from_str(attribute);
         let mut value: *const CFType = std::ptr::null();
-        let status = unsafe {
-            element.copy_attribute_value(&name, NonNull::from(&mut value))
-        };
+        let status = unsafe { element.copy_attribute_value(&name, NonNull::from(&mut value)) };
         match status {
             AXError::Success => {
                 if value.is_null() {
@@ -205,7 +205,10 @@ mod spike {
         for delay in [10u64, 25, 50, 100, 200, 400, 800] {
             std::thread::sleep(Duration::from_millis(delay));
             let still_ours = clipboard.text().as_deref() == Some(marker.as_str());
-            println!("  +{:>4}ms cumulative: clipboard still ours: {still_ours}", cumulative(delay));
+            println!(
+                "  +{:>4}ms cumulative: clipboard still ours: {still_ours}",
+                cumulative(delay)
+            );
         }
 
         match saved {
@@ -230,15 +233,33 @@ mod spike {
 
         println!("\n-- 1.7 undeclared_variables --");
         let cases = [
-            ("reserved only", "Hi, today is {{ date }} and I copied {{ clipboard }}"),
+            (
+                "reserved only",
+                "Hi, today is {{ date }} and I copied {{ clipboard }}",
+            ),
             ("one argument", "Dear {{ name }}, thanks."),
-            ("repeated argument", "{{ city }} to {{ city }} via {{ stop }}"),
-            ("mixed", "{{ greeting }} {{ name }}, sent {{ date }}{{ cursor }}"),
-            ("single braces in code", "fn main() { let x = Foo { a: 1 }; }"),
-            ("doubled braces in code", "printf(\"{{%d}}\", x); if (a) {{ b(); }}"),
+            (
+                "repeated argument",
+                "{{ city }} to {{ city }} via {{ stop }}",
+            ),
+            (
+                "mixed",
+                "{{ greeting }} {{ name }}, sent {{ date }}{{ cursor }}",
+            ),
+            (
+                "single braces in code",
+                "fn main() { let x = Foo { a: 1 }; }",
+            ),
+            (
+                "doubled braces in code",
+                "printf(\"{{%d}}\", x); if (a) {{ b(); }}",
+            ),
             ("github actions", "runs-on: ${{ matrix.os }}"),
             ("vue interpolation", "<p>{{ user.name }}</p>"),
-            ("raw block escape", "{% raw %}runs-on: ${{ matrix.os }}{% endraw %}"),
+            (
+                "raw block escape",
+                "{% raw %}runs-on: ${{ matrix.os }}{% endraw %}",
+            ),
             ("literal escape", "{{ '{{' }} matrix.os {{ '}}' }}"),
         ];
         let env = Environment::new();

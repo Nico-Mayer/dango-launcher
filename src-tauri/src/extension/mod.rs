@@ -15,6 +15,10 @@ pub use registry::{Collision, Host, RegisteredCommand, Registry};
 
 pub type ActivationResult = Result<(), Box<dyn std::error::Error + Send + Sync>>;
 
+/// What a submitted form carried, keyed by field id. Empty for an action run
+/// on a list item, which is most of them.
+pub type FormValues = std::collections::HashMap<String, String>;
+
 /// What running an action on a result produced. `Done` means the work is
 /// finished and the launcher should get out of the way; a copy hands text back
 /// because only the webview can reach the clipboard.
@@ -54,8 +58,14 @@ pub trait Extension: Send + Sync {
     fn command(&self, _command_id: &str) -> Option<Arc<dyn crate::invocation::Command>> {
         None
     }
-    /// Runs an action on a result this extension contributed.
-    fn perform_action(&self, _item_id: &str, _action_id: &str) -> ActionOutcome {
+    /// Runs an action on a result this extension contributed. A form submit is
+    /// an action too, and `values` is what its fields held.
+    fn perform_action(
+        &self,
+        _item_id: &str,
+        _action_id: &str,
+        _values: &FormValues,
+    ) -> ActionOutcome {
         ActionOutcome::Failed("this extension has no actions".into())
     }
 }
@@ -161,12 +171,13 @@ impl ExtensionHost {
         extension_id: &str,
         item_id: &str,
         action_id: &str,
+        values: &FormValues,
     ) -> ActionOutcome {
         if !self.is_active(extension_id) {
             return ActionOutcome::Failed("that extension is not available".into());
         }
         match self.extensions.get(extension_id) {
-            Some(extension) => extension.perform_action(item_id, action_id),
+            Some(extension) => extension.perform_action(item_id, action_id, values),
             None => ActionOutcome::Failed("that extension is not available".into()),
         }
     }
@@ -467,9 +478,45 @@ mod tests {
                 services: false,
             }))
         }
-        fn perform_action(&self, item_id: &str, action_id: &str) -> ActionOutcome {
-            ActionOutcome::CopyToClipboard(format!("{}:{item_id}:{action_id}", self.0))
+        fn perform_action(
+            &self,
+            item_id: &str,
+            action_id: &str,
+            values: &FormValues,
+        ) -> ActionOutcome {
+            let mut submitted: Vec<_> = values.iter().map(|(k, v)| format!("{k}={v}")).collect();
+            submitted.sort();
+            ActionOutcome::CopyToClipboard(format!(
+                "{}:{item_id}:{action_id}:[{}]",
+                self.0,
+                submitted.join(",")
+            ))
         }
+    }
+
+    #[test]
+    fn a_submitted_forms_values_reach_the_extension() {
+        let mut host = host();
+        host.register(Arc::new(Owner("alpha"))).unwrap();
+
+        let values = FormValues::from([
+            ("name".to_string(), "Nico".to_string()),
+            ("city".to_string(), "Berlin".to_string()),
+        ]);
+        assert_eq!(
+            host.perform_action("alpha", "", "save", &values),
+            ActionOutcome::CopyToClipboard("alpha::save:[city=Berlin,name=Nico]".into())
+        );
+    }
+
+    #[test]
+    fn an_action_with_no_form_carries_no_values() {
+        let mut host = host();
+        host.register(Arc::new(Owner("alpha"))).unwrap();
+        assert_eq!(
+            host.perform_action("alpha", "item", "go", &FormValues::new()),
+            ActionOutcome::CopyToClipboard("alpha:item:go:[]".into())
+        );
     }
 
     #[test]
@@ -479,12 +526,12 @@ mod tests {
         host.register(Arc::new(Owner("beta"))).unwrap();
 
         assert_eq!(
-            host.perform_action("alpha", "item", "go"),
-            ActionOutcome::CopyToClipboard("alpha:item:go".into())
+            host.perform_action("alpha", "item", "go", &FormValues::new()),
+            ActionOutcome::CopyToClipboard("alpha:item:go:[]".into())
         );
         assert_eq!(
-            host.perform_action("beta", "item", "go"),
-            ActionOutcome::CopyToClipboard("beta:item:go".into())
+            host.perform_action("beta", "item", "go", &FormValues::new()),
+            ActionOutcome::CopyToClipboard("beta:item:go:[]".into())
         );
     }
 
@@ -494,7 +541,7 @@ mod tests {
         host.register(Arc::new(Owner("alpha"))).unwrap();
         host.set_enabled("alpha", false);
         assert!(matches!(
-            host.perform_action("alpha", "item", "go"),
+            host.perform_action("alpha", "item", "go", &FormValues::new()),
             ActionOutcome::Failed(_)
         ));
     }

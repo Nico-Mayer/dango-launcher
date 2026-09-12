@@ -72,13 +72,18 @@
 
   /// An action chosen inside a pushed view goes to the extension that owns the
   /// running command, through the same path a root result uses.
-  async function runViewAction(actionId: string, itemId: string | null) {
+  async function runViewAction(
+    actionId: string,
+    itemId: string | null,
+    values?: Record<string, string>,
+  ) {
     if (!viewOwner) return;
     failure = null;
     const response = (await invoke("run_action", {
       extensionId: viewOwner,
       itemId: itemId ?? "",
       actionId,
+      values: values ?? null,
     })) as ActionResponse;
     if (response.kind === "copy") {
       await navigator.clipboard.writeText(response.text);
@@ -241,7 +246,7 @@
   <main
     class="border-border-card bg-background flex h-screen w-screen flex-col overflow-hidden rounded-[14px] border"
   >
-    <ProtocolView tree={stack[stack.length - 1]} onaction={runViewAction} onsubmit={() => {}} />
+    <ProtocolView tree={stack[stack.length - 1]} onaction={runViewAction} />
     {#if failure}
       <div
         class="text-destructive border-border-card flex shrink-0 items-center gap-2 border-t px-5 py-2 text-sm"

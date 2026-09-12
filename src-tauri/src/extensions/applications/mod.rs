@@ -12,7 +12,7 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 
-use crate::extension::{ActionOutcome, Extension, Manifest, Service};
+use crate::extension::{ActionOutcome, Extension, FormValues, Manifest, Service};
 use crate::protocol::{Action, Modifier, Shortcut};
 use crate::search::{Candidate, RootProvider, Source};
 
@@ -88,7 +88,12 @@ impl Extension for ApplicationsExtension {
         &self.manifest
     }
 
-    fn perform_action(&self, item_id: &str, action_id: &str) -> ActionOutcome {
+    fn perform_action(
+        &self,
+        item_id: &str,
+        action_id: &str,
+        _values: &FormValues,
+    ) -> ActionOutcome {
         self.perform(item_id, action_id)
     }
 
