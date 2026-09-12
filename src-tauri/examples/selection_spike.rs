@@ -268,39 +268,53 @@ mod spike {
         };
 
         println!("target: {target}");
-        let mut safest: Option<u64> = None;
-        for delay in [0u64, 5, 10, 20, 40, 80, 160] {
-            let marker = format!("MARKER-{delay}");
-            let decoy = format!("DECOY-{delay}");
+        let mut worst_failure: Option<u64> = None;
+        let mut best_safe: Option<u64> = None;
+        for delay in [80u64, 100, 120, 140, 160, 200, 300] {
+            let mut verdicts = Vec::new();
+            for trial in 0..3 {
+                let marker = format!("MARKER-{delay}-{trial}");
+                let decoy = format!("DECOY-{delay}-{trial}");
 
-            clipboard.set_text(&marker);
-            chord(&mut enigo, 'a');
-            let sent = Instant::now();
-            chord(&mut enigo, 'v');
+                clipboard.set_text(&marker);
+                chord(&mut enigo, 'a');
+                chord(&mut enigo, 'v');
 
-            std::thread::sleep(Duration::from_millis(delay));
-            clipboard.set_text(&decoy);
+                std::thread::sleep(Duration::from_millis(delay));
+                clipboard.set_text(&decoy);
 
-            // Let the paste finish either way before reading the field back.
-            std::thread::sleep(Duration::from_millis(400));
-            chord(&mut enigo, 'a');
-            chord(&mut enigo, 'c');
-            std::thread::sleep(Duration::from_millis(120));
+                // Let the paste finish either way before reading the field back.
+                std::thread::sleep(Duration::from_millis(400));
+                chord(&mut enigo, 'a');
+                chord(&mut enigo, 'c');
+                std::thread::sleep(Duration::from_millis(120));
 
-            let landed = clipboard.text().unwrap_or_default();
-            let verdict = if landed.contains(&marker) {
-                if safest.is_none() {
-                    safest = Some(delay);
-                }
-                "safe: the marker landed"
-            } else if landed.contains(&decoy) {
-                "TOO EARLY: the decoy landed"
-            } else {
-                "unclear: neither landed"
-            };
+                let landed = clipboard.text().unwrap_or_default();
+                verdicts.push(if landed.contains(&marker) {
+                    'S'
+                } else if landed.contains(&decoy) {
+                    'E'
+                } else {
+                    '?'
+                });
+            }
+
+            let all_safe = verdicts.iter().all(|v| *v == 'S');
+            let any_failed = verdicts.iter().any(|v| *v != 'S');
+            if any_failed {
+                worst_failure = Some(delay);
+            }
+            if all_safe && best_safe.is_none() {
+                best_safe = Some(delay);
+            }
+            let trials: String = verdicts.iter().collect();
             println!(
-                "  restore after {delay:>4}ms (keystroke {:>6.1?}): {verdict}",
-                sent.elapsed()
+                "  restore after {delay:>4}ms: {trials}  ({})",
+                if all_safe {
+                    "safe in every trial"
+                } else {
+                    "TOO EARLY in at least one"
+                }
             );
         }
 
@@ -311,12 +325,16 @@ mod spike {
             }
             None => println!("nothing to restore"),
         }
-        match safest {
-            Some(delay) => println!(
-                "\nearliest safe restore in this run: {delay}ms. \
-                 Set PASTE_SETTLE above the worst seen, not this one."
+        println!("\nS = the marker landed, E = the decoy landed, ? = neither");
+        match (worst_failure, best_safe) {
+            (Some(worst), Some(best)) => println!(
+                "worst failure at {worst}ms, safe in every trial from {best}ms. \
+                 PASTE_SETTLE wants headroom above {worst}ms."
             ),
-            None => println!("\nno delay was safe; the approach needs rethinking"),
+            (None, Some(best)) => {
+                println!("safe from {best}ms upward, nothing in this grid failed")
+            }
+            _ => println!("nothing was reliably safe; the approach needs rethinking"),
         }
         println!("clear the scratch field when you are done with it.");
     }
