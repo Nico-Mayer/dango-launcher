@@ -227,14 +227,25 @@ mod spike {
         }
     }
 
-    /// 1.3. Writes a marker, pastes it, and then reads the clipboard back at
-    /// increasing delays to find the earliest point a restore would not race
-    /// the target application's read.
+    /// 1.3. How soon after the paste keystroke the clipboard can be put back.
+    ///
+    /// The first version of this asked whether the clipboard still held what we
+    /// wrote, which is always true: pasting does not change the clipboard. It
+    /// measured nothing.
+    ///
+    /// This asks the only question that matters. Paste a marker, restore to a
+    /// decoy after N milliseconds, then read the field back. If the marker is
+    /// there, a restore at N was safe. If the decoy is there, the target had
+    /// not read the clipboard yet and the user would have pasted the wrong
+    /// thing.
+    ///
+    /// It types into whatever is focused, so give it an empty scratch field.
     fn measure_paste() {
-        use enigo::{Direction, Enigo, Key, Keyboard, Settings};
+        use enigo::{Enigo, Settings};
 
         println!("\n-- 1.3 paste and restore timing --");
-        println!("switch to an editable field in another application. Starting in 5s.");
+        println!("focus an EMPTY editable field in another application. Starting in 5s.");
+        println!("this will type into it and select all repeatedly.");
         std::thread::sleep(Duration::from_secs(5));
 
         let (target, _) = frontmost_application();
@@ -242,10 +253,7 @@ mod spike {
             eprintln!("no clipboard");
             return;
         };
-
         let saved = clipboard.text();
-        let marker = format!("dango-spike-{}", std::process::id());
-        clipboard.set_text(&marker);
 
         let settings = Settings {
             open_prompt_to_get_permissions: false,
@@ -259,21 +267,40 @@ mod spike {
             }
         };
 
-        let sent = Instant::now();
-        enigo.key(Key::Meta, Direction::Press).unwrap();
-        enigo.key(Key::Unicode('v'), Direction::Click).unwrap();
-        enigo.key(Key::Meta, Direction::Release).unwrap();
-        println!("target: {target}, keystroke sent in {:?}", sent.elapsed());
+        println!("target: {target}");
+        let mut safest: Option<u64> = None;
+        for delay in [0u64, 5, 10, 20, 40, 80, 160] {
+            let marker = format!("MARKER-{delay}");
+            let decoy = format!("DECOY-{delay}");
 
-        // The clipboard cannot say whether the target has read it, so this
-        // reports what the clipboard looks like over time and the paste itself
-        // is checked by eye in the target application.
-        for delay in [10u64, 25, 50, 100, 200, 400, 800] {
+            clipboard.set_text(&marker);
+            chord(&mut enigo, 'a');
+            let sent = Instant::now();
+            chord(&mut enigo, 'v');
+
             std::thread::sleep(Duration::from_millis(delay));
-            let still_ours = clipboard.text().as_deref() == Some(marker.as_str());
+            clipboard.set_text(&decoy);
+
+            // Let the paste finish either way before reading the field back.
+            std::thread::sleep(Duration::from_millis(400));
+            chord(&mut enigo, 'a');
+            chord(&mut enigo, 'c');
+            std::thread::sleep(Duration::from_millis(120));
+
+            let landed = clipboard.text().unwrap_or_default();
+            let verdict = if landed.contains(&marker) {
+                if safest.is_none() {
+                    safest = Some(delay);
+                }
+                "safe: the marker landed"
+            } else if landed.contains(&decoy) {
+                "TOO EARLY: the decoy landed"
+            } else {
+                "unclear: neither landed"
+            };
             println!(
-                "  +{:>4}ms cumulative: clipboard still ours: {still_ours}",
-                cumulative(delay)
+                "  restore after {delay:>4}ms (keystroke {:>6.1?}): {verdict}",
+                sent.elapsed()
             );
         }
 
@@ -284,12 +311,21 @@ mod spike {
             }
             None => println!("nothing to restore"),
         }
-        println!("check the target application: it should contain {marker:?} exactly once.");
+        match safest {
+            Some(delay) => println!(
+                "\nearliest safe restore in this run: {delay}ms. \
+                 Set PASTE_SETTLE above the worst seen, not this one."
+            ),
+            None => println!("\nno delay was safe; the approach needs rethinking"),
+        }
+        println!("clear the scratch field when you are done with it.");
     }
 
-    fn cumulative(delay: u64) -> u64 {
-        static TOTAL: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
-        TOTAL.fetch_add(delay, std::sync::atomic::Ordering::Relaxed) + delay
+    fn chord(enigo: &mut enigo::Enigo, letter: char) {
+        use enigo::{Direction, Key, Keyboard};
+        let _ = enigo.key(Key::Meta, Direction::Press);
+        let _ = enigo.key(Key::Unicode(letter), Direction::Click);
+        let _ = enigo.key(Key::Meta, Direction::Release);
     }
 
     /// 1.7. The question the engine choice rests on: does the crate report the
