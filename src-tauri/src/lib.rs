@@ -8,6 +8,7 @@ pub mod ranking;
 pub mod search;
 pub mod store;
 pub mod templates;
+pub mod text;
 
 use std::sync::Arc;
 use std::sync::Mutex;

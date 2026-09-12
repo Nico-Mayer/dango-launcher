@@ -71,13 +71,18 @@ since M1. Nothing else in this change works without it.
 
 ## 4. Selection and paste behind traits
 
-- [ ] 4.1 Define `SelectionSource` and `TextInjector` traits covering reading the selection, inserting text, placing the caret, and reporting a missing permission, with fakes for testing
-- [ ] 4.2 Implement the shared clipboard round trip for reading a selection: save, copy, read, restore, tested against a fake clipboard and a fake injector
-- [ ] 4.3 Implement the shared insertion path: save the clipboard, write the text, send the paste shortcut, restore, tested the same way
-- [ ] 4.4 Abandon the restore when the clipboard changed underneath the operation, with a test that the user's newer content is left alone
-- [ ] 4.5 Move the caret by counting characters after the caret offset, with a test over text containing multi-byte characters
-- [ ] 4.6 Report a failed insertion without disturbing the clipboard, with a test
-- [ ] 4.7 Change the clipboard watcher's own-write suppression from one slot to a short queue, and verify with tests that both writes of a paste are suppressed, that a restore does not reorder the history, and that the user genuinely re-copying the same content is still recorded
+- [x] 4.1 Define `SelectionSource` and `TextInjector` traits covering reading the selection, inserting text, placing the caret, and reporting a missing permission, with fakes for testing
+  - Four traits, narrow on purpose: `Keys` for the keystrokes, `Handoff` for focus, `DirectSelection` for the platforms that can read a selection without the clipboard, and `OwnWrites` so the exchange still works with the clipboard extension disabled.
+- [x] 4.2 Implement the shared clipboard round trip for reading a selection: save, copy, read, restore, tested against a fake clipboard and a fake injector
+  - **A gap the design missed.** Copying with nothing selected leaves the clipboard untouched, so reading it back cannot tell an empty selection from a selection matching what was already there. A sentinel written before the copy settles it. Recorded in design.md.
+- [x] 4.3 Implement the shared insertion path: save the clipboard, write the text, send the paste shortcut, restore, tested the same way
+- [x] 4.4 Abandon the restore when the clipboard changed underneath the operation, with a test that the user's newer content is left alone
+  - The doc comment was written before the check was, and claimed behaviour the code did not have. Now implemented and tested in both directions.
+  - The value compared against is the one read immediately after the copy or paste, not a fresh read: re-reading would hand the user their own new content back as the thing Dango borrowed, defeating the check entirely.
+- [x] 4.5 Move the caret by counting characters after the caret offset, with a test over text containing multi-byte characters
+- [x] 4.6 Report a failed insertion without disturbing the clipboard, with a test
+- [x] 4.7 Change the clipboard watcher's own-write suppression from one slot to a short queue, and verify with tests that both writes of a paste are suppressed, that a restore does not reorder the history, and that the user genuinely re-copying the same content is still recorded
+  - `VecDeque` bounded at four, which covers an insertion's two writes plus an overlapping one. Three new tests: both writes of a paste are suppressed, a restore does not reorder the history, and a genuine copy during a paste is still recorded, since the queue matches content rather than a window of time.
 
 ## 5. Platform: macOS
 

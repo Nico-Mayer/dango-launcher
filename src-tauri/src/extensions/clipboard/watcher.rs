@@ -5,6 +5,7 @@
 //! attribution are both consulted before a single byte of content is read, so
 //! an excluded password never reaches Dango's memory.
 
+use std::collections::VecDeque;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
@@ -31,6 +32,10 @@ pub trait Policy: Send + Sync {
     fn excluded_applications(&self) -> Vec<String>;
 }
 
+/// A paste declares two writes. A few more than that absorbs an overlapping
+/// second insertion without ever growing into a standing rule about content.
+const PENDING_OWN_WRITES: usize = 4;
+
 pub struct Watcher {
     source: Arc<dyn ClipboardSource>,
     attribution: Arc<dyn Attribution>,
@@ -39,7 +44,7 @@ pub struct Watcher {
     /// What Dango itself just put on the clipboard, which must not come back as
     /// a new entry. One shot and content-matched: a later copy of the same
     /// thing by the user is still theirs.
-    ours: Mutex<Option<Content>>,
+    ours: Mutex<VecDeque<Content>>,
     running: AtomicBool,
 }
 
@@ -55,7 +60,7 @@ impl Watcher {
             attribution,
             history,
             policy,
-            ours: Mutex::new(None),
+            ours: Mutex::new(VecDeque::new()),
             running: AtomicBool::new(false),
         }
     }
@@ -75,7 +80,7 @@ impl Watcher {
     /// Puts an entry back on the clipboard, remembering it so the change that
     /// follows is recognised as Dango's own.
     pub fn restore(&self, content: &Content) {
-        *self.ours.lock().unwrap() = Some(content.clone());
+        self.expect_own_write(content);
         match content {
             Content::Text(text) => self.source.set_text(text),
             Content::Image(png) => self.source.set_image(png),
@@ -132,14 +137,29 @@ impl Watcher {
             })
     }
 
-    /// Consumed whether or not it matched, so a restore only ever suppresses
-    /// the one change it caused.
+    /// Declares a write Dango is about to make, so the change it causes is not
+    /// recorded. A paste makes two: the text going out and the user's own
+    /// content going back, which is why this is a queue rather than one slot.
+    pub fn expect_own_write(&self, content: &Content) {
+        let mut ours = self.ours.lock().unwrap();
+        if ours.len() == PENDING_OWN_WRITES {
+            ours.pop_front();
+        }
+        ours.push_back(content.clone());
+    }
+
+    /// Matched entries are consumed, so a suppression covers exactly the one
+    /// change it was declared for. Everything else is the user's own copy, even
+    /// when it happens to hold the same content.
     fn was_ours(&self, content: &Content) -> bool {
-        self.ours
-            .lock()
-            .unwrap()
-            .take()
-            .is_some_and(|ours| ours == *content)
+        let mut ours = self.ours.lock().unwrap();
+        match ours.iter().position(|pending| pending == content) {
+            Some(index) => {
+                ours.remove(index);
+                true
+            }
+            None => false,
+        }
     }
 
     /// Text first: an application that offers both usually means the text, and
@@ -461,6 +481,82 @@ mod tests {
         assert!(
             f.watcher.handle_change(2),
             "the suppression is one shot, not a standing rule about the content"
+        );
+    }
+
+    #[test]
+    fn both_writes_of_a_paste_are_suppressed() {
+        let f = setup();
+        f.clipboard.copy_text("what the user had");
+        assert!(f.watcher.handle_change(1));
+
+        // An insertion borrows the clipboard: the text goes out, then the
+        // user's own content goes back.
+        f.watcher
+            .expect_own_write(&Content::Text("the snippet".into()));
+        f.watcher
+            .expect_own_write(&Content::Text("what the user had".into()));
+
+        f.clipboard.copy_text("the snippet");
+        assert!(!f.watcher.handle_change(2), "the pasted text is not a copy");
+        f.clipboard.copy_text("what the user had");
+        assert!(
+            !f.watcher.handle_change(3),
+            "restoring the user's clipboard is not a copy either"
+        );
+        assert_eq!(
+            f.history.entries().unwrap().len(),
+            1,
+            "the history is untouched by a paste"
+        );
+    }
+
+    #[test]
+    fn restoring_the_clipboard_does_not_reorder_the_history() {
+        let f = setup();
+        f.clipboard.copy_text("older");
+        f.watcher.handle_change(1);
+        f.clipboard.copy_text("newer");
+        f.watcher.handle_change(2);
+
+        let before: Vec<_> = f
+            .history
+            .entries()
+            .unwrap()
+            .into_iter()
+            .map(|entry| entry.id)
+            .collect();
+
+        // Pasting the older entry puts it out and then puts "newer" back.
+        f.watcher.expect_own_write(&Content::Text("older".into()));
+        f.watcher.expect_own_write(&Content::Text("newer".into()));
+        f.clipboard.copy_text("older");
+        f.watcher.handle_change(3);
+        f.clipboard.copy_text("newer");
+        f.watcher.handle_change(4);
+
+        let after: Vec<_> = f
+            .history
+            .entries()
+            .unwrap()
+            .into_iter()
+            .map(|entry| entry.id)
+            .collect();
+        assert_eq!(before, after, "a paste must not reorder what the user has");
+    }
+
+    #[test]
+    fn a_genuine_copy_during_a_paste_is_still_recorded() {
+        let f = setup();
+        f.watcher
+            .expect_own_write(&Content::Text("the snippet".into()));
+        f.watcher
+            .expect_own_write(&Content::Text("what the user had".into()));
+
+        f.clipboard.copy_text("something the user copied");
+        assert!(
+            f.watcher.handle_change(1),
+            "the queue suppresses declared content, not a window of time"
         );
     }
 

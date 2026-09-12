@@ -155,6 +155,38 @@ Win32 controls do not, so it would be a path that works sometimes and falls back
 often, and the fallback is the thing that has to be right anyway. A second
 mechanism that does not remove the first is not worth its dependency.
 
+### A sentinel tells "nothing selected" from "selected what was already there"
+
+Found while building the shared round trip, and it was not in the original
+design.
+
+Pressing copy with nothing selected leaves the clipboard exactly as it was. So
+reading the clipboard afterwards cannot tell an empty selection from a selection
+that happens to match what the user already had on the clipboard, and the
+difference matters: one should report nothing, the other should report the text.
+
+So the round trip writes a sentinel before the copy. If the sentinel survives,
+the copy did nothing and there was no selection. It costs one extra clipboard
+write, which is declared to the history like every other, and the suppression
+queue is sized for it.
+
+The unavoidable case is stated rather than solved: if the user copies at the
+exact moment the copy keystroke lands, what comes back is theirs and nothing can
+tell. That window is a few milliseconds wide and there is no signal that would
+close it.
+
+### The restore compares against what Dango borrowed, from one read
+
+The restore is abandoned when the clipboard no longer holds what Dango put
+there, because that means the user has copied something of their own and
+overwriting it is the one failure they would actually notice.
+
+The subtlety is which value to compare against. Re-reading the clipboard just
+before restoring defeats the whole check, since it would read the user's new
+content and conclude that it was the thing being borrowed. So the comparison
+uses the value read once, immediately after the copy or the paste, and anything
+appearing after that point is the user's.
+
 ### Pasting goes through the clipboard, not through typing the text
 
 `enigo` can type a string character by character, and that needs no clipboard at
