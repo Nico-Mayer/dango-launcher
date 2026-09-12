@@ -13,6 +13,12 @@ use std::sync::Arc;
 
 use crate::extensions::clipboard::{ClipboardSource, Content};
 
+/// How long to wait for a copy to land before calling the selection empty.
+/// Inside the 300ms the spec gives a selection read, with room for the
+/// keystroke that precedes it.
+const COPY_TIMEOUT: std::time::Duration = std::time::Duration::from_millis(200);
+const COPY_POLL: std::time::Duration = std::time::Duration::from_millis(5);
+
 #[derive(Debug, thiserror::Error, PartialEq, Eq, Clone)]
 pub enum TextError {
     #[error("Dango needs the Accessibility permission to do that")]
@@ -48,6 +54,9 @@ pub trait Handoff: Send + Sync {
     /// Called after the paste keystroke and before the clipboard is restored.
     /// Windows asks the target to answer a no-op message, which it only does
     /// once it has handled the paste. macOS has no such signal and waits.
+    ///
+    /// Only paste needs this. A copy leaves an observable result, so the
+    /// exchange watches for it instead of being told how long to wait.
     fn settle_after_paste(&self);
 }
 
@@ -167,10 +176,7 @@ impl TextExchange {
         self.own_writes.expect(&Content::Text(sentinel.clone()));
         self.clipboard.set_text(&sentinel);
 
-        let after_copy = self.keys.copy().map(|()| {
-            self.handoff.settle_after_paste();
-            self.clipboard.text()
-        })?;
+        let after_copy = self.keys.copy().map(|()| self.wait_for_copy(&sentinel))?;
 
         // One read, not two: anything that appears after this point came from
         // the user, and re-reading would hand them their own content back as
@@ -179,6 +185,25 @@ impl TextExchange {
         self.restore(saved, &borrowed);
 
         Ok(after_copy.filter(|text| *text != sentinel && !text.is_empty()))
+    }
+
+    /// Unlike a paste, a copy leaves something observable: the clipboard stops
+    /// being the sentinel. So this waits for the answer rather than guessing at
+    /// a delay, and returns the moment it arrives.
+    ///
+    /// A copy that was never going to produce anything, because nothing was
+    /// selected, costs the whole timeout. That is the price of telling an empty
+    /// selection from a slow one.
+    fn wait_for_copy(&self, sentinel: &str) -> Option<String> {
+        let deadline = std::time::Instant::now() + COPY_TIMEOUT;
+        loop {
+            let current = self.clipboard.text();
+            match current {
+                Some(text) if text != sentinel => return Some(text),
+                _ if std::time::Instant::now() >= deadline => return None,
+                _ => std::thread::sleep(COPY_POLL),
+            }
+        }
     }
 
     /// Puts text into the application the user was in. The caret, when given,

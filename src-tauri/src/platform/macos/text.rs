@@ -26,8 +26,14 @@ const SELECTED_TEXT: &str = "AXSelectedText";
 
 /// How long to wait for the target application to take the paste before the
 /// clipboard is put back. macOS offers no signal that a paste has been handled,
-/// unlike Windows, so this is a measured delay rather than an answer.
-const PASTE_SETTLE: Duration = Duration::from_millis(120);
+/// unlike Windows, so this is a delay rather than an answer.
+///
+/// Measured rather than guessed. In Notes, restoring 80ms after the keystroke
+/// loses the race intermittently and 100ms upward never did across repeated
+/// trials. This carries headroom over that for applications slower than Notes,
+/// and it costs nothing the user sees: the text has already arrived, and only
+/// the clipboard going back is waiting.
+const PASTE_SETTLE: Duration = Duration::from_millis(300);
 
 /// How long to wait for the panel to stop being the key window before a
 /// keystroke is posted, and how often to look.

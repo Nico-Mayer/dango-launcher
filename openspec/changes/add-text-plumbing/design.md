@@ -240,8 +240,17 @@ this the hard way with .NET and `CLIPBRD_E_CANT_OPEN`; this is the same trick
 pointed the other way, and it is worth reusing rather than rediscovering.
 
 macOS has no equivalent, so the restore happens after a delay the spike
-measures. That is a race, it is stated in the risks, and it is the same race
-every launcher on the platform runs.
+measured: 80ms loses the race intermittently in Notes, 100ms upward never did,
+and the constant carries headroom over the failure rather than sitting on the
+first success. That is still a race, it is stated in the risks, and it is the
+same race every launcher on the platform runs.
+
+Reading a selection needs none of this, which the measurement made obvious. A
+copy leaves something observable, because the sentinel stops being on the
+clipboard, so the exchange watches for that and returns the moment it happens
+rather than waiting a fixed time. Only paste waits blindly, because only paste
+has nothing to watch. Sharing one delay between them would have put a
+paste-sized wait inside the 300ms a selection read is given.
 
 ### Suppression becomes a small queue, not a single slot
 
