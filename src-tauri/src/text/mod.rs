@@ -74,6 +74,26 @@ pub trait OwnWrites: Send + Sync {
     fn expect(&self, content: &Content);
 }
 
+/// Runs a closure on the process's main thread and waits for the result.
+///
+/// Not a convenience. Key synthesis on macOS reaches the Text Services Manager
+/// to map a character to a keycode, and that asserts it is on the main queue:
+/// off it, the process traps. The orchestration around the keystrokes must stay
+/// off the main thread, because it sleeps and the hide it waits for needs the
+/// main run loop, so only the keystrokes themselves hop across.
+pub trait MainThread: Send + Sync {
+    fn run(&self, work: Box<dyn FnOnce() + Send>);
+}
+
+/// For platforms with no such rule, and for tests. Runs it where it stands.
+pub struct HereIsFine;
+
+impl MainThread for HereIsFine {
+    fn run(&self, work: Box<dyn FnOnce() + Send>) {
+        work();
+    }
+}
+
 /// Getting the launcher off screen. Inserting has to happen after the launcher
 /// is gone, or the keystroke lands in Dango's own search field, so the exchange
 /// owns that ordering rather than trusting a caller to hide first.

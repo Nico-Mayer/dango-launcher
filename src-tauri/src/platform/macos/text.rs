@@ -10,7 +10,7 @@
 //! sending.
 
 use std::ptr::NonNull;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use enigo::{Direction, Enigo, Key, Keyboard as _, Settings};
@@ -18,7 +18,7 @@ use objc2_app_kit::NSWorkspace;
 use objc2_application_services::{AXError, AXUIElement};
 use objc2_core_foundation::{CFBoolean, CFDictionary, CFRetained, CFString, CFType};
 
-use crate::text::{DirectSelection, Handoff, Keys, TextError};
+use crate::text::{DirectSelection, Handoff, Keys, MainThread, TextError};
 
 const FOCUSED_ELEMENT: &str = "AXFocusedUIElement";
 const SELECTED_TEXT: &str = "AXSelectedText";
@@ -39,12 +39,17 @@ const PASTE_SETTLE: Duration = Duration::from_millis(300);
 /// to land rather than a check that it has.
 const HIDE_SETTLE: Duration = Duration::from_millis(60);
 
+/// Long enough that a briefly busy main thread still runs the keystroke, short
+/// enough that a wedged one fails rather than hanging the action forever.
+const MAIN_THREAD_TIMEOUT: Duration = Duration::from_secs(2);
+
 pub struct MacKeys {
-    enigo: Mutex<Enigo>,
+    enigo: Arc<Mutex<Enigo>>,
+    main: Arc<dyn MainThread>,
 }
 
 impl MacKeys {
-    pub fn new() -> Option<Self> {
+    pub fn new(main: Arc<dyn MainThread>) -> Option<Self> {
         let settings = Settings {
             // The user got here by pressing a hotkey and may still be holding
             // its modifiers. Without this, those modifiers ride along with the
@@ -58,7 +63,8 @@ impl MacKeys {
         };
         match Enigo::new(&settings) {
             Ok(enigo) => Some(Self {
-                enigo: Mutex::new(enigo),
+                enigo: Arc::new(Mutex::new(enigo)),
+                main,
             }),
             Err(error) => {
                 eprintln!("[dango] no key injection available: {error}");
@@ -68,14 +74,33 @@ impl MacKeys {
     }
 
     fn chord(&self, letter: char) -> Result<(), TextError> {
-        let mut enigo = self.enigo.lock().unwrap();
-        let send = |enigo: &mut Enigo| -> Result<(), enigo::InputError> {
+        self.on_main(move |enigo| {
             enigo.key(Key::Meta, Direction::Press)?;
             let pressed = enigo.key(Key::Unicode(letter), Direction::Click);
             enigo.key(Key::Meta, Direction::Release)?;
             pressed
-        };
-        send(&mut enigo).map_err(|error| TextError::TargetUnavailable(error.to_string()))
+        })
+    }
+
+    /// `Key::Unicode` is the one that reaches the keyboard layout, so every
+    /// synthesis goes across rather than only the ones known to.
+    fn on_main(
+        &self,
+        work: impl FnOnce(&mut Enigo) -> Result<(), enigo::InputError> + Send + 'static,
+    ) -> Result<(), TextError> {
+        let enigo = self.enigo.clone();
+        let (done, wait) = std::sync::mpsc::channel();
+        self.main.run(Box::new(move || {
+            let mut enigo = enigo.lock().unwrap();
+            let _ = done.send(work(&mut enigo).map_err(|error| error.to_string()));
+        }));
+        match wait.recv_timeout(MAIN_THREAD_TIMEOUT) {
+            Ok(Ok(())) => Ok(()),
+            Ok(Err(error)) => Err(TextError::TargetUnavailable(error)),
+            Err(_) => Err(TextError::TargetUnavailable(
+                "the main thread did not run the keystroke".into(),
+            )),
+        }
     }
 }
 
@@ -89,13 +114,12 @@ impl Keys for MacKeys {
     }
 
     fn caret_left(&self, times: usize) -> Result<(), TextError> {
-        let mut enigo = self.enigo.lock().unwrap();
-        for _ in 0..times {
-            enigo
-                .key(Key::LeftArrow, Direction::Click)
-                .map_err(|error| TextError::TargetUnavailable(error.to_string()))?;
-        }
-        Ok(())
+        self.on_main(move |enigo| {
+            for _ in 0..times {
+                enigo.key(Key::LeftArrow, Direction::Click)?;
+            }
+            Ok(())
+        })
     }
 
     fn permitted(&self) -> bool {

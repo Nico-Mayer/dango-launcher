@@ -72,10 +72,11 @@ pub fn text_exchange(
     clipboard: std::sync::Arc<dyn crate::extensions::clipboard::ClipboardSource>,
     own_writes: std::sync::Arc<dyn crate::text::OwnWrites>,
     launcher: std::sync::Arc<dyn crate::text::Launcher>,
+    main: std::sync::Arc<dyn crate::text::MainThread>,
 ) -> Option<crate::text::TextExchange> {
     #[cfg(target_os = "macos")]
     {
-        let keys = std::sync::Arc::new(macos::MacKeys::new()?);
+        let keys = std::sync::Arc::new(macos::MacKeys::new(main)?);
         Some(crate::text::TextExchange::new(
             clipboard,
             keys,
@@ -87,6 +88,9 @@ pub fn text_exchange(
     }
     #[cfg(target_os = "windows")]
     {
+        // Windows has no main-thread rule for key synthesis: `SendInput` and
+        // the layout lookup are callable from any thread.
+        let _ = main;
         let keys = std::sync::Arc::new(windows::WindowsKeys::new()?);
         Some(crate::text::TextExchange::new(
             clipboard,

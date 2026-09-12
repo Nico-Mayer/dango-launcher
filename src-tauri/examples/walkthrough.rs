@@ -36,7 +36,7 @@ mod harness {
 
     use dango_lib::extensions::clipboard::{Content, CrateClipboard};
     use dango_lib::platform;
-    use dango_lib::text::{Launcher, OwnWrites, TextExchange};
+    use dango_lib::text::{HereIsFine, Launcher, OwnWrites, TextExchange};
 
     const SCRATCH: &str = "/tmp/dango-walkthrough.txt";
     const USER_CLIPBOARD: &str = "dango-walkthrough-user-clipboard";
@@ -87,9 +87,13 @@ mod harness {
             return;
         };
         let declared = Arc::new(Declared::default());
-        let Some(exchange) =
-            platform::text_exchange(source, declared.clone(), Arc::new(NoLauncher))
-        else {
+        let Some(exchange) = platform::text_exchange(
+            source,
+            declared.clone(),
+            Arc::new(NoLauncher),
+            // The harness runs everything on the main thread already.
+            Arc::new(HereIsFine),
+        ) else {
             eprintln!("no key injection");
             return;
         };
@@ -143,6 +147,17 @@ mod harness {
     }
 
     impl Harness {
+        /// Truncated hard. A failing check must describe what it saw without
+        /// being able to print a page of whatever was on screen.
+        fn brief(text: &str) -> String {
+            let cleaned: String = text.chars().take(80).collect();
+            if text.chars().count() > 80 {
+                format!("{cleaned:?}... ({} chars total)", text.chars().count())
+            } else {
+                format!("{cleaned:?}")
+            }
+        }
+
         fn check(&mut self, name: &str, ok: bool, detail: String) {
             if ok {
                 println!("  PASS  {name}");
@@ -169,26 +184,62 @@ mod harness {
             true
         }
 
-        fn focus(&mut self) {
+        /// Returns whether TextEdit is genuinely frontmost. `open -e` does not
+        /// always bring it forward, and assuming it did is how this harness
+        /// twice read from a browser and printed the author's own screen.
+        /// Nothing may be read without this answering true.
+        fn focus(&mut self) -> bool {
             let _ = Command::new("open").arg("-e").arg(SCRATCH).status();
-            std::thread::sleep(Duration::from_millis(600));
+            for _ in 0..10 {
+                std::thread::sleep(Duration::from_millis(200));
+                if frontmost() == "TextEdit" {
+                    return true;
+                }
+            }
+            false
         }
 
-        fn clear(&mut self) {
-            self.focus();
+        fn clear(&mut self) -> bool {
+            if !self.focus() {
+                return false;
+            }
             self.chord('a');
             let _ = self.enigo.key(Key::Backspace, Direction::Click);
             std::thread::sleep(Duration::from_millis(200));
+            true
         }
 
         /// What the document holds, read the only way another application will
         /// tell you. Destroys the clipboard, so it runs after clipboard checks.
-        fn contents(&mut self) -> String {
-            self.focus();
+        /// Reads the document by selecting and copying it, which means it must
+        /// never run against the wrong window. Returns `None` rather than
+        /// whatever happened to be frontmost.
+        fn contents(&mut self) -> Option<String> {
+            if !self.focus() {
+                return None;
+            }
+            // An insertion ends by restoring the clipboard, and the sentinel
+            // below is another clipboard write. Reading straight after one
+            // races the other, which is what made the first check fail while
+            // the text was in fact there.
+            std::thread::sleep(Duration::from_millis(300));
+
+            // The same ambiguity the exchange itself has to solve: copying an
+            // empty document leaves the clipboard alone, so without a sentinel
+            // an empty document reads back as whatever was already there.
+            let sentinel = format!("dango-empty-{}", std::process::id());
+            let _ = self.clipboard.set_text(sentinel.clone());
+            std::thread::sleep(Duration::from_millis(150));
+
             self.chord('a');
             self.chord('c');
             std::thread::sleep(Duration::from_millis(400));
-            self.clipboard.get_text().unwrap_or_default()
+            let read = self.clipboard.get_text().unwrap_or_default();
+            Some(if read == sentinel {
+                String::new()
+            } else {
+                read
+            })
         }
 
         fn chord(&mut self, letter: char) {
@@ -205,36 +256,59 @@ mod harness {
 
         fn text_reaches_the_application(&mut self) {
             println!("-- text reaches the frontmost application");
-            self.clear();
+            if !self.clear() {
+                self.check("TextEdit is drivable", false, "could not focus it".into());
+                return;
+            }
             self.set_user_clipboard();
-            self.focus();
+            if !self.focus() {
+                return;
+            }
 
             let result = self.exchange.insert("Best,\nNico", None);
-            std::thread::sleep(Duration::from_millis(300));
-
             if let Err(error) = result {
                 self.check("insertion succeeds", false, format!("{error}"));
                 return;
             }
-            let landed = self.contents();
+
+            let Some(landed) = self.contents() else {
+                self.check(
+                    "the document could be read back",
+                    false,
+                    "TextEdit was not frontmost".into(),
+                );
+                return;
+            };
             self.check(
                 "the text arrives in the document",
                 landed.contains("Best,") && landed.contains("Nico"),
-                format!("the document holds {landed:?}"),
+                format!("the document holds {}", Self::brief(&landed)),
             );
         }
 
         fn the_users_clipboard_survives(&mut self) {
             println!("-- the user's clipboard survives an insertion");
-            self.clear();
+            if !self.clear() {
+                self.check("TextEdit is drivable", false, "could not focus it".into());
+                return;
+            }
             self.set_user_clipboard();
-            self.focus();
+            if !self.focus() {
+                return;
+            }
 
             let _ = self.exchange.insert("borrowed", None);
             std::thread::sleep(Duration::from_millis(300));
 
             let after = self.clipboard.get_text().unwrap_or_default();
-            let landed = self.contents();
+            let Some(landed) = self.contents() else {
+                self.check(
+                    "the document could be read back",
+                    false,
+                    "TextEdit was not frontmost".into(),
+                );
+                return;
+            };
             let inserted = landed.contains("borrowed");
             self.check(
                 "the clipboard holds what the user had",
@@ -242,7 +316,7 @@ mod harness {
                 if inserted {
                     format!("the clipboard holds {after:?}, expected {USER_CLIPBOARD:?}")
                 } else {
-                    format!("nothing was inserted, so this proves nothing: {landed:?}")
+                    format!("nothing was inserted: {}", Self::brief(&landed))
                 },
             );
         }
@@ -251,7 +325,10 @@ mod harness {
         /// is no text, and has to put the image back rather than nothing.
         fn an_image_on_the_clipboard_survives(&mut self) {
             println!("-- an image on the clipboard survives an insertion");
-            self.clear();
+            if !self.clear() {
+                self.check("TextEdit is drivable", false, "could not focus it".into());
+                return;
+            }
 
             let png = std::fs::read(concat!(
                 env!("CARGO_MANIFEST_DIR"),
@@ -282,7 +359,9 @@ mod harness {
                 .and_then(|image| image.to_png().ok())
                 .map(|png| png.get_bytes().len());
 
-            self.focus();
+            if !self.focus() {
+                return;
+            }
             let _ = self.exchange.insert("over an image", None);
             std::thread::sleep(Duration::from_millis(300));
 
@@ -299,19 +378,31 @@ mod harness {
                 format!("held {before:?} bytes of PNG before, {after:?} after"),
             );
 
-            let landed = self.contents();
+            let Some(landed) = self.contents() else {
+                self.check(
+                    "the document could be read back",
+                    false,
+                    "TextEdit was not frontmost".into(),
+                );
+                return;
+            };
             self.check(
                 "and the text still arrived",
                 landed.contains("over an image"),
-                format!("the document holds {landed:?}"),
+                format!("the document holds {}", Self::brief(&landed)),
             );
         }
 
         fn both_writes_are_declared(&mut self) {
             println!("-- every borrowed write is declared to the history");
-            self.clear();
+            if !self.clear() {
+                self.check("TextEdit is drivable", false, "could not focus it".into());
+                return;
+            }
             self.set_user_clipboard();
-            self.focus();
+            if !self.focus() {
+                return;
+            }
 
             let before = self.declared.count();
             let _ = self.exchange.insert("declared", None);
@@ -327,29 +418,51 @@ mod harness {
 
         fn the_caret_lands_where_asked(&mut self) {
             println!("-- the caret lands where the template asked");
-            self.clear();
+            if !self.clear() {
+                self.check("TextEdit is drivable", false, "could not focus it".into());
+                return;
+            }
             self.set_user_clipboard();
-            self.focus();
+            if !self.focus() {
+                return;
+            }
 
             let _ = self.exchange.insert("<b></b>", Some(3));
             std::thread::sleep(Duration::from_millis(300));
 
-            self.focus();
+            if !self.focus() {
+                return;
+            }
             let _ = self.enigo.text("HERE");
             std::thread::sleep(Duration::from_millis(300));
 
-            let landed = self.contents();
+            let Some(landed) = self.contents() else {
+                self.check(
+                    "the document could be read back",
+                    false,
+                    "TextEdit was not frontmost".into(),
+                );
+                return;
+            };
             self.check(
                 "typing after the insertion lands at the caret",
                 landed.contains("<b>HERE</b>"),
-                format!("the document holds {landed:?}, expected <b>HERE</b>"),
+                format!(
+                    "the document holds {}, expected <b>HERE</b>",
+                    Self::brief(&landed)
+                ),
             );
         }
 
         fn the_selection_is_read(&mut self) {
             println!("-- the selection is read from the application");
-            self.clear();
-            self.focus();
+            if !self.clear() {
+                self.check("TextEdit is drivable", false, "could not focus it".into());
+                return;
+            }
+            if !self.focus() {
+                return;
+            }
             let _ = self.enigo.text("quoted material");
             std::thread::sleep(Duration::from_millis(300));
             // The clipboard is set before selecting, and nothing refocuses
@@ -366,7 +479,11 @@ mod harness {
                     // Case-insensitive: TextEdit autocapitalises what is typed
                     // into it, so the document does not hold what was sent.
                     let right = text.to_lowercase().contains("quoted material");
-                    self.check("the selection comes back", right, format!("read {text:?}"));
+                    self.check(
+                        "the selection comes back",
+                        right,
+                        format!("read {}", Self::brief(&text)),
+                    );
                     let after = self.clipboard.get_text().unwrap_or_default();
                     self.check(
                         "reading the selection gives the clipboard back",
@@ -385,9 +502,14 @@ mod harness {
 
         fn an_empty_selection_is_reported_as_empty(&mut self) {
             println!("-- nothing selected is reported as nothing");
-            self.clear();
+            if !self.clear() {
+                self.check("TextEdit is drivable", false, "could not focus it".into());
+                return;
+            }
             self.set_user_clipboard();
-            self.focus();
+            if !self.focus() {
+                return;
+            }
 
             let read = self.exchange.selection();
 
@@ -406,9 +528,14 @@ mod harness {
 
         fn insertion_is_prompt(&mut self) {
             println!("-- the text appears promptly");
-            self.clear();
+            if !self.clear() {
+                self.check("TextEdit is drivable", false, "could not focus it".into());
+                return;
+            }
             self.set_user_clipboard();
-            self.focus();
+            if !self.focus() {
+                return;
+            }
 
             let start = Instant::now();
             let _ = self.exchange.insert("prompt", None);

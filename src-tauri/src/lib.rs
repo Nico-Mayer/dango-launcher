@@ -86,6 +86,29 @@ enum ActionResponse {
     Failed { message: String },
 }
 
+/// Hops a closure onto the main thread and waits for it.
+///
+/// macOS traps if key synthesis runs anywhere else: mapping a character to a
+/// keycode goes through the Text Services Manager, which asserts the main
+/// queue. The rest of an insertion has to stay off the main thread, because it
+/// sleeps and the hide it waits for needs the main run loop to turn.
+struct OnMainThread(tauri::AppHandle);
+
+impl text::MainThread for OnMainThread {
+    fn run(&self, work: Box<dyn FnOnce() + Send>) {
+        // Queuing from the main thread would deadlock: the caller waits for a
+        // result the main thread cannot produce until the caller yields.
+        #[cfg(target_os = "macos")]
+        if objc2_foundation::MainThreadMarker::new().is_some() {
+            work();
+            return;
+        }
+        if self.0.run_on_main_thread(work).is_err() {
+            eprintln!("[dango] could not reach the main thread for a keystroke");
+        }
+    }
+}
+
 /// Getting the launcher off screen before a keystroke is sent to another
 /// application. The window has to be hidden from the main thread, and the
 /// insertion runs off it, so this hops back.
@@ -558,9 +581,12 @@ pub fn run() {
                         // so the exchange is built against this one.
                         let dismisser: Arc<dyn text::Launcher> =
                             Arc::new(HideLauncher(app.handle().clone()));
-                        if let Some(exchange) =
-                            platform::text_exchange(clipboard, watcher.clone(), dismisser)
-                        {
+                        if let Some(exchange) = platform::text_exchange(
+                            clipboard,
+                            watcher.clone(),
+                            dismisser,
+                            Arc::new(OnMainThread(app.handle().clone())),
+                        ) {
                             app.manage(Arc::new(exchange));
                         } else {
                             eprintln!("[dango] no key injection, so pasting is off");
