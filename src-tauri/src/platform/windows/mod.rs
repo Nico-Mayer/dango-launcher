@@ -6,7 +6,7 @@ mod text;
 pub use apps::{icon_for, WindowsAppIndexer};
 pub use clipboard::WindowsAttribution;
 pub use system::WindowsSystemControl;
-pub use text::{WindowsHandoff, WindowsKeys};
+pub use text::{own_integrity_level, remember_previous_foreground, WindowsHandoff, WindowsKeys};
 
 use tauri::WebviewWindow;
 use windows_sys::Win32::Foundation::{FALSE, HWND, TRUE};

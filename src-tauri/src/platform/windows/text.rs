@@ -16,8 +16,14 @@ use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
 use enigo::{Direction, Enigo, Key, Keyboard as _, Settings};
-use windows_sys::Win32::Foundation::{CloseHandle, HWND};
-use windows_sys::Win32::System::Threading::{OpenProcess, PROCESS_QUERY_LIMITED_INFORMATION};
+use windows_sys::Win32::Foundation::{CloseHandle, HANDLE, HWND};
+use windows_sys::Win32::Security::{
+    GetSidSubAuthority, GetSidSubAuthorityCount, GetTokenInformation, TokenIntegrityLevel,
+    TOKEN_MANDATORY_LABEL, TOKEN_QUERY,
+};
+use windows_sys::Win32::System::Threading::{
+    GetCurrentProcess, OpenProcess, OpenProcessToken, PROCESS_QUERY_LIMITED_INFORMATION,
+};
 use windows_sys::Win32::UI::WindowsAndMessaging::{
     AllowSetForegroundWindow, GetForegroundWindow, GetWindowThreadProcessId, SendMessageTimeoutW,
     SMTO_ABORTIFHUNG, WM_NULL,
@@ -39,6 +45,8 @@ const PASTE_ACK_TIMEOUT_MS: u32 = 500;
 /// covered is process-wide rather than threaded through three constructors.
 static PREVIOUS_FOREGROUND: AtomicIsize = AtomicIsize::new(0);
 
+/// The window an insertion goes to. The launcher records it on show; the
+/// walkthrough harness sets it to a window of its own.
 pub fn remember_previous_foreground(hwnd: isize) {
     PREVIOUS_FOREGROUND.store(hwnd, Ordering::SeqCst);
 }
@@ -184,4 +192,35 @@ fn is_elevated(hwnd: HWND) -> bool {
         CloseHandle(handle);
         false
     }
+}
+
+/// The integrity level of this process, as the last sub-authority of the
+/// token's mandatory label: 0x1000 low, 0x2000 medium, 0x3000 high.
+pub fn own_integrity_level() -> Option<u32> {
+    unsafe { integrity_level(GetCurrentProcess()) }
+}
+
+unsafe fn integrity_level(process: HANDLE) -> Option<u32> {
+    let mut token: HANDLE = std::ptr::null_mut();
+    if OpenProcessToken(process, TOKEN_QUERY, &mut token) == 0 {
+        return None;
+    }
+    // Aligned for the label struct that leads the buffer; the SID follows it.
+    let mut buffer = [0u64; 8];
+    let mut needed = 0u32;
+    let read = GetTokenInformation(
+        token,
+        TokenIntegrityLevel,
+        buffer.as_mut_ptr().cast(),
+        std::mem::size_of_val(&buffer) as u32,
+        &mut needed,
+    );
+    CloseHandle(token);
+    if read == 0 {
+        return None;
+    }
+    let label = &*(buffer.as_ptr() as *const TOKEN_MANDATORY_LABEL);
+    let sid = label.Label.Sid;
+    let count = *GetSidSubAuthorityCount(sid);
+    Some(*GetSidSubAuthority(sid, u32::from(count) - 1))
 }

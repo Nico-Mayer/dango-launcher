@@ -5,6 +5,11 @@ mod macos;
 #[cfg(target_os = "windows")]
 mod windows;
 
+/// What the walkthrough harness needs to point the exchange at a window of its
+/// own and to bring that window forward the same way an insertion does.
+#[cfg(target_os = "windows")]
+pub use windows::{own_integrity_level, remember_previous_foreground, WindowsHandoff};
+
 #[cfg(not(any(target_os = "macos", target_os = "windows")))]
 compile_error!("Dango targets macOS and Windows only. Linux is out of scope.");
 
