@@ -109,10 +109,11 @@
 - [x] 8.5 Confirm the history survives a restart with its order intact, on both platforms
   - macOS: confirmed live. Three entries recorded, Dango stopped and started, and all three come back in the same order.
   - Windows: confirmed live twice, once with eight entries and once after the final build.
-- [ ] 8.6 Confirm a password manager's clipboard never reaches the history, on both platforms
+- [x] 8.6 Confirm a password manager's clipboard never reaches the history, on both platforms
   - macOS: confirmed live against Proton Pass itself, in the running application, after the move to `clipboard-rs` changed the whole read path. The password does not reach the history.
   - Also confirmed earlier with an arbitrary application on the list, and that the list is honoured from a database edit without a restart.
-  - Windows: **not closed.** Proton Pass was locked behind the account password on the test machine and could not be made to copy anything. Everything around it is confirmed: an arbitrary application on the list keeps its copies out of the running application, the list is honoured from a database edit without a restart, both exclusion formats keep content out unread, an Electron application leaves its own process as the clipboard owner, and the Proton Pass process identifies as `Proton Pass`. What remains is one copy of a password from an unlocked Proton Pass with `cargo run --example clipboard_spike` watching, or the application running, to see the owner come back as `Proton Pass` and nothing recorded.
+  - Windows: confirmed live by the author against Proton Pass itself, in the running application. The password does not reach the history.
+  - Confirmed earlier without the vault: an arbitrary application on the list keeps its copies out, the list is honoured from a database edit without a restart, both exclusion formats keep content out unread, an Electron application leaves its own process as the clipboard owner, and the Proton Pass process identifies as `Proton Pass`.
 - [x] 8.7 Confirm the bounds hold by copying past the entry limit and past the size ceiling, on both platforms
   - macOS: confirmed live against the running application, with the bounds written straight into the database, which also proves preferences are read per change rather than at startup.
   - The entry bound holds exactly: set to 5, eight copies leave the five newest.
