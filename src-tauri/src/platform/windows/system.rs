@@ -136,8 +136,8 @@ impl SystemControl for WindowsSystemControl {
     }
 }
 
-struct Identity {
-    name: String,
+pub(super) struct Identity {
+    pub(super) name: String,
     /// What `icon_for` renders: the application's `shell:AppsFolder` entry when
     /// its window carries one, otherwise the executable itself.
     locator: String,
@@ -149,7 +149,7 @@ struct Identity {
 /// packaged desktop app such as Terminal carries it on its process. Anything
 /// else is named by its executable's file description, falling back to the
 /// file name.
-unsafe fn identify(hwnd: HWND, pid: u32) -> Option<Identity> {
+pub(super) unsafe fn identify(hwnd: HWND, pid: u32) -> Option<Identity> {
     if let Some(aumid) = window_aumid(hwnd).or_else(|| process_aumid(pid)) {
         let locator = format!("shell:AppsFolder\\{aumid}");
         if let Some(item) = shell_item(&locator) {
@@ -258,7 +258,7 @@ unsafe fn is_cloaked(hwnd: HWND) -> bool {
 /// `ApplicationFrameHost`, so the frame's own process would lump every store
 /// app together; the hosted application is the child window from another
 /// process.
-unsafe fn owning_pid(hwnd: HWND) -> Option<u32> {
+pub(super) unsafe fn owning_pid(hwnd: HWND) -> Option<u32> {
     let mut pid = 0u32;
     GetWindowThreadProcessId(hwnd, Some(&mut pid));
     if pid == 0 {
