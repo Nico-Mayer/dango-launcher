@@ -409,7 +409,8 @@ mod macos_harness {
     use std::process::Command;
     use std::time::{Duration, Instant};
 
-    use objc2_app_kit::NSWorkspace;
+    use objc2_app_kit::{NSApplication, NSApplicationActivationPolicy, NSWorkspace};
+    use objc2_foundation::MainThreadMarker;
 
     use dango_lib::extensions::window_management::geometry::{self, Region};
     use dango_lib::platform::{self, Rect, WindowError};
@@ -460,6 +461,7 @@ mod macos_harness {
             without_the_permission();
             return;
         }
+        become_an_application();
         let app = match std::env::args().nth(1).unwrap_or_default().as_str() {
             "finder" => FINDER,
             "textedit" | "" => TEXT_EDIT,
@@ -482,10 +484,7 @@ mod macos_harness {
         };
 
         harness.reads_the_target_and_its_work_area();
-        harness.the_work_area_leaves_the_menu_bar_and_dock();
-        harness.tiles_each_region_flush();
-        harness.centre_keeps_the_size();
-        harness.maximise_fills_the_work_area();
+        harness.on_every_display();
         harness.moves_to_the_next_display();
         harness.is_prompt();
         harness.no_focused_window_is_reported();
@@ -519,6 +518,30 @@ mod macos_harness {
             self.manager().target().expect("a target").work_area
         }
 
+        /// Every placement check, once per display. A second display is where
+        /// the coordinate flip and the reserved areas can differ, so running the
+        /// suite only where the window happened to start would miss it.
+        fn on_every_display(&mut self) {
+            let displays = self.manager().displays();
+            for (position, area) in displays.iter().enumerate() {
+                println!("\n== display {} of {}: {area:?}", position + 1, displays.len());
+                self.apply(geometry::center(*area, (800, 600)));
+                let landed_on = self.work_area();
+                if landed_on != *area {
+                    self.check(
+                        "the window can be put on this display",
+                        false,
+                        format!("asked for {area:?}, ended up on {landed_on:?}"),
+                    );
+                    continue;
+                }
+                self.the_work_area_leaves_the_menu_bar(*area);
+                self.tiles_each_region_flush(*area);
+                self.centre_keeps_the_size(*area);
+                self.maximise_fills_the_work_area(*area);
+            }
+        }
+
         /// Applies a frame and reads the window back through AppleScript.
         fn apply(&self, frame: Rect) -> Rect {
             self.manager().place(frame).expect("place");
@@ -530,11 +553,17 @@ mod macos_harness {
         /// to the application were tried first and time out without an
         /// Automation grant; System Events needs only the Accessibility one this
         /// already requires.
+        ///
+        /// Asking for the standard window rather than window 1: a run of quick
+        /// moves makes the system's own tiling hint flash up, and while it is
+        /// there it is window 1, so the read comes back as an eighty-four by
+        /// seventy-seven rectangle that is not the target at all.
         fn bounds(&self) -> Option<Rect> {
+            let window = "(first window whose subrole is \"AXStandardWindow\")";
             rect_from(&format!(
                 "tell application \"System Events\" to tell process \"{}\" to get \
-                 {{value of attribute \"AXPosition\" of window 1, \
-                   value of attribute \"AXSize\" of window 1}}",
+                 {{value of attribute \"AXPosition\" of {window}, \
+                   value of attribute \"AXSize\" of {window}}}",
                 self.app.process
             ))
         }
@@ -586,32 +615,23 @@ mod macos_harness {
         /// rather than something this code derived: it occupies the top of the
         /// primary screen, so that screen's work area has to start exactly where
         /// the menu bar ends. An upside-down work area would start at zero.
-        fn the_work_area_leaves_the_menu_bar_and_dock(&mut self) {
+        fn the_work_area_leaves_the_menu_bar(&mut self, area: Rect) {
             println!("-- the work area leaves the menu bar");
             let Some(menu_bar) = self.menu_bar() else {
                 self.check("the menu bar is reported", false, "none".into());
                 return;
             };
-            // Onto the primary screen, which is the one the menu bar measures,
-            // so the work area read back is that screen's.
-            self.apply(Rect {
-                x: menu_bar.width / 2 - 300,
-                y: menu_bar.height + 50,
-                width: 600,
-                height: 400,
-            });
-            let area = self.work_area();
+            // The menu bar follows the frontmost application's window, so this
+            // is the menu bar of the display the window is on.
             self.check(
                 "the work area starts where the menu bar ends",
-                (area.y - menu_bar.height).abs() <= 2,
+                menu_bar.x == area.x && (area.y - (menu_bar.y + menu_bar.height)).abs() <= 2,
                 format!("menu bar {menu_bar:?}, work area {area:?}"),
             );
-            println!("          (displays {:?})", self.manager().displays());
         }
 
-        fn tiles_each_region_flush(&mut self) {
+        fn tiles_each_region_flush(&mut self, area: Rect) {
             println!("-- each region lands flush against the work area");
-            let area = self.work_area();
             let regions = [
                 ("left half", Region::LeftHalf),
                 ("right half", Region::RightHalf),
@@ -636,9 +656,8 @@ mod macos_harness {
             }
         }
 
-        fn centre_keeps_the_size(&mut self) {
+        fn centre_keeps_the_size(&mut self, area: Rect) {
             println!("-- centre keeps the window's size");
-            let area = self.work_area();
             let before = self.apply(Rect {
                 x: area.x + 50,
                 y: area.y + 50,
@@ -656,9 +675,8 @@ mod macos_harness {
             );
         }
 
-        fn maximise_fills_the_work_area(&mut self) {
+        fn maximise_fills_the_work_area(&mut self, area: Rect) {
             println!("-- maximise fills the work area");
-            let area = self.work_area();
             let landed = self.apply(Region::Maximize.rect(area));
             self.check(
                 "maximise equals the work area",
@@ -668,7 +686,7 @@ mod macos_harness {
         }
 
         fn moves_to_the_next_display(&mut self) {
-            println!("-- move to the next display");
+            println!("\n-- move to the next display");
             let displays = self.manager().displays();
             if displays.len() < 2 {
                 self.skip(
@@ -794,6 +812,20 @@ mod macos_harness {
         println!("\nGrant Accessibility to:");
         println!("  {}", std::env::current_exe().unwrap().display());
         println!("in System Settings > Privacy & Security > Accessibility, then rerun.");
+    }
+
+    /// `NSScreen` answers differently to a process that is not an AppKit
+    /// application: it reports the menu bar inset of the display currently
+    /// showing one and nothing for the others, so a second display's work area
+    /// comes back thirty points too tall and every placement there is pushed
+    /// down by the window server. Waking the shared application up fixes it, and
+    /// it is the state Dango is always in. Accessory, so the harness still never
+    /// activates and never becomes the target itself.
+    fn become_an_application() {
+        let mtm = MainThreadMarker::new().expect("the main thread");
+        let app = NSApplication::sharedApplication(mtm);
+        app.setActivationPolicy(NSApplicationActivationPolicy::Accessory);
+        app.finishLaunching();
     }
 
     fn open_target(app: &App) -> bool {
