@@ -129,6 +129,8 @@ mod windows_harness {
         harness.tiles_each_region_flush();
         harness.centre_keeps_the_size();
         harness.maximise_fills_the_work_area();
+        harness.the_new_sizes_land();
+        harness.grows_and_shrinks_by_steps();
         harness.moves_to_the_next_display();
         harness.is_prompt();
         harness.no_target_is_reported();
@@ -167,6 +169,49 @@ mod windows_harness {
             self.manager().place(frame).expect("place");
             std::thread::sleep(Duration::from_millis(120));
             visible_frame(self.target.window).expect("frame")
+        }
+
+        fn the_new_sizes_land(&mut self) {
+            println!("-- the new absolute sizes land centred");
+            let area = self.work_area();
+            for (name, expected) in [
+                ("almost maximise", geometry::almost_maximize(area)),
+                ("reasonable size", geometry::reasonable_size(area)),
+                ("centre half", geometry::center_half(area)),
+            ] {
+                let landed = self.apply(expected);
+                self.check(name, close(landed, expected), format!("expected {expected:?}, landed {landed:?}"));
+            }
+        }
+
+        fn grows_and_shrinks_by_steps(&mut self) {
+            println!("-- make larger and smaller step and clamp");
+            let area = self.work_area();
+            let _ = self.apply(geometry::reasonable_size(area));
+            let before = visible_frame(self.target.window).expect("frame");
+            let larger = self.apply(geometry::step(before, area, geometry::Step::Larger));
+            self.check(
+                "make larger grows the window",
+                larger.width > before.width && larger.height > before.height,
+                format!("before {before:?}, larger {larger:?}"),
+            );
+            let mut frame = larger;
+            for _ in 0..40 {
+                frame = self.apply(geometry::step(frame, area, geometry::Step::Larger));
+            }
+            self.check(
+                "make larger clamps to the work area",
+                close(frame, area),
+                format!("work area {area:?}, landed {frame:?}"),
+            );
+            for _ in 0..40 {
+                frame = self.apply(geometry::step(frame, area, geometry::Step::Smaller));
+            }
+            self.check(
+                "make smaller clamps to the minimum",
+                (frame.width - 400).abs() <= 2 && (frame.height - 300).abs() <= 2,
+                format!("landed {frame:?}"),
+            );
         }
 
         fn reads_the_target_and_its_work_area(&mut self) {
