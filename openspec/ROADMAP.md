@@ -86,6 +86,17 @@ Check first whether PowerToys Keyboard Manager already covers the Windows side.
 Injected modifiers from a low-level hook have real edge cases with games and
 raw-input applications, and this is a hobby project.
 
+The recorder and settings UI were dropped in favour of JSON config files kept in
+the user's dotfiles: `add-config-file` (config.json with live reload),
+`add-file-backed-records` (snippets and quicklinks as text files),
+`add-command-hotkeys` (per-command global hotkeys with conflict detection),
+`add-hyperkey` and `add-hyperkey-tap` (CapsLock as the hyper modifier, tap for
+Escape), and `add-keyword-expansion` (type a keyword, get the snippet).
+
+Status: shipped and verified on Windows. The only remainder is the macOS side of
+`add-hyperkey` (a `CGEventTap`) and the macOS runtime verification of the M5
+changes, tracked as their still-open `[ ]` tasks.
+
 ### M6 - ai
 
 Bring-your-own-key AI commands: highlighted text in, transformed text out.
