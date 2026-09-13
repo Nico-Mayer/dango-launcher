@@ -1,14 +1,21 @@
 mod apps;
 mod clipboard;
+mod hyperkey;
 mod system;
 mod text;
 mod window;
 
 pub use apps::{icon_for, WindowsAppIndexer};
 pub use clipboard::WindowsAttribution;
+pub use hyperkey::WindowsHyperkey;
 pub use system::WindowsSystemControl;
 pub use text::{own_integrity_level, remember_previous_foreground, WindowsHandoff, WindowsKeys};
 pub use window::WindowsWindowManager;
+
+/// Stamped into `dwExtraInfo` on every event Dango injects (a paste, or the
+/// hyperkey's own modifiers), so the hyperkey hook can tell its own output from
+/// the user's and pass it straight through.
+pub(super) const DANGO_INJECTED: usize = 0x44_41_4E_47;
 
 use tauri::WebviewWindow;
 use windows_sys::Win32::Foundation::{FALSE, HWND, TRUE};

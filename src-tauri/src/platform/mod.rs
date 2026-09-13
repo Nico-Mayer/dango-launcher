@@ -68,6 +68,61 @@ pub fn system_control() -> std::sync::Arc<dyn SystemControl> {
     return std::sync::Arc::new(macos::MacSystemControl);
 }
 
+/// Which physical key acts as the hyperkey. Only CapsLock for now; the allowlist
+/// can grow without a config break.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum HyperkeyTrigger {
+    CapsLock,
+}
+
+impl HyperkeyTrigger {
+    /// Maps a config `key` name to a trigger, or `None` for a name not on the
+    /// allowlist.
+    pub fn from_key(name: &str) -> Option<Self> {
+        match name.trim().to_ascii_lowercase().as_str() {
+            "capslock" | "caps" => Some(Self::CapsLock),
+            _ => None,
+        }
+    }
+}
+
+/// The modifiers the hyperkey holds down while the trigger key is held.
+#[derive(Clone, Copy, Debug)]
+pub struct HyperModifiers {
+    pub ctrl: bool,
+    pub alt: bool,
+    pub shift: bool,
+    pub meta: bool,
+}
+
+/// A hyperkey to install: which key, and what it emits while held.
+#[derive(Clone, Copy, Debug)]
+pub struct HyperkeySpec {
+    pub trigger: HyperkeyTrigger,
+    pub emit: HyperModifiers,
+}
+
+/// A running hyperkey remap. Dropping the handle stops the remap and releases
+/// any modifiers it is holding, so a reload or shutdown never leaves keys stuck
+/// down.
+pub trait Hyperkey: Send {}
+
+/// Starts the hyperkey for this platform, or `None` when it cannot run: the OS
+/// refused the interceptor, or this platform has no implementation yet.
+pub fn start_hyperkey(spec: HyperkeySpec) -> Option<Box<dyn Hyperkey>> {
+    #[cfg(target_os = "windows")]
+    {
+        windows::WindowsHyperkey::start(spec).map(|h| Box::new(h) as Box<dyn Hyperkey>)
+    }
+    #[cfg(target_os = "macos")]
+    {
+        // The macOS event tap is a later task; a configured hyperkey reports
+        // unavailable rather than silently doing nothing.
+        let _ = spec;
+        None
+    }
+}
+
 /// The selection and paste path for this platform, or `None` when key injection
 /// is unavailable and nothing here can work.
 ///
@@ -239,6 +294,46 @@ pub fn launcher_origin(
 #[cfg(test)]
 mod tests {
     use super::launcher_origin;
+    use super::{Hyperkey, HyperkeyTrigger};
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::sync::Arc;
+
+    struct FakeHyperkey {
+        stopped: Arc<AtomicBool>,
+    }
+    impl Hyperkey for FakeHyperkey {}
+    impl Drop for FakeHyperkey {
+        fn drop(&mut self) {
+            self.stopped.store(true, Ordering::SeqCst);
+        }
+    }
+
+    #[test]
+    fn a_hyperkey_handle_stops_on_drop() {
+        let stopped = Arc::new(AtomicBool::new(false));
+        let handle: Box<dyn Hyperkey> = Box::new(FakeHyperkey {
+            stopped: stopped.clone(),
+        });
+        assert!(!stopped.load(Ordering::SeqCst));
+        drop(handle);
+        assert!(
+            stopped.load(Ordering::SeqCst),
+            "dropping the handle stops it"
+        );
+    }
+
+    #[test]
+    fn trigger_from_key_uses_an_allowlist() {
+        assert_eq!(
+            HyperkeyTrigger::from_key("capslock"),
+            Some(HyperkeyTrigger::CapsLock)
+        );
+        assert_eq!(
+            HyperkeyTrigger::from_key("CapsLock"),
+            Some(HyperkeyTrigger::CapsLock)
+        );
+        assert!(HyperkeyTrigger::from_key("f13").is_none());
+    }
 
     #[test]
     fn centres_horizontally() {

@@ -29,11 +29,8 @@ use windows_sys::Win32::UI::WindowsAndMessaging::{
     SMTO_ABORTIFHUNG, WM_NULL,
 };
 
+use super::DANGO_INJECTED;
 use crate::text::{Handoff, Keys, TextError};
-
-/// Marks every event Dango injects, so M5's key monitor can tell its own
-/// output from the user's.
-const DANGO_INJECTED: usize = 0x44_41_4E_47;
 
 const FOREGROUND_TIMEOUT: Duration = Duration::from_millis(400);
 const FOREGROUND_POLL: Duration = Duration::from_millis(10);

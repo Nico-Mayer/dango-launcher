@@ -29,6 +29,7 @@ pub struct Bindings {
 pub fn command_bindings(config: &Config, launcher: Shortcut) -> Bindings {
     let mut bindings: Vec<Binding> = Vec::new();
     let mut conflicts: Vec<String> = Vec::new();
+    let hyper = config.hyper_modifiers();
 
     for (extension_id, extension) in &config.extensions {
         for (command_id, command) in &extension.commands {
@@ -36,7 +37,7 @@ pub fn command_bindings(config: &Config, launcher: Shortcut) -> Bindings {
                 continue;
             };
             let qualified = format!("{extension_id}.{command_id}");
-            let parsed = match hotkey.parse() {
+            let parsed = match hotkey.parse_with_hyper(hyper) {
                 Ok(parsed) => parsed,
                 Err(error) => {
                     conflicts.push(format!("{qualified}: invalid hotkey, {error}"));

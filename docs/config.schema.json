@@ -22,6 +22,22 @@
       "type": "object",
       "description": "Per-extension settings, keyed by extension id such as dango.clipboard.",
       "additionalProperties": { "$ref": "#/$defs/extension" }
+    },
+    "hyperkey": {
+      "type": "object",
+      "description": "A physical key remapped to act as the hyper modifier system-wide. Present means on; omit the block to turn it off.",
+      "additionalProperties": true,
+      "properties": {
+        "key": {
+          "type": "string",
+          "description": "The physical key to remap. Defaults to capslock.",
+          "enum": ["capslock"]
+        },
+        "shift": {
+          "type": "boolean",
+          "description": "Whether Shift is part of the combination. Defaults to true; false emits Ctrl+Alt+Super, leaving typed characters unshifted."
+        }
+      }
     }
   },
   "$defs": {

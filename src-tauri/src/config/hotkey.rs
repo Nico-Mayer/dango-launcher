@@ -45,11 +45,24 @@ impl Hotkey {
         }
     }
 
-    /// Parses this hotkey for the current platform.
+    /// Parses this hotkey for the current platform, expanding `hyper` to the
+    /// full four modifiers.
     pub fn parse(&self) -> Result<ParsedHotkey, HotkeyError> {
-        let spec = self.for_platform().ok_or(HotkeyError::NoValueForPlatform)?;
-        parse(spec)
+        self.parse_with_hyper(full_hyper())
     }
+
+    /// Parses this hotkey for the current platform, expanding `hyper` to the
+    /// given set so a chord matches whatever the configured hyperkey emits.
+    pub fn parse_with_hyper(&self, hyper: Modifiers) -> Result<ParsedHotkey, HotkeyError> {
+        let spec = self.for_platform().ok_or(HotkeyError::NoValueForPlatform)?;
+        parse_with_hyper(spec, hyper)
+    }
+}
+
+/// The full hyper combination, the default meaning of `hyper` when no hyperkey
+/// narrows it.
+pub fn full_hyper() -> Modifiers {
+    Modifiers::CONTROL | Modifiers::ALT | Modifiers::SHIFT | Modifiers::SUPER
 }
 
 /// A hotkey ready to hand to the global shortcut registrar.
@@ -73,8 +86,16 @@ pub enum HotkeyError {
     NoValueForPlatform,
 }
 
-/// Parses a `mod+shift+k` style chord into modifiers and a physical key.
+/// Parses a `mod+shift+k` style chord into modifiers and a physical key,
+/// expanding `hyper` to the full four modifiers.
 pub fn parse(spec: &str) -> Result<ParsedHotkey, HotkeyError> {
+    parse_with_hyper(spec, full_hyper())
+}
+
+/// Parses a chord, expanding `hyper` to the given set. The launcher and command
+/// hotkeys pass the configured hyperkey's set so a `hyper` chord matches what
+/// the key produces.
+pub fn parse_with_hyper(spec: &str, hyper: Modifiers) -> Result<ParsedHotkey, HotkeyError> {
     let parts: Vec<&str> = spec
         .split('+')
         .map(|p| p.trim())
@@ -86,14 +107,14 @@ pub fn parse(spec: &str) -> Result<ParsedHotkey, HotkeyError> {
 
     let mut modifiers = Modifiers::empty();
     for token in mods {
-        modifiers |= modifier(&token.to_ascii_lowercase())?;
+        modifiers |= modifier(&token.to_ascii_lowercase(), hyper)?;
     }
 
     let code = key_code(&key.to_ascii_lowercase())?;
     Ok(ParsedHotkey { modifiers, code })
 }
 
-fn modifier(token: &str) -> Result<Modifiers, HotkeyError> {
+fn modifier(token: &str, hyper: Modifiers) -> Result<Modifiers, HotkeyError> {
     Ok(match token {
         // The primary accelerator: Cmd on macOS, Ctrl on Windows.
         "mod" => {
@@ -110,10 +131,10 @@ fn modifier(token: &str) -> Result<Modifiers, HotkeyError> {
         "alt" | "opt" | "option" => Modifiers::ALT,
         "shift" => Modifiers::SHIFT,
         "meta" | "cmd" | "command" | "super" | "win" | "windows" => Modifiers::SUPER,
-        // The hyperkey chord: all four modifiers at once. The hyperkey remap is
-        // its own later change; a chord bound to `hyper` is registrable today
-        // and fires once CapsLock is remapped to emit this combination.
-        "hyper" => Modifiers::CONTROL | Modifiers::ALT | Modifiers::SHIFT | Modifiers::SUPER,
+        // The hyperkey chord: the set the configured hyperkey emits (the full
+        // four by default). Passing the same set the key produces is what makes
+        // a `hyper` chord actually fire from the remap.
+        "hyper" => hyper,
         other => return Err(HotkeyError::UnknownModifier(other.to_string())),
     })
 }
@@ -173,7 +194,7 @@ fn key_code(token: &str) -> Result<Code, HotkeyError> {
 }
 
 fn is_modifier(token: &str) -> bool {
-    modifier(token).is_ok()
+    modifier(token, full_hyper()).is_ok()
 }
 
 fn letter_code(ch: char) -> Code {
@@ -256,6 +277,15 @@ mod tests {
             parsed.modifiers,
             Modifiers::CONTROL | Modifiers::ALT | Modifiers::SHIFT | Modifiers::SUPER
         );
+        assert_eq!(parsed.code, Code::ArrowLeft);
+    }
+
+    #[test]
+    fn hyper_expands_to_a_given_set() {
+        let hyper = Modifiers::CONTROL | Modifiers::ALT | Modifiers::SUPER;
+        let parsed = parse_with_hyper("hyper+left", hyper).unwrap();
+        assert_eq!(parsed.modifiers, hyper, "shift excluded from hyper");
+        assert!(!parsed.modifiers.contains(Modifiers::SHIFT));
         assert_eq!(parsed.code, Code::ArrowLeft);
     }
 

@@ -12,6 +12,7 @@ use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
+use tauri_plugin_global_shortcut::Modifiers;
 
 pub mod hotkey;
 mod location;
@@ -40,8 +41,47 @@ pub struct Config {
     pub launcher: Launcher,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub extensions: BTreeMap<String, Extension>,
+    /// The system-wide hyperkey. Present means on; absent means off.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub hyperkey: Option<Hyperkey>,
     #[serde(flatten)]
     pub extra: Map<String, Value>,
+}
+
+/// One physical key remapped to act as the hyper modifier system-wide.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Hyperkey {
+    /// The physical key to remap, from a small allowlist. Defaults to CapsLock.
+    #[serde(default = "default_hyperkey_key")]
+    pub key: String,
+    /// Whether Shift is part of the combination. On by default; off emits
+    /// Ctrl+Alt+Super, which leaves typed characters unshifted.
+    #[serde(default = "default_true", skip_serializing_if = "is_true")]
+    pub shift: bool,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+impl Default for Hyperkey {
+    fn default() -> Self {
+        Self {
+            key: default_hyperkey_key(),
+            shift: true,
+            extra: Map::new(),
+        }
+    }
+}
+
+fn default_hyperkey_key() -> String {
+    "capslock".to_string()
+}
+
+fn default_true() -> bool {
+    true
+}
+
+fn is_true(value: &bool) -> bool {
+    *value
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -72,7 +112,7 @@ pub struct Extension {
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct CommandSettings {
-    /// Reserved for `add-command-hotkeys`. Parsed and preserved here, not bound.
+    /// The command's global hotkey, registered by `hotkeys::command_bindings`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub hotkey: Option<Hotkey>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -135,6 +175,19 @@ impl Config {
         })
     }
 
+    /// The modifier set the hyperkey emits, and therefore what a `hyper` chord
+    /// must expand to for the two to match. Always Ctrl+Alt+Super, plus Shift
+    /// unless the hyperkey turns it off. With no hyperkey configured this is the
+    /// full four, so a `hyper` chord stays registrable.
+    pub fn hyper_modifiers(&self) -> Modifiers {
+        let shift = self.hyperkey.as_ref().map(|h| h.shift).unwrap_or(true);
+        let mut mods = Modifiers::CONTROL | Modifiers::ALT | Modifiers::SUPER;
+        if shift {
+            mods |= Modifiers::SHIFT;
+        }
+        mods
+    }
+
     /// A command alias the file sets.
     pub fn alias(&self, extension_id: &str, command_id: &str) -> Option<String> {
         self.extensions
@@ -181,7 +234,7 @@ mod tests {
     fn unknown_keys_are_preserved_through_a_round_trip() {
         let text = r#"{
           "version": 1,
-          "hyperkey": { "key": "capslock" },
+          "somethingFuturistic": { "on": true },
           "extensions": {
             "dango.future": { "enabled": true, "somethingNew": 42 }
           }
@@ -189,15 +242,50 @@ mod tests {
         let config = Config::parse(text).unwrap();
         let json = config.to_json();
         assert!(
-            json.contains("hyperkey"),
+            json.contains("somethingFuturistic"),
             "top-level unknown key dropped: {json}"
         );
-        assert!(json.contains("capslock"));
         assert!(
             json.contains("somethingNew"),
             "per-extension unknown key dropped: {json}"
         );
         assert!(json.contains("42"));
+    }
+
+    #[test]
+    fn a_hyperkey_block_parses_with_defaults() {
+        let config = Config::parse(r#"{ "hyperkey": { "key": "capslock" } }"#).unwrap();
+        let hyperkey = config.hyperkey.as_ref().expect("hyperkey present");
+        assert_eq!(hyperkey.key, "capslock");
+        assert!(hyperkey.shift, "shift defaults on");
+        assert_eq!(
+            config.hyper_modifiers(),
+            Modifiers::CONTROL | Modifiers::ALT | Modifiers::SHIFT | Modifiers::SUPER
+        );
+    }
+
+    #[test]
+    fn a_hyperkey_can_exclude_shift() {
+        let config =
+            Config::parse(r#"{ "hyperkey": { "key": "capslock", "shift": false } }"#).unwrap();
+        assert!(!config.hyperkey.as_ref().unwrap().shift);
+        assert_eq!(
+            config.hyper_modifiers(),
+            Modifiers::CONTROL | Modifiers::ALT | Modifiers::SUPER
+        );
+        // The excluded Shift also survives a round trip.
+        let again = Config::parse(&config.to_json()).unwrap();
+        assert!(!again.hyperkey.unwrap().shift);
+    }
+
+    #[test]
+    fn no_hyperkey_still_means_full_hyper() {
+        let config = Config::parse("{}").unwrap();
+        assert!(config.hyperkey.is_none());
+        assert_eq!(
+            config.hyper_modifiers(),
+            Modifiers::CONTROL | Modifiers::ALT | Modifiers::SHIFT | Modifiers::SUPER
+        );
     }
 
     #[test]
