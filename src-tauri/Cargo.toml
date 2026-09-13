@@ -103,8 +103,8 @@ objc2-foundation = { version = "0.3", features = [
   "NSURL",
   "block2",
 ] }
-objc2-core-foundation = { version = "0.3", features = ["CFCGTypes"] }
-objc2-core-graphics = { version = "0.3", features = ["CGBitmapContext", "CGColorSpace", "CGContext", "CGImage"] }
+objc2-core-foundation = { version = "0.3", features = ["CFCGTypes", "CFMachPort", "CFRunLoop"] }
+objc2-core-graphics = { version = "0.3", features = ["CGBitmapContext", "CGColorSpace", "CGContext", "CGEvent", "CGEventSource", "CGEventTypes", "CGImage"] }
 objc2-application-services = { version = "0.3", default-features = false, features = [
   "AXError",
   "AXUIElement",

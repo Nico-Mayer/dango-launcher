@@ -118,10 +118,7 @@ pub fn start_hyperkey(spec: HyperkeySpec) -> Option<Box<dyn Hyperkey>> {
     }
     #[cfg(target_os = "macos")]
     {
-        // The macOS event tap is a later task; a configured hyperkey reports
-        // unavailable rather than silently doing nothing.
-        let _ = spec;
-        None
+        macos::MacHyperkey::start(spec).map(|h| Box::new(h) as Box<dyn Hyperkey>)
     }
 }
 

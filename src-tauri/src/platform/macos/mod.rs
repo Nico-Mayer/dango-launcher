@@ -1,12 +1,16 @@
 mod apps;
 mod clipboard;
+mod eventtap;
+mod hyperkey;
 mod icons;
+mod keymap;
 mod system;
 mod text;
 mod window;
 
 pub use apps::MacAppIndexer;
 pub use clipboard::MacAttribution;
+pub use hyperkey::MacHyperkey;
 pub use icons::icon_for;
 pub use system::MacSystemControl;
 pub use text::{MacHandoff, MacKeys, MacSelection};
@@ -47,6 +51,11 @@ pub(super) fn prompt_for_accessibility() {
         objc2_application_services::AXIsProcessTrustedWithOptions(Some(options.as_opaque()));
     }
 }
+
+/// Marks an event as Dango's own, in the event source's user data. The same
+/// value the Windows side stamps in `dwExtraInfo`, so one number means one thing
+/// on both platforms.
+pub(super) const DANGO_INJECTED: i64 = 0x44_41_4E_47;
 
 /// Above NSMainMenuWindowLevel. A fullscreen application's window outranks the
 /// floating level that `alwaysOnTop` gives us, which leaves the launcher behind
