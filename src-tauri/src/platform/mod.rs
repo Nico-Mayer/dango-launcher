@@ -147,6 +147,56 @@ pub fn app_indexer() -> std::sync::Arc<dyn crate::extensions::applications::AppI
     return std::sync::Arc::new(macos::MacAppIndexer);
 }
 
+/// A window rectangle in the platform's own coordinates: physical pixels across
+/// one virtual desktop on Windows, logical points per screen on macOS. The
+/// geometry above this line never converts between the two, because the trait
+/// reports and accepts whatever the platform speaks.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Rect {
+    pub x: i32,
+    pub y: i32,
+    pub width: i32,
+    pub height: i32,
+}
+
+/// A snapshot of the window a command is about to reshape: its visible frame and
+/// the work area of the display it is currently on.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Placement {
+    pub frame: Rect,
+    pub work_area: Rect,
+}
+
+#[derive(Clone, Debug, thiserror::Error, PartialEq, Eq)]
+pub enum WindowError {
+    #[error("there is no window to move")]
+    NoTarget,
+    #[error("{0}")]
+    Unreachable(String),
+    #[error("{0}")]
+    Failed(String),
+}
+
+/// Reshaping the window that was focused before the launcher appeared. Narrow on
+/// purpose: read the target's frame and its display, list the displays, and set
+/// the frame. Every region computation lives above this in shared, tested code.
+pub trait WindowManager: Send + Sync {
+    /// The target window's visible frame and the work area of its display, or
+    /// `NoTarget` if there is no window to act on.
+    fn target(&self) -> Result<Placement, WindowError>;
+    /// The work areas of all displays, in a stable order, for move-to-next.
+    fn displays(&self) -> Vec<Rect>;
+    /// Move and resize the target window to `frame`.
+    fn place(&self, frame: Rect) -> Result<(), WindowError>;
+}
+
+pub fn window_manager() -> std::sync::Arc<dyn WindowManager> {
+    #[cfg(target_os = "windows")]
+    return std::sync::Arc::new(windows::WindowsWindowManager);
+    #[cfg(target_os = "macos")]
+    return std::sync::Arc::new(macos::MacWindowManager);
+}
+
 /// The cursor is the most reliable signal for "the display the user is looking
 /// at". `current_monitor` cannot answer while the window is parked offscreen for
 /// warmup, and returning nothing there would leave the launcher unpositioned and

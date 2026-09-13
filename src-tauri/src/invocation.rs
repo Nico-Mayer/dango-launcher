@@ -43,6 +43,16 @@ pub struct InvocationContext {
 }
 
 impl InvocationContext {
+    /// Builds a context around a caller-supplied sink, for testing a command's
+    /// `invoke` in isolation without an `Invoker`.
+    #[cfg(test)]
+    pub fn for_test(command_id: impl Into<String>, sink: Arc<dyn Sink>) -> Self {
+        Self {
+            command_id: command_id.into(),
+            sink,
+        }
+    }
+
     pub fn push_view(&self, tree: ViewTree) {
         self.sink.push_view(tree);
     }

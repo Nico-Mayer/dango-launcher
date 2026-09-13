@@ -3,12 +3,14 @@ mod clipboard;
 mod icons;
 mod system;
 mod text;
+mod window;
 
 pub use apps::MacAppIndexer;
 pub use clipboard::MacAttribution;
 pub use icons::icon_for;
 pub use system::MacSystemControl;
 pub use text::{MacHandoff, MacKeys, MacSelection};
+pub use window::MacWindowManager;
 
 use std::ptr::NonNull;
 use std::sync::OnceLock;

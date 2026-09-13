@@ -4,10 +4,19 @@
   import CirclePower from "@lucide/svelte/icons/circle-power";
   import ClipboardList from "@lucide/svelte/icons/clipboard-list";
   import ClipboardType from "@lucide/svelte/icons/clipboard-type";
+  import Columns3 from "@lucide/svelte/icons/columns-3";
+  import Grid2x2 from "@lucide/svelte/icons/grid-2x2";
   import LoaderCircle from "@lucide/svelte/icons/loader-circle";
   import Lock from "@lucide/svelte/icons/lock";
   import Link from "@lucide/svelte/icons/link";
+  import Maximize from "@lucide/svelte/icons/maximize";
+  import Monitor from "@lucide/svelte/icons/monitor";
   import Moon from "@lucide/svelte/icons/moon";
+  import PanelBottom from "@lucide/svelte/icons/panel-bottom";
+  import PanelLeft from "@lucide/svelte/icons/panel-left";
+  import PanelRight from "@lucide/svelte/icons/panel-right";
+  import PanelTop from "@lucide/svelte/icons/panel-top";
+  import Square from "@lucide/svelte/icons/square";
   import Terminal from "@lucide/svelte/icons/terminal";
   import Trash2 from "@lucide/svelte/icons/trash-2";
 
@@ -21,10 +30,19 @@
     "circle-power": CirclePower,
     "clipboard-list": ClipboardList,
     "clipboard-type": ClipboardType,
+    "columns-3": Columns3,
+    "grid-2x2": Grid2x2,
     "loader-circle": LoaderCircle,
     link: Link,
     lock: Lock,
+    maximize: Maximize,
+    monitor: Monitor,
     moon: Moon,
+    "panel-bottom": PanelBottom,
+    "panel-left": PanelLeft,
+    "panel-right": PanelRight,
+    "panel-top": PanelTop,
+    square: Square,
     terminal: Terminal,
     "trash-2": Trash2,
   } as const;

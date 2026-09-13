@@ -25,6 +25,7 @@ use extensions::applications::{AppIndex, ApplicationsExtension, IconCache};
 use extensions::clipboard::{ClipboardExtension, History, PreferencePolicy, Watcher};
 use extensions::snippets::{self, SnippetsExtension};
 use extensions::system::SystemExtension;
+use extensions::window_management::WindowManagementExtension;
 use invocation::{InvokeError, Invoker, Outcome, Output};
 use latency::LatencyProbe;
 use platform::LauncherWindow;
@@ -678,6 +679,15 @@ pub fn run() {
                 Ok(report) if report.is_clean() => {}
                 Ok(report) => eprintln!("[dango] system loaded with issues: {report:?}"),
                 Err(error) => eprintln!("[dango] system failed to load: {error}"),
+            }
+
+            let window_management = Arc::new(WindowManagementExtension::new(
+                platform::window_manager(),
+            ));
+            match host.register(window_management) {
+                Ok(report) if report.is_clean() => {}
+                Ok(report) => eprintln!("[dango] window-management loaded with issues: {report:?}"),
+                Err(error) => eprintln!("[dango] window-management failed to load: {error}"),
             }
 
             let frecency = Arc::new(match &store {
