@@ -185,12 +185,16 @@ the non-elevated harness.
   - Verified live against the WinForms (.NET) target: the acknowledgement returns
     only after the paste is handled, so the paste always read the intended
     clipboard and never the decoy written right after (marker 10, decoy 0).
-- [ ] 6.6 Report the elevated-window ceiling as a clear failure rather than a silent one, verified by pasting into an elevated window
-  - An `OpenProcess` probe with `PROCESS_QUERY_LIMITED_INFORMATION`: a refusal is
-    the answer, since a non-elevated process cannot open an elevated one.
-  - The probe runs (integrity `0x2000` read for the harness). The refusal itself
-    is exercised by `an_elevated_target_is_refused` against a window titled
-    `dango-elevated`; it needs that window opened elevated. See 9.9.
+- [x] 6.6 Report the elevated-window ceiling as a clear failure rather than a silent one, verified by pasting into an elevated window
+  - **A runtime bug the CI build could not catch.** The first version probed the
+    target with `OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION)` and read a
+    failure as elevation. That access right is granted across integrity levels
+    by design, so the open always succeeded, the target read as reachable, and a
+    paste into a live elevated window returned `Ok(())` and vanished under UIPI.
+  - Fixed by comparing integrity levels: the target's mandatory-label level
+    against this process's own, refusing when the target is higher. Verified
+    live against an elevated window: the insertion fails with the elevation
+    message and the clipboard is untouched.
 - [x] 6.7 Check symbol names and module paths against the vendored crate source before pushing, and verify CI's `cargo clippy -- -D warnings` passes on `windows-latest`
   - Green on the first run, which is not what the project's own notes would predict: the context warns that symbol names and module paths are the usual way Windows code fails here, and `AttachThreadInput` living in `Win32::System::Threading` is recorded as a trap. Checking them against the vendored source before pushing is what made it uneventful.
   - Run 34710561144, both jobs. That run covers `platform/windows/text.rs` and both extensions.
@@ -278,12 +282,10 @@ the non-elevated harness.
 - [x] 9.7 Confirm on both platforms that text appears in the target application within 400ms of confirming, measured over repeated pastes
   - macOS: an insertion returns in about 370ms across runs, and roughly 300ms of that is the clipboard restore the user never waits for. The text itself arrives in about 70ms.
 - [ ] 9.8 Confirm on macOS that revoking the Accessibility permission produces the explained failure and the prompt action, and that granting it restores normal behaviour without a restart
-- [ ] 9.9 Confirm on Windows that pasting into an elevated window fails visibly and leaves the clipboard alone
-  - The harness is non-elevated (integrity `0x2000`) and its
-    `an_elevated_target_is_refused` check targets a window titled `dango-elevated`.
-    Outstanding only for want of that window: launching an elevated process is
-    blocked from this session, so the author opens one elevated and reruns to
-    close it.
+- [x] 9.9 Confirm on Windows that pasting into an elevated window fails visibly and leaves the clipboard alone
+  - **Confirmed** against a live elevated window, non-elevated harness (integrity
+    `0x2000`): the insertion fails with the elevation message and the clipboard
+    is left untouched. This is what surfaced the 6.6 bug; both hold after the fix.
 - [ ] 9.10 Confirm on both platforms that snippets and quicklinks survive a restart with their names and templates intact
   - Windows: **confirmed.** A snippet and a quicklink were created through the
     launcher's own create forms on a release build, and after two restarts both
