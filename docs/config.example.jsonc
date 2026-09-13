@@ -25,10 +25,10 @@
     "dango.clipboard": {
       // Turn an extension off. Absent means on.
       "enabled": true,
-      // Override an extension's preferences. Types are as declared.
+      // Override an extension's preferences, by the extension's own keys.
       "preferences": {
-        "max_entries": 200,
-        "excluded_apps": ["Proton Pass"]
+        "entries": 200,
+        "excluded-applications": "Proton Pass, 1Password"
       }
     },
 
