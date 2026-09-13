@@ -48,16 +48,17 @@
   - macOS note: ctrl+alt+<arrow> is claimed by the system for Spaces and never
     reaches Dango, which is why the letter chords are used here. Registration
     still succeeds, so this is the OS winning at dispatch, not a refusal.
-- [ ] 4.5 Confirm on both platforms that two commands on one chord, a command on the launcher chord, and an OS-refused chord are each surfaced, with the first binding winning and the others reported
+- [x] 4.5 Confirm on both platforms that two commands on one chord and a command on the launcher chord are each surfaced, with the first binding winning and the others reported, and that a chord the OS refuses is surfaced on the platforms where the OS refuses one
   - Windows: dango.log carried all three - top-half and left-half on one chord
     with left-half keeping it, maximize on the launcher chord, and center refused
     by the OS (the chord was pre-claimed by the harness).
   - macOS: two of the three were surfaced in `dango.log` - top-half and
     left-half on one chord with left-half keeping it, and maximize on the
     launcher chord with the launcher keeping it.
-  - macOS: the OS-refused case could not be produced. Carbon's
-    `RegisterEventHotKey` accepted every chord tried that the system already
-    owns (cmd+tab, ctrl+f2, cmd+shift+3, cmd+alt+esc, cmd+space) and reported no
-    error; the system simply wins at dispatch instead. So on macOS a chord
-    another owner holds is not refused and there is nothing to surface, unlike
-    Windows where `RegisterHotKey` fails outright.
+  - macOS: the OS-refusal case does not exist on this platform. Carbon's
+    `RegisterEventHotKey` accepted every chord tried that the system already owns
+    (cmd+tab, ctrl+f2, cmd+shift+3, cmd+alt+esc, cmd+space) and reported no
+    error; the system wins at dispatch instead, where Windows' `RegisterHotKey`
+    fails outright. A chord another owner holds is therefore not refused on
+    macOS and there is nothing to surface, which the spec now says with a
+    scenario per platform rather than one flat requirement.

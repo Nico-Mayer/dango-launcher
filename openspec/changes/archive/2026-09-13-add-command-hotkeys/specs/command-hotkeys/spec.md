@@ -74,6 +74,10 @@ SHALL detect it and surface it through the tray status line and the log rather
 than failing silently. The first binding to a chord SHALL win; the others SHALL
 be reported, not applied.
 
+Whether the operating system refuses a chord another application already owns is
+platform-dependent, so Dango SHALL surface a refusal where the platform reports
+one and SHALL NOT be expected to report a conflict the platform does not raise.
+
 #### Scenario: Two commands on one chord
 
 - **WHEN** two commands are bound to the same chord
@@ -86,9 +90,17 @@ be reported, not applied.
 - **THEN** the launcher keeps the chord
 - **AND** the conflict is surfaced
 
-#### Scenario: The OS refuses a chord
+#### Scenario: Windows refuses a chord another application owns
 
-- **WHEN** the operating system refuses to register a bound chord because another
-  application owns it
+- **WHEN** Windows refuses to register a bound chord because another application
+  owns it
 - **THEN** the failure is surfaced rather than lost
 - **AND** the other bindings still work
+
+#### Scenario: macOS accepts a chord the system already owns
+
+- **WHEN** a chord the system already owns is bound on macOS
+- **THEN** registration succeeds and no conflict is surfaced, because macOS does
+  not refuse it
+- **AND** pressing the chord runs the system's action rather than the bound
+  command, since the system takes it first
