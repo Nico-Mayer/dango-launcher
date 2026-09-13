@@ -682,7 +682,7 @@ pub fn run() {
             }
 
             let window_management = Arc::new(WindowManagementExtension::new(
-                platform::window_manager(),
+                platform::window_manager(Arc::new(OnMainThread(app.handle().clone()))),
             ));
             match host.register(window_management) {
                 Ok(report) if report.is_clean() => {}

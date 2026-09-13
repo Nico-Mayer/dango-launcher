@@ -190,11 +190,18 @@ pub trait WindowManager: Send + Sync {
     fn place(&self, frame: Rect) -> Result<(), WindowError>;
 }
 
-pub fn window_manager() -> std::sync::Arc<dyn WindowManager> {
+/// `main` is how macOS reaches `NSScreen`, which only answers on the main
+/// thread. Windows has no such rule and ignores it.
+pub fn window_manager(
+    main: std::sync::Arc<dyn crate::text::MainThread>,
+) -> std::sync::Arc<dyn WindowManager> {
     #[cfg(target_os = "windows")]
-    return std::sync::Arc::new(windows::WindowsWindowManager);
+    {
+        let _ = main;
+        return std::sync::Arc::new(windows::WindowsWindowManager);
+    }
     #[cfg(target_os = "macos")]
-    return std::sync::Arc::new(macos::MacWindowManager);
+    return std::sync::Arc::new(macos::MacWindowManager::new(main));
 }
 
 /// The cursor is the most reliable signal for "the display the user is looking

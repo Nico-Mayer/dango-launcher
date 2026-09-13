@@ -73,6 +73,7 @@ block2 = "0.6"
 libc = "0.2"
 objc2-app-kit = { version = "0.3", features = [
   "NSWindow",
+  "NSScreen",
   "NSPanel",
   "NSResponder",
   "NSApplication",
@@ -103,6 +104,7 @@ objc2-core-graphics = { version = "0.3", features = ["CGBitmapContext", "CGColor
 objc2-application-services = { version = "0.3", default-features = false, features = [
   "AXError",
   "AXUIElement",
+  "AXValue",
   "HIServices",
   "libc",
 ] }
