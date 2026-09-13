@@ -93,9 +93,17 @@ the user's dotfiles: `add-config-file` (config.json with live reload),
 `add-hyperkey` and `add-hyperkey-tap` (CapsLock as the hyper modifier, tap for
 Escape), and `add-keyword-expansion` (type a keyword, get the snippet).
 
-Status: shipped and verified on Windows. The only remainder is the macOS side of
-`add-hyperkey` (a `CGEventTap`) and the macOS runtime verification of the M5
-changes, tracked as their still-open `[ ]` tasks.
+Status: shipped and verified on both platforms. The macOS side is a `hidutil`
+remap of CapsLock to F18 with a `CGEventTap` over it, because a tap alone cannot
+own CapsLock: the lock state and its debounce live below every tap location.
+
+Two verification items stay open, both recorded in their tasks with what was and
+was not exercised. `add-file-backed-records` 3.1 (creating a record through the
+launcher form) could not be driven on macOS, because synthesized keystrokes
+reach the webview out of order and a synthesized Tab is typed rather than moving
+focus. `add-command-hotkeys` 4.5's OS-refusal case cannot occur on macOS at all:
+Carbon accepts a chord the system already owns and simply loses at dispatch,
+where Windows refuses the registration outright.
 
 ### M6 - ai
 

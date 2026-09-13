@@ -84,12 +84,42 @@ The macOS implementation adds a session-level `CGEventTap` that watches for the
 mapped key and, while it is held, sets the four modifier flags
 (`maskControl | maskAlternate | maskShift | maskCommand`) on subsequent events,
 suppressing the key's own effect. This needs the Accessibility permission, like
-the existing selection path. CapsLock is special on macOS (it is debounced by
-the HID system), so the mapped key defaults are documented per platform and the
-tap targets the key's raw keycode.
+the existing selection path.
 
-macOS is designed here and implemented after Windows; its runtime verification is
-deferred, matching the project's split.
+Setting the flags on the events that pass through, rather than synthesizing
+modifier key-downs the way Windows does, is what makes the macOS side free of
+the stuck-modifier risk: no modifier is ever pressed, so none can be left down.
+The flags exist only on events the tap has already seen, which is exactly the
+window in which the hyperkey is held.
+
+### macOS: CapsLock is remapped to F18 first, because the tap cannot own it
+
+A spike measured what a session tap actually receives (`examples/keytap_spike.rs`):
+CapsLock arrives as a `FlagsChanged` event, keycode 57, carrying
+`maskAlphaShift`. The problem is what has already happened by then. The
+lock state and its LED are owned by the HID system, which sits below every tap
+location, so swallowing the event at a session tap does not stop the toggle; and
+the same layer debounces the key, which would make a quick tap unreliable for
+`add-hyperkey-tap`.
+
+So the mapped key is first remapped at the HID level, below the toggle, with
+`hidutil property --set` on `UserKeyMapping`: CapsLock (`0x700000039`) to F18
+(`0x70000006D`), a key no Apple keyboard has. The tap then sees an ordinary
+`KeyDown`/`KeyUp` for keycode 79, with no lock state, no LED, and no debounce,
+and owns it outright. This is the same two-layer arrangement every working macOS
+hyperkey uses, and it is the reason a tap alone is not enough.
+
+The remap is applied when the hyperkey starts and cleared when the handle drops,
+so disabling the hyperkey or quitting Dango gives CapsLock back. It is machine-wide
+while it is set and it does not survive a reboot, which is the trade named in the
+risks.
+
+Rejected: swallowing the `FlagsChanged` at the tap with no remap. It is what this
+design first assumed, and the measurement says the toggle happens anyway.
+
+Rejected: a Karabiner-style virtual HID driver. It owns the problem properly and
+it is a kernel extension and a signed installer, which is far past what a hobby
+project should install on a machine.
 
 ### Config shape: an optional typed `hyperkey` block, off by default
 
@@ -151,6 +181,13 @@ hotkeys use, so there is no diffing.
 - **A real modifier held with the hyperkey** (Shift+hyperkey+key). → The
   synthesized modifiers are additive to whatever is physically down; no special
   handling needed.
+- **macOS: the `hidutil` remap is machine-wide while it is set.** → It is
+  applied on start and cleared on stop and on drop, and it does not survive a
+  reboot, so the worst case after a crash is CapsLock staying F18 until Dango
+  runs again or the machine restarts.
+- **macOS 26 is reported not to deliver external-keyboard events to a session
+  tap.** → Recorded as a ceiling to confirm during verification rather than
+  designed around; the built-in keyboard is the supported case.
 
 ## Migration Plan
 

@@ -1,18 +1,25 @@
 mod apps;
 mod clipboard;
+mod eventtap;
+mod hyperkey;
 mod icons;
+mod keymap;
+mod keymonitor;
 mod system;
 mod text;
 mod window;
 
 pub use apps::MacAppIndexer;
 pub use clipboard::MacAttribution;
+pub use hyperkey::MacHyperkey;
 pub use icons::icon_for;
+pub use keymonitor::MacKeyMonitor;
 pub use system::MacSystemControl;
 pub use text::{MacHandoff, MacKeys, MacSelection};
 pub use window::MacWindowManager;
 
 use std::ptr::NonNull;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::OnceLock;
 
 use objc2::rc::Retained;
@@ -46,6 +53,57 @@ pub(super) fn prompt_for_accessibility() {
             CFDictionary::from_slices(&[prompt.as_ref()], &[yes]);
         objc2_application_services::AXIsProcessTrustedWithOptions(Some(options.as_opaque()));
     }
+}
+
+/// Marks an event as Dango's own, in the event source's user data. The same
+/// value the Windows side stamps in `dwExtraInfo`, so one number means one thing
+/// on both platforms.
+pub(super) const DANGO_INJECTED: i64 = 0x44_41_4E_47;
+
+/// How many injections are in flight. A depth rather than a flag, so a nested
+/// injection cannot unmute the monitor early.
+static MUTED: AtomicUsize = AtomicUsize::new(0);
+
+/// Whether the key monitor should ignore what it is seeing, because Dango is
+/// currently typing it.
+pub(super) fn muted() -> bool {
+    MUTED.load(Ordering::SeqCst) > 0
+}
+
+/// Mutes the key monitor while it is held. macOS cannot mark the keystrokes
+/// enigo injects, so expansion mutes the monitor around them instead of
+/// filtering them; see the keyword-expansion design.
+pub struct Mute;
+
+impl Mute {
+    pub fn new() -> Self {
+        MUTED.fetch_add(1, Ordering::SeqCst);
+        Self
+    }
+}
+
+impl Drop for Mute {
+    fn drop(&mut self) {
+        MUTED.fetch_sub(1, Ordering::SeqCst);
+    }
+}
+
+/// The frontmost application's name, resolved the same way the clipboard names
+/// the copying application, so the one exclusion list matches both.
+pub(super) fn foreground_app() -> Option<String> {
+    clipboard::frontmost_name()
+}
+
+/// Whether the system has secure event input active, which is what a password
+/// field turns on. Authoritative here, unlike the Windows guess: while it is on
+/// the tap receives nothing useful anyway, and asking makes the skip deliberate
+/// rather than an accident of what was delivered.
+pub(super) fn focused_field_is_secure() -> bool {
+    #[link(name = "Carbon", kind = "framework")]
+    extern "C" {
+        fn IsSecureEventInputEnabled() -> u8;
+    }
+    unsafe { IsSecureEventInputEnabled() != 0 }
 }
 
 /// Above NSMainMenuWindowLevel. A fullscreen application's window outranks the

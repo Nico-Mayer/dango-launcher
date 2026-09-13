@@ -108,7 +108,7 @@ fn remember(trail: &Mutex<Vec<(String, Instant)>>, name: String) {
     trail.drain(..excess);
 }
 
-fn frontmost_name() -> Option<String> {
+pub(super) fn frontmost_name() -> Option<String> {
     NSWorkspace::sharedWorkspace()
         .frontmostApplication()
         .and_then(|app| app.localizedName())

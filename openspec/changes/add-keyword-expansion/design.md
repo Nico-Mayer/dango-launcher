@@ -117,6 +117,36 @@ character a key produced with `ToUnicodeEx` over `GetKeyboardState` and
 Unlike the hyperkey hook, this one never swallows or rewrites a key: it returns
 every event to the chain and only observes.
 
+### macOS tells Dango's own output from the user's with a mute, not a marker
+
+On Windows the hook ignores any event carrying `DANGO_INJECTED` in
+`dwExtraInfo`, which the paste path already stamps. macOS has no equivalent
+available: the injection goes through enigo, whose injected-event marker is a
+Windows-only setting, and the spike confirmed the gap is real. Events this
+process posted are indistinguishable at the tap from the user's own typing:
+same `kCGEventSourceStateID` of 1, same `kCGEventSourceUserData` of 0.
+
+So the monitor is muted around the injection instead of filtering it. Expansion
+takes a guard before it sends anything and releases it when the paste is done;
+while the guard is held the tap delivers nothing to the sink. The guard is a
+depth counter rather than a flag, so nesting cannot unmute early, and it is an
+RAII handle, so an error path cannot leave the monitor muted.
+
+Muting is a wider net than a marker: the user's own keystrokes during the
+expansion are dropped too. That is the right answer rather than a cost, because
+the buffer has to be cleared across an expansion anyway - the characters the
+keyword occupied are gone from the field, so anything observed mid-paste would
+be matched against a buffer that no longer describes what is on screen.
+
+The one thing Dango posts itself, the hyperkey's tap key, is stamped with
+`kCGEventSourceUserData` and filtered on the marker the ordinary way, because
+that path builds its own events and can afford the marker. So macOS uses both:
+the marker where it owns the event, the mute where enigo owns it.
+
+Rejected: replacing enigo on the macOS paste path with hand-built `CGEvent`s so
+they could carry the marker. It would re-open a path `add-text-plumbing`
+measured and verified, to gain a filter a mute already provides.
+
 ### The monitor keeps characters, never keys, and never more than it needs
 
 The buffer is a fixed-size ring of the last N characters typed, where N is the
@@ -256,6 +286,9 @@ idle is still a key monitor.
   the feature.
 - **One exclusion list governs two features.** → Correct default, stated
   coupling, read per event so it stays changeable.
+- **macOS: the mute drops the user's keystrokes for the length of an
+  expansion.** → Bounded by the expansion itself, and the buffer has to be
+  cleared across one regardless, so nothing that could have matched is lost.
 - **A keyword that is a common word will expand when not wanted.** → The word
   boundary rule removes the worst of it; the rest is guidance about choosing
   distinctive keywords, not a rule the code can enforce without guessing.

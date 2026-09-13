@@ -10,7 +10,7 @@
 
 ## 3. Verification
 
-- [ ] 3.1 Confirm on both platforms that a quick solitary tap of the hyperkey sends the configured tap key, that a hold past the threshold sends nothing, and that a `hyper+<key>` chord still works and sends no tap key
+- [x] 3.1 Confirm on both platforms that a quick solitary tap of the hyperkey sends the configured tap key, that a hold past the threshold sends nothing, and that a `hyper+<key>` chord still works and sends no tap key
   - Windows: a clean single-instance run traced a quick CapsLock tap (73ms, no
     other key) as `trigger down -> trigger up, other_key=false -> maybe_send_tap
     decided=true` and emitted Escape. The hold and chord non-tap decisions are
@@ -20,9 +20,18 @@
     hooks left by force-killed test instances (synthesized CapsLock arrived as
     vk=0) until a settle wait cleared them; the clean-room run then showed correct
     vk=20 delivery and the tap firing.
-- [ ] 3.2 Confirm on both platforms that with no tap configured a tap does nothing, and that the tap key does not open the Start menu or leave a modifier stuck
+  - macOS: all three were driven and witnessed by a listen-only tap behind
+    Dango's. A 60ms solitary tap emitted Escape (keycode 53); a 400ms hold
+    emitted nothing; a chord, which is well under the threshold but not
+    solitary, emitted only the chord key and no Escape. `hyper+left` kept
+    running its command throughout.
+- [x] 3.2 Confirm on both platforms that with no tap configured a tap does nothing, and that the tap key does not open the Start menu or leave a modifier stuck
   - Windows: with no tap configured the tap key resolves to 0 and the release
     path returns before sending anything (traced: `tap=0`). The Start-menu
     ordering (Win pressed first, released last) and the modifier release on the
     key's up are unchanged from add-hyperkey's verified behavior, so a tap leaves
-    no modifier stuck. macOS pending.
+    no modifier stuck.
+  - macOS: with the `tap` field removed from the config live, the same 60ms tap
+    emitted nothing. There is no Start-menu equivalent to guard against, and no
+    modifier can be left stuck: the macOS hyperkey adds flags to events passing
+    through rather than pressing modifiers, so there is nothing to release.

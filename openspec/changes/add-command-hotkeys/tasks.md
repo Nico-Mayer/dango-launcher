@@ -18,21 +18,46 @@
 
 ## 4. Verification
 
-- [ ] 4.1 Confirm on both platforms that a command bound in the config runs from its hotkey while another application is focused, and that a no-view command does so without the launcher appearing
+- [x] 4.1 Confirm on both platforms that a command bound in the config runs from its hotkey while another application is focused, and that a no-view command does so without the launcher appearing
   - Windows: with a plain target window focused, ctrl+alt+left ran
     window-management left-half on it (its frame became the exact left half of
-    the work area) while the launcher window stayed hidden. macOS pending.
-- [ ] 4.2 Confirm on both platforms that a view command's hotkey shows the launcher with its view
+    the work area) while the launcher window stayed hidden.
+  - macOS: with the harness's own window focused, ctrl+alt+i ran right-half and
+    ctrl+alt+u ran left-half on it, each landing on the exact half of the work
+    area, while the launcher window count stayed 0 throughout - a no-view
+    command runs without the launcher appearing.
+- [x] 4.2 Confirm on both platforms that a view command's hotkey shows the launcher with its view
   - Windows: ctrl+alt+v, bound to clipboard history (a view command), showed the
-    launcher window. macOS pending.
-- [ ] 4.3 Confirm on both platforms that a snippet or window-management hotkey acts on the window that was focused when the chord was pressed
+    launcher window.
+  - macOS: ctrl+alt+v, bound to clipboard history (a view command), brought the
+    launcher up (window count 1) and left the focused window where it was.
+- [x] 4.3 Confirm on both platforms that a snippet or window-management hotkey acts on the window that was focused when the chord was pressed
   - Windows: the window-management hotkey moved the focused target window, not
-    the launcher, so it acted on the window focused at the press. macOS pending.
-- [ ] 4.4 Confirm on both platforms that adding, changing, and removing a binding in the file applies live
+    the launcher, so it acted on the window focused at the press.
+  - macOS: both window-management hotkeys moved the window that was focused when
+    the chord was pressed, not the launcher. On macOS the headless foreground
+    capture is a no-op, since the frontmost application is the target, and that
+    path is what these runs exercised.
+- [x] 4.4 Confirm on both platforms that adding, changing, and removing a binding in the file applies live
   - Windows: rewriting config.json while running rebound left-half to ctrl+alt+up
     (which then moved the target) and dropped right-half's ctrl+alt+right (which
-    then did nothing), no restart. macOS pending.
+    then did nothing), no restart.
+  - macOS: all three applied live with no restart. Removing left-half's hotkey
+    left ctrl+alt+u doing nothing while ctrl+alt+i kept working; rebinding
+    left-half to ctrl+alt+o made the new chord move the window.
+  - macOS note: ctrl+alt+<arrow> is claimed by the system for Spaces and never
+    reaches Dango, which is why the letter chords are used here. Registration
+    still succeeds, so this is the OS winning at dispatch, not a refusal.
 - [ ] 4.5 Confirm on both platforms that two commands on one chord, a command on the launcher chord, and an OS-refused chord are each surfaced, with the first binding winning and the others reported
   - Windows: dango.log carried all three - top-half and left-half on one chord
     with left-half keeping it, maximize on the launcher chord, and center refused
-    by the OS (the chord was pre-claimed by the harness). macOS pending.
+    by the OS (the chord was pre-claimed by the harness).
+  - macOS: two of the three were surfaced in `dango.log` - top-half and
+    left-half on one chord with left-half keeping it, and maximize on the
+    launcher chord with the launcher keeping it.
+  - macOS: the OS-refused case could not be produced. Carbon's
+    `RegisterEventHotKey` accepted every chord tried that the system already
+    owns (cmd+tab, ctrl+f2, cmd+shift+3, cmd+alt+esc, cmd+space) and reported no
+    error; the system simply wins at dispatch instead. So on macOS a chord
+    another owner holds is not refused and there is nothing to surface, unlike
+    Windows where `RegisterHotKey` fails outright.
