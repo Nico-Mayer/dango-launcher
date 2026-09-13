@@ -46,5 +46,19 @@ Pure storage, validation, and matching, no monitor, so the app stays runnable.
 ## 5. Verification
 
 - [ ] 5.1 Confirm on both platforms that typing a keyword in another application replaces it in place with the snippet's text, and that a keyword typed inside a longer word does not expand
+  - Windows: typing `;sig` into a text field replaced it with the snippet's text,
+    typing `a brb` after a space expanded `brb` in place, and typing `abrb` (the
+    keyword inside a word) did not expand. Driven by SendKeys into a WinForms
+    TextBox whose content was read back from a mirror file. macOS pending.
 - [ ] 5.2 Confirm on both platforms that the buffer is bounded and is cleared on a focus change, a non-character key, a pause, and secure input or a focused password field, and that typing latency in another application stays within budget with the monitor running
+  - Windows: after a keyword split by a several-second pause (`;si`, wait, `g`)
+    nothing expanded, confirming the pause clears the buffer. The bound and the
+    non-character, focus-change, secure, and excluded clears are unit tested; the
+    monitor's callback only translates and hands off, and the per-key work runs on
+    the worker thread. Live latency measurement and secure-field driving were not
+    scripted. macOS pending.
 - [ ] 5.3 Confirm on both platforms that disabling the snippets extension removes the monitor, that an excluded application is skipped, and that a snippet with placeholder arguments is refused a keyword
+  - Windows: disabling the snippets extension live stopped expansion (`;sig`
+    stayed literal). The exclusion check and the placeholder-keyword refusal are
+    unit tested; driving an excluded app and the create-form refusal live were not
+    scripted. macOS pending.
