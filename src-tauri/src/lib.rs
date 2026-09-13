@@ -516,7 +516,7 @@ pub fn platform_attribution() -> Arc<dyn extensions::clipboard::Attribution> {
 /// same chord: Option is Alt.
 fn launcher_shortcut(config: &config::Config) -> Shortcut {
     if let Some(hotkey) = &config.launcher.hotkey {
-        match hotkey.parse() {
+        match hotkey.parse_with_hyper(config.hyper_modifiers()) {
             Ok(parsed) => return Shortcut::new(Some(parsed.modifiers), parsed.code),
             Err(error) => eprintln!("[dango] invalid launcher hotkey, using the default: {error}"),
         }

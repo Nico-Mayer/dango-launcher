@@ -47,9 +47,17 @@
         }
       }
     }
-  }
+  },
 
-  // The hyperkey (a system-wide CapsLock remap) lands in a later release. Its
-  // key is reserved, so a config written for it loads harmlessly today:
-  // "hyperkey": { "key": "capslock" }
+  // A physical key remapped to act as the hyper modifier system-wide, the way
+  // Raycast and Hyperkey do. While it is held, Ctrl+Alt+Shift+Super are in
+  // effect, so a chord like "hyper+left" fires from this one key. Omit the block
+  // to turn it off.
+  "hyperkey": {
+    // The physical key to remap. Defaults to capslock.
+    "key": "capslock",
+    // Whether Shift is part of the combination. Default true. Set false to emit
+    // Ctrl+Alt+Super, which leaves typed characters unshifted.
+    "shift": true
+  }
 }
