@@ -266,19 +266,26 @@ the non-elevated harness.
     insertion lands at the declared caret (`<b>HERE</b>`). A second application
     is the remaining manual step.
 - [ ] 9.6 Confirm on both platforms that activation still meets the 80ms budget on a release build with both new extensions enabled
-  - Windows: release binary built (`npx tauri build --no-bundle`), but the
-    activation timing needs the launcher run interactively with `DANGO_MEASURE=1`,
-    which session 0 cannot do.
+  - Windows: **passes.** Release build with `DANGO_MEASURE=1`, store loaded and
+    both new extensions registered (no load-failure logs). 26 activations by
+    global hotkey: min 19.2ms, median 24.6ms, p90 26.8ms, max 33.0ms, none over
+    80ms. macOS still to confirm for this change.
 - [x] 9.7 Confirm on both platforms that text appears in the target application within 400ms of confirming, measured over repeated pastes
   - macOS: an insertion returns in about 370ms across runs, and roughly 300ms of that is the clipboard restore the user never waits for. The text itself arrives in about 70ms.
 - [ ] 9.8 Confirm on macOS that revoking the Accessibility permission produces the explained failure and the prompt action, and that granting it restores normal behaviour without a restart
 - [ ] 9.9 Confirm on Windows that pasting into an elevated window fails visibly and leaves the clipboard alone
-  - `an_elevated_target_is_refused` in the harness targets a window titled
-    `dango-elevated` and skips itself when the harness is elevated. The integrity
-    primitive it relies on runs (see group 6 note); the paste refusal itself
-    needs a non-elevated session-1 run against an elevated window.
+  - The harness is non-elevated (integrity `0x2000`) and its
+    `an_elevated_target_is_refused` check targets a window titled `dango-elevated`.
+    Outstanding only for want of that window: launching an elevated process is
+    blocked from this session, so the author opens one elevated and reruns to
+    close it.
 - [ ] 9.10 Confirm on both platforms that snippets and quicklinks survive a restart with their names and templates intact
-  - Windows: outstanding; needs the launcher run interactively (see 1.5).
+  - Windows: the release launcher starts, opens by hotkey, and loads the store
+    and both extensions cleanly. Creating a record and reopening after a restart
+    runs through the launcher's own create form, which the harness cannot drive
+    (the same manual check as macOS 9.1), so it stays an author confirmation.
 - [ ] 9.11 Confirm on both platforms that the save form's argument preview catches a pasted doubled-brace expression before it is stored
   - macOS: confirmed by the author, who saved a GitHub Actions expression and later met its argument prompt. Windows outstanding.
-  - Windows: outstanding; needs the launcher run interactively (see 1.5).
+  - Windows: reading the live preview is inside the launcher's webview form, which
+    the harness cannot introspect, so it stays an author confirmation like
+    macOS 9.1. The preview logic itself is shared and unit tested (3.5, 3.6).
