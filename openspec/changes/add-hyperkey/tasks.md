@@ -25,5 +25,20 @@
 ## 6. Verification
 
 - [ ] 6.1 Confirm on both platforms that holding the hyperkey and pressing a bound `hyper+<key>` chord invokes that command while another application is focused, and that the mapped key's own function (the CapsLock toggle) does not occur
+  - Windows: with a target window focused, synthesizing CapsLock-hold + Left ran
+    window-management left-half on it (frame became the exact left half) and the
+    CapsLock toggle state was unchanged before and after. macOS pending.
 - [ ] 6.2 Confirm on both platforms that a lone tap of the hyperkey does nothing, that normal typing without the hyperkey is unchanged, and that a snippet paste still inserts text with the hyperkey enabled
+  - Windows: a lone CapsLock tap moved no window, kept the foreground (so the
+    Start menu did not open from the injected Win), left no modifier down, and
+    did not toggle CapsLock. Normal typing and snippet paste are structurally
+    untouched: the hook passes every non-trigger key straight through, and its
+    own injected events and the paste path both carry `DANGO_INJECTED`, which the
+    hook ignores; a text-field paste was not separately scripted. macOS pending.
 - [ ] 6.3 Confirm on both platforms that adding, removing, and changing the hyperkey in the file apply live without a restart, and that after disabling it or quitting no modifier is left stuck down
+  - Windows: editing the file live to exclude Shift kept the chord firing (the
+    emitted set and the `hyper` chord stayed in agreement), and removing the
+    hyperkey block stopped the hook live, after which CapsLock toggled normally
+    and the chord was dead, with no modifier left down. The reload trace showed
+    each edit dropping the previous hook and starting the new one or none. macOS
+    pending.
