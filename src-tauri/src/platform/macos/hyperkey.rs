@@ -169,21 +169,37 @@ fn send_tap(key: keymap::TapKey) {
     }
 }
 
+/// What `UserKeyMapping` currently holds. It is one machine-wide list, so who
+/// owns it decides whether the hyperkey may take it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Existing {
+    Empty,
+    /// Exactly Dango's own remap, left behind by a previous run that did not
+    /// get to clean up. Reclaimable.
+    Ours,
+    /// Someone else's, such as Karabiner or a hand-written `hidutil` line.
+    Foreign,
+}
+
 /// The `hidutil` remap, held for as long as the hyperkey runs.
 ///
-/// `UserKeyMapping` is one machine-wide list, so Dango only takes it when it is
-/// empty. A user who already has a remap installed (Karabiner, or their own
-/// `hidutil` line) keeps it, and the hyperkey reports unavailable instead of
-/// silently replacing something they set up.
+/// A user who already has a remap installed keeps it, and the hyperkey reports
+/// unavailable rather than silently replacing something they set up. Dango's own
+/// leftover is a different thing entirely: `Drop` does not run when the process
+/// is signalled or killed, so a force-quit always leaves the remap behind, and
+/// treating that as a foreign mapping would disable the hyperkey for good.
 struct Remap;
 
 impl Remap {
     fn apply() -> Option<Self> {
-        if !mapping_is_empty() {
-            eprintln!(
-                "[dango] the hyperkey needs hidutil's UserKeyMapping, which another tool already set"
-            );
-            return None;
+        match existing() {
+            Existing::Foreign => {
+                eprintln!(
+                    "[dango] the hyperkey needs hidutil's UserKeyMapping, which another tool already set"
+                );
+                return None;
+            }
+            Existing::Ours | Existing::Empty => {}
         }
         let mapping = format!(
             r#"{{"UserKeyMapping":[{{"HIDKeyboardModifierMappingSrc":{HID_CAPSLOCK},"HIDKeyboardModifierMappingDst":{HID_F18}}}]}}"#
@@ -205,15 +221,30 @@ fn set_mapping(json: &str) -> bool {
         .is_ok_and(|output| output.status.success())
 }
 
-fn mapping_is_empty() -> bool {
+fn existing() -> Existing {
     std::process::Command::new("hidutil")
         .args(["property", "--get", "UserKeyMapping"])
         .output()
-        .is_ok_and(|output| {
-            let text = String::from_utf8_lossy(&output.stdout);
-            // An unset mapping prints "(null)"; an empty one prints "(\n)".
-            !text.contains("HIDKeyboardModifierMappingSrc")
-        })
+        .map(|output| classify(&String::from_utf8_lossy(&output.stdout)))
+        .unwrap_or(Existing::Foreign)
+}
+
+/// Reads `hidutil`'s printed mapping. An unset mapping prints `(null)` and an
+/// empty one prints an empty list; anything else is one entry per `Src`. Pure,
+/// so the three cases are tested without touching the machine's real mapping.
+fn classify(text: &str) -> Existing {
+    let entries = text.matches("HIDKeyboardModifierMappingSrc").count();
+    if entries == 0 {
+        return Existing::Empty;
+    }
+    let ours = entries == 1
+        && text.contains(&HID_CAPSLOCK.to_string())
+        && text.contains(&HID_F18.to_string());
+    if ours {
+        Existing::Ours
+    } else {
+        Existing::Foreign
+    }
 }
 
 #[cfg(test)]
@@ -249,6 +280,36 @@ mod tests {
     #[test]
     fn a_press_with_another_key_is_not_a_tap() {
         assert!(!should_tap(Duration::from_millis(80), true));
+    }
+
+    #[test]
+    fn an_unset_or_empty_mapping_is_free_to_take() {
+        use super::{classify, Existing};
+        assert_eq!(classify("(null)\n"), Existing::Empty);
+        assert_eq!(classify("(\n)\n"), Existing::Empty);
+    }
+
+    #[test]
+    fn dangos_own_leftover_mapping_is_reclaimed() {
+        use super::{classify, Existing};
+        // What a previous run leaves behind when it is killed before Drop runs.
+        let left_behind = "(\n  {\n    HIDKeyboardModifierMappingDst = 30064771181;\n    \
+                           HIDKeyboardModifierMappingSrc = 30064771129;\n  }\n)";
+        assert_eq!(classify(left_behind), Existing::Ours);
+    }
+
+    #[test]
+    fn another_tools_mapping_is_left_alone() {
+        use super::{classify, Existing};
+        let karabiner = "(\n  {\n    HIDKeyboardModifierMappingDst = 30064771110;\n    \
+                         HIDKeyboardModifierMappingSrc = 30064771129;\n  }\n)";
+        assert_eq!(classify(karabiner), Existing::Foreign);
+
+        let two_entries = "(\n  {\n    HIDKeyboardModifierMappingDst = 30064771181;\n    \
+                           HIDKeyboardModifierMappingSrc = 30064771129;\n  },\n  {\n    \
+                           HIDKeyboardModifierMappingDst = 30064771111;\n    \
+                           HIDKeyboardModifierMappingSrc = 30064771112;\n  }\n)";
+        assert_eq!(classify(two_entries), Existing::Foreign);
     }
 
     #[test]
