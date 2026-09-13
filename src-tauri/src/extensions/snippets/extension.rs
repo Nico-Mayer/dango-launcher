@@ -10,7 +10,8 @@ use std::sync::Arc;
 use async_trait::async_trait;
 
 use crate::extension::{
-    ActionOutcome, CommandDecl, Extension, FormValues, InvocationMode, Manifest, NAMED_ICON,
+    ActionOutcome, CommandDecl, Extension, FormValues, InvocationMode, Manifest, Service,
+    NAMED_ICON,
 };
 use crate::invocation::{Command, InvocationContext};
 use crate::protocol::{
@@ -21,6 +22,7 @@ use crate::search::{Candidate, RootProvider, Source};
 use crate::templates::{Template, Values};
 use crate::text::{TextError, TextTarget};
 
+use super::service::{ExcludedApps, KeywordExpansion};
 use super::store::{Kind, Record, Records};
 
 pub const SNIPPETS_ID: &str = "dango.snippets";
@@ -51,6 +53,7 @@ pub const ACTION_SAVE: &str = "save";
 
 const FIELD_NAME: &str = "name";
 const FIELD_BODY: &str = "body";
+const FIELD_KEYWORD: &str = "keyword";
 /// Prefix for the fields an argument form asks about, so an argument called
 /// "name" cannot collide with the snippet's own name field.
 const ARGUMENT_PREFIX: &str = "arg:";
@@ -63,6 +66,9 @@ pub struct SnippetsExtension {
     text: Option<Arc<dyn TextTarget>>,
     /// Only quicklinks need this, and only so the URL can be opened.
     opener: Option<Arc<dyn OpenUrl>>,
+    /// The keyword-expansion service, only for snippets and only when text can
+    /// be inserted. Its lifetime follows the extension's enabled state.
+    services: Vec<Arc<dyn Service>>,
 }
 
 /// Opening a URL in whatever the user's default browser is. A trait so the
@@ -76,12 +82,22 @@ impl SnippetsExtension {
         records: Arc<Records>,
         text: Option<Arc<dyn TextTarget>>,
         opener: Option<Arc<dyn OpenUrl>>,
+        excluded: ExcludedApps,
     ) -> Self {
+        let services: Vec<Arc<dyn Service>> = match (records.kind(), &text) {
+            (Kind::Snippet, Some(text)) => vec![Arc::new(KeywordExpansion::new(
+                records.clone(),
+                text.clone(),
+                excluded,
+            ))],
+            _ => Vec::new(),
+        };
         Self {
             manifest: manifest(records.kind()),
             records,
             text,
             opener,
+            services,
         }
     }
 
@@ -188,6 +204,10 @@ impl Extension for SnippetsExtension {
         }))
     }
 
+    fn services(&self) -> Vec<Arc<dyn Service>> {
+        self.services.clone()
+    }
+
     fn command(&self, command_id: &str) -> Option<Arc<dyn Command>> {
         match command_id {
             COMMAND_CREATE => Some(Arc::new(ShowForm(None, self.kind()))),
@@ -201,10 +221,12 @@ impl Extension for SnippetsExtension {
             ACTION_SAVE => {
                 let name = values.get(FIELD_NAME).map(String::as_str).unwrap_or("");
                 let body = values.get(FIELD_BODY).map(String::as_str).unwrap_or("");
+                // Absent for a quicklink form, which has no keyword field.
+                let keyword = values.get(FIELD_KEYWORD).map(String::as_str);
                 let saved = if item_id.is_empty() {
-                    self.records.create(name, body).map(|_| ())
+                    self.records.create(name, body, keyword).map(|_| ())
                 } else {
-                    self.records.update(item_id, name, body)
+                    self.records.update(item_id, name, body, keyword)
                 };
                 match saved {
                     Ok(()) => ActionOutcome::Replaced(Box::new(self.list_tree())),
@@ -361,25 +383,35 @@ fn form_tree(record: Option<&Record>, kind: Kind) -> ViewTree {
         Kind::Snippet => ("Snippet", "Save Snippet"),
         Kind::Quicklink => ("URL", "Save Quicklink"),
     };
+    let mut fields = vec![
+        FormField {
+            id: FIELD_NAME.into(),
+            label: "Name".into(),
+            kind: FieldKind::Text,
+            value: record.map(|record| record.name.clone()),
+        },
+        FormField {
+            id: FIELD_BODY.into(),
+            label: body_label.into(),
+            // A template field, so the form shows what it will ask for
+            // while the user is still editing it.
+            kind: FieldKind::Template,
+            value: record.map(|record| record.body.clone()),
+        },
+    ];
+    // Only a snippet expands from a keyword; a quicklink is not typed mid-line.
+    if kind == Kind::Snippet {
+        fields.push(FormField {
+            id: FIELD_KEYWORD.into(),
+            label: "Keyword (optional)".into(),
+            kind: FieldKind::Text,
+            value: record.and_then(|record| record.keyword.clone()),
+        });
+    }
     ViewTree {
         protocol_version: PROTOCOL_VERSION,
         view: View::Form(FormView {
-            fields: vec![
-                FormField {
-                    id: FIELD_NAME.into(),
-                    label: "Name".into(),
-                    kind: FieldKind::Text,
-                    value: record.map(|record| record.name.clone()),
-                },
-                FormField {
-                    id: FIELD_BODY.into(),
-                    label: body_label.into(),
-                    // A template field, so the form shows what it will ask for
-                    // while the user is still editing it.
-                    kind: FieldKind::Template,
-                    value: record.map(|record| record.body.clone()),
-                },
-            ],
+            fields,
             actions: vec![Action {
                 id: ACTION_SAVE.into(),
                 title: save_title.into(),
@@ -535,6 +567,14 @@ mod tests {
                 .push((text.to_string(), caret));
             Ok(())
         }
+        fn expand(
+            &self,
+            _backspaces: usize,
+            text: &str,
+            caret: Option<usize>,
+        ) -> Result<(), TextError> {
+            self.insert(text, caret)
+        }
         fn selection(&self) -> Result<Option<String>, TextError> {
             Ok(self.selection.clone())
         }
@@ -580,6 +620,7 @@ mod tests {
                 records.clone(),
                 Some(target.clone()),
                 Some(opener.clone()),
+                Arc::new(Vec::new),
             ),
             records,
             target,
@@ -632,7 +673,9 @@ mod tests {
     #[tokio::test]
     async fn snippets_are_offered_in_root_search() {
         let f = fixture(Kind::Snippet);
-        f.records.create("Signature", "Best,\n  Nico").unwrap();
+        f.records
+            .create("Signature", "Best,\n  Nico", None)
+            .unwrap();
 
         let provider = f.extension.root_provider().unwrap();
         let candidates = provider.items(String::new()).await;
@@ -650,7 +693,7 @@ mod tests {
     #[tokio::test]
     async fn a_long_snippet_is_cut_rather_than_wrapped() {
         let f = fixture(Kind::Snippet);
-        f.records.create("Long", &"word ".repeat(40)).unwrap();
+        f.records.create("Long", &"word ".repeat(40), None).unwrap();
 
         let candidates = f
             .extension
@@ -667,7 +710,9 @@ mod tests {
     async fn the_provider_answers_within_the_budget_with_five_hundred_snippets() {
         let f = fixture(Kind::Snippet);
         for i in 0..500 {
-            f.records.create(&format!("snippet {i}"), "body").unwrap();
+            f.records
+                .create(&format!("snippet {i}"), "body", None)
+                .unwrap();
         }
 
         let provider = f.extension.root_provider().unwrap();
@@ -685,7 +730,10 @@ mod tests {
     #[test]
     fn confirming_a_snippet_inserts_its_rendered_text() {
         let f = fixture(Kind::Snippet);
-        let id = f.records.create("Date", "Today is {{ date }}.").unwrap();
+        let id = f
+            .records
+            .create("Date", "Today is {{ date }}.", None)
+            .unwrap();
 
         let outcome = f.extension.perform_action(&id, ACTION_INSERT, &no_values());
 
@@ -703,7 +751,7 @@ mod tests {
             ..Default::default()
         });
         let f = fixture_with(Kind::Snippet, target);
-        let id = f.records.create("Wrap", "> {{ clipboard }}").unwrap();
+        let id = f.records.create("Wrap", "> {{ clipboard }}", None).unwrap();
 
         f.extension.perform_action(&id, ACTION_INSERT, &no_values());
 
@@ -717,7 +765,10 @@ mod tests {
             ..Default::default()
         });
         let f = fixture_with(Kind::Snippet, target);
-        let id = f.records.create("Quote", "\"{{ selection }}\"").unwrap();
+        let id = f
+            .records
+            .create("Quote", "\"{{ selection }}\"", None)
+            .unwrap();
 
         f.extension.perform_action(&id, ACTION_INSERT, &no_values());
 
@@ -727,7 +778,10 @@ mod tests {
     #[test]
     fn a_caret_position_survives_to_the_insertion() {
         let f = fixture(Kind::Snippet);
-        let id = f.records.create("Tag", "<b>{{ cursor }}</b>").unwrap();
+        let id = f
+            .records
+            .create("Tag", "<b>{{ cursor }}</b>", None)
+            .unwrap();
 
         f.extension.perform_action(&id, ACTION_INSERT, &no_values());
 
@@ -739,7 +793,7 @@ mod tests {
         let f = fixture(Kind::Snippet);
         let id = f
             .records
-            .create("Greeting", "Dear {{ name }}, about {{ topic }}.")
+            .create("Greeting", "Dear {{ name }}, about {{ topic }}.", None)
             .unwrap();
 
         let outcome = f.extension.perform_action(&id, ACTION_INSERT, &no_values());
@@ -760,7 +814,7 @@ mod tests {
         let f = fixture(Kind::Snippet);
         let id = f
             .records
-            .create("Greeting", "Dear {{ name }}, about {{ topic }}.")
+            .create("Greeting", "Dear {{ name }}, about {{ topic }}.", None)
             .unwrap();
 
         let outcome = f.extension.perform_action(
@@ -776,7 +830,7 @@ mod tests {
     #[test]
     fn an_argument_named_like_the_form_field_does_not_collide() {
         let f = fixture(Kind::Snippet);
-        let id = f.records.create("Hello", "Hi {{ name }}").unwrap();
+        let id = f.records.create("Hello", "Hi {{ name }}", None).unwrap();
 
         // `name` is also the id of the create form's own name field.
         let outcome =
@@ -794,7 +848,7 @@ mod tests {
             ..Default::default()
         });
         let f = fixture_with(Kind::Snippet, target);
-        let id = f.records.create("Signature", "Best, Nico").unwrap();
+        let id = f.records.create("Signature", "Best, Nico", None).unwrap();
 
         let outcome = f.extension.perform_action(&id, ACTION_INSERT, &no_values());
 
@@ -805,7 +859,7 @@ mod tests {
     #[test]
     fn a_snippet_can_be_copied_instead_of_inserted() {
         let f = fixture(Kind::Snippet);
-        let id = f.records.create("Signature", "Best, Nico").unwrap();
+        let id = f.records.create("Signature", "Best, Nico", None).unwrap();
 
         let outcome = f.extension.perform_action(&id, ACTION_COPY, &no_values());
 
@@ -816,8 +870,8 @@ mod tests {
     #[test]
     fn removing_a_snippet_leaves_the_list_open() {
         let f = fixture(Kind::Snippet);
-        let id = f.records.create("Signature", "Best, Nico").unwrap();
-        f.records.create("Other", "text").unwrap();
+        let id = f.records.create("Signature", "Best, Nico", None).unwrap();
+        f.records.create("Other", "text", None).unwrap();
 
         let outcome = f.extension.perform_action(&id, ACTION_REMOVE, &no_values());
 
@@ -846,7 +900,7 @@ mod tests {
     #[test]
     fn saving_over_an_existing_snippet_edits_it() {
         let f = fixture(Kind::Snippet);
-        let id = f.records.create("Signature", "Best, Nico").unwrap();
+        let id = f.records.create("Signature", "Best, Nico", None).unwrap();
 
         f.extension.perform_action(
             &id,
@@ -874,7 +928,7 @@ mod tests {
     #[test]
     fn editing_offers_the_snippet_as_a_template_field() {
         let f = fixture(Kind::Snippet);
-        let id = f.records.create("Signature", "Best, Nico").unwrap();
+        let id = f.records.create("Signature", "Best, Nico", None).unwrap();
 
         let outcome = f.extension.perform_action(&id, ACTION_EDIT, &no_values());
 
@@ -910,7 +964,7 @@ mod tests {
         let f = fixture(Kind::Quicklink);
         let id = f
             .records
-            .create("Docs", "https://example.com/docs")
+            .create("Docs", "https://example.com/docs", None)
             .unwrap();
 
         let outcome = f.extension.perform_action(&id, ACTION_INSERT, &no_values());
@@ -925,7 +979,7 @@ mod tests {
         let f = fixture(Kind::Quicklink);
         let id = f
             .records
-            .create("Search", "https://example.com/s?q={{ query }}&safe=1")
+            .create("Search", "https://example.com/s?q={{ query }}&safe=1", None)
             .unwrap();
 
         f.extension.perform_action(
@@ -945,7 +999,7 @@ mod tests {
         let f = fixture(Kind::Quicklink);
         let id = f
             .records
-            .create("Search", "https://example.com/s?q={{ query }}")
+            .create("Search", "https://example.com/s?q={{ query }}", None)
             .unwrap();
 
         let outcome = f.extension.perform_action(&id, ACTION_INSERT, &no_values());
@@ -966,7 +1020,7 @@ mod tests {
         let f = fixture_with(Kind::Quicklink, target);
         let id = f
             .records
-            .create("Search", "https://example.com/s?q={{ clipboard }}")
+            .create("Search", "https://example.com/s?q={{ clipboard }}", None)
             .unwrap();
 
         let outcome = f.extension.perform_action(&id, ACTION_INSERT, &no_values());
@@ -980,7 +1034,7 @@ mod tests {
         let f = fixture(Kind::Quicklink);
         let id = f
             .records
-            .create("Docs", "https://example.com/docs")
+            .create("Docs", "https://example.com/docs", None)
             .unwrap();
 
         let outcome = f.extension.perform_action(&id, ACTION_COPY, &no_values());
@@ -995,7 +1049,9 @@ mod tests {
     #[tokio::test]
     async fn a_quicklinks_primary_action_reads_as_open() {
         let f = fixture(Kind::Quicklink);
-        f.records.create("Docs", "https://example.com").unwrap();
+        f.records
+            .create("Docs", "https://example.com", None)
+            .unwrap();
 
         let candidates = f
             .extension

@@ -1,6 +1,7 @@
 mod apps;
 mod clipboard;
 mod hyperkey;
+mod keymonitor;
 mod system;
 mod text;
 mod window;
@@ -8,6 +9,7 @@ mod window;
 pub use apps::{icon_for, WindowsAppIndexer};
 pub use clipboard::WindowsAttribution;
 pub use hyperkey::WindowsHyperkey;
+pub use keymonitor::WindowsKeyMonitor;
 pub use system::WindowsSystemControl;
 pub use text::{own_integrity_level, remember_previous_foreground, WindowsHandoff, WindowsKeys};
 pub use window::WindowsWindowManager;
@@ -207,4 +209,71 @@ fn hwnd(window: &WebviewWindow) -> Option<HWND> {
     // Tauri hands back the windows crate HWND, whose inner pointer is exactly
     // the windows-sys HWND, so no conversion is involved.
     Some(window.hwnd().ok()?.0)
+}
+
+/// The foreground application's name, resolved the same way the clipboard names
+/// the copying application, so the one exclusion list matches both. Used to skip
+/// excluded applications and to notice a focus change.
+pub(super) fn foreground_app() -> Option<String> {
+    use windows::Win32::UI::WindowsAndMessaging::{GetForegroundWindow, GetWindowThreadProcessId};
+    unsafe {
+        let hwnd = GetForegroundWindow();
+        if hwnd.0.is_null() {
+            return None;
+        }
+        let mut pid = 0u32;
+        GetWindowThreadProcessId(hwnd, Some(&mut pid));
+        if pid == 0 {
+            return None;
+        }
+        apps::init_com();
+        system::identify(hwnd, pid).map(|identity| identity.name)
+    }
+}
+
+/// Records the current foreground as the previous-foreground the paste settle
+/// waits on. Keyword expansion inserts into the application already focused, so
+/// this points the settle at it.
+pub(super) fn note_insertion_target() {
+    use windows_sys::Win32::UI::WindowsAndMessaging::GetForegroundWindow as GetForegroundWindowSys;
+    unsafe {
+        let foreground = GetForegroundWindowSys();
+        if !foreground.is_null() {
+            text::remember_previous_foreground(foreground as isize);
+        }
+    }
+}
+
+/// A best-effort guess at whether the focused field is a password. Windows has
+/// no reliable signal: this catches only a classic Win32 password edit and
+/// misses browser and other custom fields, which the keyword-expansion spec
+/// records as the honest limitation.
+pub(super) fn focused_field_is_secure() -> bool {
+    use windows_sys::Win32::UI::WindowsAndMessaging::{
+        GetClassNameW, GetForegroundWindow as GetForegroundWindowSys, GetGUIThreadInfo,
+        GetWindowLongPtrW, GetWindowThreadProcessId as GetWindowThreadProcessIdSys, GUITHREADINFO,
+        GWL_STYLE,
+    };
+    const ES_PASSWORD: u32 = 0x0020;
+    unsafe {
+        let foreground = GetForegroundWindowSys();
+        if foreground.is_null() {
+            return false;
+        }
+        let thread = GetWindowThreadProcessIdSys(foreground, std::ptr::null_mut());
+        let mut info: GUITHREADINFO = std::mem::zeroed();
+        info.cbSize = std::mem::size_of::<GUITHREADINFO>() as u32;
+        if GetGUIThreadInfo(thread, &mut info) == 0 || info.hwndFocus.is_null() {
+            return false;
+        }
+        let style = GetWindowLongPtrW(info.hwndFocus, GWL_STYLE) as u32;
+        if style & ES_PASSWORD == 0 {
+            return false;
+        }
+        // ES_PASSWORD is only a password on an Edit control.
+        let mut class = [0u16; 16];
+        let len = GetClassNameW(info.hwndFocus, class.as_mut_ptr(), class.len() as i32);
+        let class = String::from_utf16_lossy(&class[..len.max(0) as usize]);
+        class.eq_ignore_ascii_case("edit")
+    }
 }

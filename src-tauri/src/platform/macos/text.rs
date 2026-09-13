@@ -122,6 +122,15 @@ impl Keys for MacKeys {
         })
     }
 
+    fn backspace(&self, times: usize) -> Result<(), TextError> {
+        self.on_main(move |enigo| {
+            for _ in 0..times {
+                enigo.key(Key::Backspace, Direction::Click)?;
+            }
+            Ok(())
+        })
+    }
+
     fn permitted(&self) -> bool {
         super::accessibility_trusted()
     }

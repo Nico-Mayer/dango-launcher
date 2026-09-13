@@ -30,6 +30,10 @@ pub enum RecordError {
     Gone,
     #[error("the records file is not valid JSON: {0}")]
     Parse(String),
+    #[error("a snippet with a fill-in-the-blank cannot have a keyword")]
+    KeywordNeedsPlainSnippet,
+    #[error("another snippet already uses the keyword '{0}'")]
+    KeywordTaken(String),
 }
 
 /// One snippet or quicklink as the store hands it back.
@@ -39,6 +43,9 @@ pub struct Record {
     pub name: String,
     /// The template text: a snippet's body, or a quicklink's URL.
     pub body: String,
+    /// The snippet's expansion keyword, if it has one. Always `None` for a
+    /// quicklink.
+    pub keyword: Option<String>,
 }
 
 /// Which of the two kinds a store instance owns. They are identical in shape,
@@ -132,8 +139,42 @@ impl Records {
         Ok(())
     }
 
-    pub fn create(&self, name: &str, body: &str) -> Result<String, RecordError> {
+    /// Checks a keyword before it is stored: a snippet whose template needs a
+    /// fill-in-the-blank cannot have one, because expanding in place has no way
+    /// to ask, and no two snippets may share a keyword. `own_id` is the record
+    /// being edited, excluded from the uniqueness check. Returns the normalised
+    /// keyword (trimmed, empty becomes `None`).
+    fn validate_keyword(
+        &self,
+        keyword: Option<&str>,
+        body: &str,
+        own_id: Option<&str>,
+    ) -> Result<Option<String>, RecordError> {
+        let keyword = keyword.map(str::trim).filter(|k| !k.is_empty());
+        let Some(keyword) = keyword else {
+            return Ok(None);
+        };
+        if !Template::parse(body)?.arguments().is_empty() {
+            return Err(RecordError::KeywordNeedsPlainSnippet);
+        }
+        let taken = self.cache.read().unwrap().iter().any(|record| {
+            record_id(record) != own_id
+                && record.get("keyword").and_then(Value::as_str) == Some(keyword)
+        });
+        if taken {
+            return Err(RecordError::KeywordTaken(keyword.to_string()));
+        }
+        Ok(Some(keyword.to_string()))
+    }
+
+    pub fn create(
+        &self,
+        name: &str,
+        body: &str,
+        keyword: Option<&str>,
+    ) -> Result<String, RecordError> {
         self.validate(name, body)?;
+        let keyword = self.validate_keyword(keyword, body, None)?;
         let id = uuid::Uuid::new_v4().to_string();
         let mut record = Map::new();
         record.insert("id".into(), Value::String(id.clone()));
@@ -142,13 +183,23 @@ impl Records {
             self.kind.body_field().into(),
             Value::String(body.to_string()),
         );
+        if let Some(keyword) = keyword {
+            record.insert("keyword".into(), Value::String(keyword));
+        }
         self.cache.write().unwrap().push(record);
         self.persist();
         Ok(id)
     }
 
-    pub fn update(&self, id: &str, name: &str, body: &str) -> Result<(), RecordError> {
+    pub fn update(
+        &self,
+        id: &str,
+        name: &str,
+        body: &str,
+        keyword: Option<&str>,
+    ) -> Result<(), RecordError> {
         self.validate(name, body)?;
+        let keyword = self.validate_keyword(keyword, body, Some(id))?;
         {
             let mut cache = self.cache.write().unwrap();
             let Some(record) = cache.iter_mut().find(|r| record_id(r) == Some(id)) else {
@@ -159,6 +210,14 @@ impl Records {
                 self.kind.body_field().into(),
                 Value::String(body.to_string()),
             );
+            match keyword {
+                Some(keyword) => {
+                    record.insert("keyword".into(), Value::String(keyword));
+                }
+                None => {
+                    record.remove("keyword");
+                }
+            }
         }
         self.persist();
         Ok(())
@@ -207,7 +266,19 @@ impl Records {
             .unwrap_or_default()
             .to_string();
         let id = record_id(record)?.to_string();
-        Some(Record { id, name, body })
+        let keyword = match self.kind {
+            Kind::Snippet => record
+                .get("keyword")
+                .and_then(Value::as_str)
+                .map(str::to_string),
+            Kind::Quicklink => None,
+        };
+        Some(Record {
+            id,
+            name,
+            body,
+            keyword,
+        })
     }
 
     fn persist(&self) {
@@ -270,7 +341,7 @@ mod tests {
     #[test]
     fn a_snippet_is_stored_and_read_back() {
         let records = records(Kind::Snippet);
-        let id = records.create("Signature", "Best, Nico").unwrap();
+        let id = records.create("Signature", "Best, Nico", None).unwrap();
 
         let all = records.all().unwrap();
         assert_eq!(all.len(), 1);
@@ -285,7 +356,7 @@ mod tests {
         std::fs::create_dir_all(&dir).unwrap();
         let id = {
             let records = Records::open(&dir, Kind::Snippet).0;
-            records.create("Signature", "Best, Nico").unwrap()
+            records.create("Signature", "Best, Nico", None).unwrap()
         };
         let reopened = Records::open(&dir, Kind::Snippet).0;
         let all = reopened.all().unwrap();
@@ -296,9 +367,11 @@ mod tests {
     #[test]
     fn a_snippet_is_edited_and_the_old_version_is_not_kept() {
         let records = records(Kind::Snippet);
-        let id = records.create("Signature", "Best, Nico").unwrap();
+        let id = records.create("Signature", "Best, Nico", None).unwrap();
 
-        records.update(&id, "Sign-off", "Regards, Nico").unwrap();
+        records
+            .update(&id, "Sign-off", "Regards, Nico", None)
+            .unwrap();
 
         let all = records.all().unwrap();
         assert_eq!(all.len(), 1, "an edit is not a second snippet");
@@ -309,7 +382,7 @@ mod tests {
     #[test]
     fn a_removed_snippet_is_gone_and_leaves_no_entry() {
         let records = records(Kind::Snippet);
-        let id = records.create("Signature", "Best, Nico").unwrap();
+        let id = records.create("Signature", "Best, Nico", None).unwrap();
 
         records.remove(&id).unwrap();
 
@@ -323,11 +396,11 @@ mod tests {
     #[test]
     fn create_update_and_remove_write_the_file() {
         let records = records(Kind::Snippet);
-        let id = records.create("Signature", "Best, Nico").unwrap();
+        let id = records.create("Signature", "Best, Nico", None).unwrap();
         assert!(std::fs::read_to_string(records.path())
             .unwrap()
             .contains("Signature"));
-        records.update(&id, "Sign-off", "Regards").unwrap();
+        records.update(&id, "Sign-off", "Regards", None).unwrap();
         assert!(std::fs::read_to_string(records.path())
             .unwrap()
             .contains("Sign-off"));
@@ -357,18 +430,18 @@ mod tests {
         std::fs::create_dir_all(&dir).unwrap();
         std::fs::write(
             dir.join("snippets.json"),
-            r#"[{ "id": "a", "name": "Hand", "template": "t", "keyword": ";h" }]"#,
+            r#"[{ "id": "a", "name": "Hand", "template": "t", "color": "blue" }]"#,
         )
         .unwrap();
         let records = Records::open(&dir, Kind::Snippet).0;
         // An edit that does not touch the unknown field keeps it.
-        records.update("a", "Hand", "t2").unwrap();
+        records.update("a", "Hand", "t2", None).unwrap();
         let on_disk = std::fs::read_to_string(records.path()).unwrap();
         assert!(
-            on_disk.contains("keyword"),
+            on_disk.contains("color"),
             "unknown field dropped: {on_disk}"
         );
-        assert!(on_disk.contains(";h"));
+        assert!(on_disk.contains("blue"));
     }
 
     #[test]
@@ -376,7 +449,7 @@ mod tests {
         let dir = std::env::temp_dir().join(format!("dango-records-{}", uuid::Uuid::new_v4()));
         std::fs::create_dir_all(&dir).unwrap();
         let records = Records::open(&dir, Kind::Snippet).0;
-        records.create("Signature", "Best").unwrap();
+        records.create("Signature", "Best", None).unwrap();
         // A bad edit lands; reload keeps the last good set.
         let error = records.reload("{ not an array").unwrap_err();
         assert!(matches!(error, RecordError::Parse(_)));
@@ -387,7 +460,7 @@ mod tests {
     fn a_snippet_needs_a_name() {
         let records = records(Kind::Snippet);
         assert!(matches!(
-            records.create("   ", "Best, Nico"),
+            records.create("   ", "Best, Nico", None),
             Err(RecordError::NoName)
         ));
         assert!(records.all().unwrap().is_empty());
@@ -397,7 +470,7 @@ mod tests {
     fn a_snippet_needs_some_text() {
         let records = records(Kind::Snippet);
         assert!(matches!(
-            records.create("Signature", ""),
+            records.create("Signature", "", None),
             Err(RecordError::NoBody(_))
         ));
         assert!(records.all().unwrap().is_empty());
@@ -406,7 +479,9 @@ mod tests {
     #[test]
     fn a_template_that_will_not_parse_is_refused_where_it_is_written() {
         let records = records(Kind::Snippet);
-        let error = records.create("Broken", "unclosed {{ name").unwrap_err();
+        let error = records
+            .create("Broken", "unclosed {{ name", None)
+            .unwrap_err();
         assert!(matches!(error, RecordError::Template(_)));
         assert!(records.all().unwrap().is_empty());
     }
@@ -415,7 +490,7 @@ mod tests {
     fn editing_something_that_is_gone_says_so() {
         let records = records(Kind::Snippet);
         assert!(matches!(
-            records.update("nope", "Name", "Body"),
+            records.update("nope", "Name", "Body", None),
             Err(RecordError::Gone)
         ));
     }
@@ -427,9 +502,9 @@ mod tests {
         let snippets = Records::open(&dir, Kind::Snippet).0;
         let quicklinks = Records::open(&dir, Kind::Quicklink).0;
 
-        snippets.create("Signature", "Best, Nico").unwrap();
+        snippets.create("Signature", "Best, Nico", None).unwrap();
         quicklinks
-            .create("Search", "https://example.com?q={{ query }}")
+            .create("Search", "https://example.com?q={{ query }}", None)
             .unwrap();
 
         assert_eq!(snippets.all().unwrap().len(), 1);
@@ -442,16 +517,16 @@ mod tests {
     #[test]
     fn a_quicklink_says_it_needs_a_url() {
         let records = records(Kind::Quicklink);
-        let error = records.create("Search", "  ").unwrap_err();
+        let error = records.create("Search", "  ", None).unwrap_err();
         assert_eq!(error.to_string(), "give it a URL");
     }
 
     #[test]
     fn records_come_back_in_name_order_regardless_of_case() {
         let records = records(Kind::Snippet);
-        records.create("zebra", "z").unwrap();
-        records.create("Apple", "a").unwrap();
-        records.create("mango", "m").unwrap();
+        records.create("zebra", "z", None).unwrap();
+        records.create("Apple", "a", None).unwrap();
+        records.create("mango", "m", None).unwrap();
 
         let names: Vec<_> = records
             .all()
@@ -460,5 +535,51 @@ mod tests {
             .map(|record| record.name)
             .collect();
         assert_eq!(names, vec!["Apple", "mango", "zebra"]);
+    }
+
+    #[test]
+    fn a_snippet_stores_and_reads_its_keyword() {
+        let records = records(Kind::Snippet);
+        let id = records
+            .create("Signature", "Best, Nico", Some(";sig"))
+            .unwrap();
+        assert_eq!(records.get(&id).unwrap().keyword.as_deref(), Some(";sig"));
+        // An absent keyword is None, and an empty one is treated as absent.
+        let plain = records.create("Plain", "hi", Some("  ")).unwrap();
+        assert_eq!(records.get(&plain).unwrap().keyword, None);
+    }
+
+    #[test]
+    fn a_keyword_can_be_cleared_on_edit() {
+        let records = records(Kind::Snippet);
+        let id = records
+            .create("Signature", "Best, Nico", Some(";sig"))
+            .unwrap();
+        records
+            .update(&id, "Signature", "Best, Nico", None)
+            .unwrap();
+        assert_eq!(records.get(&id).unwrap().keyword, None);
+    }
+
+    #[test]
+    fn a_keyword_on_a_fill_in_the_blank_is_refused() {
+        let records = records(Kind::Snippet);
+        let error = records
+            .create("Greeting", "Dear {{ name }}", Some(";hi"))
+            .unwrap_err();
+        assert!(matches!(error, RecordError::KeywordNeedsPlainSnippet));
+        // A self-resolving placeholder is not a fill-in-the-blank, so it is fine.
+        assert!(records.create("Today", "{{ date }}", Some(";d")).is_ok());
+    }
+
+    #[test]
+    fn a_duplicate_keyword_is_refused() {
+        let records = records(Kind::Snippet);
+        records.create("One", "first", Some(";sig")).unwrap();
+        let error = records.create("Two", "second", Some(";sig")).unwrap_err();
+        assert!(matches!(error, RecordError::KeywordTaken(k) if k == ";sig"));
+        // Re-saving the same record keeps its own keyword.
+        let id = records.create("Three", "third", Some(";x")).unwrap();
+        assert!(records.update(&id, "Three", "third", Some(";x")).is_ok());
     }
 }

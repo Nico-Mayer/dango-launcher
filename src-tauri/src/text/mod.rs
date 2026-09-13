@@ -37,6 +37,9 @@ pub trait Keys: Send + Sync {
     fn copy(&self) -> Result<(), TextError>;
     fn paste(&self) -> Result<(), TextError>;
     fn caret_left(&self, times: usize) -> Result<(), TextError>;
+    /// Deletes the character before the caret `times` times, for removing a
+    /// typed keyword before its expansion is pasted.
+    fn backspace(&self, times: usize) -> Result<(), TextError>;
     /// macOS gates all of this behind Accessibility. Windows has no equivalent
     /// and always answers true.
     fn permitted(&self) -> bool;
@@ -113,6 +116,10 @@ impl OwnWrites for Unwatched {
 /// without a clipboard, a keyboard, or a window.
 pub trait TextTarget: Send + Sync {
     fn insert(&self, text: &str, caret: Option<usize>) -> Result<(), TextError>;
+    /// Deletes `backspaces` characters before the caret, then inserts `text`.
+    /// For keyword expansion, where the focus is already the target and no
+    /// launcher is involved.
+    fn expand(&self, backspaces: usize, text: &str, caret: Option<usize>) -> Result<(), TextError>;
     fn selection(&self) -> Result<Option<String>, TextError>;
     fn clipboard_text(&self) -> Option<String>;
 }
@@ -120,6 +127,10 @@ pub trait TextTarget: Send + Sync {
 impl TextTarget for TextExchange {
     fn insert(&self, text: &str, caret: Option<usize>) -> Result<(), TextError> {
         TextExchange::insert(self, text, caret)
+    }
+
+    fn expand(&self, backspaces: usize, text: &str, caret: Option<usize>) -> Result<(), TextError> {
+        TextExchange::expand(self, backspaces, text, caret)
     }
 
     fn selection(&self) -> Result<Option<String>, TextError> {
@@ -256,6 +267,49 @@ impl TextExchange {
 
         // A failed paste must leave the clipboard as it was found, so the
         // restore happens either way.
+        let pasted = self.keys.paste();
+        self.handoff.settle_after_paste();
+        if pasted.is_ok() {
+            self.place_caret(text, caret)?;
+        }
+        self.restore(saved, text);
+        pasted
+    }
+
+    /// Replaces a just-typed keyword with `text`: deletes the keyword with
+    /// `backspaces` backspaces, then pastes the text and restores the clipboard.
+    ///
+    /// Unlike `insert`, it neither dismisses a launcher nor yields the
+    /// foreground: keyword expansion happens in the application the user is
+    /// already typing in, so the focus is right and must not be disturbed. The
+    /// backspaces run before the paste, so a keyword that did not match what the
+    /// application held shows as visible text rather than a silent corruption.
+    pub fn expand(
+        &self,
+        backspaces: usize,
+        text: &str,
+        caret: Option<usize>,
+    ) -> Result<(), TextError> {
+        if !self.keys.permitted() {
+            return Err(TextError::PermissionMissing);
+        }
+
+        let saved = self.read_clipboard();
+        // The target is already the foreground here, unlike the launcher case, so
+        // this is a re-assert rather than a focus change. It is still needed: it
+        // is what makes the paste land before the clipboard is restored, the same
+        // ordering the launcher insert relies on. Without it the restore can race
+        // the paste and the user's own clipboard is pasted instead.
+        self.handoff.yield_to_previous()?;
+
+        if backspaces > 0 {
+            self.keys.backspace(backspaces)?;
+        }
+
+        let outgoing = Content::Text(text.to_string());
+        self.own_writes.expect(&outgoing);
+        self.clipboard.set_text(text);
+
         let pasted = self.keys.paste();
         self.handoff.settle_after_paste();
         if pasted.is_ok() {
@@ -422,6 +476,13 @@ mod tests {
             self.events.lock().unwrap().push(format!("left {times}"));
             Ok(())
         }
+        fn backspace(&self, times: usize) -> Result<(), TextError> {
+            self.events
+                .lock()
+                .unwrap()
+                .push(format!("backspace {times}"));
+            Ok(())
+        }
         fn permitted(&self) -> bool {
             self.permitted
         }
@@ -513,6 +574,25 @@ mod tests {
 
     fn holding(text: &str) -> Arc<FakeClipboard> {
         FakeClipboard::holding(Content::Text(text.into()))
+    }
+
+    #[test]
+    fn expanding_backspaces_before_it_pastes_and_leaves_no_launcher_dismiss() {
+        let f = fixture(holding("what the user had"), FakeKeys::working());
+
+        f.exchange.expand(4, "the snippet", None).unwrap();
+
+        // The keyword is deleted before the paste replaces it. Expansion never
+        // dismisses a launcher, but it does re-assert the foreground so the paste
+        // lands before the clipboard is restored.
+        assert_eq!(f.keys.events(), vec!["backspace 4", "paste"]);
+        assert_eq!(f.launcher.dismissals(), 0, "expansion has no launcher");
+        assert_eq!(*f.handoff.yielded.lock().unwrap(), 1);
+        assert_eq!(
+            f.clipboard.now(),
+            Some(Content::Text("what the user had".into())),
+            "the user's clipboard is theirs"
+        );
     }
 
     #[test]

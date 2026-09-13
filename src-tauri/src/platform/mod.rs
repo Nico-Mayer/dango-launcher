@@ -123,6 +123,78 @@ pub fn start_hyperkey(spec: HyperkeySpec) -> Option<Box<dyn Hyperkey>> {
     }
 }
 
+/// One thing the key monitor saw: a printable character the user typed, or an
+/// event that should clear the recent-character buffer, which is any key that is
+/// not a plain character - a control key, an arrow, or a chord with a modifier
+/// other than Shift.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum KeyStroke {
+    Char(char),
+    Clear,
+}
+
+/// A running key monitor. Dropping the handle stops observing.
+pub trait KeyMonitor: Send {}
+
+/// Starts observing keystrokes system-wide, delivering each as a `KeyStroke` to
+/// `sink`, or `None` when it cannot run: the OS refused, or this platform has no
+/// implementation yet. The sink is called on the monitor's own thread and must
+/// return quickly, since it sits on the input path.
+pub fn start_key_monitor(sink: Box<dyn Fn(KeyStroke) + Send>) -> Option<Box<dyn KeyMonitor>> {
+    #[cfg(target_os = "windows")]
+    {
+        windows::WindowsKeyMonitor::start(sink).map(|m| Box::new(m) as Box<dyn KeyMonitor>)
+    }
+    #[cfg(target_os = "macos")]
+    {
+        // The macOS event tap is a later task; keyword expansion reports
+        // unavailable there rather than silently doing nothing.
+        let _ = sink;
+        None
+    }
+}
+
+/// The foreground application's identity, used to skip excluded applications and
+/// to notice a focus change. `None` when it cannot be determined.
+pub fn foreground_app() -> Option<String> {
+    #[cfg(target_os = "windows")]
+    {
+        windows::foreground_app()
+    }
+    #[cfg(target_os = "macos")]
+    {
+        None
+    }
+}
+
+/// Whether the focused field is one the monitor must not act in, such as a
+/// password field. Authoritative on macOS through secure event input; a
+/// best-effort guess on Windows, where the system offers no reliable signal (see
+/// the keyword-expansion spec).
+pub fn focused_field_is_secure() -> bool {
+    #[cfg(target_os = "windows")]
+    {
+        windows::focused_field_is_secure()
+    }
+    #[cfg(target_os = "macos")]
+    {
+        false
+    }
+}
+
+/// Records the current foreground window as the insertion target, so a paste's
+/// settle waits on the right window. The launcher records this when it shows;
+/// keyword expansion has no launcher, so it records it just before expanding. A
+/// no-op where the platform does not need it.
+pub fn note_insertion_target() {
+    #[cfg(target_os = "windows")]
+    {
+        windows::note_insertion_target();
+    }
+    #[cfg(target_os = "macos")]
+    {}
+}
+
 /// The selection and paste path for this platform, or `None` when key injection
 /// is unavailable and nothing here can work.
 ///
@@ -320,6 +392,38 @@ mod tests {
             stopped.load(Ordering::SeqCst),
             "dropping the handle stops it"
         );
+    }
+
+    #[test]
+    fn a_key_monitor_delivers_strokes_and_stops_on_drop() {
+        use super::{KeyMonitor, KeyStroke};
+        let stopped = Arc::new(AtomicBool::new(false));
+        struct FakeMonitor {
+            stopped: Arc<AtomicBool>,
+        }
+        impl KeyMonitor for FakeMonitor {}
+        impl Drop for FakeMonitor {
+            fn drop(&mut self) {
+                self.stopped.store(true, Ordering::SeqCst);
+            }
+        }
+
+        let seen = Arc::new(std::sync::Mutex::new(Vec::new()));
+        let sink_seen = seen.clone();
+        let sink: Box<dyn Fn(KeyStroke) + Send> =
+            Box::new(move |stroke| sink_seen.lock().unwrap().push(stroke));
+        sink(KeyStroke::Char('a'));
+        sink(KeyStroke::Clear);
+        assert_eq!(
+            *seen.lock().unwrap(),
+            vec![KeyStroke::Char('a'), KeyStroke::Clear]
+        );
+
+        let handle: Box<dyn KeyMonitor> = Box::new(FakeMonitor {
+            stopped: stopped.clone(),
+        });
+        drop(handle);
+        assert!(stopped.load(Ordering::SeqCst));
     }
 
     #[test]
