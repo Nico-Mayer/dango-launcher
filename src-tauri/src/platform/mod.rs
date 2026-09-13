@@ -95,11 +95,13 @@ pub struct HyperModifiers {
     pub meta: bool,
 }
 
-/// A hyperkey to install: which key, and what it emits while held.
-#[derive(Clone, Copy, Debug)]
+/// A hyperkey to install: which key, what it emits while held, and an optional
+/// key name to send on a quick, solitary tap.
+#[derive(Clone, Debug)]
 pub struct HyperkeySpec {
     pub trigger: HyperkeyTrigger,
     pub emit: HyperModifiers,
+    pub tap: Option<String>,
 }
 
 /// A running hyperkey remap. Dropping the handle stops the remap and releases

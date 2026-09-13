@@ -700,6 +700,7 @@ fn apply_hyperkey(config: &config::Config, handle: &HyperkeyHandle) -> Option<St
             shift: mods.contains(Modifiers::SHIFT),
             meta: mods.contains(Modifiers::SUPER),
         },
+        tap: hyperkey.tap.clone(),
     };
     match platform::start_hyperkey(spec) {
         Some(running) => {

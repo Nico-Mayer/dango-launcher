@@ -15,14 +15,17 @@
 
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::mpsc::Sender;
+use std::sync::Mutex;
 use std::thread::JoinHandle;
+use std::time::{Duration, Instant};
 
 use windows_sys::Win32::Foundation::{LPARAM, LRESULT, WPARAM};
 use windows_sys::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows_sys::Win32::System::Threading::GetCurrentThreadId;
 use windows_sys::Win32::UI::Input::KeyboardAndMouse::{
-    SendInput, INPUT, INPUT_KEYBOARD, KEYBDINPUT, KEYEVENTF_KEYUP, VIRTUAL_KEY, VK_CAPITAL,
-    VK_LCONTROL, VK_LMENU, VK_LSHIFT, VK_LWIN,
+    SendInput, VkKeyScanW, INPUT, INPUT_KEYBOARD, KEYBDINPUT, KEYEVENTF_KEYUP, VIRTUAL_KEY,
+    VK_BACK, VK_CAPITAL, VK_DELETE, VK_ESCAPE, VK_LCONTROL, VK_LMENU, VK_LSHIFT, VK_LWIN,
+    VK_RETURN, VK_SPACE, VK_TAB,
 };
 use windows_sys::Win32::UI::WindowsAndMessaging::{
     CallNextHookEx, GetMessageW, PostThreadMessageW, SetWindowsHookExW, UnhookWindowsHookEx,
@@ -39,6 +42,16 @@ static EMIT_ALT: AtomicBool = AtomicBool::new(false);
 static EMIT_SHIFT: AtomicBool = AtomicBool::new(false);
 static EMIT_META: AtomicBool = AtomicBool::new(false);
 static HELD: AtomicBool = AtomicBool::new(false);
+/// The key to send on a tap, as a virtual key. 0 means no tap.
+static TAP_VK: AtomicU32 = AtomicU32::new(0);
+/// Whether another key went down while the hyperkey was held, which rules out a
+/// tap. Reset on each fresh press.
+static OTHER_KEY: AtomicBool = AtomicBool::new(false);
+/// When the current press started, for measuring a tap against the threshold.
+static PRESS_AT: Mutex<Option<Instant>> = Mutex::new(None);
+
+/// Longer than this held is a hold, not a tap.
+const TAP_THRESHOLD: Duration = Duration::from_millis(200);
 
 pub struct WindowsHyperkey {
     thread_id: u32,
@@ -55,6 +68,10 @@ impl WindowsHyperkey {
         EMIT_SHIFT.store(spec.emit.shift, Ordering::SeqCst);
         EMIT_META.store(spec.emit.meta, Ordering::SeqCst);
         HELD.store(false, Ordering::SeqCst);
+        OTHER_KEY.store(false, Ordering::SeqCst);
+        *PRESS_AT.lock().unwrap() = None;
+        let tap = spec.tap.as_deref().and_then(tap_vk).unwrap_or(0);
+        TAP_VK.store(tap as u32, Ordering::SeqCst);
         TRIGGER_VK.store(vk, Ordering::SeqCst);
 
         let (report, done) = std::sync::mpsc::channel::<Option<u32>>();
@@ -127,8 +144,10 @@ unsafe extern "system" fn hook_proc(code: i32, wparam: WPARAM, lparam: LPARAM) -
     }
 
     let trigger = TRIGGER_VK.load(Ordering::SeqCst);
+    let message = wparam as u32;
+    let is_down = message == WM_KEYDOWN || message == WM_SYSKEYDOWN;
     if trigger != 0 && info.vkCode == trigger {
-        let edge = match wparam as u32 {
+        let edge = match message {
             WM_KEYDOWN | WM_SYSKEYDOWN => Some(KeyEdge::Down),
             WM_KEYUP | WM_SYSKEYUP => Some(KeyEdge::Up),
             _ => None,
@@ -139,13 +158,80 @@ unsafe extern "system" fn hook_proc(code: i32, wparam: WPARAM, lparam: LPARAM) -
             let (held, emit) = transition(HELD.load(Ordering::SeqCst), edge);
             HELD.store(held, Ordering::SeqCst);
             if emit {
-                emit_modifiers(matches!(edge, KeyEdge::Down));
+                match edge {
+                    KeyEdge::Down => {
+                        // A fresh press: start the tap clock and forget any
+                        // other key from a previous hold.
+                        *PRESS_AT.lock().unwrap() = Some(Instant::now());
+                        OTHER_KEY.store(false, Ordering::SeqCst);
+                        emit_modifiers(true);
+                    }
+                    KeyEdge::Up => {
+                        emit_modifiers(false);
+                        maybe_send_tap();
+                    }
+                }
             }
             return 1; // swallow the key, so CapsLock never toggles
         }
+    } else if is_down && HELD.load(Ordering::SeqCst) {
+        // Another key pressed while the hyperkey is held: this is a chord or
+        // incidental typing, not a solitary tap.
+        OTHER_KEY.store(true, Ordering::SeqCst);
     }
 
     CallNextHookEx(std::ptr::null_mut(), code, wparam, lparam)
+}
+
+/// Sends the tap key if the press just ended qualifies: a tap key is configured,
+/// no other key was pressed while held, and the hold was under the threshold.
+unsafe fn maybe_send_tap() {
+    let tap = TAP_VK.load(Ordering::SeqCst);
+    if tap == 0 {
+        return;
+    }
+    let elapsed = PRESS_AT
+        .lock()
+        .unwrap()
+        .take()
+        .map(|at| at.elapsed())
+        .unwrap_or(TAP_THRESHOLD);
+    if should_tap(elapsed, OTHER_KEY.load(Ordering::SeqCst)) {
+        send_key(tap as VIRTUAL_KEY, true);
+        send_key(tap as VIRTUAL_KEY, false);
+    }
+}
+
+/// Whether a just-ended press was a tap: solitary and shorter than the
+/// threshold. Pure, so the decision is tested without the hook.
+fn should_tap(elapsed: Duration, other_key: bool) -> bool {
+    !other_key && elapsed < TAP_THRESHOLD
+}
+
+/// Resolves a tap key name in the launcher grammar to a virtual key. A named key
+/// from a small set, or a single character through the current layout; an
+/// unknown name returns `None`, which disables the tap.
+fn tap_vk(name: &str) -> Option<u16> {
+    let name = name.trim().to_ascii_lowercase();
+    Some(match name.as_str() {
+        "escape" | "esc" => VK_ESCAPE,
+        "tab" => VK_TAB,
+        "enter" | "return" => VK_RETURN,
+        "space" => VK_SPACE,
+        "backspace" => VK_BACK,
+        "delete" | "del" => VK_DELETE,
+        _ => {
+            let mut chars = name.chars();
+            let (Some(c), None) = (chars.next(), chars.next()) else {
+                return None;
+            };
+            let scan = unsafe { VkKeyScanW(c as u16) };
+            if scan == -1 {
+                return None;
+            }
+            (scan as u16) & 0x00FF
+        }
+    })
 }
 
 #[derive(Clone, Copy)]
@@ -217,7 +303,31 @@ unsafe fn send_key(vk: VIRTUAL_KEY, down: bool) {
 
 #[cfg(test)]
 mod tests {
-    use super::{transition, KeyEdge};
+    use super::{should_tap, tap_vk, transition, KeyEdge, TAP_THRESHOLD};
+    use std::time::Duration;
+
+    #[test]
+    fn a_short_solitary_press_is_a_tap() {
+        assert!(should_tap(Duration::from_millis(80), false));
+    }
+
+    #[test]
+    fn a_long_press_is_not_a_tap() {
+        assert!(!should_tap(TAP_THRESHOLD + Duration::from_millis(1), false));
+    }
+
+    #[test]
+    fn a_press_with_another_key_is_not_a_tap() {
+        assert!(!should_tap(Duration::from_millis(80), true));
+    }
+
+    #[test]
+    fn tap_key_names_resolve() {
+        assert_eq!(tap_vk("escape"), tap_vk("esc"));
+        assert!(tap_vk("escape").is_some());
+        assert!(tap_vk("tab").is_some());
+        assert!(tap_vk("not-a-key").is_none());
+    }
 
     #[test]
     fn first_down_presses_and_repeats_do_not() {

@@ -58,6 +58,10 @@ pub struct Hyperkey {
     /// Ctrl+Alt+Super, which leaves typed characters unshifted.
     #[serde(default = "default_true", skip_serializing_if = "is_true")]
     pub shift: bool,
+    /// A key to send on a quick, solitary tap of the hyperkey, in the launcher
+    /// grammar (for example `escape`). Absent means a tap does nothing.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tap: Option<String>,
     #[serde(flatten)]
     pub extra: Map<String, Value>,
 }
@@ -67,6 +71,7 @@ impl Default for Hyperkey {
         Self {
             key: default_hyperkey_key(),
             shift: true,
+            tap: None,
             extra: Map::new(),
         }
     }
@@ -262,6 +267,21 @@ mod tests {
             config.hyper_modifiers(),
             Modifiers::CONTROL | Modifiers::ALT | Modifiers::SHIFT | Modifiers::SUPER
         );
+    }
+
+    #[test]
+    fn a_hyperkey_tap_key_parses_and_round_trips() {
+        let config =
+            Config::parse(r#"{ "hyperkey": { "key": "capslock", "tap": "escape" } }"#).unwrap();
+        assert_eq!(
+            config.hyperkey.as_ref().unwrap().tap.as_deref(),
+            Some("escape")
+        );
+        let again = Config::parse(&config.to_json()).unwrap();
+        assert_eq!(again.hyperkey.unwrap().tap.as_deref(), Some("escape"));
+        // Absent means no tap.
+        let plain = Config::parse(r#"{ "hyperkey": { "key": "capslock" } }"#).unwrap();
+        assert_eq!(plain.hyperkey.unwrap().tap, None);
     }
 
     #[test]

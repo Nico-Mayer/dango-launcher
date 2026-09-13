@@ -58,6 +58,10 @@
     "key": "capslock",
     // Whether Shift is part of the combination. Default true. Set false to emit
     // Ctrl+Alt+Super, which leaves typed characters unshifted.
-    "shift": true
+    "shift": true,
+    // A key to send on a quick, solitary tap of the hyperkey. A hold, or a press
+    // combined with another key, still acts as the hyper modifier. Omit for no
+    // tap action. A common setup is Escape on tap, hyper on hold.
+    "tap": "escape"
   }
 }
