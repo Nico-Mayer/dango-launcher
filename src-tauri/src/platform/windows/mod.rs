@@ -2,11 +2,13 @@ mod apps;
 mod clipboard;
 mod system;
 mod text;
+mod window;
 
 pub use apps::{icon_for, WindowsAppIndexer};
 pub use clipboard::WindowsAttribution;
 pub use system::WindowsSystemControl;
 pub use text::{own_integrity_level, remember_previous_foreground, WindowsHandoff, WindowsKeys};
+pub use window::WindowsWindowManager;
 
 use tauri::WebviewWindow;
 use windows_sys::Win32::Foundation::{FALSE, HWND, TRUE};

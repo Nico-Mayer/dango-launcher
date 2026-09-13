@@ -51,7 +51,7 @@ pub fn remember_previous_foreground(hwnd: isize) {
     PREVIOUS_FOREGROUND.store(hwnd, Ordering::SeqCst);
 }
 
-fn previous_foreground() -> Option<HWND> {
+pub(super) fn previous_foreground() -> Option<HWND> {
     match PREVIOUS_FOREGROUND.load(Ordering::SeqCst) {
         0 => None,
         hwnd => Some(hwnd as HWND),
@@ -186,7 +186,7 @@ impl Handoff for WindowsHandoff {
 /// and read a refusal as "elevated". That was wrong and only showed at runtime:
 /// that access right is granted across integrity levels by design, so the open
 /// always succeeded and every elevated window read as reachable.
-fn is_out_of_reach(hwnd: HWND) -> bool {
+pub(super) fn is_out_of_reach(hwnd: HWND) -> bool {
     unsafe {
         let mut pid: u32 = 0;
         GetWindowThreadProcessId(hwnd, &mut pid);
