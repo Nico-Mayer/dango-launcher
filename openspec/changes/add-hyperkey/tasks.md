@@ -6,12 +6,12 @@
 
 ## 2. The platform service
 
-- [ ] 2.1 Define a `Hyperkey` platform trait with a start-from-config entry point returning a stop-on-drop handle, plus a no-op fallback that reports unavailable like key injection does, and verify it compiles on every target with a fake exercising start and stop
+- [x] 2.1 Define a `Hyperkey` platform trait with a start-from-config entry point returning a stop-on-drop handle, plus a no-op fallback that reports unavailable like key injection does, and verify it compiles on every target with a fake exercising start and stop
 
 ## 3. Windows implementation
 
-- [ ] 3.1 Implement the Windows `Hyperkey` with a `WH_KEYBOARD_LL` hook on a dedicated pumped thread: swallow the mapped key, synthesize the four hyper modifiers (`VK_LCONTROL`, `VK_LMENU`, `VK_LSHIFT`, `VK_LWIN`) on its down and up marked `DANGO_INJECTED`, and pass through its own injected events and all other events, and verify it builds and clippy is clean on Windows
-- [ ] 3.2 Track held state so an auto-repeat down does not re-synthesize, and release all synthesized modifiers when the handle stops so none are ever left down, and verify the held-state and release logic with a unit test over the pure state transitions
+- [x] 3.1 Implement the Windows `Hyperkey` with a `WH_KEYBOARD_LL` hook on a dedicated pumped thread: swallow the mapped key, synthesize the four hyper modifiers (`VK_LCONTROL`, `VK_LMENU`, `VK_LSHIFT`, `VK_LWIN`) on its down and up marked `DANGO_INJECTED`, and pass through its own injected events and all other events, and verify it builds and clippy is clean on Windows
+- [x] 3.2 Track held state so an auto-repeat down does not re-synthesize, and release all synthesized modifiers when the handle stops so none are ever left down, and verify the held-state and release logic with a unit test over the pure state transitions
 
 ## 4. macOS implementation
 
@@ -19,8 +19,8 @@
 
 ## 5. Startup and live reload
 
-- [ ] 5.1 Start the hyperkey from the initial config at startup, after the launcher and command hotkeys are registered, holding the handle for its lifetime, and verify the app runs with a configured hyperkey
-- [ ] 5.2 Extend `apply_config_reload` to stop the current hyperkey and start a fresh one from the new config, so enabling, disabling, and changing the key apply live, and verify the existing suite, clippy, and fmt are all clean
+- [x] 5.1 Start the hyperkey from the initial config at startup, after the launcher and command hotkeys are registered, holding the handle for its lifetime, and verify the app runs with a configured hyperkey
+- [x] 5.2 Extend `apply_config_reload` to stop the current hyperkey and start a fresh one from the new config, so enabling, disabling, and changing the key apply live, and verify the existing suite, clippy, and fmt are all clean
 
 ## 6. Verification
 

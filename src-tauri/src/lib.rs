@@ -585,6 +585,7 @@ fn apply_config_reload(
     file_config: &Arc<config::FileConfig>,
     launcher_hotkey: &Arc<Mutex<Shortcut>>,
     bindings: &Arc<Mutex<Vec<(Shortcut, String)>>>,
+    hyperkey: &HyperkeyHandle,
     result: Result<config::Config, config::ConfigError>,
 ) {
     let config = match result {
@@ -627,7 +628,11 @@ fn apply_config_reload(
     let conflicts = {
         let config = file_config.shared();
         let config = config.read().unwrap();
-        apply_command_hotkeys(app, &config, new_shortcut, bindings)
+        let mut conflicts = apply_command_hotkeys(app, &config, new_shortcut, bindings);
+        if let Some(message) = apply_hyperkey(&config, hyperkey) {
+            conflicts.push(message);
+        }
+        conflicts
     };
     for conflict in &conflicts {
         log_config(conflict);
@@ -665,6 +670,49 @@ fn apply_command_hotkeys(
     conflicts
 }
 
+/// The running hyperkey, held for the app's lifetime and swapped on a reload.
+type HyperkeyHandle = Arc<Mutex<Option<Box<dyn platform::Hyperkey>>>>;
+
+/// Keeps the hyperkey handle in Tauri state so it lives as long as the app.
+struct HyperkeyState(#[allow(dead_code)] HyperkeyHandle);
+
+/// (Re)starts the hyperkey from a config: drops the current one, which stops its
+/// hook and releases any modifiers it holds, then starts a fresh one if the
+/// config asks for it. Returns a message to surface when a configured hyperkey
+/// could not start.
+fn apply_hyperkey(config: &config::Config, handle: &HyperkeyHandle) -> Option<String> {
+    let mut current = handle.lock().unwrap();
+    *current = None;
+
+    let hyperkey = config.hyperkey.as_ref()?;
+    let Some(trigger) = platform::HyperkeyTrigger::from_key(&hyperkey.key) else {
+        return Some(format!(
+            "hyperkey: '{}' is not a remappable key",
+            hyperkey.key
+        ));
+    };
+    let mods = config.hyper_modifiers();
+    let spec = platform::HyperkeySpec {
+        trigger,
+        emit: platform::HyperModifiers {
+            ctrl: mods.contains(Modifiers::CONTROL),
+            alt: mods.contains(Modifiers::ALT),
+            shift: mods.contains(Modifiers::SHIFT),
+            meta: mods.contains(Modifiers::SUPER),
+        },
+    };
+    match platform::start_hyperkey(spec) {
+        Some(running) => {
+            *current = Some(running);
+            None
+        }
+        None => Some(
+            "hyperkey: could not start; unavailable on this platform or refused by the OS"
+                .to_string(),
+        ),
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let config_path = config::config_path();
@@ -685,6 +733,7 @@ pub fn run() {
     // dispatches on a press and a reload can rebuild the set.
     let bindings: Arc<Mutex<Vec<(Shortcut, String)>>> = Arc::new(Mutex::new(Vec::new()));
     let handler_bindings = bindings.clone();
+    let hyperkey: HyperkeyHandle = Arc::new(Mutex::new(None));
 
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
@@ -967,6 +1016,18 @@ pub fn run() {
                 }
             }
 
+            // Start the hyperkey from the config, kept alive in state so it runs
+            // even if config watching later fails to start.
+            {
+                let config = file_config.shared();
+                let config = config.read().unwrap();
+                if let Some(message) = apply_hyperkey(&config, &hyperkey) {
+                    log_config(&message);
+                    notices.push("Hyperkey unavailable, see log".to_string());
+                }
+            }
+            app.manage(HyperkeyState(hyperkey.clone()));
+
             let notice_items = notices
                 .iter()
                 .enumerate()
@@ -1003,6 +1064,7 @@ pub fn run() {
                 let file_config = file_config.clone();
                 let launcher_hotkey = launcher_hotkey.clone();
                 let bindings = bindings.clone();
+                let hyperkey = hyperkey.clone();
                 let started = config::watch::watch(
                     config::config_path(),
                     file_config.own_write(),
@@ -1011,12 +1073,14 @@ pub fn run() {
                         let file_config = file_config.clone();
                         let launcher_hotkey = launcher_hotkey.clone();
                         let bindings = bindings.clone();
+                        let hyperkey = hyperkey.clone();
                         let _ = app.clone().run_on_main_thread(move || {
                             apply_config_reload(
                                 &app,
                                 &file_config,
                                 &launcher_hotkey,
                                 &bindings,
+                                &hyperkey,
                                 config::Config::parse(&text),
                             );
                         });
