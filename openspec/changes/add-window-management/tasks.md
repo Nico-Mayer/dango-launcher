@@ -84,17 +84,17 @@ application was still the one behind it.
     `MainThread` hop and `platform::window_manager` now takes one. Windows
     ignores it. Accessibility itself needs no hop.
   - Ordered left-to-right then top-to-bottom, the same order Windows uses.
-- [ ] 5.3 Report the missing Accessibility permission through the state M3 built and offer the prompt, verified by revoking the permission and running a command
+- [x] 5.3 Report the missing Accessibility permission through the state M3 built and offer the prompt, verified by revoking the permission and running a command
   - Implemented. `AXIsProcessTrusted` gates every call, and a missing permission
     shows the system prompt and returns `WindowError::Failed` explaining it, so
     the command reports rather than doing nothing. M3's two helpers moved from
     `macos/text.rs` up to `macos/mod.rs`, so the paste path and this share one
     check and one prompt instead of two copies.
-  - Not verified live. Revoking Accessibility is a System Settings step, and it
-    cannot be faked from here: a copy of the harness at a fresh path, and one
-    re-signed under a different identifier, both stayed trusted, because an
-    unsigned binary launched from a terminal inherits the terminal's grant as
-    its responsible process. Needs a by-hand revoke and regrant (6.6).
+  - Confirmed by the author, by revoking and regranting in System Settings. It
+    could not be faked from a harness: a copy at a fresh path, and one re-signed
+    under a different identifier, both stayed trusted, because an unsigned
+    binary launched from a terminal inherits the terminal's grant as its
+    responsible process.
 - [x] 5.4 On macOS, verify by hand: each region lands correctly against the visible frame, maximise leaves the menu bar and dock, and centre keeps the size
   - `examples/window_walkthrough` now has a macOS half, and it runs every
     placement check once per display. 32 of 32 against a scratch TextEdit
@@ -143,7 +143,7 @@ application was still the one behind it.
   - macOS: confirmed against TextEdit and Finder, two applications with
     different window shapes and minimum sizes, and on each of two displays.
     Every region flush in all four combinations.
-- [ ] 6.2 Confirm on both platforms that move-to-next-display moves the window and keeps its relative region, including across displays of different DPI scale
+- [x] 6.2 Confirm on both platforms that move-to-next-display moves the window and keeps its relative region, including across displays of different DPI scale
   - Windows: confirmed, including across displays of different DPI scale
     (5120x2160 and 1440x2560).
   - macOS: the move is confirmed across two displays of very different size, a
@@ -151,22 +151,21 @@ application was still the one behind it.
     points). A left-half window arrives as a left-half window on the other
     display's work area, and every region was then checked on each display in
     turn.
-  - **The different-scale half is still not covered.** Both displays report a
-    backing scale of 2, so no mixed-scale pair was available. It needs a
-    display running at scale 1 next to the built-in panel. Worth saying what is
-    and is not at risk: Accessibility speaks logical points in one global space,
-    so a display's scale never enters the arithmetic here, which is exactly the
-    mechanism the Windows DPI finding came from and exactly what macOS does not
-    have.
-- [ ] 6.3 Confirm on both platforms that a command acts on the window that was focused before the launcher, never the launcher itself
+  - The different-scale half was confirmed by the author; the harness could not
+    reach it, because both displays report a backing scale of 2. Worth recording
+    why it was never the risk it was on Windows: Accessibility speaks logical
+    points in one global space, so a display's scale never enters the arithmetic
+    here. That is exactly the mechanism the Windows DPI finding came from, and
+    exactly what macOS does not have.
+- [x] 6.3 Confirm on both platforms that a command acts on the window that was focused before the launcher, never the launcher itself
   - Windows: confirmed end to end; Left Half from the launcher moved the
     previously focused window, not the launcher.
   - macOS: the half that can be checked without the interface is confirmed. With
     the launcher shown and its window on screen, the frontmost application was
     still the one behind it, which is the window `target` picks. The manager also
-    refuses its own process outright. Running Left Half from root search is still
-    a by-hand step, for the same reason M3 recorded: keystrokes cannot be
-    delivered to a non-activating panel from a harness.
+    refuses its own process outright. Running Left Half from root search stayed a
+    by-hand step, for the same reason M3 recorded (keystrokes cannot be delivered
+    to a non-activating panel from a harness), and the author confirmed it.
 - [x] 6.4 Confirm on both platforms that a window arrangement completes within 100ms of confirming
   - Windows: confirmed; `place` returns in under 2ms, well inside 100ms.
   - macOS: confirmed; `place` returns in well under 1ms against TextEdit and
@@ -176,10 +175,8 @@ application was still the one behind it.
 - [ ] 6.5 Confirm on Windows that tiling an elevated window fails visibly and leaves it unchanged
   - Needs a `dango-elevated` window opened elevated (a UAC step); the harness
     check skips without it. The refusal path is M3-verified (9.9).
-- [ ] 6.6 Confirm on macOS that revoking Accessibility produces the explained failure and the prompt, and that granting it restores normal behaviour without a restart
-  - The path is implemented (5.3) but needs a by-hand revoke in System Settings.
-    It could not be faked: an unsigned binary run from a terminal inherits that
-    terminal's grant, so neither a copy at a fresh path nor a re-signed copy came
-    up untrusted. `examples/window_walkthrough` detects an untrusted process and
-    reports what `target` and `place` return, so the check is one run once the
-    permission is actually off.
+- [x] 6.6 Confirm on macOS that revoking Accessibility produces the explained failure and the prompt, and that granting it restores normal behaviour without a restart
+  - Confirmed by the author: revoking produces the explained failure and the
+    prompt, and granting it again restores normal behaviour with no restart.
+    `examples/window_walkthrough` also detects an untrusted process and reports
+    what `target` and `place` return, for whoever has to check this next.
