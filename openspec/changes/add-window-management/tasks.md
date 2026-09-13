@@ -96,10 +96,12 @@ application was still the one behind it.
     unsigned binary launched from a terminal inherits the terminal's grant as
     its responsible process. Needs a by-hand revoke and regrant (6.6).
 - [x] 5.4 On macOS, verify by hand: each region lands correctly against the visible frame, maximise leaves the menu bar and dock, and centre keeps the size
-  - `examples/window_walkthrough` now has a macOS half. 17 of 17 against a
-    scratch TextEdit document, 16 of 16 against a Finder window (the
-    seventeenth does not apply, below). Every half, quarter and third lands
-    flush, maximise equals the work area, and centre keeps the size exactly.
+  - `examples/window_walkthrough` now has a macOS half, and it runs every
+    placement check once per display. 32 of 32 against a scratch TextEdit
+    document and 31 of 31 against a Finder window (the thirty-second does not
+    apply, below), across a built-in Retina panel and a Dell U4025QW. Every
+    half, quarter and third lands flush on both, maximise equals the work area,
+    and centre keeps the size exactly.
   - Frames are read back by asking System Events, so the answer comes from a
     different process than the one that wrote it. Direct Apple Events to the
     target application were tried first and time out without an Automation
@@ -112,6 +114,21 @@ application was still the one behind it.
     rather than something the code derived, and the primary screen's work area
     starts exactly where it ends: menu bar 1512x33 at the origin, work area top
     33. An inverted flip would put the work area top at zero and fail.
+  - **An `NSScreen` finding, and the one real bug this run caught.** A process
+    that is not an AppKit application gets a different answer from
+    `visibleFrame`: it subtracts the menu bar only on the display currently
+    showing one, and reports every other display as if it had none. The Dell
+    came back thirty points too tall, so a placement there asked for the top of
+    the screen and the window server pushed it down thirty points, which would
+    have put a top half and a bottom half thirty points into each other. Dango
+    is an AppKit application and never saw this; the harness was not one, so it
+    now wakes the shared application as an accessory before reading screens.
+    Worth remembering for any future harness that reads `NSScreen`.
+  - **A second harness trap.** A run of quick moves makes the system's own
+    window-tiling hint flash up, and while it is there it is the target
+    application's window 1, so the read back came out as an 84 by 77 rectangle
+    that is not the window. The harness now asks for the `AXStandardWindow`
+    instead of window 1.
   - **A Finder finding, recorded.** Closing Finder's last window never produces
     "no window to move": the desktop is a window and stays focused, so `target`
     answers with the full screen. Harmless, since a placement then acts on the
@@ -124,16 +141,23 @@ application was still the one behind it.
   - Windows: confirmed by the walkthrough against a real window in two
     applications' worth of sizes; every region lands flush.
   - macOS: confirmed against TextEdit and Finder, two applications with
-    different window shapes and minimum sizes. Every region flush in both.
+    different window shapes and minimum sizes, and on each of two displays.
+    Every region flush in all four combinations.
 - [ ] 6.2 Confirm on both platforms that move-to-next-display moves the window and keeps its relative region, including across displays of different DPI scale
   - Windows: confirmed, including across displays of different DPI scale
     (5120x2160 and 1440x2560).
-  - macOS: not run. Only one display was attached, so the harness skipped it.
-    Needs a second display, ideally one non-Retina next to the built-in Retina
-    panel, to answer the mixed-scale half of this. Note that the macOS side has
-    less to get wrong than Windows did: Accessibility speaks logical points in
-    one global space, so a display's scale never enters the arithmetic, which is
-    exactly where the Windows DPI finding came from.
+  - macOS: the move is confirmed across two displays of very different size, a
+    built-in Retina panel (1512x982 points) and a Dell U4025QW (3840x1620
+    points). A left-half window arrives as a left-half window on the other
+    display's work area, and every region was then checked on each display in
+    turn.
+  - **The different-scale half is still not covered.** Both displays report a
+    backing scale of 2, so no mixed-scale pair was available. It needs a
+    display running at scale 1 next to the built-in panel. Worth saying what is
+    and is not at risk: Accessibility speaks logical points in one global space,
+    so a display's scale never enters the arithmetic here, which is exactly the
+    mechanism the Windows DPI finding came from and exactly what macOS does not
+    have.
 - [ ] 6.3 Confirm on both platforms that a command acts on the window that was focused before the launcher, never the launcher itself
   - Windows: confirmed end to end; Left Half from the launcher moved the
     previously focused window, not the launcher.
@@ -145,9 +169,10 @@ application was still the one behind it.
     delivered to a non-activating panel from a harness.
 - [x] 6.4 Confirm on both platforms that a window arrangement completes within 100ms of confirming
   - Windows: confirmed; `place` returns in under 2ms, well inside 100ms.
-  - macOS: confirmed; `place` returns in 2.7ms against TextEdit and 30ms against
-    Finder, both inside 100ms. Finder is the slower one because each
-    Accessibility write is a round trip into the application.
+  - macOS: confirmed; `place` returns in well under 1ms against TextEdit and
+    about 1ms against Finder, both far inside 100ms. A first Accessibility
+    write into a cold application is slower, around 30ms, because each write is
+    a round trip; still inside the budget.
 - [ ] 6.5 Confirm on Windows that tiling an elevated window fails visibly and leaves it unchanged
   - Needs a `dango-elevated` window opened elevated (a UAC step); the harness
     check skips without it. The refusal path is M3-verified (9.9).
