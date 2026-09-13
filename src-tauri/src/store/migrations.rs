@@ -5,6 +5,7 @@ pub const MIGRATIONS: &[&str] = &[
     include_str!("migrations/0002_clipboard_history.sql"),
     include_str!("migrations/0003_snippets.sql"),
     include_str!("migrations/0004_drop_config_tables.sql"),
+    include_str!("migrations/0005_drop_records_tables.sql"),
 ];
 
 #[derive(Debug, thiserror::Error)]
@@ -74,7 +75,7 @@ mod tests {
             assert!(table_exists(&connection, table), "{table} missing");
         }
         // The configuration tables were retired by migration 0004.
-        for table in ["extension_state", "preferences"] {
+        for table in ["extension_state", "preferences", "snippets", "quicklinks"] {
             assert!(!table_exists(&connection, table), "{table} should be gone");
         }
     }

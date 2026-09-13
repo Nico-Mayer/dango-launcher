@@ -764,16 +764,44 @@ pub fn run() {
                 eprintln!("[dango] no database, so clipboard history is off");
             }
 
-            if let Some(store) = &store {
-                // Both kinds share one store and one extension type; they
-                // differ in which table they own and what they do on confirm.
+            {
+                // Snippets and quicklinks are file-backed now, so they load from
+                // the config directory rather than the database and share one
+                // extension type, differing in their file and what they do on
+                // confirm.
                 let exchange: Option<Arc<dyn text::TextTarget>> = app
                     .try_state::<Arc<TextExchange>>()
                     .map(|state| state.inner().clone() as Arc<dyn text::TextTarget>);
                 let opener: Arc<dyn snippets::OpenUrl> =
                     Arc::new(DefaultBrowser(app.handle().clone()));
+                let records_dir = config::config_dir();
                 for kind in [snippets::Kind::Snippet, snippets::Kind::Quicklink] {
-                    let records = Arc::new(snippets::Records::new(store.clone(), kind));
+                    let (records, load_error) = snippets::Records::open(&records_dir, kind);
+                    if let Some(error) = load_error {
+                        log_config(&format!("{}: {error}", kind.file_name()));
+                        notices.push(format!("{} has an error, see log", kind.file_name()));
+                    }
+                    // Apply hand-edits to the file live, on the main thread for
+                    // the tray, keeping the last good records on a parse failure.
+                    {
+                        let records = records.clone();
+                        let handle = app.handle().clone();
+                        let file = kind.file_name();
+                        config::watch::watch(
+                            records.path().to_path_buf(),
+                            records.own_write(),
+                            move |text| {
+                                if let Err(error) = records.reload(&text) {
+                                    let handle = handle.clone();
+                                    let message = format!("{file}: {error}");
+                                    let _ = handle.clone().run_on_main_thread(move || {
+                                        log_config(&message);
+                                        set_config_status(&handle, true);
+                                    });
+                                }
+                            },
+                        );
+                    }
                     let extension = Arc::new(SnippetsExtension::new(
                         records,
                         exchange.clone(),
@@ -785,8 +813,6 @@ pub fn run() {
                         Err(error) => eprintln!("[dango] {kind:?} failed to load: {error}"),
                     }
                 }
-            } else {
-                eprintln!("[dango] no database, so snippets and quicklinks are off");
             }
 
             let system = Arc::new(SystemExtension::new(
@@ -874,12 +900,17 @@ pub fn run() {
                 let started = config::watch::watch(
                     config::config_path(),
                     file_config.own_write(),
-                    move |result| {
+                    move |text| {
                         let app = handle.clone();
                         let file_config = file_config.clone();
                         let launcher_hotkey = launcher_hotkey.clone();
                         let _ = app.clone().run_on_main_thread(move || {
-                            apply_config_reload(&app, &file_config, &launcher_hotkey, result);
+                            apply_config_reload(
+                                &app,
+                                &file_config,
+                                &launcher_hotkey,
+                                config::Config::parse(&text),
+                            );
                         });
                     },
                 );

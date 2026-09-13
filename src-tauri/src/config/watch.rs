@@ -12,17 +12,17 @@ use std::time::Duration;
 
 use notify::{RecursiveMode, Watcher};
 
-use super::{Config, ConfigError};
-
 const DEBOUNCE: Duration = Duration::from_millis(150);
 
-/// Watches `path` and calls `apply` with the reparsed configuration whenever the
-/// file changes, other than the app's own writes. Returns whether the watch
-/// started; the watcher lives on its own thread for the life of the process.
+/// Watches `path` and calls `apply` with the file's current text whenever it
+/// changes, other than the app's own writes; the caller parses. A missing file
+/// yields empty text, so deleting the file is a change to the empty state.
+/// Returns whether the watch started; the watcher lives on its own thread for
+/// the life of the process.
 pub fn watch(
     path: PathBuf,
     own_write: Arc<Mutex<Option<String>>>,
-    apply: impl Fn(Result<Config, ConfigError>) + Send + 'static,
+    apply: impl Fn(String) + Send + 'static,
 ) -> bool {
     let Some(dir) = path.parent().map(|p| p.to_path_buf()) else {
         return false;
@@ -75,7 +75,7 @@ pub fn watch(
                     continue;
                 }
             }
-            apply(Config::parse(&text));
+            apply(text);
         }
     });
     true
