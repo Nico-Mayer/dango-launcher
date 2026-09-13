@@ -295,6 +295,13 @@ impl TextExchange {
         }
 
         let saved = self.read_clipboard();
+        // The target is already the foreground here, unlike the launcher case, so
+        // this is a re-assert rather than a focus change. It is still needed: it
+        // is what makes the paste land before the clipboard is restored, the same
+        // ordering the launcher insert relies on. Without it the restore can race
+        // the paste and the user's own clipboard is pasted instead.
+        self.handoff.yield_to_previous()?;
+
         if backspaces > 0 {
             self.keys.backspace(backspaces)?;
         }
@@ -570,16 +577,17 @@ mod tests {
     }
 
     #[test]
-    fn expanding_backspaces_before_it_pastes_and_never_touches_the_launcher() {
+    fn expanding_backspaces_before_it_pastes_and_leaves_no_launcher_dismiss() {
         let f = fixture(holding("what the user had"), FakeKeys::working());
 
         f.exchange.expand(4, "the snippet", None).unwrap();
 
-        // Backspaces delete the keyword before the paste replaces it, and the
-        // focus is left alone: no launcher dismiss, no foreground yield.
+        // The keyword is deleted before the paste replaces it. Expansion never
+        // dismisses a launcher, but it does re-assert the foreground so the paste
+        // lands before the clipboard is restored.
         assert_eq!(f.keys.events(), vec!["backspace 4", "paste"]);
-        assert_eq!(f.launcher.dismissals(), 0, "expansion never touches focus");
-        assert_eq!(*f.handoff.yielded.lock().unwrap(), 0);
+        assert_eq!(f.launcher.dismissals(), 0, "expansion has no launcher");
+        assert_eq!(*f.handoff.yielded.lock().unwrap(), 1);
         assert_eq!(
             f.clipboard.now(),
             Some(Content::Text("what the user had".into())),
