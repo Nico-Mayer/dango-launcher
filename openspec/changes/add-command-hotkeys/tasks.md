@@ -19,7 +19,20 @@
 ## 4. Verification
 
 - [ ] 4.1 Confirm on both platforms that a command bound in the config runs from its hotkey while another application is focused, and that a no-view command does so without the launcher appearing
+  - Windows: with a plain target window focused, ctrl+alt+left ran
+    window-management left-half on it (its frame became the exact left half of
+    the work area) while the launcher window stayed hidden. macOS pending.
 - [ ] 4.2 Confirm on both platforms that a view command's hotkey shows the launcher with its view
+  - Windows: ctrl+alt+v, bound to clipboard history (a view command), showed the
+    launcher window. macOS pending.
 - [ ] 4.3 Confirm on both platforms that a snippet or window-management hotkey acts on the window that was focused when the chord was pressed
+  - Windows: the window-management hotkey moved the focused target window, not
+    the launcher, so it acted on the window focused at the press. macOS pending.
 - [ ] 4.4 Confirm on both platforms that adding, changing, and removing a binding in the file applies live
+  - Windows: rewriting config.json while running rebound left-half to ctrl+alt+up
+    (which then moved the target) and dropped right-half's ctrl+alt+right (which
+    then did nothing), no restart. macOS pending.
 - [ ] 4.5 Confirm on both platforms that two commands on one chord, a command on the launcher chord, and an OS-refused chord are each surfaced, with the first binding winning and the others reported
+  - Windows: dango.log carried all three - top-half and left-half on one chord
+    with left-half keeping it, maximize on the launcher chord, and center refused
+    by the OS (the chord was pre-claimed by the harness). macOS pending.
