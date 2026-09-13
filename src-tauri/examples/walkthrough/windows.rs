@@ -74,15 +74,21 @@ struct TextBox {
 
 impl TextBox {
     fn open(title: &str, x: i32) -> Option<Self> {
+        // The form asserts the foreground itself on show. A process that is
+        // starting up is allowed one SetForegroundWindow, which is how the
+        // target stands in for "the app the user was in had focus before the
+        // launcher appeared" even over a fullscreen window that is holding it.
         let script = format!(
             "Add-Type -AssemblyName System.Windows.Forms; \
+             Add-Type -Name Fg -Namespace W -MemberDefinition '[DllImport(\"user32.dll\")] public static extern bool SetForegroundWindow(System.IntPtr h);'; \
              $f = New-Object System.Windows.Forms.Form; \
              $f.Text = '{title}'; $f.Width = 560; $f.Height = 360; \
              $f.StartPosition = 'Manual'; $f.Location = New-Object System.Drawing.Point({x}, 120); \
              $t = New-Object System.Windows.Forms.TextBox; \
              $t.Multiline = $true; $t.AcceptsReturn = $true; $t.Dock = 'Fill'; \
              $t.Font = New-Object System.Drawing.Font('Consolas', 12); \
-             $f.Controls.Add($t); $f.Add_Shown({{ $t.Focus() }}); \
+             $f.Controls.Add($t); \
+             $f.Add_Shown({{ $f.Activate(); [void][W.Fg]::SetForegroundWindow($f.Handle); $t.Focus() }}); \
              [System.Windows.Forms.Application]::Run($f)"
         );
         let process = Command::new("powershell")
@@ -209,6 +215,7 @@ pub fn run() {
         harness.target.close();
         return;
     }
+    harness.warm_up();
 
     harness.text_reaches_the_application();
     harness.the_users_clipboard_survives();
@@ -272,12 +279,31 @@ impl Harness {
     /// says whether it is genuinely the foreground window afterwards. Nothing
     /// may be typed into or read from a window without this answering true.
     fn focus(&mut self, window: HWND) -> bool {
+        // Earn foreground rights the way the real launcher does when the user
+        // presses the hotkey. Windows only lets a process call
+        // SetForegroundWindow if, among other things, it received the last
+        // input event, and a synthesised keystroke satisfies that. Without it
+        // the handoff is refused whenever a foreground-locking window, such as
+        // a fullscreen video, is holding the front.
+        let _ = self.enigo.key(Key::Shift, Direction::Click);
+        std::thread::sleep(Duration::from_millis(30));
         platform::remember_previous_foreground(window as isize);
         if let Err(error) = self.handoff.yield_to_previous() {
             eprintln!("          (handoff refused: {error})");
             return false;
         }
         unsafe { GetForegroundWindow() == window }
+    }
+
+    /// One throwaway insertion before anything is graded. The first paste after
+    /// the target has just opened loses a cold-start race intermittently; a
+    /// warm-up pays that cost where nothing is measured.
+    fn warm_up(&mut self) {
+        if self.clear() {
+            let _ = self.exchange.insert("warm-up", None);
+            self.settle();
+        }
+        self.target.set_text("");
     }
 
     /// Empties the target and leaves it in front with its edit focused.
