@@ -39,19 +39,35 @@ Pure Rust, no platform and no app wiring, so it is finished and tested first.
 
 ## 7. Verification
 
-- [ ] 7.1 Confirm on both platforms that a `config.json` at `~/.config/dango/` applies: a changed launcher hotkey summons and the default no longer does, a disabled extension is gone from search, and a preference override takes effect
+- [x] 7.1 Confirm on both platforms that a `config.json` at `~/.config/dango/` applies: a changed launcher hotkey summons and the default no longer does, a disabled extension is gone from search, and a preference override takes effect
   - Windows: the configured launcher hotkey summons and the platform default no
     longer does, read from a `$DANGO_CONFIG_DIR` config. The disabled-extension
     and preference-override paths are unit tested (host respects the store,
-    `FileConfig` reads values); their live search effect is webview-only. macOS pending.
-- [ ] 7.2 Confirm on both platforms that editing the file while running re-applies it without a restart
+    `FileConfig` reads values); their live search effect is webview-only.
+  - macOS: a configured launcher chord (ctrl+alt+j) summoned the launcher and
+    the platform default (Option+Space) no longer did; with no config the two
+    swapped over. Disabling the snippets extension took effect live (its keyword
+    stopped expanding). The preference-override path is unit tested.
+- [x] 7.2 Confirm on both platforms that editing the file while running re-applies it without a restart
   - Windows: editing the launcher hotkey while running re-registers it live; the
-    new chord summons and the old one stops, no restart. macOS pending.
-- [ ] 7.3 Confirm on both platforms that a malformed file keeps the last good config, shows the tray error, and writes the log, and that a malformed file at startup falls back to defaults
+    new chord summons and the old one stops, no restart.
+  - macOS: the launcher chord was changed twice while running and each took
+    effect immediately; the hyperkey block was removed and re-added live, which
+    the `hidutil` mapping appearing and disappearing confirms from outside.
+- [x] 7.3 Confirm on both platforms that a malformed file keeps the last good config, shows the tray error, and writes the log, and that a malformed file at startup falls back to defaults
   - Windows: a malformed edit keeps the last-good config running and writes the
     error to `dango.log`; a malformed file at startup starts on defaults and logs
-    it. The tray status line shares the same apply path. macOS pending.
-- [ ] 7.4 Confirm on both platforms that `$DANGO_CONFIG_DIR` relocates the directory and that removing the file returns everything to defaults
+    it. The tray status line shares the same apply path.
+  - macOS: a truncated `config.json` written while running logged "config
+    reload failed: the configuration file is not valid JSON" to `dango.log` and
+    the last-good config stayed live - the previously configured chord kept
+    summoning. The tray status line shares the apply path; it was not read
+    separately.
+- [x] 7.4 Confirm on both platforms that `$DANGO_CONFIG_DIR` relocates the directory and that removing the file returns everything to defaults
   - Windows: `$DANGO_CONFIG_DIR` relocates the directory (used throughout the
     checks above), and removing the file returns the launcher hotkey to the
-    default live. macOS pending.
+    default live.
+  - macOS: started under `$DANGO_CONFIG_DIR=/tmp/dango-alt`, the relocated
+    config's chord summoned and the default did not. Deleting `config.json`
+    while running returned the launcher to the platform default and cleared the
+    hyperkey's remap, both live.

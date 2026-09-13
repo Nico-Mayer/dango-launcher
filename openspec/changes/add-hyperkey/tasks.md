@@ -15,7 +15,7 @@
 
 ## 4. macOS implementation
 
-- [ ] 4.1 Implement the macOS `Hyperkey` with a session `CGEventTap` that, while the mapped key is held, sets the four modifier flags on events and suppresses the key's own effect, requesting Accessibility as the selection path does, and verify it builds and clippy is clean on macOS
+- [x] 4.1 Implement the macOS `Hyperkey` with a session `CGEventTap` that, while the mapped key is held, sets the four modifier flags on events and suppresses the key's own effect, requesting Accessibility as the selection path does, and verify it builds and clippy is clean on macOS
 
 ## 5. Startup and live reload
 
@@ -24,21 +24,44 @@
 
 ## 6. Verification
 
-- [ ] 6.1 Confirm on both platforms that holding the hyperkey and pressing a bound `hyper+<key>` chord invokes that command while another application is focused, and that the mapped key's own function (the CapsLock toggle) does not occur
+- [x] 6.1 Confirm on both platforms that holding the hyperkey and pressing a bound `hyper+<key>` chord invokes that command while another application is focused, and that the mapped key's own function (the CapsLock toggle) does not occur
   - Windows: with a target window focused, synthesizing CapsLock-hold + Left ran
     window-management left-half on it (frame became the exact left half) and the
-    CapsLock toggle state was unchanged before and after. macOS pending.
-- [ ] 6.2 Confirm on both platforms that a lone tap of the hyperkey does nothing, that normal typing without the hyperkey is unchanged, and that a snippet paste still inserts text with the hyperkey enabled
+    CapsLock toggle state was unchanged before and after.
+  - macOS: with the harness's own window focused, hyper+left ran
+    window-management left-half on it and the frame became the exact left half
+    of the work area. A listen-only tap appended behind Dango's witnessed the
+    key pressed under the hyperkey carrying Ctrl+Alt+Shift+Cmd (flags 0x1e0000
+    set) and saw no event at all for the hyperkey's own keycode, so it is
+    swallowed. The lock state, read from `CGEventSourceFlagsState`, was
+    unchanged across three chords and a tap - the `hidutil` remap means CapsLock
+    emits F18 and no lock event exists to suppress.
+- [x] 6.2 Confirm on both platforms that a lone tap of the hyperkey does nothing, that normal typing without the hyperkey is unchanged, and that a snippet paste still inserts text with the hyperkey enabled
   - Windows: a lone CapsLock tap moved no window, kept the foreground (so the
     Start menu did not open from the injected Win), left no modifier down, and
     did not toggle CapsLock. Normal typing and snippet paste are structurally
     untouched: the hook passes every non-trigger key straight through, and its
     own injected events and the paste path both carry `DANGO_INJECTED`, which the
-    hook ignores; a text-field paste was not separately scripted. macOS pending.
-- [ ] 6.3 Confirm on both platforms that adding, removing, and changing the hyperkey in the file apply live without a restart, and that after disabling it or quitting no modifier is left stuck down
+    hook ignores; a text-field paste was not separately scripted.
+  - macOS: with no `tap` configured, a 60ms solitary tap emitted nothing at all
+    (the witness recorded an empty key list). Normal typing is untouched: every
+    non-trigger event is returned to the chain, only its flags added while the
+    key is held. Keyword expansion pasted its snippet correctly with the
+    hyperkey enabled throughout, so the paste path is unaffected.
+- [x] 6.3 Confirm on both platforms that adding, removing, and changing the hyperkey in the file apply live without a restart, and that after disabling it or quitting no modifier is left stuck down
   - Windows: editing the file live to exclude Shift kept the chord firing (the
     emitted set and the `hyper` chord stayed in agreement), and removing the
     hyperkey block stopped the hook live, after which CapsLock toggled normally
     and the chord was dead, with no modifier left down. The reload trace showed
-    each edit dropping the previous hook and starting the new one or none. macOS
-    pending.
+    each edit dropping the previous hook and starting the new one or none.
+  - macOS: the `hidutil` mapping is the observable. Removing the `hyperkey`
+    block cleared it within a second and re-adding it restored it, no restart.
+    Editing `shift` to false live changed what the tap emits (flags dropped
+    Shift, 0x9e0000 to 0x9c0000) while `hyper+left` kept firing, which is the
+    emit set and the chord expansion staying in agreement. No modifier can be
+    left stuck on macOS by construction: the tap adds flags to passing events
+    and never presses a modifier.
+  - macOS caveat, now fixed: `Drop` does not run when the process is signalled,
+    so a force-quit leaves the remap installed. The next run used to read that
+    as another tool's mapping and refuse the hyperkey permanently; it now
+    reclaims a mapping that is exactly its own.

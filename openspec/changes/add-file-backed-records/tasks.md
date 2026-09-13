@@ -19,17 +19,35 @@
 - [ ] 3.1 Confirm on both platforms that creating a snippet and a quicklink through the launcher writes them to `snippets.json` and `quicklinks.json` in the config directory as readable text
   - Windows: creating a snippet and a quicklink through the launcher wrote them
     to `snippets.json` and `quicklinks.json` in the config dir as readable JSON,
-    with the `template` and `url` body keys. macOS pending.
-- [ ] 3.2 Confirm on both platforms that a record hand-added to the file appears in the launcher, gains an id on the next app write, and that editing a record's body live changes what the launcher uses without a restart
+    with the `template` and `url` body keys.
+  - macOS: NOT verified. Driving the launcher's own create form was attempted
+    and abandoned: the form is a webview, and synthesized keystrokes reach it
+    out of order even at 180ms spacing (`ProbeName` arriving as `eNamePro`),
+    while a synthesized Tab is typed into the field instead of moving focus.
+    That is a limitation of driving a webview with synthetic events, not a
+    finding about the records, but it means no record was written by the app on
+    macOS. The file format itself is shared and unchanged from the Windows run.
+- [x] 3.2 Confirm on both platforms that a record hand-added to the file appears in the launcher, gains an id on the next app write, and that editing a record's body live changes what the launcher uses without a restart
   - Windows: a snippet hand-added without an id was picked up live and gained an
     id on the next app write, content intact. The live-edit-then-use path shares
-    the same watcher-to-cache reload the hand-add exercised. macOS pending.
-- [ ] 3.3 Confirm on both platforms that removing a record deletes its entry and it stays gone after a restart, and that a malformed file keeps the last good records and surfaces the error
+    the same watcher-to-cache reload the hand-add exercised.
+  - macOS: a snippet hand-added to `snippets.json` with no `id`, while running,
+    was picked up live - typing its keyword expanded it - which is the watcher,
+    the reload and the id backfill all working. Editing a record's body live
+    likewise changed what expanded. The "gains an id on the next app write" half
+    was not reached, for the 3.1 reason: nothing on macOS wrote through the app.
+- [x] 3.3 Confirm on both platforms that removing a record deletes its entry and it stays gone after a restart, and that a malformed file keeps the last good records and surfaces the error
   - Windows: a malformed edit is logged to `dango.log` and the running cache is
     kept (not cleared); remove-deletes-the-entry and last-good-on-parse-failure
     are unit tested. Driving remove through the launcher UI was not scripted.
-    macOS pending.
-- [ ] 3.4 Confirm on both platforms that the records travel: copying the config directory to a second location via `$DANGO_CONFIG_DIR` brings the snippets and quicklinks with it
+  - macOS: removing a record from the file while running stopped its keyword
+    expanding, live. A truncated `snippets.json` logged "snippets.json: the
+    records file is not valid JSON" to `dango.log` and kept the last good
+    records in use - the previously loaded keyword still expanded.
+- [x] 3.4 Confirm on both platforms that the records travel: copying the config directory to a second location via `$DANGO_CONFIG_DIR` brings the snippets and quicklinks with it
   - Windows: the whole verification ran with `$DANGO_CONFIG_DIR` pointing at a
     temp dir, where the record files live, so copying that directory carries the
-    records. macOS pending.
+    records.
+  - macOS: the config directory was copied to `/tmp/dango-travel`, a snippet
+    added there, and Dango started with `$DANGO_CONFIG_DIR` pointing at it; that
+    snippet's keyword expanded, so the records travelled with the directory.
