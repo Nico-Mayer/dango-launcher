@@ -3,7 +3,7 @@
   import ActionPanel from "./ActionPanel.svelte";
   import FormFields from "./FormFields.svelte";
   import ResultRow from "./ResultRow.svelte";
-  import { pointerOwnsSelection } from "./pointer.svelte";
+  import { inUserGesture, pointerActive } from "./input.svelte";
   import type { ViewTree } from "../protocol/ViewTree";
   import { matchesShortcut, type ActionDto } from "./types";
 
@@ -15,9 +15,10 @@
   let { tree, onaction }: Props = $props();
 
   let query = $state("");
-  let selectedId = $state("");
+  let pickedId = $state("");
   let panelOpen = $state(false);
   let inputEl = $state<HTMLInputElement | null>(null);
+  let listEl = $state<HTMLElement | null>(null);
 
   const view = $derived(tree.view);
 
@@ -40,7 +41,18 @@
         : view.items,
   );
 
-  const selectedItem = $derived(items.find((item) => item.id === selectedId) ?? items[0]);
+  /// A list that has rows always has one of them selected, whatever narrowing
+  /// or a new tree did to the items.
+  const selectedId = $derived(
+    items.some((item) => item.id === pickedId) ? pickedId : (items[0]?.id ?? ""),
+  );
+  const selectedItem = $derived(items.find((item) => item.id === selectedId));
+
+  /// Same first-row blind spot in the primitive's scroll-into-view as the root
+  /// list has: without a group heading to scroll to, it scrolls nothing.
+  $effect(() => {
+    if (selectedId && selectedId === items[0]?.id && listEl) listEl.scrollTop = 0;
+  });
 
   /// What the action panel offers. A list item's own actions win over the
   /// view's, because the item is what the user has selected.
@@ -103,50 +115,57 @@
 {#if view.kind === "list"}
   <Command.Root
     shouldFilter={false}
-    disablePointerSelection={!pointerOwnsSelection()}
-    bind:value={selectedId}
+    disablePointerSelection
+    bind:value={() => selectedId, (id) => inUserGesture() && (pickedId = id)}
     class="flex min-h-0 flex-1 flex-col"
   >
     <Command.Input
       bind:ref={inputEl}
-      bind:value={query}
+      bind:value={() => query, (q) => ((query = q), (pickedId = ""))}
       placeholder="Search..."
       spellcheck={false}
       autocomplete="off"
       class="text-foreground placeholder:text-muted-foreground h-16 w-full shrink-0 bg-transparent px-5 text-2xl focus:outline-none"
     />
-    <Command.List class="border-border-card min-h-0 flex-1 overflow-y-auto border-t">
-      <Command.Viewport class="p-2">
-        {#each items as item (item.id)}
-          <Command.Item
-            value={item.id}
-            onSelect={() => item.actions.length > 0 && onaction(item.actions[0].id, item.id)}
-            class="data-[selected]:bg-muted flex h-14 items-center gap-3 rounded-lg px-3"
-          >
-            <ResultRow
-              title={item.title}
-              subtitle={item.subtitle}
-              icon={item.icon}
-              iconIsContent
-            />
-          </Command.Item>
-        {/each}
-        {#if items.length === 0}
-          <div class="text-muted-foreground px-3 py-4 text-sm">
-            {#if view.loading}
-              Loading...
-            {:else if query.length > 0}
-              No results
-            {:else}
-              {view.emptyState?.title ?? "Nothing here"}
-              {#if view.emptyState?.description}
-                <p class="mt-1 text-xs">{view.emptyState.description}</p>
+    <div class="border-border-card flex min-h-0 flex-1 flex-col border-t py-2">
+      <Command.List
+        bind:ref={listEl}
+        data-pointer={pointerActive() ? "" : undefined}
+        class="min-h-0 flex-1 overflow-y-auto"
+      >
+        <Command.Viewport class="px-2">
+          {#each items as item (item.id)}
+            <Command.Item
+              value={item.id}
+              onSelect={() => item.actions.length > 0 && onaction(item.actions[0].id, item.id)}
+              onmousedown={(event) => event.preventDefault()}
+              class="data-[selected]:bg-muted [[data-pointer]_&:hover:not([data-selected])]:bg-muted/50 flex h-14 items-center gap-3 rounded-lg px-3"
+            >
+              <ResultRow
+                title={item.title}
+                subtitle={item.subtitle}
+                icon={item.icon}
+                iconIsContent
+              />
+            </Command.Item>
+          {/each}
+          {#if items.length === 0}
+            <div class="text-muted-foreground px-3 py-4 text-sm">
+              {#if view.loading}
+                Loading...
+              {:else if query.length > 0}
+                No results
+              {:else}
+                {view.emptyState?.title ?? "Nothing here"}
+                {#if view.emptyState?.description}
+                  <p class="mt-1 text-xs">{view.emptyState.description}</p>
+                {/if}
               {/if}
-            {/if}
-          </div>
-        {/if}
-      </Command.Viewport>
-    </Command.List>
+            </div>
+          {/if}
+        </Command.Viewport>
+      </Command.List>
+    </div>
   </Command.Root>
 {:else if view.kind === "detail"}
   <div class="text-foreground min-h-0 flex-1 overflow-y-auto px-5 py-4 text-sm whitespace-pre-wrap">

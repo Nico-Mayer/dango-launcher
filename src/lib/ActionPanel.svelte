@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import { pointerOwnsSelection } from "./pointer.svelte";
+  import { pointerActive } from "./input.svelte";
   import type { ActionDto } from "./types";
 
   interface Props {
@@ -47,6 +47,7 @@
      one take focus would strand the cursor outside the search input once the
      panel closes. -->
 <div
+  data-pointer={pointerActive() ? "" : undefined}
   class="border-border-card bg-background-alt absolute bottom-12 right-2 w-72 overflow-hidden rounded-[10px] border shadow-xl"
 >
   {#each actions as action, i (action.id)}
@@ -54,8 +55,7 @@
       type="button"
       class="flex w-full items-center justify-between px-3 py-2 text-left text-sm {i === selected
         ? 'bg-muted text-foreground'
-        : 'text-foreground-alt'}"
-      onpointermove={() => pointerOwnsSelection() && (selected = i)}
+        : 'text-foreground-alt [[data-pointer]_&:hover]:bg-muted/50'}"
       onmousedown={(event) => event.preventDefault()}
       onclick={() => onrun(action.id)}
     >

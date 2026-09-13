@@ -5,7 +5,7 @@
   import { onMount } from "svelte";
   import ActionPanel from "./lib/ActionPanel.svelte";
   import Icon from "./lib/Icon.svelte";
-  import { pointerOwnsSelection } from "./lib/pointer.svelte";
+  import { inUserGesture, pointerActive } from "./lib/input.svelte";
   import ProtocolView from "./lib/ProtocolView.svelte";
   import ResultRow from "./lib/ResultRow.svelte";
   import { matchesShortcut, type ActionResponse, type ResultItem, type ResultsPayload } from "./lib/types";
@@ -15,7 +15,10 @@
 
   let query = $state("");
   let results = $state<ResultItem[]>([]);
-  let selectedId = $state("");
+  /// What the keyboard or a click last picked. The selection is derived from
+  /// it rather than stored, so results arriving without the picked item fall
+  /// back to the first row instead of leaving the list with nothing selected.
+  let pickedId = $state("");
   let stack = $state<ViewTree[]>([]);
   let panelOpen = $state(false);
   let protocolError = $state(false);
@@ -26,14 +29,24 @@
   // A view command has been invoked and its first tree has not arrived yet.
   let working = $state(false);
   let inputEl = $state<HTMLInputElement | null>(null);
+  let listEl = $state<HTMLElement | null>(null);
 
   // The query whose results we will display; a late event for an older query is
   // dropped so cancelled results never show.
   let liveQuery = "";
 
-  const selectedItem = $derived(
-    results.find((r) => r.id === selectedId) ?? results[0],
+  const selectedId = $derived(
+    results.some((r) => r.id === pickedId) ? pickedId : (results[0]?.id ?? ""),
   );
+  const selectedItem = $derived(results.find((r) => r.id === selectedId));
+
+  /// The primitive scrolls the selection into view for every row but the first:
+  /// for that one it scrolls the enclosing group's heading instead, and a list
+  /// without groups has none, so it returns having scrolled nothing. Arrowing
+  /// back to the top then leaves the first row selected just above the fold.
+  $effect(() => {
+    if (selectedId && selectedId === results[0]?.id && listEl) listEl.scrollTop = 0;
+  });
 
   function runSearch(q: string) {
     liveQuery = q;
@@ -287,39 +300,51 @@
 {:else}
   <Command.Root
     shouldFilter={false}
-    disablePointerSelection={!pointerOwnsSelection()}
-    bind:value={selectedId}
+    disablePointerSelection
+    bind:value={() => selectedId, (id) => inUserGesture() && (pickedId = id)}
     class="border-border-card bg-background flex h-screen w-screen flex-col overflow-hidden rounded-[14px] border"
   >
     <Command.Input
       bind:ref={inputEl}
-      bind:value={query}
+      bind:value={() => query, (q) => ((query = q), (pickedId = ""))}
       placeholder="Search for apps and commands..."
       spellcheck={false}
       autocomplete="off"
       class="text-foreground placeholder:text-muted-foreground h-16 w-full shrink-0 bg-transparent px-5 text-2xl focus:outline-none"
     />
-    <Command.List class="border-border-card min-h-0 flex-1 overflow-y-auto border-t">
-      <Command.Viewport class="p-2">
-        {#each results as item (item.id)}
-          <Command.Item
-            value={item.id}
-            onSelect={() => confirm(item)}
-            class="data-[selected]:bg-muted flex h-14 items-center gap-3 rounded-lg px-3"
-          >
-            <ResultRow
-              title={item.title}
-              subtitle={item.subtitle}
-              icon={item.icon}
-              matchPositions={item.matchPositions}
-            />
-          </Command.Item>
-        {/each}
-        {#if results.length === 0 && query.length > 0}
-          <div class="text-muted-foreground px-3 py-4 text-sm">No results</div>
-        {/if}
-      </Command.Viewport>
-    </Command.List>
+    <!-- The inset lives outside the scroller, so the gap above the first row
+         and below the last one is there at every scroll position instead of
+         appearing only at the two ends. -->
+    <div class="border-border-card flex min-h-0 flex-1 flex-col border-t py-2">
+      <Command.List
+        bind:ref={listEl}
+        data-pointer={pointerActive() ? "" : undefined}
+        class="min-h-0 flex-1 overflow-y-auto"
+      >
+        <Command.Viewport class="px-2">
+          {#each results as item (item.id)}
+            <!-- The row is not focusable, so a click would otherwise move focus
+                 off the prompt and leave the launcher unable to type. -->
+            <Command.Item
+              value={item.id}
+              onSelect={() => confirm(item)}
+              onmousedown={(event) => event.preventDefault()}
+              class="data-[selected]:bg-muted [[data-pointer]_&:hover:not([data-selected])]:bg-muted/50 flex h-14 items-center gap-3 rounded-lg px-3"
+            >
+              <ResultRow
+                title={item.title}
+                subtitle={item.subtitle}
+                icon={item.icon}
+                matchPositions={item.matchPositions}
+              />
+            </Command.Item>
+          {/each}
+          {#if results.length === 0 && query.length > 0}
+            <div class="text-muted-foreground px-3 py-4 text-sm">No results</div>
+          {/if}
+        </Command.Viewport>
+      </Command.List>
+    </div>
 
     {#if working}
       <div
