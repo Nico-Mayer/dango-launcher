@@ -36,6 +36,10 @@
         "shift": {
           "type": "boolean",
           "description": "Whether Shift is part of the combination. Defaults to true; false emits Ctrl+Alt+Super, leaving typed characters unshifted."
+        },
+        "tap": {
+          "type": "string",
+          "description": "A key to send on a quick, solitary tap of the hyperkey, such as \"escape\". A hold, or a press combined with another key, still acts as the hyper modifier. Absent means a tap does nothing."
         }
       }
     }
