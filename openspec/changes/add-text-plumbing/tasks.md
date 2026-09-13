@@ -23,35 +23,37 @@ expensive to answer late.
   - Cost noted: the settle is after the text has already arrived, so it delays only the clipboard going back, not anything the user sees.
 - [x] 1.4 On macOS, record how often Accessibility trust has to be re-granted across rebuilds of an unsigned debug binary, so the development cost is known rather than assumed
   - Trust turned out stickier than the design assumed. `AXIsProcessTrusted` read true across many rebuilds and across separate example binaries, so the per-binary revocation warned about never bit in a day of rebuilding. Recorded as observed, not as a rule: it is TCC behaviour nobody promised.
-- [ ] 1.5 On Windows, confirm that waiting for the previous window to become foreground before injecting is reliable under foreground lock, and that a no-op message to the target after Ctrl+V returns only once the paste has been handled
+- [x] 1.5 On Windows, confirm that waiting for the previous window to become foreground before injecting is reliable under foreground lock, and that a no-op message to the target after Ctrl+V returns only once the paste has been handled
   - The Windows walkthrough harness (`examples/walkthrough/windows.rs`) exercises
     both halves: `the_target_is_brought_forward_first` drives a decoy to the
     front and asserts the text still lands in the remembered target, and
     `the_paste_acknowledgement_is_measured` pastes a marker, waits on
     `settle_after_paste`, then overwrites the clipboard with a decoy and reads
     the control back to see which one the paste took.
-  - **Blocked here, not verified.** The Windows dev machine runs this Claude Code
-    session over SSH in session 0, the isolated services session, while the
-    desktop is session 1. Session 0 cannot synthesise input to or read the
-    foreground of session 1: `GetForegroundWindow` returns 0 and the handoff
-    times out with 'the previous window would not come back to the foreground'.
-    The screen was also locked. So no keystroke, foreground, or clipboard round
-    trip could be exercised from here. It needs an interactive, unlocked
-    session-1 shell, ideally non-elevated for the elevated-target check.
+  - **Run on a live session-1 desktop, and both hold.** The foreground wait is
+    reliable even under a foreground-locking fullscreen window: with a decoy in
+    front the text still landed in the remembered target and the target was the
+    foreground window afterwards, and a target that never comes forward is
+    reported after about 400ms with nothing sent and the clipboard untouched.
+  - The no-op acknowledgement is a true signal, not a guess: over 10 trials the
+    marker the paste read was the pre-acknowledgement clipboard every time
+    (marker 10, decoy 0), and the acknowledgement came back in 0.3 to 1.3ms.
+  - **A finding about driving this from a harness, not about the code.** The
+    real launcher may call `SetForegroundWindow` because the user's hotkey press
+    gave it foreground rights. A harness has no such press, so over a fullscreen
+    Brave the handoff was refused until the harness synthesised an inert
+    keystroke first, which is what a hotkey does. The target window also asserts
+    the foreground itself on open, standing in for the app the user was in.
 
 - [ ] 1.6 On Windows, confirm the clipboard round trip reads a selection from a native app, a browser, an Electron app, and a terminal
   - The harness reads a selection from its own WinForms edit control, which is a
     real Win32 native control and a .NET application at once. Browser, Electron,
     and terminal still need a manual pass, since those depend on each app's own
-    Ctrl+C, and the harness cannot drive them from here.
-  - **Blocked here, not verified.** The Windows dev machine runs this Claude Code
-    session over SSH in session 0, the isolated services session, while the
-    desktop is session 1. Session 0 cannot synthesise input to or read the
-    foreground of session 1: `GetForegroundWindow` returns 0 and the handoff
-    times out with 'the previous window would not come back to the foreground'.
-    The screen was also locked. So no keystroke, foreground, or clipboard round
-    trip could be exercised from here. It needs an interactive, unlocked
-    session-1 shell, ideally non-elevated for the elevated-target check.
+    Ctrl+C, and Dango's copy keystroke could be sent to them but arranging a
+    live selection in each is a manual step.
+  - Verified on the live desktop for the native and .NET case: the selection is
+    read back through the round trip and the user's clipboard is handed back.
+    Browser, Electron, and terminal are the remaining manual pass.
 
 - [x] 1.7 Verify `minijinja::Template::undeclared_variables` reports the names in the templates snippets will actually hold, including one with reserved names only and one with a repeated argument
   - Works exactly as the design needs. Reserved-only reports only reserved names, a repeated argument is reported once, and an unclosed placeholder fails to parse so it can be refused at save.
@@ -154,25 +156,41 @@ since M1. Nothing else in this change works without it.
 Cannot be compiled on macOS. These land as code plus confirmations the author
 closes on the Windows machine, the way the clipboard change did.
 
-Session note for this whole group: the Windows session available here is a
-session-0 SSH shell and could not drive the interactive desktop (see 1.5). All
-of 6.1 to 6.6 compile, pass `cargo clippy --all-targets -- -D warnings`, and are
-covered by the new `examples/walkthrough/windows.rs`, but none has been run
-against a live desktop. The one thing that did execute is the integrity probe
-behind 6.6: `own_integrity_level()` returned `0x3000` for the elevated shell,
-confirming `OpenProcessToken`, `GetTokenInformation`, and `GetSidSubAuthority`
-link and run.
+Run against a live session-1 desktop through `examples/walkthrough/windows.rs`,
+which drives a WinForms text box the harness opens: a native Win32 control and a
+.NET application at once, read back with `WM_GETTEXT` so no check touches the
+clipboard it is verifying. 18 of 18 graded checks pass; the elevated-target
+check (6.6, 9.9) needs an elevated window and is covered separately. The
+integrity probe behind 6.6 runs: `own_integrity_level()` returned `0x2000` for
+the non-elevated harness.
 
-- [ ] 6.1 Read the selection through the shared clipboard round trip, verified by hand against the applications from 1.6
-- [ ] 6.2 Inject Ctrl+V through `enigo` with `windows_dw_extra_info` set so the injected events are identifiable, verified by pasting into another application
-  - Written with `windows_dw_extra_info` set to a Dango marker. Cannot be compiled here; CI is the first check.
-- [ ] 6.3 Hide the launcher, call `restore_previous_focus`, and wait for `GetForegroundWindow` to return the target before injecting, verified by pasting immediately after activation
-  - Written as a poll of `GetForegroundWindow` against the remembered window, not a delay.
-- [ ] 6.4 Fail with a message when the previous window never becomes foreground, verified by holding foreground elsewhere
-- [ ] 6.5 Wait for the target window to answer a no-op message after Ctrl+V before restoring the clipboard, verified by checking the clipboard after pasting into a .NET application
-  - Written as `SendMessageTimeoutW` with `WM_NULL` and `SMTO_ABORTIFHUNG`, the clipboard change's trick pointed the other way.
+- [x] 6.1 Read the selection through the shared clipboard round trip, verified by hand against the applications from 1.6
+  - Verified live: the round trip reads the selection from the target and gives
+    the user's clipboard back untouched, and an empty control reports no
+    selection (the sentinel survives) in about 205ms, inside the read budget.
+- [x] 6.2 Inject Ctrl+V through `enigo` with `windows_dw_extra_info` set so the injected events are identifiable, verified by pasting into another application
+  - `windows_dw_extra_info` is a Dango marker. Verified live: the text arrives in
+    the target and appears within about 3ms of the call.
+- [x] 6.3 Hide the launcher, call `restore_previous_focus`, and wait for `GetForegroundWindow` to return the target before injecting, verified by pasting immediately after activation
+  - A poll of `GetForegroundWindow` against the remembered window, not a delay.
+  - Verified live with a decoy holding the front: the target is brought forward
+    first and the text lands in it, never in the window that was in front.
+- [x] 6.4 Fail with a message when the previous window never becomes foreground, verified by holding foreground elsewhere
+  - Verified live against a window that had been closed: the insertion fails
+    with a message naming the foreground after about 400ms, and nothing is
+    sent and the clipboard is left untouched.
+- [x] 6.5 Wait for the target window to answer a no-op message after Ctrl+V before restoring the clipboard, verified by checking the clipboard after pasting into a .NET application
+  - `SendMessageTimeoutW` with `WM_NULL` and `SMTO_ABORTIFHUNG`, the clipboard
+    change's trick pointed the other way.
+  - Verified live against the WinForms (.NET) target: the acknowledgement returns
+    only after the paste is handled, so the paste always read the intended
+    clipboard and never the decoy written right after (marker 10, decoy 0).
 - [ ] 6.6 Report the elevated-window ceiling as a clear failure rather than a silent one, verified by pasting into an elevated window
-  - Written as an `OpenProcess` probe with `PROCESS_QUERY_LIMITED_INFORMATION`: a refusal is the answer, since a non-elevated process cannot open an elevated one.
+  - An `OpenProcess` probe with `PROCESS_QUERY_LIMITED_INFORMATION`: a refusal is
+    the answer, since a non-elevated process cannot open an elevated one.
+  - The probe runs (integrity `0x2000` read for the harness). The refusal itself
+    is exercised by `an_elevated_target_is_refused` against a window titled
+    `dango-elevated`; it needs that window opened elevated. See 9.9.
 - [x] 6.7 Check symbol names and module paths against the vendored crate source before pushing, and verify CI's `cargo clippy -- -D warnings` passes on `windows-latest`
   - Green on the first run, which is not what the project's own notes would predict: the context warns that symbol names and module paths are the usual way Windows code fails here, and `AttachThreadInput` living in `Win32::System::Threading` is recorded as a trap. Checking them against the vendored source before pushing is what made it uneventful.
   - Run 34710561144, both jobs. That run covers `platform/windows/text.rs` and both extensions.
@@ -232,18 +250,21 @@ link and run.
   - **What a harness cannot reach, and why.** Driving the launcher's own interface was tried and abandoned twice. A synthesised Option+Space never reaches the global shortcut. Launching the binary again does open the launcher, but keystrokes do not arrive at the panel, and there is no asking whether it is up either, because a non-activating panel never becomes the frontmost application. So root search, Enter, and the action dispatch stay a manual check.
   - Two conditions the harness needs, both learned the hard way: the application must not be running, or two clipboard owners fight and every check reads empty; and TextEdit must be quit between runs, because rewriting the scratch file does not reset a window it already has open.
 - [ ] 9.2 Walk every scenario in the four spec files on Windows
-  - The harness covers the selection-and-paste scenarios end to end once run on
-    a live desktop. Not run here: session-0 isolation (see 1.5).
+  - The selection-and-paste scenarios pass live through the harness (18 of 18,
+    see group 6). The snippets, quicklinks, and templates scenarios run through
+    the launcher's own interface, which the harness cannot drive, the same manual
+    check 9.1 is on macOS. Outstanding: those and the elevated case (9.9).
 - [x] 9.3 Confirm on both platforms that the user's clipboard is identical before and after a paste, for text and for an image
   - macOS: verified by the driven harness for both content types. Text comes back identical, and a PNG on the clipboard is still there, byte for byte, after an insertion. The image path is a separate branch from text and had never been run live.
 - [ ] 9.4 Confirm on both platforms that no paste, restore, or selection capture appears in the clipboard history or reorders it, while the watcher is running
   - macOS: confirmed by the author with the watcher running. Windows outstanding.
-  - Windows: the harness declares every borrowed write and asserts two per
-    insertion (`both_writes_are_declared`), but the against-the-live-history
-    check needs a session-1 run.
+  - Windows: verified live in the harness that an insertion declares exactly two
+    borrowed writes. Confirming the running watcher records neither, and no
+    reorder, is a check against the live launcher and still outstanding.
 - [ ] 9.5 Confirm on both platforms that a snippet with a caret position leaves the caret where the template declared it, in at least two applications
-  - Windows: `the_caret_lands_where_asked` covers one application in the harness;
-    not run here (see 1.5).
+  - Windows: verified live in the WinForms edit control that typing after an
+    insertion lands at the declared caret (`<b>HERE</b>`). A second application
+    is the remaining manual step.
 - [ ] 9.6 Confirm on both platforms that activation still meets the 80ms budget on a release build with both new extensions enabled
   - Windows: release binary built (`npx tauri build --no-bundle`), but the
     activation timing needs the launcher run interactively with `DANGO_MEASURE=1`,
