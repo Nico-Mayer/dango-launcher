@@ -1,21 +1,37 @@
-//! Exercises the Windows window manager against a real window.
+//! Exercises the platform window manager against a real window.
 //!
-//! It opens a plain resizable window, points the manager at it through the same
-//! previous-foreground the launcher records, and drives each move, reading the
-//! window's visible frame back with `DWMWA_EXTENDED_FRAME_BOUNDS` to check it
-//! landed exactly. No keyboard or foreground dance is needed: a window move is
-//! `SetWindowPos`, not synthesized input, so the target need not be foreground.
+//! On Windows it opens a plain resizable window, points the manager at it
+//! through the same previous-foreground the launcher records, and drives each
+//! move, reading the window's visible frame back with
+//! `DWMWA_EXTENDED_FRAME_BOUNDS` to check it landed exactly. No keyboard or
+//! foreground dance is needed: a window move is `SetWindowPos`, not synthesized
+//! input, so the target need not be foreground.
+//!
+//! On macOS the target is a scratch TextEdit document, or a Finder window with
+//! `cargo run --example window_walkthrough -- finder`, because the manager acts
+//! on the frontmost application's focused window and there is no handle to
+//! point it at. The harness itself is not an application, so it never becomes
+//! frontmost and never steals the target. Frames are read back by asking System
+//! Events, so the answer comes from a different process than the one that wrote
+//! it and a write that reported success while moving nothing is still caught.
+//! It needs the Accessibility permission granted to the example binary, not to
+//! Dango.
 //!
 //! Usage: `cargo run --example window_walkthrough`
 
-#[cfg(not(target_os = "windows"))]
+#[cfg(not(any(target_os = "macos", target_os = "windows")))]
 fn main() {
-    eprintln!("window_walkthrough only runs on Windows");
+    eprintln!("window_walkthrough only runs on Windows and macOS");
 }
 
 #[cfg(target_os = "windows")]
 fn main() {
     windows_harness::run();
+}
+
+#[cfg(target_os = "macos")]
+fn main() {
+    macos_harness::run();
 }
 
 #[cfg(target_os = "windows")]
@@ -35,6 +51,7 @@ mod windows_harness {
 
     use dango_lib::extensions::window_management::geometry::{self, Region};
     use dango_lib::platform::{self, Rect, WindowError};
+    use dango_lib::text::HereIsFine;
 
     const TITLE: &str = "dango-window-walkthrough";
 
@@ -138,7 +155,7 @@ mod windows_harness {
         }
 
         fn manager(&self) -> std::sync::Arc<dyn platform::WindowManager> {
-            platform::window_manager()
+            platform::window_manager(std::sync::Arc::new(HereIsFine))
         }
 
         fn work_area(&self) -> Rect {
@@ -384,5 +401,440 @@ mod windows_harness {
             }
             std::thread::sleep(Duration::from_millis(100));
         }
+    }
+}
+
+#[cfg(target_os = "macos")]
+mod macos_harness {
+    use std::process::Command;
+    use std::time::{Duration, Instant};
+
+    use objc2_app_kit::NSWorkspace;
+
+    use dango_lib::extensions::window_management::geometry::{self, Region};
+    use dango_lib::platform::{self, Rect, WindowError};
+    use dango_lib::text::HereIsFine;
+
+    const SCRATCH: &str = "/tmp/dango-window-walkthrough.txt";
+
+    /// Long enough for the target to take a move and redraw. Accessibility
+    /// writes return before the application has finished applying them.
+    const SETTLE: Duration = Duration::from_millis(150);
+
+    /// Which application's window is being pushed around. Two are offered
+    /// because "it works" has to mean more than one application's idea of what
+    /// a window is: TextEdit is a plain document window, Finder's is a browser
+    /// with a sidebar and its own minimum size.
+    struct App {
+        process: &'static str,
+        bundle: &'static str,
+        open: [&'static str; 2],
+        /// Whether closing the last window leaves the application with none.
+        /// Finder always keeps one: the desktop is a window, and it stays
+        /// focused, so closing everything never produces "no window to move".
+        closes_to_nothing: bool,
+    }
+
+    const TEXT_EDIT: App = App {
+        process: "TextEdit",
+        bundle: "com.apple.TextEdit",
+        open: ["TextEdit", SCRATCH],
+        closes_to_nothing: true,
+    };
+    const FINDER: App = App {
+        process: "Finder",
+        bundle: "com.apple.finder",
+        open: ["Finder", "/tmp"],
+        closes_to_nothing: false,
+    };
+
+    struct Harness {
+        app: App,
+        passed: usize,
+        failed: Vec<String>,
+        skipped: Vec<String>,
+    }
+
+    pub fn run() {
+        if !unsafe { objc2_application_services::AXIsProcessTrusted() } {
+            without_the_permission();
+            return;
+        }
+        let app = match std::env::args().nth(1).unwrap_or_default().as_str() {
+            "finder" => FINDER,
+            "textedit" | "" => TEXT_EDIT,
+            other => {
+                eprintln!("unknown target {other}; use textedit or finder");
+                return;
+            }
+        };
+        println!("target: {}\n", app.process);
+        if !open_target(&app) {
+            eprintln!("could not bring a {} window to the front", app.process);
+            return;
+        }
+
+        let mut harness = Harness {
+            app,
+            passed: 0,
+            failed: vec![],
+            skipped: vec![],
+        };
+
+        harness.reads_the_target_and_its_work_area();
+        harness.the_work_area_leaves_the_menu_bar_and_dock();
+        harness.tiles_each_region_flush();
+        harness.centre_keeps_the_size();
+        harness.maximise_fills_the_work_area();
+        harness.moves_to_the_next_display();
+        harness.is_prompt();
+        harness.no_focused_window_is_reported();
+
+        harness.report();
+        harness.close_target();
+    }
+
+    impl Harness {
+        fn check(&mut self, name: &str, ok: bool, detail: String) {
+            if ok {
+                println!("  PASS  {name}");
+                self.passed += 1;
+            } else {
+                println!("  FAIL  {name}\n          {detail}");
+                self.failed.push(format!("{name}: {detail}"));
+            }
+        }
+
+        fn skip(&mut self, name: &str, why: String) {
+            println!("  SKIP  {name}\n          {why}");
+            self.skipped.push(format!("{name}: {why}"));
+        }
+
+        /// The harness runs on the main thread, so the `NSScreen` hop is inline.
+        fn manager(&self) -> std::sync::Arc<dyn platform::WindowManager> {
+            platform::window_manager(std::sync::Arc::new(HereIsFine))
+        }
+
+        fn work_area(&self) -> Rect {
+            self.manager().target().expect("a target").work_area
+        }
+
+        /// Applies a frame and reads the window back through AppleScript.
+        fn apply(&self, frame: Rect) -> Rect {
+            self.manager().place(frame).expect("place");
+            std::thread::sleep(SETTLE);
+            self.bounds().expect("bounds")
+        }
+
+        /// The window's frame as System Events reports it. Direct Apple Events
+        /// to the application were tried first and time out without an
+        /// Automation grant; System Events needs only the Accessibility one this
+        /// already requires.
+        fn bounds(&self) -> Option<Rect> {
+            rect_from(&format!(
+                "tell application \"System Events\" to tell process \"{}\" to get \
+                 {{value of attribute \"AXPosition\" of window 1, \
+                   value of attribute \"AXSize\" of window 1}}",
+                self.app.process
+            ))
+        }
+
+        /// The menu bar's own frame, in the same coordinates a window frame uses.
+        fn menu_bar(&self) -> Option<Rect> {
+            rect_from(&format!(
+                "tell application \"System Events\" to tell process \"{}\" to get \
+                 {{value of attribute \"AXPosition\" of menu bar 1, \
+                   value of attribute \"AXSize\" of menu bar 1}}",
+                self.app.process
+            ))
+        }
+
+        /// Closes the scratch window and leaves the application running, so a
+        /// document the user had open is not taken down with it. TextEdit's
+        /// scratch file is saved and unchanged, so nothing asks about it.
+        fn close_target(&self) {
+            let _ = osascript(
+                "tell application \"System Events\" to keystroke \"w\" using command down",
+            );
+        }
+
+        fn reads_the_target_and_its_work_area(&mut self) {
+            println!("-- the target and its work area are read");
+            match self.manager().target() {
+                Ok(placement) => {
+                    let reported = self.bounds();
+                    self.check(
+                        "target reports the frontmost window's own frame",
+                        reported.is_some_and(|bounds| close(bounds, placement.frame)),
+                        format!("accessibility {:?}, applescript {reported:?}", placement.frame),
+                    );
+                }
+                Err(error) => self.check(
+                    "target reports the frontmost window's own frame",
+                    false,
+                    format!("{error}"),
+                ),
+            }
+        }
+
+        /// The one assertion that is not circular. Every other check compares a
+        /// placement against the work area this same code computed, so a work
+        /// area flipped upside down would agree with itself.
+        ///
+        /// The menu bar is the independent witness. The system reports it as an
+        /// element of its own, and where it sits is a fact about the screen
+        /// rather than something this code derived: it occupies the top of the
+        /// primary screen, so that screen's work area has to start exactly where
+        /// the menu bar ends. An upside-down work area would start at zero.
+        fn the_work_area_leaves_the_menu_bar_and_dock(&mut self) {
+            println!("-- the work area leaves the menu bar");
+            let Some(menu_bar) = self.menu_bar() else {
+                self.check("the menu bar is reported", false, "none".into());
+                return;
+            };
+            // Onto the primary screen, which is the one the menu bar measures,
+            // so the work area read back is that screen's.
+            self.apply(Rect {
+                x: menu_bar.width / 2 - 300,
+                y: menu_bar.height + 50,
+                width: 600,
+                height: 400,
+            });
+            let area = self.work_area();
+            self.check(
+                "the work area starts where the menu bar ends",
+                (area.y - menu_bar.height).abs() <= 2,
+                format!("menu bar {menu_bar:?}, work area {area:?}"),
+            );
+            println!("          (displays {:?})", self.manager().displays());
+        }
+
+        fn tiles_each_region_flush(&mut self) {
+            println!("-- each region lands flush against the work area");
+            let area = self.work_area();
+            let regions = [
+                ("left half", Region::LeftHalf),
+                ("right half", Region::RightHalf),
+                ("top half", Region::TopHalf),
+                ("bottom half", Region::BottomHalf),
+                ("top-left quarter", Region::TopLeftQuarter),
+                ("top-right quarter", Region::TopRightQuarter),
+                ("bottom-left quarter", Region::BottomLeftQuarter),
+                ("bottom-right quarter", Region::BottomRightQuarter),
+                ("left third", Region::LeftThird),
+                ("centre third", Region::CenterThird),
+                ("right third", Region::RightThird),
+            ];
+            for (name, region) in regions {
+                let expected = region.rect(area);
+                let landed = self.apply(expected);
+                self.check(
+                    name,
+                    close(landed, expected),
+                    format!("expected {expected:?}, landed {landed:?}"),
+                );
+            }
+        }
+
+        fn centre_keeps_the_size(&mut self) {
+            println!("-- centre keeps the window's size");
+            let area = self.work_area();
+            let before = self.apply(Rect {
+                x: area.x + 50,
+                y: area.y + 50,
+                width: 640,
+                height: 480,
+            });
+            let centred = geometry::center(area, (before.width, before.height));
+            let landed = self.apply(centred);
+            self.check(
+                "centre keeps size and centres",
+                close(landed, centred)
+                    && landed.width == before.width
+                    && landed.height == before.height,
+                format!("before {before:?}, expected {centred:?}, landed {landed:?}"),
+            );
+        }
+
+        fn maximise_fills_the_work_area(&mut self) {
+            println!("-- maximise fills the work area");
+            let area = self.work_area();
+            let landed = self.apply(Region::Maximize.rect(area));
+            self.check(
+                "maximise equals the work area",
+                close(landed, area),
+                format!("work area {area:?}, landed {landed:?}"),
+            );
+        }
+
+        fn moves_to_the_next_display(&mut self) {
+            println!("-- move to the next display");
+            let displays = self.manager().displays();
+            if displays.len() < 2 {
+                self.skip(
+                    "move to next display",
+                    format!("only {} display present", displays.len()),
+                );
+                return;
+            }
+            let area = self.work_area();
+            let frame = self.apply(Region::LeftHalf.rect(area));
+            let Some(moved) = geometry::next_display(frame, area, &displays) else {
+                self.check("move to next display", false, "geometry returned none".into());
+                return;
+            };
+            let landed = self.apply(moved);
+            let index = displays.iter().position(|d| *d == area).expect("this display");
+            let destination = displays[(index + 1) % displays.len()];
+            // The same left half, on the next display's work area. The tolerance
+            // is wider than a placement's: the relative region is recomputed
+            // from fractions, so a pixel of slack in the frame it started from
+            // is magnified by the ratio between the two displays.
+            let expected = Region::LeftHalf.rect(destination);
+            self.check(
+                "a left-half window is a left-half window on the next display",
+                within(landed, moved, 2) && within(moved, expected, 8),
+                format!("expected {expected:?}, asked {moved:?}, landed {landed:?}, displays {displays:?}"),
+            );
+        }
+
+        fn is_prompt(&mut self) {
+            println!("-- a move is prompt");
+            let area = self.work_area();
+            let start = Instant::now();
+            self.manager()
+                .place(Region::LeftHalf.rect(area))
+                .expect("place");
+            let elapsed = start.elapsed();
+            self.check(
+                "place returns within 100ms",
+                elapsed < Duration::from_millis(100),
+                format!("place took {elapsed:?}"),
+            );
+            println!("          (place returned in {elapsed:?})");
+        }
+
+        /// Closing the document leaves TextEdit frontmost with nothing focused,
+        /// which is the macOS shape of "there is no window to move".
+        fn no_focused_window_is_reported(&mut self) {
+            println!("-- no focused window is reported");
+            if !self.app.closes_to_nothing {
+                self.close_target();
+                self.skip(
+                    "no focused window is NoTarget",
+                    format!("{}'s desktop stays focused with no window open", self.app.process),
+                );
+                return;
+            }
+            self.close_target();
+            std::thread::sleep(SETTLE);
+            if frontmost_bundle().as_deref() != Some(self.app.bundle) {
+                self.skip(
+                    "no focused window is NoTarget",
+                    format!("{} stopped being frontmost after the close", self.app.process),
+                );
+                return;
+            }
+            let result = self.manager().target();
+            self.check(
+                "no focused window is NoTarget",
+                matches!(result, Err(WindowError::NoTarget)),
+                format!("got {result:?}"),
+            );
+        }
+
+        fn report(&self) {
+            println!(
+                "\n{} passed, {} failed, {} skipped",
+                self.passed,
+                self.failed.len(),
+                self.skipped.len()
+            );
+            for failure in &self.failed {
+                println!("  {failure}");
+            }
+        }
+    }
+
+    /// Logical points, so placement should be exact. A pixel or two of slack
+    /// absorbs an application enforcing a minimum or snapping to a text grid
+    /// without hiding a real gap.
+    fn close(a: Rect, b: Rect) -> bool {
+        within(a, b, 2)
+    }
+
+    fn within(a: Rect, b: Rect, slack: i32) -> bool {
+        (a.x - b.x).abs() <= slack
+            && (a.y - b.y).abs() <= slack
+            && (a.width - b.width).abs() <= slack
+            && (a.height - b.height).abs() <= slack
+    }
+
+
+    /// What an untrusted process gets. Running a copy of this binary from a
+    /// path the permission was never granted to exercises the same branch a
+    /// revoked permission does, without taking the grant away from anything
+    /// else. Every command has to say what is wrong and offer the prompt, not
+    /// quietly do nothing.
+    fn without_the_permission() {
+        println!("-- without the Accessibility permission");
+        let manager = platform::window_manager(std::sync::Arc::new(HereIsFine));
+        let target = manager.target();
+        let placed = manager.place(Rect { x: 0, y: 0, width: 800, height: 600 });
+        println!("  target: {target:?}");
+        println!("  place:  {placed:?}");
+        fn explained<T>(result: &Result<T, WindowError>) -> bool {
+            matches!(result, Err(WindowError::Failed(message)) if message.contains("Accessibility"))
+        }
+        if explained(&target) && explained(&placed) {
+            println!("  PASS  both explain the missing permission and prompt for it");
+        } else {
+            println!("  FAIL  the missing permission was not explained");
+        }
+        println!("\nGrant Accessibility to:");
+        println!("  {}", std::env::current_exe().unwrap().display());
+        println!("in System Settings > Privacy & Security > Accessibility, then rerun.");
+    }
+
+    fn open_target(app: &App) -> bool {
+        let _ = std::fs::write(SCRATCH, "dango window walkthrough\n");
+        // `open` activates as well, so no separate activation is needed.
+        let _ = Command::new("open").arg("-a").args(app.open).status();
+
+        let deadline = Instant::now() + Duration::from_secs(20);
+        while Instant::now() < deadline {
+            if frontmost_bundle().as_deref() == Some(app.bundle) {
+                return true;
+            }
+            std::thread::sleep(Duration::from_millis(100));
+        }
+        false
+    }
+
+    fn frontmost_bundle() -> Option<String> {
+        NSWorkspace::sharedWorkspace()
+            .frontmostApplication()?
+            .bundleIdentifier()
+            .map(|id| id.to_string())
+    }
+
+    fn rect_from(script: &str) -> Option<Rect> {
+        let output = osascript(script)?;
+        let numbers: Vec<i32> = output
+            .split(',')
+            .filter_map(|part| part.trim().parse().ok())
+            .collect();
+        match numbers[..] {
+            [x, y, width, height] => Some(Rect { x, y, width, height }),
+            _ => None,
+        }
+    }
+
+    fn osascript(script: &str) -> Option<String> {
+        let output = Command::new("osascript").args(["-e", script]).output().ok()?;
+        output
+            .status
+            .success()
+            .then(|| String::from_utf8_lossy(&output.stdout).trim().to_string())
     }
 }
