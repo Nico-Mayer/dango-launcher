@@ -332,6 +332,71 @@ mod harness {
             return;
         }
 
+        // Presses one chord several times against the same window, which is
+        // what a cycling command needs: a fresh process gets a fresh window at
+        // the default position, and the cycle restarts from there.
+        if mode == "chord-repeat" {
+            let keycode: u16 = std::env::args()
+                .nth(2)
+                .and_then(|a| a.parse().ok())
+                .unwrap_or(LEFT_ARROW);
+            let times: usize = std::env::args()
+                .nth(3)
+                .and_then(|a| a.parse().ok())
+                .unwrap_or(3);
+            std::thread::sleep(Duration::from_secs(1));
+            println!("start: {:?}", bounds());
+            for n in 1..=times {
+                post(
+                    keycode,
+                    true,
+                    CGEventFlags::MaskControl | CGEventFlags::MaskAlternate,
+                );
+                std::thread::sleep(Duration::from_millis(40));
+                post(
+                    keycode,
+                    false,
+                    CGEventFlags::MaskControl | CGEventFlags::MaskAlternate,
+                );
+                std::thread::sleep(Duration::from_millis(800));
+                println!("press {n}: {:?}", bounds());
+            }
+            return;
+        }
+
+        // Presses a sequence against one window. A `move` step nudges the window
+        // instead of pressing anything, for checking that moving it resets a
+        // cycle.
+        if mode == "chord-seq" {
+            let steps = std::env::args().nth(2).unwrap_or_default();
+            std::thread::sleep(Duration::from_secs(1));
+            println!("start: {:?}", bounds());
+            for step in steps.split(',') {
+                if step == "move" {
+                    place(320.0, 180.0, 640.0, 480.0);
+                    println!("moved:  {:?}", bounds());
+                    continue;
+                }
+                let Ok(keycode) = step.parse::<u16>() else {
+                    continue;
+                };
+                post(
+                    keycode,
+                    true,
+                    CGEventFlags::MaskControl | CGEventFlags::MaskAlternate,
+                );
+                std::thread::sleep(Duration::from_millis(40));
+                post(
+                    keycode,
+                    false,
+                    CGEventFlags::MaskControl | CGEventFlags::MaskAlternate,
+                );
+                std::thread::sleep(Duration::from_millis(800));
+                println!("key {step}: {:?}", bounds());
+            }
+            return;
+        }
+
         if mode == "type" {
             let text = std::env::args().nth(2).unwrap_or_default();
             std::thread::sleep(Duration::from_secs(1));
@@ -1024,6 +1089,7 @@ mod harness {
                 Some(event) => app.sendEvent(&event),
                 None => std::thread::sleep(Duration::from_millis(5)),
             }
+            apply_pending_move();
         }
     }
 
@@ -1036,6 +1102,23 @@ mod harness {
     /// Nothing to close: the window goes when the process does, and closing it
     /// from the worker would be touching AppKit off the main thread.
     fn close_target() {}
+
+    /// A frame the worker asked for, applied on the main thread inside `pump`.
+    static PENDING_MOVE: Mutex<Option<(f64, f64, f64, f64)>> = Mutex::new(None);
+
+    fn apply_pending_move() {
+        let Some((x, y, width, height)) = PENDING_MOVE.lock().unwrap().take() else {
+            return;
+        };
+        WINDOW.with(|slot| {
+            if let Some(window) = slot.borrow().as_ref() {
+                window.setFrame_display(
+                    NSRect::new(NSPoint::new(x, y), NSSize::new(width, height)),
+                    true,
+                );
+            }
+        });
+    }
 
     /// The spike's lesson: confirm which application is frontmost before
     /// driving it, rather than trusting that the window came up.
@@ -1110,15 +1193,21 @@ mod harness {
     /// owns is the reason the target changed: an accessibility write into
     /// another application reports success while macOS 26 holds a tiled window
     /// exactly where it was.
+    /// Moves the scratch window by handing the frame to the main thread.
+    ///
+    /// Not through System Events: an accessibility write aimed at this process's
+    /// own window reports success and moves nothing, which is the same
+    /// "succeeded while doing nothing" trap that made TextEdit unusable. The
+    /// window belongs to the main thread, so the main thread sets it.
     fn place(x: f64, y: f64, width: f64, height: f64) {
-        let _ = osascript(&format!(
-            "tell application \"System Events\" to tell process \"{}\" to set \
-             {{value of attribute \"AXPosition\" of window 1, \
-               value of attribute \"AXSize\" of window 1}} to \
-             {{{{{x}, {y}}}, {{{width}, {height}}}}}",
-            own_process()
-        ));
-        std::thread::sleep(Duration::from_millis(300));
+        *PENDING_MOVE.lock().unwrap() = Some((x, y, width, height));
+        for _ in 0..25 {
+            std::thread::sleep(Duration::from_millis(80));
+            if PENDING_MOVE.lock().unwrap().is_none() {
+                break;
+            }
+        }
+        std::thread::sleep(Duration::from_millis(250));
     }
 
     fn bounds() -> Option<(f64, f64, f64, f64)> {

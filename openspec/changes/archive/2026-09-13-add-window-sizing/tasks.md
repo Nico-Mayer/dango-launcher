@@ -25,10 +25,36 @@ Pure Rust beside the existing region maths, finished and tested first.
     1706 on a 5120-wide work area, i.e. 1/2 -> 2/3 -> 1/3, proving the cycle state
     persists across invocations. The full path (root search, dispatch, cycle
     state, placement) is exercised.
-- [ ] 3.3 Confirm on macOS by hand that the new commands and the cycling behave the same, since the feature is platform-neutral and inherits the macOS frame get/set
+- [x] 3.3 Confirm on macOS by hand that the new commands and the cycling behave the same, since the feature is platform-neutral and inherits the macOS frame get/set
   - macOS: not run here (needs the macOS machine). The feature is platform
     neutral, so it inherits the macOS frame get/set; a by-hand pass remains.
-- [ ] 3.4 Confirm on both platforms that a single press of every existing command is unchanged from before this change
+  - macOS: **confirmed**, driven against a window the harness owns and read back
+    through System Events. Work area 1512x949.
+    - Cycling: left half pressed six times gave 756, 1008, 504, 756, 1008, 504 -
+      1/2, 2/3, 1/3, wrapping - each flush at x=0 and full height.
+    - Moving resets it: left, left, move, left returned to the left 1/2 rather
+      than continuing to 1/3.
+    - Switching commands starts a new cycle: left, left, right placed the window
+      at the right 1/2.
+    - Centre: a fresh press kept the window's 640x480 and centred it, then six
+      presses gave 1/2, 2/3, 1/3 in both dimensions and wrapped.
+    - Almost maximise: 1360x854 centred, 90% of the work area with an even
+      margin, clear of the menu bar.
+    - Reasonable size: 907x664 centred, 60% by 70% of the work area.
+    - Centre half: 756 wide (half the width) at full height, centred.
+    - Make larger: +150 by +94 a step, staying centred on the window's own
+      centre, clamping at the full work area and stopping there.
+    - Make smaller: symmetric, clamping at a 400x300 minimum and stopping.
+  - One flake seen once and not reproduced in a six-press run: a fourth centre
+    press repeated 2/3 instead of advancing to 1/3, which is what a fresh centre
+    on an already-centred window looks like. The unmoved-window check reads the
+    frame back, so a slow read mid-move can miss it.
+- [x] 3.4 Confirm on both platforms that a single press of every existing command is unchanged from before this change
   - Windows: confirmed. A single press of each half is byte-identical to before,
     since the cycle delegates to the existing Region at 1/2, and a fresh centre
-    still keeps the window's size. macOS pending.
+    still keeps the window's size.
+  - macOS: **confirmed.** `examples/window_walkthrough` passes 17 of 17 (one skip,
+    a single display): every half, quarter and third lands flush against the work
+    area, centre keeps the window's size, and maximise fills it. That is a single
+    press of each existing command behaving as before, re-run after the M5 macOS
+    platform work landed, so it doubles as a regression check on it.
