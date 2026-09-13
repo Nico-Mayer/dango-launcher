@@ -175,6 +175,15 @@ the non-elevated harness.
   - A poll of `GetForegroundWindow` against the remembered window, not a delay.
   - Verified live with a decoy holding the front: the target is brought forward
     first and the text lands in it, never in the window that was in front.
+  - **A second runtime bug, reported by the author using it.** Restoring focus
+    was intermittently refused ("the previous window would not come back to the
+    foreground") when using a snippet. `force_foreground` only attached to the
+    current foreground thread and did a bare `SetForegroundWindow` when that was
+    null, which is the state right after the launcher hides, and the foreground
+    lock drops it silently. Fixed by zeroing `SPI_SETFOREGROUNDLOCKTIMEOUT` for
+    the call, attaching to both the outgoing and the target thread, and
+    `BringWindowToTop`. The walkthrough proves it: with its synthesised-keystroke
+    crutch removed the handoff was refused before the fix and reliable after.
 - [x] 6.4 Fail with a message when the previous window never becomes foreground, verified by holding foreground elsewhere
   - Verified live against a window that had been closed: the insertion fails
     with a message naming the foreground after about 400ms, and nothing is
