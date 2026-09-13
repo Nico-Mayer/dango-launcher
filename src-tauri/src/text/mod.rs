@@ -18,6 +18,9 @@ use crate::extensions::clipboard::{ClipboardSource, Content};
 /// keystroke that precedes it.
 const COPY_TIMEOUT: std::time::Duration = std::time::Duration::from_millis(200);
 const COPY_POLL: std::time::Duration = std::time::Duration::from_millis(5);
+/// How long a keyword expansion waits after the paste before restoring the
+/// clipboard, so the target consumes the paste first (see `expand`).
+const EXPAND_PASTE_GRACE: std::time::Duration = std::time::Duration::from_millis(120);
 
 #[derive(Debug, thiserror::Error, PartialEq, Eq, Clone)]
 pub enum TextError {
@@ -314,6 +317,13 @@ impl TextExchange {
         self.handoff.settle_after_paste();
         if pasted.is_ok() {
             self.place_caret(text, caret)?;
+            // `settle_after_paste` confirms the target thread is responsive, but
+            // a sent message is handled before the posted paste keystroke is
+            // consumed, so the restore can still win the race and put the user's
+            // own clipboard back before the paste reads it, pasting that instead
+            // of the snippet. A brief grace lets the queued paste land first,
+            // still far inside the 500ms an expansion is allowed.
+            std::thread::sleep(EXPAND_PASTE_GRACE);
         }
         self.restore(saved, text);
         pasted
