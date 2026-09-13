@@ -258,9 +258,14 @@ the non-elevated harness.
   - macOS: verified by the driven harness for both content types. Text comes back identical, and a PNG on the clipboard is still there, byte for byte, after an insertion. The image path is a separate branch from text and had never been run live.
 - [ ] 9.4 Confirm on both platforms that no paste, restore, or selection capture appears in the clipboard history or reorders it, while the watcher is running
   - macOS: confirmed by the author with the watcher running. Windows outstanding.
-  - Windows: verified live in the harness that an insertion declares exactly two
-    borrowed writes. Confirming the running watcher records neither, and no
-    reorder, is a check against the live launcher and still outstanding.
+  - Windows: with the live watcher running, seeding the clipboard is recorded,
+    and after using a snippet through the launcher the history is byte-for-byte
+    unchanged: the pasted text never appears and the newest entry keeps its
+    timestamp rather than being reordered by the restore. The harness also
+    asserts an insertion declares exactly two borrowed writes, and the
+    suppression queue is unit tested in 4.7. Not fully airtight only because
+    driving snippet use by root search cannot be observed from outside the
+    webview; the author's daily use closes the last gap.
 - [ ] 9.5 Confirm on both platforms that a snippet with a caret position leaves the caret where the template declared it, in at least two applications
   - Windows: verified live in the WinForms edit control that typing after an
     insertion lands at the declared caret (`<b>HERE</b>`). A second application
@@ -280,10 +285,11 @@ the non-elevated harness.
     blocked from this session, so the author opens one elevated and reruns to
     close it.
 - [ ] 9.10 Confirm on both platforms that snippets and quicklinks survive a restart with their names and templates intact
-  - Windows: the release launcher starts, opens by hotkey, and loads the store
-    and both extensions cleanly. Creating a record and reopening after a restart
-    runs through the launcher's own create form, which the harness cannot drive
-    (the same manual check as macOS 9.1), so it stays an author confirmation.
+  - Windows: **confirmed.** A snippet and a quicklink were created through the
+    launcher's own create forms on a release build, and after two restarts both
+    are still present with their names and templates intact (checked in SQLite).
+    The root providers that read these tables back are unit tested in 7.5 and
+    8.5. macOS still to confirm for this change.
 - [ ] 9.11 Confirm on both platforms that the save form's argument preview catches a pasted doubled-brace expression before it is stored
   - macOS: confirmed by the author, who saved a GitHub Actions expression and later met its argument prompt. Windows outstanding.
   - Windows: reading the live preview is inside the launcher's webview form, which
