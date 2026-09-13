@@ -126,7 +126,7 @@ impl Handoff for WindowsHandoff {
         let Some(previous) = previous_foreground() else {
             return Err(TextError::NoTarget);
         };
-        if is_elevated(previous) {
+        if is_out_of_reach(previous) {
             return Err(TextError::TargetUnavailable(
                 "that window belongs to an elevated program, which Dango cannot reach".into(),
             ));
@@ -175,10 +175,18 @@ impl Handoff for WindowsHandoff {
     }
 }
 
-/// A non-elevated process cannot open an elevated one, so the refusal is the
-/// answer. This is a hard ceiling of running unelevated, not something to work
-/// around.
-fn is_elevated(hwnd: HWND) -> bool {
+/// Whether the target window is out of reach because it outranks this process.
+///
+/// The ceiling is UIPI: synthesised input from a lower integrity level is
+/// silently dropped by a higher-integrity window, so the paste would vanish
+/// with no error. The answer is to compare integrity levels and refuse when the
+/// target sits above us.
+///
+/// An earlier version probed with `OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION)`
+/// and read a refusal as "elevated". That was wrong and only showed at runtime:
+/// that access right is granted across integrity levels by design, so the open
+/// always succeeded and every elevated window read as reachable.
+fn is_out_of_reach(hwnd: HWND) -> bool {
     unsafe {
         let mut pid: u32 = 0;
         GetWindowThreadProcessId(hwnd, &mut pid);
@@ -187,10 +195,18 @@ fn is_elevated(hwnd: HWND) -> bool {
         }
         let handle = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, pid);
         if handle.is_null() {
+            // Cannot even be opened, so it certainly cannot be driven.
             return true;
         }
+        let target = integrity_level(handle);
         CloseHandle(handle);
-        false
+        match (target, own_integrity_level()) {
+            (Some(target), Some(own)) => target > own,
+            // Its integrity could not be read while ours could, which a
+            // same-or-lower process would not do. Treat it as above us.
+            (None, Some(_)) => true,
+            _ => false,
+        }
     }
 }
 
