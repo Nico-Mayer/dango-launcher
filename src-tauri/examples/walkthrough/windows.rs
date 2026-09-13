@@ -279,14 +279,6 @@ impl Harness {
     /// says whether it is genuinely the foreground window afterwards. Nothing
     /// may be typed into or read from a window without this answering true.
     fn focus(&mut self, window: HWND) -> bool {
-        // Earn foreground rights the way the real launcher does when the user
-        // presses the hotkey. Windows only lets a process call
-        // SetForegroundWindow if, among other things, it received the last
-        // input event, and a synthesised keystroke satisfies that. Without it
-        // the handoff is refused whenever a foreground-locking window, such as
-        // a fullscreen video, is holding the front.
-        let _ = self.enigo.key(Key::Shift, Direction::Click);
-        std::thread::sleep(Duration::from_millis(30));
         platform::remember_previous_foreground(window as isize);
         if let Err(error) = self.handoff.yield_to_previous() {
             eprintln!("          (handoff refused: {error})");
