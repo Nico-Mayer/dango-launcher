@@ -225,6 +225,9 @@ fn expand(records: &Records, text: &dyn TextTarget, hit: &Hit) {
         return;
     };
     platform::note_insertion_target();
+    // Held across the whole injection: the monitor must not observe the
+    // backspaces and the paste it is about to send.
+    let _injecting = platform::injection_guard();
     let _ = text.expand(hit.keyword_chars, &rendered.text, rendered.caret);
 }
 

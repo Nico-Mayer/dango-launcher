@@ -146,10 +146,7 @@ pub fn start_key_monitor(sink: Box<dyn Fn(KeyStroke) + Send>) -> Option<Box<dyn 
     }
     #[cfg(target_os = "macos")]
     {
-        // The macOS event tap is a later task; keyword expansion reports
-        // unavailable there rather than silently doing nothing.
-        let _ = sink;
-        None
+        macos::MacKeyMonitor::start(sink).map(|m| Box::new(m) as Box<dyn KeyMonitor>)
     }
 }
 
@@ -162,7 +159,7 @@ pub fn foreground_app() -> Option<String> {
     }
     #[cfg(target_os = "macos")]
     {
-        None
+        macos::foreground_app()
     }
 }
 
@@ -177,7 +174,7 @@ pub fn focused_field_is_secure() -> bool {
     }
     #[cfg(target_os = "macos")]
     {
-        false
+        macos::focused_field_is_secure()
     }
 }
 
@@ -190,8 +187,26 @@ pub fn note_insertion_target() {
     {
         windows::note_insertion_target();
     }
+    // macOS has nothing to record: every insertion acts on the frontmost
+    // application, which is already the target.
+}
+
+/// Held for as long as Dango is injecting keystrokes, so the key monitor does
+/// not observe its own output. Windows marks its injected events instead and
+/// needs no guard; on macOS the paste goes through enigo, which cannot mark
+/// them, so the monitor is muted for the duration. See the keyword-expansion
+/// design.
+#[cfg(target_os = "macos")]
+pub struct InjectionGuard(#[allow(dead_code)] macos::Mute);
+
+#[cfg(target_os = "windows")]
+pub struct InjectionGuard;
+
+pub fn injection_guard() -> InjectionGuard {
     #[cfg(target_os = "macos")]
-    {}
+    return InjectionGuard(macos::Mute::new());
+    #[cfg(target_os = "windows")]
+    return InjectionGuard;
 }
 
 /// The selection and paste path for this platform, or `None` when key injection
