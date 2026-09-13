@@ -262,6 +262,16 @@ the non-elevated harness.
   - Mostly covered by the driven harness, at 11 of 11 against a real application: text arrives, the caret lands where asked, the clipboard survives for text and for a PNG, both borrowed writes are declared, a selection is read and given back, and an empty document reports no selection.
   - **What a harness cannot reach, and why.** Driving the launcher's own interface was tried and abandoned twice. A synthesised Option+Space never reaches the global shortcut. Launching the binary again does open the launcher, but keystrokes do not arrive at the panel, and there is no asking whether it is up either, because a non-activating panel never becomes the frontmost application. So root search, Enter, and the action dispatch stay a manual check.
   - Two conditions the harness needs, both learned the hard way: the application must not be running, or two clipboard owners fight and every check reads empty; and TextEdit must be quit between runs, because rewriting the scratch file does not reset a window it already has open.
+  - macOS correction: two of the blockers above no longer hold. A synthesized
+    Option+Space **does** reach the global shortcut - 26 of 26 summons landed -
+    and keystrokes **do** arrive at the panel, which took text into the create
+    form's field. Whether the launcher is up is answerable from outside too, by
+    asking System Events for the window count of the `dango` process. So root
+    search, Enter, and action dispatch are drivable now and this walk is no
+    longer blocked; it is only unfinished.
+  - One caveat for whoever finishes it: the form is a webview and reorders
+    synthesized keystrokes at speed (`ProbeName` arriving as `eNamePro`), and a
+    synthesized Tab is typed into the field rather than moving focus.
 - [ ] 9.2 Walk every scenario in the four spec files on Windows
   - The selection-and-paste scenarios pass live through the harness (18 of 18,
     see group 6). The snippets, quicklinks, and templates scenarios run through
@@ -269,7 +279,7 @@ the non-elevated harness.
     check 9.1 is on macOS. Outstanding: those and the elevated case (9.9).
 - [x] 9.3 Confirm on both platforms that the user's clipboard is identical before and after a paste, for text and for an image
   - macOS: verified by the driven harness for both content types. Text comes back identical, and a PNG on the clipboard is still there, byte for byte, after an insertion. The image path is a separate branch from text and had never been run live.
-- [ ] 9.4 Confirm on both platforms that no paste, restore, or selection capture appears in the clipboard history or reorders it, while the watcher is running
+- [x] 9.4 Confirm on both platforms that no paste, restore, or selection capture appears in the clipboard history or reorders it, while the watcher is running
   - macOS: confirmed by the author with the watcher running. Windows outstanding.
   - Windows: with the live watcher running, seeding the clipboard is recorded,
     and after using a snippet through the launcher the history is byte-for-byte
@@ -279,15 +289,30 @@ the non-elevated harness.
     suppression queue is unit tested in 4.7. Not fully airtight only because
     driving snippet use by root search cannot be observed from outside the
     webview; the author's daily use closes the last gap.
+  - macOS: re-confirmed against the live watcher by snapshotting
+    `local_clipboard_history` either side of an expansion. The history is
+    byte-for-byte identical: the pasted snippet never appears, and the newest
+    entry keeps its timestamp rather than being reordered by the restore.
 - [ ] 9.5 Confirm on both platforms that a snippet with a caret position leaves the caret where the template declared it, in at least two applications
   - Windows: verified live in the WinForms edit control that typing after an
     insertion lands at the declared caret (`<b>HERE</b>`). A second application
     is the remaining manual step.
-- [ ] 9.6 Confirm on both platforms that activation still meets the 80ms budget on a release build with both new extensions enabled
+  - macOS: verified in two applications. Typing after expanding a
+    `<b>{{cursor}}</b>` snippet produced `<b>HERE</b>` in the harness's own
+    window and again in TextEdit, so the caret landed where the template
+    declared it in both. Windows still needs its second application.
+- [x] 9.6 Confirm on both platforms that activation still meets the 80ms budget on a release build with both new extensions enabled
   - Windows: **passes.** Release build with `DANGO_MEASURE=1`, store loaded and
     both new extensions registered (no load-failure logs). 26 activations by
     global hotkey: min 19.2ms, median 24.6ms, p90 26.8ms, max 33.0ms, none over
     80ms. macOS still to confirm for this change.
+  - macOS: **passes.** Release build with `DANGO_MEASURE=1`, store loaded and
+    both new extensions registered. 26 activations by the global hotkey: min
+    27.5ms, median 46.5ms, p90 48.0ms, max 53.3ms, none over 80ms.
+  - Measuring this needs the launcher confirmed down between summons. The hotkey
+    toggles, so pressing it again while the launcher is still up starts an
+    activation that never paints and lands in the probe as a multi-second
+    reading.
 - [x] 9.7 Confirm on both platforms that text appears in the target application within 400ms of confirming, measured over repeated pastes
   - macOS: an insertion returns in about 370ms across runs, and roughly 300ms of that is the clipboard restore the user never waits for. The text itself arrives in about 70ms.
 - [ ] 9.8 Confirm on macOS that revoking the Accessibility permission produces the explained failure and the prompt action, and that granting it restores normal behaviour without a restart
@@ -295,12 +320,19 @@ the non-elevated harness.
   - **Confirmed** against a live elevated window, non-elevated harness (integrity
     `0x2000`): the insertion fails with the elevation message and the clipboard
     is left untouched. This is what surfaced the 6.6 bug; both hold after the fix.
-- [ ] 9.10 Confirm on both platforms that snippets and quicklinks survive a restart with their names and templates intact
+- [x] 9.10 Confirm on both platforms that snippets and quicklinks survive a restart with their names and templates intact
   - Windows: **confirmed.** A snippet and a quicklink were created through the
     launcher's own create forms on a release build, and after two restarts both
     are still present with their names and templates intact (checked in SQLite).
     The root providers that read these tables back are unit tested in 7.5 and
     8.5. macOS still to confirm for this change.
+  - macOS: **confirmed.** `snippets.json` and `quicklinks.json` are byte-identical
+    (same md5) after two restarts of a release build, and the snippet's keyword
+    still expands to its full template afterwards, so names and templates
+    survive.
+  - Note: `add-file-backed-records` has since moved these out of SQLite, so this
+    is now a check on the JSON files rather than on the tables the Windows note
+    describes.
 - [ ] 9.11 Confirm on both platforms that the save form's argument preview catches a pasted doubled-brace expression before it is stored
   - macOS: confirmed by the author, who saved a GitHub Actions expression and later met its argument prompt. Windows outstanding.
   - Windows: reading the live preview is inside the launcher's webview form, which

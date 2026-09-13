@@ -114,6 +114,22 @@ mod harness {
         if !preflight() {
             return;
         }
+        // Types into whatever application is already frontmost and reads the
+        // result back out of it, for checking a second application without this
+        // harness taking focus away from it. No scratch window is built.
+        if std::env::args().nth(1).as_deref() == Some("caret-in") {
+            let process = std::env::args().nth(2).unwrap_or_default();
+            let keyword = std::env::args().nth(3).unwrap_or_else(|| ";ct".into());
+            let after = std::env::args().nth(4).unwrap_or_else(|| "HERE".into());
+            println!("frontmost: {:?}", frontmost_process());
+            type_text(&keyword);
+            std::thread::sleep(Duration::from_millis(1800));
+            type_text(&after);
+            std::thread::sleep(Duration::from_millis(700));
+            println!("{process} holds: {:?}", text_of(&process));
+            return;
+        }
+
         start_witness();
         if !build_window() {
             eprintln!("could not build the scratch window");
@@ -268,6 +284,53 @@ mod harness {
         // field instead of moving focus. Records written by hand are covered
         // above; a record written by the app is not, and saying so is better
         // than a check that passes for the wrong reason.
+
+        // Summons and dismisses the launcher repeatedly, for the activation
+        // budget. The numbers come from Dango's own probe on its stderr, not
+        // from anything timed here.
+        if mode == "summon" {
+            let times: usize = std::env::args()
+                .nth(2)
+                .and_then(|a| a.parse().ok())
+                .unwrap_or(25);
+            let mut clean = 0;
+            for _ in 0..times {
+                // The hotkey toggles, so the launcher has to be confirmed down
+                // before the next summon. Pressing it again while it is still up
+                // starts an activation that never paints, which lands in the
+                // probe as a multi-second reading.
+                if !wait_for_launcher(false) {
+                    continue;
+                }
+                post(SPACE, true, CGEventFlags::MaskAlternate);
+                post(SPACE, false, CGEventFlags::MaskAlternate);
+                if !wait_for_launcher(true) {
+                    continue;
+                }
+                post(SPACE, true, CGEventFlags::MaskAlternate);
+                post(SPACE, false, CGEventFlags::MaskAlternate);
+                if wait_for_launcher(false) {
+                    clean += 1;
+                }
+            }
+            println!("{clean} clean summon/dismiss cycles of {times}");
+            return;
+        }
+
+        // Expands a keyword, then types more, so where the caret was left is
+        // visible in the resulting text rather than inferred.
+        if mode == "caret" {
+            let keyword = std::env::args().nth(2).unwrap_or_else(|| ";ct".into());
+            let after = std::env::args().nth(3).unwrap_or_else(|| "HERE".into());
+            std::thread::sleep(Duration::from_secs(1));
+            clear_document();
+            type_text(&keyword);
+            std::thread::sleep(Duration::from_millis(1600));
+            type_text(&after);
+            std::thread::sleep(Duration::from_millis(600));
+            println!("after {keyword:?} then {after:?}: {:?}", document_text());
+            return;
+        }
 
         if mode == "type" {
             let text = std::env::args().nth(2).unwrap_or_default();
@@ -610,6 +673,18 @@ mod harness {
         post(keycode, false, flags);
         std::thread::sleep(Duration::from_millis(900));
         launcher_windows() > 0
+    }
+
+    /// Waits for the launcher to be up or down, so a summon is never sent while
+    /// the previous one is still on screen.
+    fn wait_for_launcher(up: bool) -> bool {
+        for _ in 0..25 {
+            std::thread::sleep(Duration::from_millis(120));
+            if (launcher_windows() > 0) == up {
+                return true;
+            }
+        }
+        false
     }
 
     fn dismiss() {
@@ -970,6 +1045,22 @@ mod harness {
              whose frontmost is true",
         )
         .is_some_and(|name| name.trim() == process)
+    }
+
+    fn frontmost_process() -> Option<String> {
+        osascript(
+            "tell application \"System Events\" to get name of first application process \
+             whose frontmost is true",
+        )
+    }
+
+    /// The text of a named application's first text area, for checking an
+    /// application this harness does not own.
+    fn text_of(process: &str) -> Option<String> {
+        osascript(&format!(
+            "tell application \"System Events\" to tell process \"{process}\" to get value of \
+             text area 1 of scroll area 1 of window 1"
+        ))
     }
 
     /// Read from outside this process, so the answer is never this process's
