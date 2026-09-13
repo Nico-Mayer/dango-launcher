@@ -21,7 +21,8 @@ use windows_sys::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows_sys::Win32::System::Threading::GetCurrentThreadId;
 use windows_sys::Win32::UI::Input::KeyboardAndMouse::{
     GetAsyncKeyState, GetKeyState, GetKeyboardLayout, ToUnicodeEx, HKL, VK_CAPITAL, VK_CONTROL,
-    VK_LWIN, VK_MENU, VK_RWIN, VK_SHIFT,
+    VK_LCONTROL, VK_LMENU, VK_LSHIFT, VK_LWIN, VK_MENU, VK_RCONTROL, VK_RMENU, VK_RSHIFT, VK_RWIN,
+    VK_SHIFT,
 };
 use windows_sys::Win32::UI::WindowsAndMessaging::{
     CallNextHookEx, GetForegroundWindow, GetMessageW, GetWindowThreadProcessId, PostThreadMessageW,
@@ -110,12 +111,35 @@ unsafe extern "system" fn hook_proc(code: i32, wparam: WPARAM, lparam: LPARAM) -
         if info.dwExtraInfo != DANGO_INJECTED {
             let message = wparam as u32;
             if message == WM_KEYDOWN || message == WM_SYSKEYDOWN {
-                deliver(translate(info.vkCode, info.scanCode, message));
+                if let Some(stroke) = translate(info.vkCode, info.scanCode, message) {
+                    deliver(stroke);
+                }
             }
         }
     }
     // A monitor never swallows a key: always pass the event on.
     CallNextHookEx(std::ptr::null_mut(), code, wparam, lparam)
+}
+
+/// A modifier key pressed on its own. Its own key event carries no character and
+/// must be ignored, not treated as a clear, or a keyword with a capital letter
+/// (whose Shift press comes first) would clear the buffer before its own letter.
+fn is_modifier_key(vk: u32) -> bool {
+    matches!(
+        vk as u16,
+        VK_SHIFT
+            | VK_LSHIFT
+            | VK_RSHIFT
+            | VK_CONTROL
+            | VK_LCONTROL
+            | VK_RCONTROL
+            | VK_MENU
+            | VK_LMENU
+            | VK_RMENU
+            | VK_LWIN
+            | VK_RWIN
+            | VK_CAPITAL
+    )
 }
 
 fn deliver(stroke: KeyStroke) {
@@ -130,7 +154,12 @@ unsafe fn down(vk: u16) -> bool {
     (GetAsyncKeyState(vk as i32) as u16 & 0x8000) != 0
 }
 
-fn translate(vk_code: u32, scan_code: u32, message: u32) -> KeyStroke {
+fn translate(vk_code: u32, scan_code: u32, message: u32) -> Option<KeyStroke> {
+    // A modifier pressed on its own carries no character; ignore it entirely so
+    // it neither adds to nor clears the buffer.
+    if is_modifier_key(vk_code) {
+        return None;
+    }
     unsafe {
         // A chord with anything but Shift is not text; it clears the buffer.
         if message == WM_SYSKEYDOWN
@@ -139,7 +168,7 @@ fn translate(vk_code: u32, scan_code: u32, message: u32) -> KeyStroke {
             || down(VK_LWIN)
             || down(VK_RWIN)
         {
-            return KeyStroke::Clear;
+            return Some(KeyStroke::Clear);
         }
 
         let layout = current_layout();
@@ -166,11 +195,11 @@ fn translate(vk_code: u32, scan_code: u32, message: u32) -> KeyStroke {
         // key), a negative (a dead key), or a control character clears.
         if produced == 1 {
             match char::from_u32(buffer[0] as u32) {
-                Some(c) if !c.is_control() => KeyStroke::Char(c),
-                _ => KeyStroke::Clear,
+                Some(c) if !c.is_control() => Some(KeyStroke::Char(c)),
+                _ => Some(KeyStroke::Clear),
             }
         } else {
-            KeyStroke::Clear
+            Some(KeyStroke::Clear)
         }
     }
 }
