@@ -10,6 +10,8 @@
   import Lock from "@lucide/svelte/icons/lock";
   import Link from "@lucide/svelte/icons/link";
   import Maximize from "@lucide/svelte/icons/maximize";
+  import Maximize2 from "@lucide/svelte/icons/maximize-2";
+  import Minimize2 from "@lucide/svelte/icons/minimize-2";
   import Monitor from "@lucide/svelte/icons/monitor";
   import Moon from "@lucide/svelte/icons/moon";
   import PanelBottom from "@lucide/svelte/icons/panel-bottom";
@@ -36,6 +38,8 @@
     link: Link,
     lock: Lock,
     maximize: Maximize,
+    "maximize-2": Maximize2,
+    "minimize-2": Minimize2,
     monitor: Monitor,
     moon: Moon,
     "panel-bottom": PanelBottom,

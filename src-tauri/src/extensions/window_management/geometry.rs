@@ -127,6 +127,103 @@ fn scale(fraction: f64, whole: i32) -> i32 {
     (fraction * whole as f64).round() as i32
 }
 
+/// The work area at 90% of its size, centred: a nearly full window with a small
+/// margin on every side.
+pub fn almost_maximize(area: Rect) -> Rect {
+    center(area, (area.width * 9 / 10, area.height * 9 / 10))
+}
+
+/// A comfortable centred default: 60% of the width by 70% of the height.
+pub fn reasonable_size(area: Rect) -> Rect {
+    center(area, (area.width * 3 / 5, area.height * 7 / 10))
+}
+
+/// The middle half of the width at full height: a centred column.
+pub fn center_half(area: Rect) -> Rect {
+    let width = area.width / 2;
+    Rect {
+        x: area.x + (area.width - width) / 2,
+        y: area.y,
+        width,
+        height: area.height,
+    }
+}
+
+/// Which way a step resizes the window.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Step {
+    Larger,
+    Smaller,
+}
+
+/// A step is a twentieth of the work area on every side, so 5% grows or shrinks
+/// each edge and the change scales with the display.
+const STEP_DENOMINATOR: i32 = 20;
+const MIN_WIDTH: i32 = 400;
+const MIN_HEIGHT: i32 = 300;
+
+/// Grow or shrink `frame` by a step on every side, staying centred on its own
+/// centre. Growing never exceeds the work area; shrinking never goes below a
+/// usable minimum. Repeated steps therefore accumulate to a limit and stop.
+pub fn step(frame: Rect, area: Rect, step: Step) -> Rect {
+    let dx = area.width / STEP_DENOMINATOR;
+    let dy = area.height / STEP_DENOMINATOR;
+    let (width, height) = match step {
+        Step::Larger => (frame.width + 2 * dx, frame.height + 2 * dy),
+        Step::Smaller => (frame.width - 2 * dx, frame.height - 2 * dy),
+    };
+    let width = width.clamp(MIN_WIDTH.min(area.width), area.width);
+    let height = height.clamp(MIN_HEIGHT.min(area.height), area.height);
+
+    let cx = frame.x + frame.width / 2;
+    let cy = frame.y + frame.height / 2;
+    Rect {
+        x: (cx - width / 2).clamp(area.x, area.x + area.width - width),
+        y: (cy - height / 2).clamp(area.y, area.y + area.height - height),
+        width,
+        height,
+    }
+}
+
+/// A command whose repeats cycle through a set of sizes.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Cycle {
+    LeftHalf,
+    RightHalf,
+    TopHalf,
+    BottomHalf,
+    Center,
+}
+
+/// The fractions a repeat cycles through, in order.
+pub const CYCLE_FRACTIONS: [(i32, i32); 3] = [(1, 2), (2, 3), (1, 3)];
+
+/// The rectangle for a cycle command at a given step. The half commands scale
+/// one dimension and stay anchored to their edge; centre scales both and stays
+/// centred. At the 1/2 step the half commands delegate to the matching `Region`,
+/// so a fresh press is byte-for-byte the existing single-press result.
+pub fn cycle_rect(cycle: Cycle, index: usize, area: Rect) -> Rect {
+    let (n, d) = CYCLE_FRACTIONS[index % CYCLE_FRACTIONS.len()];
+    let is_half = (n, d) == (1, 2);
+    match cycle {
+        Cycle::LeftHalf if is_half => Region::LeftHalf.rect(area),
+        Cycle::RightHalf if is_half => Region::RightHalf.rect(area),
+        Cycle::TopHalf if is_half => Region::TopHalf.rect(area),
+        Cycle::BottomHalf if is_half => Region::BottomHalf.rect(area),
+        Cycle::LeftHalf => Rect { x: area.x, y: area.y, width: area.width * n / d, height: area.height },
+        Cycle::RightHalf => {
+            let width = area.width * n / d;
+            Rect { x: area.x + area.width - width, y: area.y, width, height: area.height }
+        }
+        Cycle::TopHalf => Rect { x: area.x, y: area.y, width: area.width, height: area.height * n / d },
+        Cycle::BottomHalf => {
+            let height = area.height * n / d;
+            Rect { x: area.x, y: area.y + area.height - height, width: area.width, height }
+        }
+        Cycle::Center => center(area, (area.width * n / d, area.height * n / d)),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -274,5 +371,128 @@ mod tests {
         assert!(moved.is_some());
         // It resolved b as current and wrapped to a.
         assert!(moved.unwrap().x < 1920);
+    }
+
+    #[test]
+    fn almost_maximise_is_ninety_percent_centred() {
+        let r = almost_maximize(AREA);
+        assert_eq!((r.width, r.height), (1728, 972));
+        assert_eq!(r.x, (1920 - 1728) / 2);
+        assert_eq!(r.y, (1080 - 972) / 2);
+    }
+
+    #[test]
+    fn reasonable_size_is_sixty_by_seventy_centred() {
+        let r = reasonable_size(AREA);
+        assert_eq!((r.width, r.height), (1152, 756));
+        assert_eq!(r.x, (1920 - 1152) / 2);
+    }
+
+    #[test]
+    fn sizes_respect_a_non_zero_origin() {
+        let area = Rect { x: 100, y: 40, width: 800, height: 600 };
+        let r = reasonable_size(area);
+        assert_eq!(r.x, area.x + (area.width - r.width) / 2);
+        assert_eq!(r.y, area.y + (area.height - r.height) / 2);
+    }
+
+    #[test]
+    fn center_half_is_the_middle_column() {
+        let r = center_half(AREA);
+        assert_eq!(r, Rect { x: 480, y: 0, width: 960, height: 1080 });
+    }
+
+    #[test]
+    fn larger_grows_around_the_centre() {
+        let frame = Rect { x: 800, y: 400, width: 320, height: 240 };
+        let cx = frame.x + frame.width / 2;
+        let grown = step(frame, AREA, Step::Larger);
+        assert!(grown.width > frame.width && grown.height > frame.height);
+        assert_eq!(grown.x + grown.width / 2, cx);
+    }
+
+    #[test]
+    fn smaller_shrinks_around_the_centre() {
+        let frame = Rect { x: 400, y: 200, width: 1000, height: 800 };
+        let cx = frame.x + frame.width / 2;
+        let small = step(frame, AREA, Step::Smaller);
+        assert!(small.width < frame.width && small.height < frame.height);
+        assert_eq!(small.x + small.width / 2, cx);
+    }
+
+    #[test]
+    fn larger_clamps_to_the_work_area() {
+        let mut frame = Rect { x: 0, y: 0, width: 200, height: 200 };
+        for _ in 0..40 {
+            frame = step(frame, AREA, Step::Larger);
+        }
+        assert_eq!((frame.width, frame.height), (AREA.width, AREA.height));
+        assert!(frame.x >= AREA.x && frame.y >= AREA.y);
+    }
+
+    #[test]
+    fn smaller_clamps_to_the_minimum() {
+        let mut frame = Rect { x: 0, y: 0, width: 1920, height: 1080 };
+        for _ in 0..40 {
+            frame = step(frame, AREA, Step::Smaller);
+        }
+        assert_eq!((frame.width, frame.height), (400, 300));
+    }
+
+    #[test]
+    fn cycle_left_half_advances_through_the_fractions() {
+        assert_eq!(cycle_rect(Cycle::LeftHalf, 0, AREA), Region::LeftHalf.rect(AREA));
+        assert_eq!(
+            cycle_rect(Cycle::LeftHalf, 1, AREA),
+            Rect { x: 0, y: 0, width: 1280, height: 1080 }
+        );
+        assert_eq!(
+            cycle_rect(Cycle::LeftHalf, 2, AREA),
+            Rect { x: 0, y: 0, width: 640, height: 1080 }
+        );
+    }
+
+    #[test]
+    fn cycle_wraps_after_a_third() {
+        assert_eq!(cycle_rect(Cycle::LeftHalf, 3, AREA), cycle_rect(Cycle::LeftHalf, 0, AREA));
+    }
+
+    #[test]
+    fn cycle_right_half_stays_anchored_right() {
+        let two_thirds = cycle_rect(Cycle::RightHalf, 1, AREA);
+        assert_eq!(two_thirds.x + two_thirds.width, AREA.x + AREA.width);
+        assert_eq!(two_thirds.width, 1280);
+        assert_eq!(cycle_rect(Cycle::RightHalf, 0, AREA), Region::RightHalf.rect(AREA));
+    }
+
+    #[test]
+    fn cycle_top_and_bottom_scale_height() {
+        let top = cycle_rect(Cycle::TopHalf, 1, AREA);
+        assert_eq!((top.width, top.height), (1920, 720));
+        let bottom = cycle_rect(Cycle::BottomHalf, 1, AREA);
+        assert_eq!(bottom.y + bottom.height, AREA.y + AREA.height);
+        assert_eq!(bottom.height, 720);
+    }
+
+    #[test]
+    fn cycle_center_scales_both_dimensions_centred() {
+        let half = cycle_rect(Cycle::Center, 0, AREA);
+        assert_eq!((half.width, half.height), (960, 540));
+        assert_eq!(half.x, (1920 - 960) / 2);
+        assert_eq!(half.y, (1080 - 540) / 2);
+    }
+
+    #[test]
+    fn first_press_of_each_half_matches_the_region() {
+        for (cycle, region) in [
+            (Cycle::LeftHalf, Region::LeftHalf),
+            (Cycle::RightHalf, Region::RightHalf),
+            (Cycle::TopHalf, Region::TopHalf),
+            (Cycle::BottomHalf, Region::BottomHalf),
+        ] {
+            // Odd-sized area so the anchoring rounding would show.
+            let area = Rect { x: 7, y: 3, width: 1001, height: 769 };
+            assert_eq!(cycle_rect(cycle, 0, area), region.rect(area));
+        }
     }
 }
