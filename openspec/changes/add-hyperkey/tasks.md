@@ -1,7 +1,8 @@
 ## 1. Config foundation
 
-- [ ] 1.1 Add a typed optional `hyperkey` field to `Config` (a `key` from a small allowlist starting with `capslock`, presence meaning on), parsing and re-serialising it, and verify with unit tests over a present block, an absent block, and the existing unknown-key round-trip
-- [ ] 1.2 Add `hyperkey` to `docs/config.schema.json` and replace the reserved comment in `docs/config.example.jsonc` with a real block, and verify the `the_example_config_validates_and_parses` test passes
+- [ ] 1.1 Add a typed optional `hyperkey` field to `Config` (a `key` defaulting to `capslock`, a `shift` flag defaulting to true, presence meaning on) plus a `hyper_modifiers()` returning Ctrl+Alt+Super and Shift unless excluded, parsing and re-serialising it, and verify with unit tests over a present block, `shift: false`, an absent block, and the existing unknown-key round-trip
+- [ ] 1.2 Make the chord grammar expand `hyper` to a passed-in set: add a `parse` variant taking the hyper modifiers, keep the free `parse` defaulting to the full four, and have the launcher and command-hotkey builders pass `config.hyper_modifiers()`, and verify with a unit test that `hyper+left` under a shift-excluded set drops Shift
+- [ ] 1.3 Add `hyperkey` to `docs/config.schema.json` and replace the reserved comment in `docs/config.example.jsonc` with a real block including `shift`, and verify the `the_example_config_validates_and_parses` test passes
 
 ## 2. The platform service
 

@@ -94,18 +94,37 @@ deferred, matching the project's split.
 ### Config shape: an optional typed `hyperkey` block, off by default
 
 ```jsonc
-"hyperkey": { "key": "capslock" }   // present = on; absent = off
+"hyperkey": { "key": "capslock", "shift": true }   // present = on; absent = off
 ```
 
 `key` names a physical key from a small allowlist (starting with `capslock`;
 others can be added without a schema break). Presence enables it; there is no
-separate `enabled` flag, matching how a missing block means off. The field
-becomes typed on `Config` and gains a schema entry; the untyped-preservation
-test already proves older files with this key survive.
+separate `enabled` flag, matching how a missing block means off. `shift` defaults
+to true. The field becomes typed on `Config` and gains a schema entry; the
+untyped-preservation test already proves older files with this key survive.
 
 Rejected: an `enabled: false` toggle that keeps the block. Absent-means-off is
 simpler and the file is hand-edited, so commenting out the block is the natural
 "off".
+
+### One configured hyper set drives both emission and chord expansion
+
+The hyperkey emits a modifier set, and the `hyper` token in a chord must expand to
+the identical set, or `RegisterHotKey` (which matches modifiers exactly) never
+fires: emit Ctrl+Alt+Super but register Ctrl+Alt+Shift+Super and the press is a
+miss. So the set is computed once from the config, `Ctrl+Alt+Super` always plus
+Shift unless `"shift": false`, and used in two places: the hook synthesizes
+exactly it, and chord parsing expands `hyper` to it.
+
+Concretely, `hotkey::parse` grows a variant that takes the hyper set; the free
+`parse` keeps expanding `hyper` to the full four as the default (an unconfigured
+`hyper` chord stays registrable), while the launcher and command-hotkey builders,
+which already hold the `Config`, pass `config.hyper_modifiers()`. Only Shift is
+optional for now; Ctrl, Alt, and Super are always in the set.
+
+Rejected: a free-form modifier list in the config (`["ctrl","alt","super"]`).
+Shift is the one that changes typed characters and the only exclusion asked for;
+a list is more surface for no present need.
 
 ### Live reload rebuilds the service
 

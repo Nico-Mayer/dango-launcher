@@ -13,8 +13,13 @@ hyperkey setup travels in the dotfiles with everything else.
 ## What Changes
 
 - Add an optional top-level `hyperkey` block to the config: a physical key to
-  remap (default `capslock`) whose press and release emit the four hyper
-  modifiers, so held-key chords like `hyper+left` fire. Absent means off.
+  remap (default `capslock`) whose press and release emit the hyper modifiers, so
+  held-key chords like `hyper+left` fire. Absent means off.
+- Make Shift optional in the combination, the way Raycast does: `shift` defaults
+  to on (Ctrl+Alt+Shift+Super), and `"shift": false` drops it to Ctrl+Alt+Super,
+  which avoids Shift changing the base character on letter chords. The same set
+  drives both what the key emits and what the `hyper` token expands to, so the
+  two can never disagree.
 - Add a platform `Hyperkey` service that installs a system-wide key interceptor:
   while the mapped key is held it holds Ctrl+Alt+Shift+Super down, on release it
   lets them up, and it suppresses the key's normal function (the CapsLock
@@ -37,7 +42,8 @@ hyperkey setup travels in the dotfiles with everything else.
 
 ### Modified Capabilities
 
-- None. Chord parsing already expands `hyper`, and registration is unchanged.
+- None at the requirement level for existing capabilities. Chord parsing gains a
+  configured `hyper` set (see design.md), but registration is unchanged.
 
 ## Impact
 
@@ -46,8 +52,9 @@ hyperkey setup travels in the dotfiles with everything else.
   macOS implementation (a `CGEventTap` rewriting the mapped key into modifier
   flag changes), plus a no-op fallback. New typed `hyperkey` config field and a
   schema entry (today the key is only preserved untyped).
-- Touches config parsing, the schema and example docs, and the startup and
-  reload paths in `lib.rs`.
+- Touches the chord grammar so `hyper` expands to the configured set rather than
+  a hardcoded four, config parsing, the schema and example docs, and the startup
+  and reload paths in `lib.rs`.
 - Reuses the `DANGO_INJECTED` marker so the hook ignores Dango's own output.
 
 ## Non-goals

@@ -41,6 +41,26 @@ registration the launcher and command hotkeys already use.
 - **WHEN** the hyperkey is enabled and the user types normally without holding it
 - **THEN** every other key produces its normal character or function unchanged
 
+### Requirement: Shift is optional in the hyper combination
+
+The configuration MAY choose whether Shift is part of the hyper combination.
+Shift SHALL be included by default (Ctrl+Alt+Shift+Super); when the configuration
+turns it off, the combination SHALL be Ctrl+Alt+Super. The same set SHALL both be
+emitted by the hyperkey and be what a `hyper+<key>` chord expands to, so a bound
+chord always matches what the key produces.
+
+#### Scenario: Shift excluded still fires the chord
+
+- **WHEN** the hyperkey excludes Shift and a command is bound to `hyper+left`
+- **THEN** holding the hyperkey and pressing the left arrow invokes that command,
+  because both the emitted modifiers and the chord are Ctrl+Alt+Super+Left
+
+#### Scenario: Shift excluded leaves letters unshifted under the hyperkey
+
+- **WHEN** the hyperkey excludes Shift and the user holds it and presses a letter
+  that is not bound to a chord
+- **THEN** Shift is not applied to that letter
+
 ### Requirement: The hyperkey is off unless configured
 
 Dango SHALL treat the hyperkey as absent by default. Only when the configuration
