@@ -4,13 +4,15 @@
 
 When the user invokes a cycling command and the target window is still where that
 same command last placed it, Dango SHALL advance the window to the next size in
-the cycle rather than leaving it unchanged. The cycle is 1/2, then 2/3, then 1/3,
-then back to 1/2. Left and right half cycle their width; top and bottom half
-cycle their height; centre cycles both dimensions, staying centred.
+the cycle (1/2, then 2/3, then 1/3, wrapping back to 1/2) rather than leaving it
+unchanged. Otherwise Dango SHALL place the window at the command's base result,
+which is its existing single-press behaviour: the half commands at 1/2, and
+centre at the window's current size. Left and right half cycle their width; top
+and bottom half cycle their height; centre cycles both dimensions, staying
+centred.
 
-The first invocation, or any invocation after the window has changed since the
-command last acted on it, SHALL place the window at the first size in the cycle
-(1/2), so existing behaviour is unchanged for a single press.
+Because centre's base result is the window's current size, existing single-press
+behaviour is unchanged for every command.
 
 #### Scenario: Repeating left half narrows it through the cycle
 
@@ -36,11 +38,12 @@ command last acted on it, SHALL place the window at the first size in the cycle
 - **WHEN** the user invokes left half and then invokes right half
 - **THEN** right half places the window at the right 1/2, starting its own cycle
 
-#### Scenario: Centre cycles both dimensions
+#### Scenario: Centre keeps size on a fresh press, then cycles
 
-- **WHEN** the user invokes centre repeatedly on a window that stays put
-- **THEN** the window is centred at 1/2, then 2/3, then 1/3 of the work area in
-  both width and height
+- **WHEN** the user invokes centre on a window it has not just centred
+- **THEN** the window is centred at its current size, unchanged from before
+- **AND** invoking centre again on the unmoved window centres it at 1/2, then
+  2/3, then 1/3 of the work area in both dimensions
 
 ### Requirement: The focused window can be sized to a comfortable default
 

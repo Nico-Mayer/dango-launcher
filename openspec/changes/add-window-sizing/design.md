@@ -64,6 +64,13 @@ invoke(cmd):
 A small tolerance on the frame match absorbs the border rounding the platforms
 already have; an exact match would reset spuriously after a pixel-off placement.
 
+Centre is the one command whose reset state is not a cycle member. M4 shipped
+centre as "keep the window's size, centred", and that single-press behaviour must
+not regress. So a fresh centre keeps size as before, and only a repeat on the
+unmoved window enters the 1/2, 2/3, 1/3 cycle. The half commands have no such
+split: their reset state, 1/2, is already the first cycle member, so their
+single press is unchanged for free.
+
 ### Make larger and smaller share the cycle's "unmoved" check, but step instead of cycle
 
 Growing and shrinking read the current frame and adjust it, so they have the same
