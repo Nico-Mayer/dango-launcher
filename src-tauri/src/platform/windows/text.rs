@@ -107,6 +107,16 @@ impl Keys for WindowsKeys {
         Ok(())
     }
 
+    fn backspace(&self, times: usize) -> Result<(), TextError> {
+        let mut enigo = self.enigo.lock().unwrap();
+        for _ in 0..times {
+            enigo
+                .key(Key::Backspace, Direction::Click)
+                .map_err(|error| TextError::TargetUnavailable(error.to_string()))?;
+        }
+        Ok(())
+    }
+
     /// Windows gates none of this. The one thing it does refuse is an elevated
     /// target, which is reported where it happens rather than here.
     fn permitted(&self) -> bool {

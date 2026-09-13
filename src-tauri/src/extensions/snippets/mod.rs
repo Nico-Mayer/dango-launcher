@@ -2,8 +2,10 @@
 
 mod extension;
 mod matcher;
+mod service;
 mod store;
 
 pub use extension::{extension_id, OpenUrl, SnippetsExtension, QUICKLINKS_ID, SNIPPETS_ID};
 pub use matcher::{match_keyword, KeywordEntry};
+pub use service::ExcludedApps;
 pub use store::{Kind, Record, RecordError, Records};

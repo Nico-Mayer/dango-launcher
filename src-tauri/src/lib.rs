@@ -913,6 +913,17 @@ pub fn run() {
                     .map(|state| state.inner().clone() as Arc<dyn text::TextTarget>);
                 let opener: Arc<dyn snippets::OpenUrl> =
                     Arc::new(DefaultBrowser(app.handle().clone()));
+                // Keyword expansion skips the applications the clipboard history
+                // is told to skip: one list, read fresh each keystroke.
+                let excluded: snippets::ExcludedApps = {
+                    use extensions::clipboard::Policy;
+                    let policy = PreferencePolicy(extension::Preferences::new(
+                        extensions::clipboard::EXTENSION_ID,
+                        extensions::clipboard::preference_declarations(),
+                        file_config.clone(),
+                    ));
+                    Arc::new(move || policy.excluded_applications())
+                };
                 let records_dir = config::config_dir();
                 for kind in [snippets::Kind::Snippet, snippets::Kind::Quicklink] {
                     let (records, load_error) = snippets::Records::open(&records_dir, kind);
@@ -945,6 +956,7 @@ pub fn run() {
                         records,
                         exchange.clone(),
                         Some(opener.clone()),
+                        excluded.clone(),
                     ));
                     match host.register(extension) {
                         Ok(report) if report.is_clean() => {}

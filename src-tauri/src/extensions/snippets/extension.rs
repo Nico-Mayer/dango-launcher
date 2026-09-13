@@ -10,7 +10,8 @@ use std::sync::Arc;
 use async_trait::async_trait;
 
 use crate::extension::{
-    ActionOutcome, CommandDecl, Extension, FormValues, InvocationMode, Manifest, NAMED_ICON,
+    ActionOutcome, CommandDecl, Extension, FormValues, InvocationMode, Manifest, Service,
+    NAMED_ICON,
 };
 use crate::invocation::{Command, InvocationContext};
 use crate::protocol::{
@@ -21,6 +22,7 @@ use crate::search::{Candidate, RootProvider, Source};
 use crate::templates::{Template, Values};
 use crate::text::{TextError, TextTarget};
 
+use super::service::{ExcludedApps, KeywordExpansion};
 use super::store::{Kind, Record, Records};
 
 pub const SNIPPETS_ID: &str = "dango.snippets";
@@ -64,6 +66,9 @@ pub struct SnippetsExtension {
     text: Option<Arc<dyn TextTarget>>,
     /// Only quicklinks need this, and only so the URL can be opened.
     opener: Option<Arc<dyn OpenUrl>>,
+    /// The keyword-expansion service, only for snippets and only when text can
+    /// be inserted. Its lifetime follows the extension's enabled state.
+    services: Vec<Arc<dyn Service>>,
 }
 
 /// Opening a URL in whatever the user's default browser is. A trait so the
@@ -77,12 +82,22 @@ impl SnippetsExtension {
         records: Arc<Records>,
         text: Option<Arc<dyn TextTarget>>,
         opener: Option<Arc<dyn OpenUrl>>,
+        excluded: ExcludedApps,
     ) -> Self {
+        let services: Vec<Arc<dyn Service>> = match (records.kind(), &text) {
+            (Kind::Snippet, Some(text)) => vec![Arc::new(KeywordExpansion::new(
+                records.clone(),
+                text.clone(),
+                excluded,
+            ))],
+            _ => Vec::new(),
+        };
         Self {
             manifest: manifest(records.kind()),
             records,
             text,
             opener,
+            services,
         }
     }
 
@@ -187,6 +202,10 @@ impl Extension for SnippetsExtension {
             records: self.records.clone(),
             kind: self.kind(),
         }))
+    }
+
+    fn services(&self) -> Vec<Arc<dyn Service>> {
+        self.services.clone()
     }
 
     fn command(&self, command_id: &str) -> Option<Arc<dyn Command>> {
@@ -548,6 +567,14 @@ mod tests {
                 .push((text.to_string(), caret));
             Ok(())
         }
+        fn expand(
+            &self,
+            _backspaces: usize,
+            text: &str,
+            caret: Option<usize>,
+        ) -> Result<(), TextError> {
+            self.insert(text, caret)
+        }
         fn selection(&self) -> Result<Option<String>, TextError> {
             Ok(self.selection.clone())
         }
@@ -593,6 +620,7 @@ mod tests {
                 records.clone(),
                 Some(target.clone()),
                 Some(opener.clone()),
+                Arc::new(Vec::new),
             ),
             records,
             target,
