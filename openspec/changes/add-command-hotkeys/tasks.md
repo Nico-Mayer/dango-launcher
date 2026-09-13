@@ -1,0 +1,25 @@
+## 1. The binding table and conflict detection
+
+- [ ] 1.1 Build the command-binding table from a config: parse each `extensions.<id>.commands.<id>.hotkey`, resolve conflicts first-wins against other commands and against the launcher chord, and return both the survivors and the conflicts, with tests over a clean set, two commands on one chord, and a command on the launcher chord
+- [ ] 1.2 Factor the command-run streaming out of `invoke_command` into a shared `run_command(app, qualified_id)` used by both the Tauri command and the hotkey dispatch, and verify the existing invocation still works
+
+## 2. Registering and dispatching
+
+- [ ] 2.1 Register the survivors' hotkeys at startup alongside the launcher hotkey, holding the shared table the handler reads
+- [ ] 2.2 Dispatch in the global-shortcut handler: the launcher chord toggles, a bound chord runs its command, an unknown chord is ignored, with the launcher chord checked first
+- [ ] 2.3 Route by mode: a no-view command runs without showing the launcher, a view command shows the launcher then invokes, read from the command's `InvocationMode`
+- [ ] 2.4 Before a no-view command, record the current foreground as the previous window on Windows so the command acts on the window that was focused at the press; macOS needs nothing, since the frontmost application is already the target
+- [ ] 2.5 Surface the conflicts from 1.1 and any OS registration refusal through the tray status line and the log, naming the commands involved
+
+## 3. Live reload
+
+- [ ] 3.1 Extend the config reload to unregister the current command hotkeys, rebuild the table, and register the survivors, leaving the launcher hotkey untouched unless it changed, with the conflicts re-surfaced
+- [ ] 3.2 Verify the existing test suite passes and clippy and fmt are clean
+
+## 4. Verification
+
+- [ ] 4.1 Confirm on both platforms that a command bound in the config runs from its hotkey while another application is focused, and that a no-view command does so without the launcher appearing
+- [ ] 4.2 Confirm on both platforms that a view command's hotkey shows the launcher with its view
+- [ ] 4.3 Confirm on both platforms that a snippet or window-management hotkey acts on the window that was focused when the chord was pressed
+- [ ] 4.4 Confirm on both platforms that adding, changing, and removing a binding in the file applies live
+- [ ] 4.5 Confirm on both platforms that two commands on one chord, a command on the launcher chord, and an OS-refused chord are each surfaced, with the first binding winning and the others reported
