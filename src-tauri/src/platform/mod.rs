@@ -198,10 +198,12 @@ pub fn window_manager(
     #[cfg(target_os = "windows")]
     {
         let _ = main;
-        return std::sync::Arc::new(windows::WindowsWindowManager);
+        std::sync::Arc::new(windows::WindowsWindowManager)
     }
     #[cfg(target_os = "macos")]
-    return std::sync::Arc::new(macos::MacWindowManager::new(main));
+    {
+        std::sync::Arc::new(macos::MacWindowManager::new(main))
+    }
 }
 
 /// The cursor is the most reliable signal for "the display the user is looking
