@@ -12,10 +12,11 @@ use tauri::WebviewWindow;
 use windows_sys::Win32::Foundation::{FALSE, HWND, TRUE};
 use windows_sys::Win32::System::Threading::{AttachThreadInput, GetCurrentThreadId};
 use windows_sys::Win32::UI::WindowsAndMessaging::{
-    AllowSetForegroundWindow, GetForegroundWindow, GetWindowLongPtrW, GetWindowThreadProcessId,
-    SetForegroundWindow, SetWindowLongPtrW, SetWindowPos, GWL_EXSTYLE, HWND_TOPMOST,
-    SWP_FRAMECHANGED, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, WS_EX_APPWINDOW, WS_EX_TOOLWINDOW,
-    WS_EX_TOPMOST,
+    AllowSetForegroundWindow, BringWindowToTop, GetForegroundWindow, GetWindowLongPtrW,
+    GetWindowThreadProcessId, SetForegroundWindow, SetWindowLongPtrW, SetWindowPos,
+    SystemParametersInfoW, GWL_EXSTYLE, HWND_TOPMOST, SPIF_SENDCHANGE,
+    SPI_GETFOREGROUNDLOCKTIMEOUT, SPI_SETFOREGROUNDLOCKTIMEOUT, SWP_FRAMECHANGED, SWP_NOACTIVATE,
+    SWP_NOMOVE, SWP_NOSIZE, WS_EX_APPWINDOW, WS_EX_TOOLWINDOW, WS_EX_TOPMOST,
 };
 
 use super::{LauncherWindow, RunningApp, SystemControl, SystemError};
@@ -132,23 +133,65 @@ unsafe fn apply_tool_window_style(hwnd: HWND) {
 /// away for an instant, which fires blur in the page and dismisses the launcher
 /// as soon as it shows.
 pub(super) unsafe fn force_foreground(target: HWND) {
-    let foreground = GetForegroundWindow();
-    if foreground.is_null() {
-        SetForegroundWindow(target);
-        return;
-    }
+    // The lock is time based: after the launcher took the foreground, the system
+    // refuses to give it away again until a timeout passes, and the request is
+    // dropped silently. Zero the timeout for the duration and put it back, so
+    // the call below is allowed rather than quietly ignored. This is the piece
+    // the attach trick alone did not cover, and the reason a paste sometimes
+    // reported that the previous window would not come forward.
+    let mut previous_timeout: u32 = 0;
+    SystemParametersInfoW(
+        SPI_GETFOREGROUNDLOCKTIMEOUT,
+        0,
+        (&mut previous_timeout as *mut u32).cast(),
+        0,
+    );
+    SystemParametersInfoW(
+        SPI_SETFOREGROUNDLOCKTIMEOUT,
+        0,
+        std::ptr::null_mut(),
+        SPIF_SENDCHANGE,
+    );
 
+    // Share an input queue with both the window losing the foreground and the
+    // one gaining it. Attaching to the target's thread is what lets the focus
+    // actually land there; attaching to the current foreground lifts its claim.
+    // The foreground can be null in the instant after the launcher hides, so
+    // that case still has to relax the lock rather than fall through untreated.
     let current = GetCurrentThreadId();
-    let owner = GetWindowThreadProcessId(foreground, std::ptr::null_mut());
+    let target_thread = GetWindowThreadProcessId(target, std::ptr::null_mut());
+    let foreground = GetForegroundWindow();
+    let foreground_thread = if foreground.is_null() {
+        0
+    } else {
+        GetWindowThreadProcessId(foreground, std::ptr::null_mut())
+    };
 
-    if owner == current {
-        SetForegroundWindow(target);
-        return;
+    let attach_fg = foreground_thread != 0 && foreground_thread != current;
+    let attach_target = target_thread != 0 && target_thread != current;
+    if attach_fg {
+        AttachThreadInput(current, foreground_thread, TRUE);
+    }
+    if attach_target {
+        AttachThreadInput(current, target_thread, TRUE);
     }
 
-    AttachThreadInput(current, owner, TRUE);
     SetForegroundWindow(target);
-    AttachThreadInput(current, owner, FALSE);
+    BringWindowToTop(target);
+
+    if attach_target {
+        AttachThreadInput(current, target_thread, FALSE);
+    }
+    if attach_fg {
+        AttachThreadInput(current, foreground_thread, FALSE);
+    }
+
+    SystemParametersInfoW(
+        SPI_SETFOREGROUNDLOCKTIMEOUT,
+        0,
+        previous_timeout as usize as *mut _,
+        SPIF_SENDCHANGE,
+    );
 }
 
 fn hwnd(window: &WebviewWindow) -> Option<HWND> {
