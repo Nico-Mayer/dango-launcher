@@ -76,7 +76,14 @@ mod windows_harness {
                  [System.Windows.Forms.Application]::Run($f)"
             );
             let process = Command::new("powershell")
-                .args(["-NoProfile", "-STA", "-WindowStyle", "Normal", "-Command", &script])
+                .args([
+                    "-NoProfile",
+                    "-STA",
+                    "-WindowStyle",
+                    "Normal",
+                    "-Command",
+                    &script,
+                ])
                 .stdout(Stdio::null())
                 .stderr(Stdio::null())
                 .spawn()
@@ -180,7 +187,11 @@ mod windows_harness {
                 ("centre half", geometry::center_half(area)),
             ] {
                 let landed = self.apply(expected);
-                self.check(name, close(landed, expected), format!("expected {expected:?}, landed {landed:?}"));
+                self.check(
+                    name,
+                    close(landed, expected),
+                    format!("expected {expected:?}, landed {landed:?}"),
+                );
             }
         }
 
@@ -227,7 +238,11 @@ mod windows_harness {
                         format!("{placement:?}"),
                     );
                 }
-                Err(error) => self.check("target reports a frame and a work area", false, format!("{error}")),
+                Err(error) => self.check(
+                    "target reports a frame and a work area",
+                    false,
+                    format!("{error}"),
+                ),
             }
         }
 
@@ -262,7 +277,12 @@ mod windows_harness {
             println!("-- centre keeps the window's size");
             let area = self.work_area();
             // Start from a known small size.
-            let _ = self.apply(Rect { x: area.x + 50, y: area.y + 50, width: 640, height: 480 });
+            let _ = self.apply(Rect {
+                x: area.x + 50,
+                y: area.y + 50,
+                width: 640,
+                height: 480,
+            });
             let before = visible_frame(self.target.window).expect("frame");
             let centred = geometry::center(area, (before.width, before.height));
             let landed = self.apply(centred);
@@ -300,7 +320,11 @@ mod windows_harness {
             let _ = self.apply(Region::LeftHalf.rect(area));
             let frame = visible_frame(self.target.window).expect("frame");
             let Some(moved) = geometry::next_display(frame, area, &displays) else {
-                self.check("move to next display", false, "geometry returned none".into());
+                self.check(
+                    "move to next display",
+                    false,
+                    "geometry returned none".into(),
+                );
                 return;
             };
             let landed = self.apply(moved);
@@ -308,9 +332,9 @@ mod windows_harness {
             // outside the destination.
             let cx = landed.x + landed.width / 2;
             let cy = landed.y + landed.height / 2;
-            let on_other = displays
-                .iter()
-                .any(|d| d.x != area.x && cx >= d.x && cx < d.x + d.width && cy >= d.y && cy < d.y + d.height);
+            let on_other = displays.iter().any(|d| {
+                d.x != area.x && cx >= d.x && cx < d.x + d.width && cy >= d.y && cy < d.y + d.height
+            });
             self.check(
                 "the window moved to another display",
                 on_other,
@@ -322,7 +346,9 @@ mod windows_harness {
             println!("-- a move is prompt");
             let area = self.work_area();
             let start = Instant::now();
-            self.manager().place(Region::LeftHalf.rect(area)).expect("place");
+            self.manager()
+                .place(Region::LeftHalf.rect(area))
+                .expect("place");
             let elapsed = start.elapsed();
             self.check(
                 "place returns within 100ms",
@@ -347,7 +373,10 @@ mod windows_harness {
         fn an_elevated_target_is_refused(&mut self) {
             println!("-- an elevated target is refused");
             if platform::own_integrity_level().is_some_and(|level| level > 0x2000) {
-                self.skip("elevated target refused", "this harness is elevated itself".into());
+                self.skip(
+                    "elevated target refused",
+                    "this harness is elevated itself".into(),
+                );
                 return;
             }
             let Some(elevated) = find_window("dango-elevated") else {
@@ -390,7 +419,12 @@ mod windows_harness {
     }
 
     fn visible_frame(hwnd: HWND) -> Option<Rect> {
-        let mut rect = RECT { left: 0, top: 0, right: 0, bottom: 0 };
+        let mut rect = RECT {
+            left: 0,
+            top: 0,
+            right: 0,
+            bottom: 0,
+        };
         let hr = unsafe {
             DwmGetWindowAttribute(
                 hwnd,
@@ -569,7 +603,11 @@ mod macos_harness {
         fn on_every_display(&mut self) {
             let displays = self.manager().displays();
             for (position, area) in displays.iter().enumerate() {
-                println!("\n== display {} of {}: {area:?}", position + 1, displays.len());
+                println!(
+                    "\n== display {} of {}: {area:?}",
+                    position + 1,
+                    displays.len()
+                );
                 self.apply(geometry::center(*area, (800, 600)));
                 let landed_on = self.work_area();
                 if landed_on != *area {
@@ -640,7 +678,10 @@ mod macos_harness {
                     self.check(
                         "target reports the frontmost window's own frame",
                         reported.is_some_and(|bounds| close(bounds, placement.frame)),
-                        format!("accessibility {:?}, applescript {reported:?}", placement.frame),
+                        format!(
+                            "accessibility {:?}, applescript {reported:?}",
+                            placement.frame
+                        ),
                     );
                 }
                 Err(error) => self.check(
@@ -743,11 +784,18 @@ mod macos_harness {
             let area = self.work_area();
             let frame = self.apply(Region::LeftHalf.rect(area));
             let Some(moved) = geometry::next_display(frame, area, &displays) else {
-                self.check("move to next display", false, "geometry returned none".into());
+                self.check(
+                    "move to next display",
+                    false,
+                    "geometry returned none".into(),
+                );
                 return;
             };
             let landed = self.apply(moved);
-            let index = displays.iter().position(|d| *d == area).expect("this display");
+            let index = displays
+                .iter()
+                .position(|d| *d == area)
+                .expect("this display");
             let destination = displays[(index + 1) % displays.len()];
             // The same left half, on the next display's work area. The tolerance
             // is wider than a placement's: the relative region is recomputed
@@ -785,7 +833,10 @@ mod macos_harness {
                 self.close_target();
                 self.skip(
                     "no focused window is NoTarget",
-                    format!("{}'s desktop stays focused with no window open", self.app.process),
+                    format!(
+                        "{}'s desktop stays focused with no window open",
+                        self.app.process
+                    ),
                 );
                 return;
             }
@@ -794,7 +845,10 @@ mod macos_harness {
             if frontmost_bundle().as_deref() != Some(self.app.bundle) {
                 self.skip(
                     "no focused window is NoTarget",
-                    format!("{} stopped being frontmost after the close", self.app.process),
+                    format!(
+                        "{} stopped being frontmost after the close",
+                        self.app.process
+                    ),
                 );
                 return;
             }
@@ -833,7 +887,6 @@ mod macos_harness {
             && (a.height - b.height).abs() <= slack
     }
 
-
     /// What an untrusted process gets. Running a copy of this binary from a
     /// path the permission was never granted to exercises the same branch a
     /// revoked permission does, without taking the grant away from anything
@@ -843,7 +896,12 @@ mod macos_harness {
         println!("-- without the Accessibility permission");
         let manager = platform::window_manager(std::sync::Arc::new(HereIsFine));
         let target = manager.target();
-        let placed = manager.place(Rect { x: 0, y: 0, width: 800, height: 600 });
+        let placed = manager.place(Rect {
+            x: 0,
+            y: 0,
+            width: 800,
+            height: 600,
+        });
         println!("  target: {target:?}");
         println!("  place:  {placed:?}");
         fn explained<T>(result: &Result<T, WindowError>) -> bool {
@@ -902,13 +960,21 @@ mod macos_harness {
             .filter_map(|part| part.trim().parse().ok())
             .collect();
         match numbers[..] {
-            [x, y, width, height] => Some(Rect { x, y, width, height }),
+            [x, y, width, height] => Some(Rect {
+                x,
+                y,
+                width,
+                height,
+            }),
             _ => None,
         }
     }
 
     fn osascript(script: &str) -> Option<String> {
-        let output = Command::new("osascript").args(["-e", script]).output().ok()?;
+        let output = Command::new("osascript")
+            .args(["-e", script])
+            .output()
+            .ok()?;
         output
             .status
             .success()

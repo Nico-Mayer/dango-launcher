@@ -92,7 +92,14 @@ impl TextBox {
              [System.Windows.Forms.Application]::Run($f)"
         );
         let process = Command::new("powershell")
-            .args(["-NoProfile", "-STA", "-WindowStyle", "Hidden", "-Command", &script])
+            .args([
+                "-NoProfile",
+                "-STA",
+                "-WindowStyle",
+                "Hidden",
+                "-Command",
+                &script,
+            ])
             .stdout(Stdio::null())
             .stderr(Stdio::null())
             .spawn()
@@ -271,7 +278,10 @@ impl Harness {
             );
             return false;
         }
-        println!("target: {TARGET_TITLE} (edit control {:?})\n", self.target.edit);
+        println!(
+            "target: {TARGET_TITLE} (edit control {:?})\n",
+            self.target.edit
+        );
         true
     }
 
@@ -377,11 +387,19 @@ impl Harness {
         ))
         .expect("the repo's favicon");
         let Ok(image) = clipboard_rs::RustImageData::from_bytes(&png) else {
-            self.check("an image can be put on the clipboard", false, "decode failed".into());
+            self.check(
+                "an image can be put on the clipboard",
+                false,
+                "decode failed".into(),
+            );
             return;
         };
         if self.clipboard.set_image(image).is_err() {
-            self.check("an image can be put on the clipboard", false, "set failed".into());
+            self.check(
+                "an image can be put on the clipboard",
+                false,
+                "set failed".into(),
+            );
             return;
         }
         std::thread::sleep(Duration::from_millis(200));
@@ -458,7 +476,10 @@ impl Harness {
         self.check(
             "typing after the insertion lands at the caret",
             landed.contains("<b>HERE</b>"),
-            format!("the control holds {}, expected <b>HERE</b>", Self::brief(&landed)),
+            format!(
+                "the control holds {}, expected <b>HERE</b>",
+                Self::brief(&landed)
+            ),
         );
     }
 
@@ -564,7 +585,11 @@ impl Harness {
             returned.push(took);
             self.settle();
         }
-        let worst = appeared.iter().map(|v| v.unwrap_or(Duration::MAX)).max().unwrap();
+        let worst = appeared
+            .iter()
+            .map(|v| v.unwrap_or(Duration::MAX))
+            .max()
+            .unwrap();
         self.check(
             "the text is visible within 400ms on every run",
             worst < Duration::from_millis(400),
@@ -590,7 +615,11 @@ impl Harness {
             return;
         }
         if !self.focus(decoy.window) {
-            self.check("the decoy takes the foreground", false, "could not focus it".into());
+            self.check(
+                "the decoy takes the foreground",
+                false,
+                "could not focus it".into(),
+            );
             decoy.close();
             return;
         }
@@ -606,7 +635,10 @@ impl Harness {
         self.check(
             "the target is the foreground window afterwards",
             in_front == self.target.window,
-            format!("foreground is {in_front:?}, target is {:?}", self.target.window),
+            format!(
+                "foreground is {in_front:?}, target is {:?}",
+                self.target.window
+            ),
         );
         self.check(
             "the text landed in the target and not in the window that was in front",
@@ -730,7 +762,10 @@ impl Harness {
     fn an_elevated_target_is_refused(&mut self, integrity: Option<u32>) {
         println!("-- an elevated target is refused rather than pasted into silently");
         if integrity.is_some_and(|level| level > MEDIUM_INTEGRITY) {
-            self.skip("an elevated target is refused", "this harness is elevated itself".into());
+            self.skip(
+                "an elevated target is refused",
+                "this harness is elevated itself".into(),
+            );
             return;
         }
         let Some(elevated) = find_window(|title| title.contains(ELEVATED_TITLE)) else {

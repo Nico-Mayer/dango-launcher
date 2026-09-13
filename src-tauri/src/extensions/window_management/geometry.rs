@@ -33,28 +33,72 @@ impl Region {
         let half_h = h / 2;
         let third_w = w / 3;
         match self {
-            Region::LeftHalf => Rect { x, y, width: half_w, height: h },
-            Region::RightHalf => Rect { x: x + half_w, y, width: w - half_w, height: h },
-            Region::TopHalf => Rect { x, y, width: w, height: half_h },
-            Region::BottomHalf => Rect { x, y: y + half_h, width: w, height: h - half_h },
-            Region::TopLeftQuarter => Rect { x, y, width: half_w, height: half_h },
-            Region::TopRightQuarter => {
-                Rect { x: x + half_w, y, width: w - half_w, height: half_h }
-            }
-            Region::BottomLeftQuarter => {
-                Rect { x, y: y + half_h, width: half_w, height: h - half_h }
-            }
+            Region::LeftHalf => Rect {
+                x,
+                y,
+                width: half_w,
+                height: h,
+            },
+            Region::RightHalf => Rect {
+                x: x + half_w,
+                y,
+                width: w - half_w,
+                height: h,
+            },
+            Region::TopHalf => Rect {
+                x,
+                y,
+                width: w,
+                height: half_h,
+            },
+            Region::BottomHalf => Rect {
+                x,
+                y: y + half_h,
+                width: w,
+                height: h - half_h,
+            },
+            Region::TopLeftQuarter => Rect {
+                x,
+                y,
+                width: half_w,
+                height: half_h,
+            },
+            Region::TopRightQuarter => Rect {
+                x: x + half_w,
+                y,
+                width: w - half_w,
+                height: half_h,
+            },
+            Region::BottomLeftQuarter => Rect {
+                x,
+                y: y + half_h,
+                width: half_w,
+                height: h - half_h,
+            },
             Region::BottomRightQuarter => Rect {
                 x: x + half_w,
                 y: y + half_h,
                 width: w - half_w,
                 height: h - half_h,
             },
-            Region::LeftThird => Rect { x, y, width: third_w, height: h },
-            Region::CenterThird => Rect { x: x + third_w, y, width: third_w, height: h },
-            Region::RightThird => {
-                Rect { x: x + 2 * third_w, y, width: w - 2 * third_w, height: h }
-            }
+            Region::LeftThird => Rect {
+                x,
+                y,
+                width: third_w,
+                height: h,
+            },
+            Region::CenterThird => Rect {
+                x: x + third_w,
+                y,
+                width: third_w,
+                height: h,
+            },
+            Region::RightThird => Rect {
+                x: x + 2 * third_w,
+                y,
+                width: w - 2 * third_w,
+                height: h,
+            },
             Region::Maximize => area,
         }
     }
@@ -110,9 +154,9 @@ fn display_index(frame: Rect, current: Rect, displays: &[Rect]) -> Option<usize>
     // back to the display containing the frame's centre.
     let cx = frame.x + frame.width / 2;
     let cy = frame.y + frame.height / 2;
-    displays.iter().position(|d| {
-        cx >= d.x && cx < d.x + d.width && cy >= d.y && cy < d.y + d.height
-    })
+    displays
+        .iter()
+        .position(|d| cx >= d.x && cx < d.x + d.width && cy >= d.y && cy < d.y + d.height)
 }
 
 fn fraction(part: i32, whole: i32) -> f64 {
@@ -210,15 +254,35 @@ pub fn cycle_rect(cycle: Cycle, index: usize, area: Rect) -> Rect {
         Cycle::RightHalf if is_half => Region::RightHalf.rect(area),
         Cycle::TopHalf if is_half => Region::TopHalf.rect(area),
         Cycle::BottomHalf if is_half => Region::BottomHalf.rect(area),
-        Cycle::LeftHalf => Rect { x: area.x, y: area.y, width: area.width * n / d, height: area.height },
+        Cycle::LeftHalf => Rect {
+            x: area.x,
+            y: area.y,
+            width: area.width * n / d,
+            height: area.height,
+        },
         Cycle::RightHalf => {
             let width = area.width * n / d;
-            Rect { x: area.x + area.width - width, y: area.y, width, height: area.height }
+            Rect {
+                x: area.x + area.width - width,
+                y: area.y,
+                width,
+                height: area.height,
+            }
         }
-        Cycle::TopHalf => Rect { x: area.x, y: area.y, width: area.width, height: area.height * n / d },
+        Cycle::TopHalf => Rect {
+            x: area.x,
+            y: area.y,
+            width: area.width,
+            height: area.height * n / d,
+        },
         Cycle::BottomHalf => {
             let height = area.height * n / d;
-            Rect { x: area.x, y: area.y + area.height - height, width: area.width, height }
+            Rect {
+                x: area.x,
+                y: area.y + area.height - height,
+                width: area.width,
+                height,
+            }
         }
         Cycle::Center => center(area, (area.width * n / d, area.height * n / d)),
     }
@@ -228,14 +292,35 @@ pub fn cycle_rect(cycle: Cycle, index: usize, area: Rect) -> Rect {
 mod tests {
     use super::*;
 
-    const AREA: Rect = Rect { x: 0, y: 0, width: 1920, height: 1080 };
+    const AREA: Rect = Rect {
+        x: 0,
+        y: 0,
+        width: 1920,
+        height: 1080,
+    };
 
     #[test]
     fn halves_tile_without_gap_or_overlap() {
         let left = Region::LeftHalf.rect(AREA);
         let right = Region::RightHalf.rect(AREA);
-        assert_eq!(left, Rect { x: 0, y: 0, width: 960, height: 1080 });
-        assert_eq!(right, Rect { x: 960, y: 0, width: 960, height: 1080 });
+        assert_eq!(
+            left,
+            Rect {
+                x: 0,
+                y: 0,
+                width: 960,
+                height: 1080
+            }
+        );
+        assert_eq!(
+            right,
+            Rect {
+                x: 960,
+                y: 0,
+                width: 960,
+                height: 1080
+            }
+        );
         assert_eq!(left.x + left.width, right.x);
         assert_eq!(right.x + right.width, AREA.x + AREA.width);
     }
@@ -275,7 +360,12 @@ mod tests {
 
     #[test]
     fn odd_width_thirds_and_halves_still_cover_exactly() {
-        let area = Rect { x: 10, y: 5, width: 1001, height: 769 };
+        let area = Rect {
+            x: 10,
+            y: 5,
+            width: 1001,
+            height: 769,
+        };
         let l = Region::LeftThird.rect(area);
         let c = Region::CenterThird.rect(area);
         let r = Region::RightThird.rect(area);
@@ -296,17 +386,35 @@ mod tests {
 
     #[test]
     fn respects_a_non_zero_work_area_origin() {
-        let area = Rect { x: 100, y: 40, width: 800, height: 600 };
+        let area = Rect {
+            x: 100,
+            y: 40,
+            width: 800,
+            height: 600,
+        };
         assert_eq!(
             Region::LeftHalf.rect(area),
-            Rect { x: 100, y: 40, width: 400, height: 600 }
+            Rect {
+                x: 100,
+                y: 40,
+                width: 400,
+                height: 600
+            }
         );
     }
 
     #[test]
     fn centre_keeps_size_and_centres() {
         let r = center(AREA, (800, 600));
-        assert_eq!(r, Rect { x: 560, y: 240, width: 800, height: 600 });
+        assert_eq!(
+            r,
+            Rect {
+                x: 560,
+                y: 240,
+                width: 800,
+                height: 600
+            }
+        );
     }
 
     #[test]
@@ -319,7 +427,12 @@ mod tests {
 
     #[test]
     fn centre_keeps_an_oversized_window_reachable() {
-        let area = Rect { x: 0, y: 0, width: 400, height: 300 };
+        let area = Rect {
+            x: 0,
+            y: 0,
+            width: 400,
+            height: 300,
+        };
         let r = center(area, (800, 600));
         assert_eq!((r.x, r.y), (0, 0));
         assert_eq!((r.width, r.height), (800, 600));
@@ -327,17 +440,45 @@ mod tests {
 
     #[test]
     fn next_display_keeps_the_relative_region() {
-        let a = Rect { x: 0, y: 0, width: 1920, height: 1080 };
-        let b = Rect { x: 1920, y: 0, width: 1920, height: 1080 };
+        let a = Rect {
+            x: 0,
+            y: 0,
+            width: 1920,
+            height: 1080,
+        };
+        let b = Rect {
+            x: 1920,
+            y: 0,
+            width: 1920,
+            height: 1080,
+        };
         let left_half = Region::LeftHalf.rect(a);
         let moved = next_display(left_half, a, &[a, b]).unwrap();
-        assert_eq!(moved, Rect { x: 1920, y: 0, width: 960, height: 1080 });
+        assert_eq!(
+            moved,
+            Rect {
+                x: 1920,
+                y: 0,
+                width: 960,
+                height: 1080
+            }
+        );
     }
 
     #[test]
     fn next_display_wraps_to_the_first() {
-        let a = Rect { x: 0, y: 0, width: 1920, height: 1080 };
-        let b = Rect { x: 1920, y: 0, width: 1920, height: 1080 };
+        let a = Rect {
+            x: 0,
+            y: 0,
+            width: 1920,
+            height: 1080,
+        };
+        let b = Rect {
+            x: 1920,
+            y: 0,
+            width: 1920,
+            height: 1080,
+        };
         let on_b = Region::RightHalf.rect(b);
         let moved = next_display(on_b, b, &[a, b]).unwrap();
         assert_eq!(moved, Region::RightHalf.rect(a));
@@ -345,28 +486,71 @@ mod tests {
 
     #[test]
     fn next_display_maps_across_different_scale() {
-        let a = Rect { x: 0, y: 0, width: 1920, height: 1080 };
+        let a = Rect {
+            x: 0,
+            y: 0,
+            width: 1920,
+            height: 1080,
+        };
         // A smaller, higher-DPI panel to the right, half the resolution.
-        let b = Rect { x: 1920, y: 0, width: 960, height: 540 };
+        let b = Rect {
+            x: 1920,
+            y: 0,
+            width: 960,
+            height: 540,
+        };
         let left_half = Region::LeftHalf.rect(a);
         let moved = next_display(left_half, a, &[a, b]).unwrap();
-        assert_eq!(moved, Rect { x: 1920, y: 0, width: 480, height: 540 });
+        assert_eq!(
+            moved,
+            Rect {
+                x: 1920,
+                y: 0,
+                width: 480,
+                height: 540
+            }
+        );
     }
 
     #[test]
     fn next_display_is_a_no_op_on_one_display() {
-        let a = Rect { x: 0, y: 0, width: 1920, height: 1080 };
+        let a = Rect {
+            x: 0,
+            y: 0,
+            width: 1920,
+            height: 1080,
+        };
         assert_eq!(next_display(Region::LeftHalf.rect(a), a, &[a]), None);
     }
 
     #[test]
     fn next_display_finds_the_current_by_the_frame_when_work_area_differs() {
-        let a = Rect { x: 0, y: 0, width: 1920, height: 1080 };
-        let b = Rect { x: 1920, y: 0, width: 1920, height: 1080 };
+        let a = Rect {
+            x: 0,
+            y: 0,
+            width: 1920,
+            height: 1080,
+        };
+        let b = Rect {
+            x: 1920,
+            y: 0,
+            width: 1920,
+            height: 1080,
+        };
         // A frame on display b, but a `current` work area that matches neither
         // exactly (a taskbar-shrunk area), so the centre falls back in.
-        let frame = Rect { x: 2000, y: 100, width: 400, height: 300 };
-        let shrunk = Rect { x: 1920, y: 0, width: 1920, height: 1040 };
+        let frame = Rect {
+            x: 2000,
+            y: 100,
+            width: 400,
+            height: 300,
+        };
+        let shrunk = Rect {
+            x: 1920,
+            y: 0,
+            width: 1920,
+            height: 1040,
+        };
         let moved = next_display(frame, shrunk, &[a, b]);
         assert!(moved.is_some());
         // It resolved b as current and wrapped to a.
@@ -390,7 +574,12 @@ mod tests {
 
     #[test]
     fn sizes_respect_a_non_zero_origin() {
-        let area = Rect { x: 100, y: 40, width: 800, height: 600 };
+        let area = Rect {
+            x: 100,
+            y: 40,
+            width: 800,
+            height: 600,
+        };
         let r = reasonable_size(area);
         assert_eq!(r.x, area.x + (area.width - r.width) / 2);
         assert_eq!(r.y, area.y + (area.height - r.height) / 2);
@@ -399,12 +588,25 @@ mod tests {
     #[test]
     fn center_half_is_the_middle_column() {
         let r = center_half(AREA);
-        assert_eq!(r, Rect { x: 480, y: 0, width: 960, height: 1080 });
+        assert_eq!(
+            r,
+            Rect {
+                x: 480,
+                y: 0,
+                width: 960,
+                height: 1080
+            }
+        );
     }
 
     #[test]
     fn larger_grows_around_the_centre() {
-        let frame = Rect { x: 800, y: 400, width: 320, height: 240 };
+        let frame = Rect {
+            x: 800,
+            y: 400,
+            width: 320,
+            height: 240,
+        };
         let cx = frame.x + frame.width / 2;
         let grown = step(frame, AREA, Step::Larger);
         assert!(grown.width > frame.width && grown.height > frame.height);
@@ -413,7 +615,12 @@ mod tests {
 
     #[test]
     fn smaller_shrinks_around_the_centre() {
-        let frame = Rect { x: 400, y: 200, width: 1000, height: 800 };
+        let frame = Rect {
+            x: 400,
+            y: 200,
+            width: 1000,
+            height: 800,
+        };
         let cx = frame.x + frame.width / 2;
         let small = step(frame, AREA, Step::Smaller);
         assert!(small.width < frame.width && small.height < frame.height);
@@ -422,7 +629,12 @@ mod tests {
 
     #[test]
     fn larger_clamps_to_the_work_area() {
-        let mut frame = Rect { x: 0, y: 0, width: 200, height: 200 };
+        let mut frame = Rect {
+            x: 0,
+            y: 0,
+            width: 200,
+            height: 200,
+        };
         for _ in 0..40 {
             frame = step(frame, AREA, Step::Larger);
         }
@@ -432,7 +644,12 @@ mod tests {
 
     #[test]
     fn smaller_clamps_to_the_minimum() {
-        let mut frame = Rect { x: 0, y: 0, width: 1920, height: 1080 };
+        let mut frame = Rect {
+            x: 0,
+            y: 0,
+            width: 1920,
+            height: 1080,
+        };
         for _ in 0..40 {
             frame = step(frame, AREA, Step::Smaller);
         }
@@ -441,20 +658,36 @@ mod tests {
 
     #[test]
     fn cycle_left_half_advances_through_the_fractions() {
-        assert_eq!(cycle_rect(Cycle::LeftHalf, 0, AREA), Region::LeftHalf.rect(AREA));
+        assert_eq!(
+            cycle_rect(Cycle::LeftHalf, 0, AREA),
+            Region::LeftHalf.rect(AREA)
+        );
         assert_eq!(
             cycle_rect(Cycle::LeftHalf, 1, AREA),
-            Rect { x: 0, y: 0, width: 1280, height: 1080 }
+            Rect {
+                x: 0,
+                y: 0,
+                width: 1280,
+                height: 1080
+            }
         );
         assert_eq!(
             cycle_rect(Cycle::LeftHalf, 2, AREA),
-            Rect { x: 0, y: 0, width: 640, height: 1080 }
+            Rect {
+                x: 0,
+                y: 0,
+                width: 640,
+                height: 1080
+            }
         );
     }
 
     #[test]
     fn cycle_wraps_after_a_third() {
-        assert_eq!(cycle_rect(Cycle::LeftHalf, 3, AREA), cycle_rect(Cycle::LeftHalf, 0, AREA));
+        assert_eq!(
+            cycle_rect(Cycle::LeftHalf, 3, AREA),
+            cycle_rect(Cycle::LeftHalf, 0, AREA)
+        );
     }
 
     #[test]
@@ -462,7 +695,10 @@ mod tests {
         let two_thirds = cycle_rect(Cycle::RightHalf, 1, AREA);
         assert_eq!(two_thirds.x + two_thirds.width, AREA.x + AREA.width);
         assert_eq!(two_thirds.width, 1280);
-        assert_eq!(cycle_rect(Cycle::RightHalf, 0, AREA), Region::RightHalf.rect(AREA));
+        assert_eq!(
+            cycle_rect(Cycle::RightHalf, 0, AREA),
+            Region::RightHalf.rect(AREA)
+        );
     }
 
     #[test]
@@ -491,7 +727,12 @@ mod tests {
             (Cycle::BottomHalf, Region::BottomHalf),
         ] {
             // Odd-sized area so the anchoring rounding would show.
-            let area = Rect { x: 7, y: 3, width: 1001, height: 769 };
+            let area = Rect {
+                x: 7,
+                y: 3,
+                width: 1001,
+                height: 769,
+            };
             assert_eq!(cycle_rect(cycle, 0, area), region.rect(area));
         }
     }

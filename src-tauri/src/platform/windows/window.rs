@@ -16,7 +16,7 @@ use windows_sys::Win32::Graphics::Gdi::{
     MONITOR_DEFAULTTONEAREST,
 };
 use windows_sys::Win32::UI::WindowsAndMessaging::{
-    GetWindowRect, IsZoomed, SetWindowPos, ShowWindow, SW_RESTORE, SWP_NOACTIVATE, SWP_NOZORDER,
+    GetWindowRect, IsZoomed, SetWindowPos, ShowWindow, SWP_NOACTIVATE, SWP_NOZORDER, SW_RESTORE,
 };
 
 use super::text::{is_out_of_reach, previous_foreground};
@@ -32,9 +32,8 @@ impl WindowManager for WindowsWindowManager {
                 "that window belongs to an elevated program, which Dango cannot reach".into(),
             ));
         }
-        let frame = visible_frame(hwnd).ok_or_else(|| {
-            WindowError::Failed("could not read the window's frame".into())
-        })?;
+        let frame = visible_frame(hwnd)
+            .ok_or_else(|| WindowError::Failed("could not read the window's frame".into()))?;
         let work_area = work_area(hwnd)
             .ok_or_else(|| WindowError::Failed("could not read the display".into()))?;
         Ok(Placement { frame, work_area })
@@ -111,7 +110,12 @@ fn visible_frame(hwnd: HWND) -> Option<Rect> {
 }
 
 fn dwm_frame(hwnd: HWND) -> Option<RECT> {
-    let mut rect = RECT { left: 0, top: 0, right: 0, bottom: 0 };
+    let mut rect = RECT {
+        left: 0,
+        top: 0,
+        right: 0,
+        bottom: 0,
+    };
     let hr = unsafe {
         DwmGetWindowAttribute(
             hwnd,
@@ -135,12 +139,22 @@ struct Inset {
 }
 
 impl Inset {
-    const ZERO: Inset = Inset { left: 0, top: 0, right: 0, bottom: 0 };
+    const ZERO: Inset = Inset {
+        left: 0,
+        top: 0,
+        right: 0,
+        bottom: 0,
+    };
 }
 
 /// How much larger the outer window rect is than the visible frame on each edge.
 fn border_inset(hwnd: HWND) -> Option<Inset> {
-    let mut outer = RECT { left: 0, top: 0, right: 0, bottom: 0 };
+    let mut outer = RECT {
+        left: 0,
+        top: 0,
+        right: 0,
+        bottom: 0,
+    };
     if unsafe { GetWindowRect(hwnd, &mut outer) } == 0 {
         return None;
     }
@@ -164,8 +178,18 @@ fn work_area(hwnd: HWND) -> Option<Rect> {
 fn monitor_work_area(monitor: HMONITOR) -> Option<Rect> {
     let mut info = MONITORINFO {
         cbSize: size_of::<MONITORINFO>() as u32,
-        rcMonitor: RECT { left: 0, top: 0, right: 0, bottom: 0 },
-        rcWork: RECT { left: 0, top: 0, right: 0, bottom: 0 },
+        rcMonitor: RECT {
+            left: 0,
+            top: 0,
+            right: 0,
+            bottom: 0,
+        },
+        rcWork: RECT {
+            left: 0,
+            top: 0,
+            right: 0,
+            bottom: 0,
+        },
         dwFlags: 0,
     };
     if unsafe { GetMonitorInfoW(monitor, &mut info) } == 0 {

@@ -59,7 +59,9 @@ impl MacWindowManager {
     fn screens(&self) -> Vec<Screen> {
         let (done, wait) = mpsc::channel();
         self.main.run(Box::new(move || {
-            let screens = MainThreadMarker::new().map(read_screens).unwrap_or_default();
+            let screens = MainThreadMarker::new()
+                .map(read_screens)
+                .unwrap_or_default();
             let _ = done.send(screens);
         }));
         wait.recv_timeout(MAIN_THREAD_TIMEOUT).unwrap_or_default()
@@ -182,9 +184,9 @@ unsafe fn copy_attribute(
 fn ax_error(error: AXError) -> WindowError {
     match error {
         AXError::APIDisabled => WindowError::Failed(PERMISSION_MISSING.into()),
-        AXError::NotImplemented => WindowError::Unreachable(
-            "that application does not let Dango move its windows".into(),
-        ),
+        AXError::NotImplemented => {
+            WindowError::Unreachable("that application does not let Dango move its windows".into())
+        }
         AXError::InvalidUIElement => WindowError::NoTarget,
         other => WindowError::Failed(format!("that window could not be reached ({})", other.0)),
     }
@@ -244,12 +246,32 @@ mod tests {
     use super::*;
 
     const LEFT: Screen = Screen {
-        frame: Rect { x: 0, y: 0, width: 1920, height: 1080 },
-        work_area: Rect { x: 0, y: 25, width: 1920, height: 1000 },
+        frame: Rect {
+            x: 0,
+            y: 0,
+            width: 1920,
+            height: 1080,
+        },
+        work_area: Rect {
+            x: 0,
+            y: 25,
+            width: 1920,
+            height: 1000,
+        },
     };
     const RIGHT: Screen = Screen {
-        frame: Rect { x: 1920, y: 0, width: 1280, height: 800 },
-        work_area: Rect { x: 1920, y: 0, width: 1280, height: 800 },
+        frame: Rect {
+            x: 1920,
+            y: 0,
+            width: 1280,
+            height: 800,
+        },
+        work_area: Rect {
+            x: 1920,
+            y: 0,
+            width: 1280,
+            height: 800,
+        },
     };
 
     #[test]
@@ -257,7 +279,12 @@ mod tests {
         let primary = CGRect::new(CGPoint::new(0.0, 0.0), CGSize::new(1920.0, 1080.0));
         assert_eq!(
             flipped(primary, 1080.0),
-            Rect { x: 0, y: 0, width: 1920, height: 1080 }
+            Rect {
+                x: 0,
+                y: 0,
+                width: 1920,
+                height: 1080
+            }
         );
     }
 
@@ -268,7 +295,12 @@ mod tests {
         let visible = CGRect::new(CGPoint::new(0.0, 0.0), CGSize::new(1920.0, 1055.0));
         assert_eq!(
             flipped(visible, 1080.0),
-            Rect { x: 0, y: 25, width: 1920, height: 1055 }
+            Rect {
+                x: 0,
+                y: 25,
+                width: 1920,
+                height: 1055
+            }
         );
     }
 
@@ -279,19 +311,34 @@ mod tests {
         let above = CGRect::new(CGPoint::new(0.0, 1080.0), CGSize::new(1280.0, 800.0));
         assert_eq!(
             flipped(above, 1080.0),
-            Rect { x: 0, y: -800, width: 1280, height: 800 }
+            Rect {
+                x: 0,
+                y: -800,
+                width: 1280,
+                height: 800
+            }
         );
     }
 
     #[test]
     fn picks_the_screen_the_window_is_centred_on() {
-        let frame = Rect { x: 2000, y: 100, width: 400, height: 300 };
+        let frame = Rect {
+            x: 2000,
+            y: 100,
+            width: 400,
+            height: 300,
+        };
         assert_eq!(work_area_for(frame, &[LEFT, RIGHT]), Some(RIGHT.work_area));
     }
 
     #[test]
     fn falls_back_to_the_first_screen_when_the_centre_is_nowhere() {
-        let frame = Rect { x: -5000, y: -5000, width: 400, height: 300 };
+        let frame = Rect {
+            x: -5000,
+            y: -5000,
+            width: 400,
+            height: 300,
+        };
         assert_eq!(work_area_for(frame, &[LEFT, RIGHT]), Some(LEFT.work_area));
     }
 

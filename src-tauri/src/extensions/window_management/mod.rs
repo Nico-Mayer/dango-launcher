@@ -207,25 +207,115 @@ fn manifest() -> Manifest {
         name: "Window Management".into(),
         icon: None,
         commands: vec![
-            command(COMMAND_LEFT_HALF, "Left Half", "panel-left", &["left", "half", "tile", "snap"]),
-            command(COMMAND_RIGHT_HALF, "Right Half", "panel-right", &["right", "half", "tile", "snap"]),
-            command(COMMAND_TOP_HALF, "Top Half", "panel-top", &["top", "half", "tile", "snap"]),
-            command(COMMAND_BOTTOM_HALF, "Bottom Half", "panel-bottom", &["bottom", "half", "tile", "snap"]),
-            command(COMMAND_TOP_LEFT, "Top Left Quarter", "grid-2x2", &["top", "left", "quarter", "corner"]),
-            command(COMMAND_TOP_RIGHT, "Top Right Quarter", "grid-2x2", &["top", "right", "quarter", "corner"]),
-            command(COMMAND_BOTTOM_LEFT, "Bottom Left Quarter", "grid-2x2", &["bottom", "left", "quarter", "corner"]),
-            command(COMMAND_BOTTOM_RIGHT, "Bottom Right Quarter", "grid-2x2", &["bottom", "right", "quarter", "corner"]),
-            command(COMMAND_LEFT_THIRD, "Left Third", "columns-3", &["left", "third", "column"]),
-            command(COMMAND_CENTER_THIRD, "Center Third", "columns-3", &["center", "middle", "third", "column"]),
-            command(COMMAND_RIGHT_THIRD, "Right Third", "columns-3", &["right", "third", "column"]),
-            command(COMMAND_MAXIMIZE, "Maximize", "maximize", &["maximize", "fill", "full", "fullscreen"]),
-            command(COMMAND_ALMOST_MAXIMIZE, "Almost Maximize", "maximize", &["almost", "maximize", "large", "margin"]),
-            command(COMMAND_REASONABLE_SIZE, "Reasonable Size", "app-window", &["reasonable", "default", "comfortable", "size"]),
+            command(
+                COMMAND_LEFT_HALF,
+                "Left Half",
+                "panel-left",
+                &["left", "half", "tile", "snap"],
+            ),
+            command(
+                COMMAND_RIGHT_HALF,
+                "Right Half",
+                "panel-right",
+                &["right", "half", "tile", "snap"],
+            ),
+            command(
+                COMMAND_TOP_HALF,
+                "Top Half",
+                "panel-top",
+                &["top", "half", "tile", "snap"],
+            ),
+            command(
+                COMMAND_BOTTOM_HALF,
+                "Bottom Half",
+                "panel-bottom",
+                &["bottom", "half", "tile", "snap"],
+            ),
+            command(
+                COMMAND_TOP_LEFT,
+                "Top Left Quarter",
+                "grid-2x2",
+                &["top", "left", "quarter", "corner"],
+            ),
+            command(
+                COMMAND_TOP_RIGHT,
+                "Top Right Quarter",
+                "grid-2x2",
+                &["top", "right", "quarter", "corner"],
+            ),
+            command(
+                COMMAND_BOTTOM_LEFT,
+                "Bottom Left Quarter",
+                "grid-2x2",
+                &["bottom", "left", "quarter", "corner"],
+            ),
+            command(
+                COMMAND_BOTTOM_RIGHT,
+                "Bottom Right Quarter",
+                "grid-2x2",
+                &["bottom", "right", "quarter", "corner"],
+            ),
+            command(
+                COMMAND_LEFT_THIRD,
+                "Left Third",
+                "columns-3",
+                &["left", "third", "column"],
+            ),
+            command(
+                COMMAND_CENTER_THIRD,
+                "Center Third",
+                "columns-3",
+                &["center", "middle", "third", "column"],
+            ),
+            command(
+                COMMAND_RIGHT_THIRD,
+                "Right Third",
+                "columns-3",
+                &["right", "third", "column"],
+            ),
+            command(
+                COMMAND_MAXIMIZE,
+                "Maximize",
+                "maximize",
+                &["maximize", "fill", "full", "fullscreen"],
+            ),
+            command(
+                COMMAND_ALMOST_MAXIMIZE,
+                "Almost Maximize",
+                "maximize",
+                &["almost", "maximize", "large", "margin"],
+            ),
+            command(
+                COMMAND_REASONABLE_SIZE,
+                "Reasonable Size",
+                "app-window",
+                &["reasonable", "default", "comfortable", "size"],
+            ),
             command(COMMAND_CENTER, "Center", "square", &["center", "middle"]),
-            command(COMMAND_CENTER_HALF, "Center Half", "square", &["center", "middle", "half", "column"]),
-            command(COMMAND_MAKE_LARGER, "Make Larger", "maximize-2", &["larger", "bigger", "grow", "expand"]),
-            command(COMMAND_MAKE_SMALLER, "Make Smaller", "minimize-2", &["smaller", "shrink", "contract"]),
-            command(COMMAND_NEXT_DISPLAY, "Move to Next Display", "monitor", &["display", "monitor", "screen", "next", "move"]),
+            command(
+                COMMAND_CENTER_HALF,
+                "Center Half",
+                "square",
+                &["center", "middle", "half", "column"],
+            ),
+            command(
+                COMMAND_MAKE_LARGER,
+                "Make Larger",
+                "maximize-2",
+                &["larger", "bigger", "grow", "expand"],
+            ),
+            command(
+                COMMAND_MAKE_SMALLER,
+                "Make Smaller",
+                "minimize-2",
+                &["smaller", "shrink", "contract"],
+            ),
+            command(
+                COMMAND_NEXT_DISPLAY,
+                "Move to Next Display",
+                "monitor",
+                &["display", "monitor", "screen", "next", "move"],
+            ),
         ],
         preferences: vec![],
         root_items: false,
@@ -316,8 +406,18 @@ mod tests {
         }
     }
 
-    const AREA: Rect = Rect { x: 0, y: 0, width: 1920, height: 1080 };
-    const FRAME: Rect = Rect { x: 100, y: 100, width: 800, height: 600 };
+    const AREA: Rect = Rect {
+        x: 0,
+        y: 0,
+        width: 1920,
+        height: 1080,
+    };
+    const FRAME: Rect = Rect {
+        x: 100,
+        y: 100,
+        width: 800,
+        height: 600,
+    };
 
     #[test]
     fn manifest_validates() {
@@ -343,7 +443,10 @@ mod tests {
         let extension = WindowManagementExtension::new(manager.clone());
         let command = extension.command(COMMAND_LEFT_HALF).unwrap();
         let sink = Arc::new(RecordingSink::default());
-        command.invoke(&InvocationContext::for_test(COMMAND_LEFT_HALF, sink.clone()));
+        command.invoke(&InvocationContext::for_test(
+            COMMAND_LEFT_HALF,
+            sink.clone(),
+        ));
         assert_eq!(manager.placed(), vec![Region::LeftHalf.rect(AREA)]);
         assert_eq!(sink.outcome.lock().unwrap().clone(), Some(Outcome::Success));
     }
@@ -361,7 +464,10 @@ mod tests {
             ));
         let placed = manager.placed();
         assert_eq!(placed.len(), 1);
-        assert_eq!((placed[0].width, placed[0].height), (FRAME.width, FRAME.height));
+        assert_eq!(
+            (placed[0].width, placed[0].height),
+            (FRAME.width, FRAME.height)
+        );
     }
 
     #[test]
@@ -372,7 +478,10 @@ mod tests {
         extension
             .command(COMMAND_NEXT_DISPLAY)
             .unwrap()
-            .invoke(&InvocationContext::for_test(COMMAND_NEXT_DISPLAY, sink.clone()));
+            .invoke(&InvocationContext::for_test(
+                COMMAND_NEXT_DISPLAY,
+                sink.clone(),
+            ));
         assert!(manager.placed().is_empty());
         assert_eq!(sink.outcome.lock().unwrap().clone(), Some(Outcome::Success));
     }
@@ -401,7 +510,10 @@ mod tests {
         extension
             .command(COMMAND_LEFT_HALF)
             .unwrap()
-            .invoke(&InvocationContext::for_test(COMMAND_LEFT_HALF, sink.clone()));
+            .invoke(&InvocationContext::for_test(
+                COMMAND_LEFT_HALF,
+                sink.clone(),
+            ));
         assert!(matches!(
             sink.outcome.lock().unwrap().clone(),
             Some(Outcome::Failure(_))
@@ -495,7 +607,12 @@ mod tests {
         let extension = WindowManagementExtension::new(sim.clone());
         invoke(&extension, COMMAND_LEFT_HALF);
         // The user drags the window somewhere else.
-        sim.set_frame(Rect { x: 500, y: 500, width: 300, height: 300 });
+        sim.set_frame(Rect {
+            x: 500,
+            y: 500,
+            width: 300,
+            height: 300,
+        });
         invoke(&extension, COMMAND_LEFT_HALF);
         let placed = sim.placed();
         assert_eq!(placed[1], geometry::cycle_rect(Cycle::LeftHalf, 0, AREA));
@@ -503,7 +620,12 @@ mod tests {
 
     #[test]
     fn center_keeps_size_then_cycles_on_repeat() {
-        let start = Rect { x: 200, y: 150, width: 800, height: 600 };
+        let start = Rect {
+            x: 200,
+            y: 150,
+            width: 800,
+            height: 600,
+        };
         let sim = WindowSim::new(start, AREA);
         let extension = WindowManagementExtension::new(sim.clone());
         invoke(&extension, COMMAND_CENTER);
@@ -519,7 +641,15 @@ mod tests {
 
     #[test]
     fn make_larger_accumulates_to_the_work_area() {
-        let sim = WindowSim::new(Rect { x: 800, y: 400, width: 200, height: 200 }, AREA);
+        let sim = WindowSim::new(
+            Rect {
+                x: 800,
+                y: 400,
+                width: 200,
+                height: 200,
+            },
+            AREA,
+        );
         let extension = WindowManagementExtension::new(sim.clone());
         for _ in 0..40 {
             invoke(&extension, COMMAND_MAKE_LARGER);
