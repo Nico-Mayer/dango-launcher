@@ -88,6 +88,13 @@ objc2-app-kit = { version = "0.3", features = [
   "NSGraphicsContext",
   "NSBitmapImageRep",
   "NSPasteboard",
+  "NSView",
+  "NSText",
+  "NSTextView",
+  "NSScrollView",
+  "NSClipView",
+  "NSMenu",
+  "NSMenuItem",
   "block2",
   "objc2-core-graphics",
 ] }
