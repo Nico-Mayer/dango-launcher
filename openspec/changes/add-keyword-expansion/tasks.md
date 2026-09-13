@@ -24,9 +24,9 @@ Windows hook cost and `ToUnicodeEx` behaviour; password-field detection on both.
 
 Pure storage, validation, and matching, no monitor, so the app stays runnable.
 
-- [ ] 1.1 Add an optional `keyword` to the file-backed snippet `Record` and its create and edit paths, preserved on a round trip, and verify with unit tests that setting a keyword writes and reads it and that an absent one is `None`
-- [ ] 1.2 Refuse a keyword at save time when the snippet's template has placeholder arguments (self-resolving placeholders like `date` and `clipboard` are fine), and enforce keyword uniqueness across snippets, and verify both with unit tests
-- [ ] 1.3 Add a pure word-boundary matcher: given the recent-character buffer and the set of keywords, return the keyword that ends at the caret when what precedes it is not a word character, and verify with unit tests (start of line, after a space, not inside a longer word, a punctuation-led keyword)
+- [x] 1.1 Add an optional `keyword` to the file-backed snippet `Record` and its create and edit paths, preserved on a round trip, and verify with unit tests that setting a keyword writes and reads it and that an absent one is `None`
+- [x] 1.2 Refuse a keyword at save time when the snippet's template has placeholder arguments (self-resolving placeholders like `date` and `clipboard` are fine), and enforce keyword uniqueness across snippets, and verify both with unit tests
+- [x] 1.3 Add a pure word-boundary matcher: given the recent-character buffer and the set of keywords, return the keyword that ends at the caret when what precedes it is not a word character, and verify with unit tests (start of line, after a space, not inside a longer word, a punctuation-led keyword)
 
 ## 2. The key-monitor service trait
 
