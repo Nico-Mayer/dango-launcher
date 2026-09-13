@@ -40,6 +40,18 @@ Pure Rust, no platform and no app wiring, so it is finished and tested first.
 ## 7. Verification
 
 - [ ] 7.1 Confirm on both platforms that a `config.json` at `~/.config/dango/` applies: a changed launcher hotkey summons and the default no longer does, a disabled extension is gone from search, and a preference override takes effect
+  - Windows: the configured launcher hotkey summons and the platform default no
+    longer does, read from a `$DANGO_CONFIG_DIR` config. The disabled-extension
+    and preference-override paths are unit tested (host respects the store,
+    `FileConfig` reads values); their live search effect is webview-only. macOS pending.
 - [ ] 7.2 Confirm on both platforms that editing the file while running re-applies it without a restart
+  - Windows: editing the launcher hotkey while running re-registers it live; the
+    new chord summons and the old one stops, no restart. macOS pending.
 - [ ] 7.3 Confirm on both platforms that a malformed file keeps the last good config, shows the tray error, and writes the log, and that a malformed file at startup falls back to defaults
+  - Windows: a malformed edit keeps the last-good config running and writes the
+    error to `dango.log`; a malformed file at startup starts on defaults and logs
+    it. The tray status line shares the same apply path. macOS pending.
 - [ ] 7.4 Confirm on both platforms that `$DANGO_CONFIG_DIR` relocates the directory and that removing the file returns everything to defaults
+  - Windows: `$DANGO_CONFIG_DIR` relocates the directory (used throughout the
+    checks above), and removing the file returns the launcher hotkey to the
+    default live. macOS pending.
