@@ -23,6 +23,31 @@ use tauri::WebviewWindow;
 
 use super::{LauncherWindow, RunningApp, SystemControl, SystemError};
 
+/// Whether the Accessibility permission has been granted. macOS gates every
+/// route into another application behind it: key synthesis, reading the
+/// selection, and moving a window.
+pub(super) fn accessibility_trusted() -> bool {
+    unsafe { objc2_application_services::AXIsProcessTrusted() }
+}
+
+/// Asks the system to show its Accessibility prompt, which is the only way to
+/// offer the user a route to the settings pane. Called from an action the user
+/// chose, never on its own: a dialog from a process they cannot see is worse
+/// than a command that explains itself.
+pub(super) fn prompt_for_accessibility() {
+    use objc2_core_foundation::{CFBoolean, CFDictionary, CFRetained, CFString};
+
+    let prompt = CFString::from_static_str("AXTrustedCheckOptionPrompt");
+    unsafe {
+        let Some(yes) = objc2_core_foundation::kCFBooleanTrue else {
+            return;
+        };
+        let options: CFRetained<CFDictionary<CFString, CFBoolean>> =
+            CFDictionary::from_slices(&[prompt.as_ref()], &[yes]);
+        objc2_application_services::AXIsProcessTrustedWithOptions(Some(options.as_opaque()));
+    }
+}
+
 /// Above NSMainMenuWindowLevel. A fullscreen application's window outranks the
 /// floating level that `alwaysOnTop` gives us, which leaves the launcher behind
 /// it.

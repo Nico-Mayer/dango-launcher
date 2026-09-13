@@ -16,7 +16,7 @@ use std::time::Duration;
 use enigo::{Direction, Enigo, Key, Keyboard as _, Settings};
 use objc2_app_kit::NSWorkspace;
 use objc2_application_services::{AXError, AXUIElement};
-use objc2_core_foundation::{CFBoolean, CFDictionary, CFRetained, CFString, CFType};
+use objc2_core_foundation::{CFRetained, CFString, CFType};
 
 use crate::text::{DirectSelection, Handoff, Keys, MainThread, TextError};
 
@@ -123,19 +123,11 @@ impl Keys for MacKeys {
     }
 
     fn permitted(&self) -> bool {
-        unsafe { objc2_application_services::AXIsProcessTrusted() }
+        super::accessibility_trusted()
     }
 
     fn request_permission(&self) {
-        let prompt = CFString::from_static_str("AXTrustedCheckOptionPrompt");
-        unsafe {
-            let Some(yes) = objc2_core_foundation::kCFBooleanTrue else {
-                return;
-            };
-            let options: CFRetained<CFDictionary<CFString, CFBoolean>> =
-                CFDictionary::from_slices(&[prompt.as_ref()], &[yes]);
-            objc2_application_services::AXIsProcessTrustedWithOptions(Some(options.as_opaque()));
-        }
+        super::prompt_for_accessibility();
     }
 }
 
