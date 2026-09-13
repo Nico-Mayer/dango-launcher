@@ -1,6 +1,7 @@
 pub mod config;
 pub mod extension;
 pub mod extensions;
+pub mod hotkeys;
 pub mod invocation;
 mod latency;
 pub mod platform;
@@ -360,9 +361,6 @@ mod inspect_tests {
 /// can be sent back to the right place, or the reason it could not start.
 #[tauri::command]
 async fn invoke_command(app: tauri::AppHandle, command_id: String) -> Result<String, String> {
-    let Some(invoker) = app.try_state::<Arc<Invoker>>() else {
-        return Err("no extensions are loaded".into());
-    };
     let owner = app
         .try_state::<Arc<Mutex<ExtensionHost>>>()
         .and_then(|host| {
@@ -370,16 +368,23 @@ async fn invoke_command(app: tauri::AppHandle, command_id: String) -> Result<Str
             Some(host.registry().get(&command_id)?.extension_id.clone())
         })
         .ok_or_else(|| InvokeError::Unavailable.to_string())?;
-    let mut rx = match invoker.invoke(&command_id) {
-        Ok(rx) => rx,
-        Err(error @ (InvokeError::Unavailable | InvokeError::HostUnavailable)) => {
-            return Err(error.to_string())
-        }
-    };
+    run_command(&app, &command_id).map_err(|error| error.to_string())?;
+    Ok(owner)
+}
+
+/// Runs a command through the invoker and streams its output the same way for a
+/// launcher selection and a hotkey press: a view goes to the webview, success
+/// hides the launcher, a failure is reported.
+fn run_command(app: &tauri::AppHandle, command_id: &str) -> Result<(), InvokeError> {
+    let invoker = app
+        .try_state::<Arc<Invoker>>()
+        .ok_or(InvokeError::HostUnavailable)?;
+    let mut rx = invoker.invoke(command_id)?;
     if let Some(frecency) = app.try_state::<Arc<FrecencyTable>>() {
-        frecency.record_launch(&command_id, now_millis());
+        frecency.record_launch(command_id, now_millis());
     }
 
+    let app = app.clone();
     tauri::async_runtime::spawn(async move {
         while let Some(output) = rx.recv().await {
             match output {
@@ -399,7 +404,39 @@ async fn invoke_command(app: tauri::AppHandle, command_id: String) -> Result<Str
             }
         }
     });
-    Ok(owner)
+    Ok(())
+}
+
+/// Invokes a command from its hotkey. A no-view command runs without showing the
+/// launcher, acting on the window that was focused at the press; a view command
+/// shows the launcher first so its pushed view is displayed.
+fn dispatch_command(app: &tauri::AppHandle, command_id: &str) {
+    let shows_view = app
+        .try_state::<Arc<Mutex<ExtensionHost>>>()
+        .and_then(|host| {
+            let host = host.lock().ok()?;
+            Some(host.registry().get(command_id)?.decl.mode == extension::InvocationMode::View)
+        })
+        .unwrap_or(false);
+
+    if shows_view {
+        show(app, None);
+        let _ = run_command(app, command_id);
+        return;
+    }
+
+    // A headless command that reshapes or types into the user's window needs the
+    // window that was focused at the press; the launcher never showed to record
+    // it, so capture it now.
+    #[cfg(target_os = "windows")]
+    unsafe {
+        use windows_sys::Win32::UI::WindowsAndMessaging::GetForegroundWindow;
+        let foreground = GetForegroundWindow();
+        if !foreground.is_null() {
+            platform::remember_previous_foreground(foreground as isize);
+        }
+    }
+    let _ = run_command(app, command_id);
 }
 
 /// Hides the launcher without restoring the previous foreground, because the
@@ -547,6 +584,7 @@ fn apply_config_reload(
     app: &tauri::AppHandle,
     file_config: &Arc<config::FileConfig>,
     launcher_hotkey: &Arc<Mutex<Shortcut>>,
+    bindings: &Arc<Mutex<Vec<(Shortcut, String)>>>,
     result: Result<config::Config, config::ConfigError>,
 ) {
     let config = match result {
@@ -586,7 +624,45 @@ fn apply_config_reload(
         }
     }
 
-    set_config_status(app, false);
+    let conflicts = {
+        let config = file_config.shared();
+        let config = config.read().unwrap();
+        apply_command_hotkeys(app, &config, new_shortcut, bindings)
+    };
+    for conflict in &conflicts {
+        log_config(conflict);
+    }
+    set_config_status(app, !conflicts.is_empty());
+}
+
+/// (Re)registers the command hotkeys from a config: unregisters the ones the app
+/// currently holds, rebuilds the table first-wins, registers the survivors, and
+/// returns the conflicts to surface (collisions plus any OS registration
+/// refusal).
+fn apply_command_hotkeys(
+    app: &tauri::AppHandle,
+    config: &config::Config,
+    launcher: Shortcut,
+    bindings: &Arc<Mutex<Vec<(Shortcut, String)>>>,
+) -> Vec<String> {
+    let previous: Vec<(Shortcut, String)> = bindings.lock().unwrap().drain(..).collect();
+    for (chord, _) in previous {
+        let _ = app.global_shortcut().unregister(chord);
+    }
+
+    let built = crate::hotkeys::command_bindings(config, launcher);
+    let mut conflicts = built.conflicts;
+    let mut table = bindings.lock().unwrap();
+    for binding in built.bindings {
+        match app.global_shortcut().register(binding.chord) {
+            Ok(()) => table.push((binding.chord, binding.command_id)),
+            Err(error) => conflicts.push(format!(
+                "{}: could not register its hotkey, {error}",
+                binding.command_id
+            )),
+        }
+    }
+    conflicts
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -605,6 +681,10 @@ pub fn run() {
     // handler can compare against whatever is registered now.
     let launcher_hotkey = Arc::new(Mutex::new(shortcut));
     let handler_hotkey = launcher_hotkey.clone();
+    // Command hotkeys, as (chord, qualified command id). Shared so the handler
+    // dispatches on a press and a reload can rebuild the set.
+    let bindings: Arc<Mutex<Vec<(Shortcut, String)>>> = Arc::new(Mutex::new(Vec::new()));
+    let handler_bindings = bindings.clone();
 
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
@@ -614,12 +694,22 @@ pub fn run() {
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
                 .with_handler(move |app, received, event| {
-                    if event.state() != ShortcutState::Pressed
-                        || *received != *handler_hotkey.lock().unwrap()
-                    {
+                    if event.state() != ShortcutState::Pressed {
                         return;
                     }
-                    toggle(app);
+                    if *received == *handler_hotkey.lock().unwrap() {
+                        toggle(app);
+                        return;
+                    }
+                    let command = handler_bindings
+                        .lock()
+                        .unwrap()
+                        .iter()
+                        .find(|(chord, _)| chord == received)
+                        .map(|(_, id)| id.clone());
+                    if let Some(command_id) = command {
+                        dispatch_command(app, &command_id);
+                    }
                 })
                 .build(),
         )
@@ -862,6 +952,21 @@ pub fn run() {
                 notices.push(format!("{SHORTCUT_LABEL} unavailable, already in use"));
             }
 
+            // Register the command hotkeys from the config, surfacing conflicts.
+            {
+                let handle = app.handle().clone();
+                let config = file_config.shared();
+                let config = config.read().unwrap();
+                let conflicts =
+                    apply_command_hotkeys(&handle, &config, current_shortcut, &bindings);
+                if !conflicts.is_empty() {
+                    for conflict in &conflicts {
+                        log_config(conflict);
+                    }
+                    notices.push("Hotkey conflict, see log".to_string());
+                }
+            }
+
             let notice_items = notices
                 .iter()
                 .enumerate()
@@ -897,6 +1002,7 @@ pub fn run() {
                 let handle = app.handle().clone();
                 let file_config = file_config.clone();
                 let launcher_hotkey = launcher_hotkey.clone();
+                let bindings = bindings.clone();
                 let started = config::watch::watch(
                     config::config_path(),
                     file_config.own_write(),
@@ -904,11 +1010,13 @@ pub fn run() {
                         let app = handle.clone();
                         let file_config = file_config.clone();
                         let launcher_hotkey = launcher_hotkey.clone();
+                        let bindings = bindings.clone();
                         let _ = app.clone().run_on_main_thread(move || {
                             apply_config_reload(
                                 &app,
                                 &file_config,
                                 &launcher_hotkey,
+                                &bindings,
                                 config::Config::parse(&text),
                             );
                         });
