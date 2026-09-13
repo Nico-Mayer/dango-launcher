@@ -16,6 +16,7 @@ use serde_json::{Map, Value};
 pub mod hotkey;
 mod location;
 mod store;
+pub mod watch;
 
 pub use hotkey::{Hotkey, HotkeyError, ParsedHotkey};
 pub use location::{config_dir, config_path};
@@ -246,5 +247,35 @@ mod tests {
         assert!(json.contains("keepMe"));
         assert!(json.contains("keepThis"));
         assert!(json.contains("\"enabled\": false"));
+    }
+
+    #[test]
+    fn the_example_config_validates_and_parses() {
+        let docs = concat!(env!("CARGO_MANIFEST_DIR"), "/../docs");
+        let schema_text =
+            std::fs::read_to_string(format!("{docs}/config.schema.json")).expect("schema file");
+        let example_jsonc =
+            std::fs::read_to_string(format!("{docs}/config.example.jsonc")).expect("example file");
+        // The example is JSONC for documentation; strip its full-line comments
+        // to get the JSON the live file would hold.
+        let example_json: String = example_jsonc
+            .lines()
+            .filter(|line| !line.trim_start().starts_with("//"))
+            .collect::<Vec<_>>()
+            .join("\n");
+
+        // It is valid Dango configuration.
+        assert!(
+            Config::parse(&example_json).is_ok(),
+            "the example config does not parse"
+        );
+
+        // And it matches the shipped JSON Schema.
+        let schema: Value = serde_json::from_str(&schema_text).expect("schema is valid JSON");
+        let instance: Value =
+            serde_json::from_str(&example_json).expect("example is valid JSON once decommented");
+        if let Err(error) = jsonschema::validate(&schema, &instance) {
+            panic!("the example config does not match the schema: {error}");
+        }
     }
 }

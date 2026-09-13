@@ -1,0 +1,50 @@
+// Example Dango configuration.
+//
+// This file documents every setting with comments. The live config.json cannot
+// have comments, because JSON has none and a future settings UI writing the file
+// could not keep them. Copy the parts you want into ~/.config/dango/config.json
+// (or the directory named by $DANGO_CONFIG_DIR) as plain JSON.
+//
+// Everything here is optional. Anything you leave out uses its built-in default,
+// so an empty file, or no file at all, is a valid configuration.
+{
+  // The config schema version. Leave it at 1.
+  "version": 1,
+
+  "launcher": {
+    // The chord that summons the launcher. Portable tokens work on both
+    // machines: "mod" is Cmd on macOS and Ctrl on Windows. The default is
+    // Option+Space on macOS and Alt+Space on Windows.
+    "hotkey": "alt+space"
+
+    // A chord can also differ per platform:
+    // "hotkey": { "macos": "cmd+space", "windows": "ctrl+space" }
+  },
+
+  "extensions": {
+    "dango.clipboard": {
+      // Turn an extension off. Absent means on.
+      "enabled": true,
+      // Override an extension's preferences. Types are as declared.
+      "preferences": {
+        "max_entries": 200,
+        "excluded_apps": ["Proton Pass"]
+      }
+    },
+
+    "dango.window-management": {
+      "commands": {
+        "left-half": {
+          // A short alias to match this command in root search.
+          "alias": "lh"
+          // Per-command hotkeys land in a later release; the key is reserved:
+          // "hotkey": "hyper+left"
+        }
+      }
+    }
+  }
+
+  // The hyperkey (a system-wide CapsLock remap) lands in a later release. Its
+  // key is reserved, so a config written for it loads harmlessly today:
+  // "hyperkey": { "key": "capslock" }
+}

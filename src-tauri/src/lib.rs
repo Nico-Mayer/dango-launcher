@@ -487,6 +487,108 @@ fn launcher_shortcut(config: &config::Config) -> Shortcut {
     Shortcut::new(Some(Modifiers::ALT), Code::Space)
 }
 
+/// The tray line describing the config file's health.
+fn config_status_text(error: bool) -> &'static str {
+    if error {
+        "Config error, see log"
+    } else {
+        "Config loaded"
+    }
+}
+
+/// A handle to the tray's config status line, so a reload can update it.
+struct ConfigStatusItem(MenuItem<tauri::Wry>);
+
+fn set_config_status(app: &tauri::AppHandle, error: bool) {
+    if let Some(item) = app.try_state::<ConfigStatusItem>() {
+        let _ = item.0.set_text(config_status_text(error));
+    }
+}
+
+/// Appends a config problem to a log file beside the config. A release build has
+/// `windows_subsystem = "windows"`, so stderr is not visible; the log is.
+fn log_config(message: &str) {
+    let path = config::config_dir().join("dango.log");
+    if let Some(parent) = path.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+    if let Ok(mut file) = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&path)
+    {
+        use std::io::Write;
+        let _ = writeln!(file, "{message}");
+    }
+}
+
+/// Command candidates with the config file's aliases applied over the manifest's.
+fn aliased_candidates(host: &ExtensionHost, file_config: &config::FileConfig) -> Vec<Candidate> {
+    let shared = file_config.shared();
+    let config = shared.read().unwrap();
+    host.command_candidates()
+        .into_iter()
+        .map(|mut candidate| {
+            let prefix = format!("{}.", candidate.extension_id);
+            if let Some(command_id) = candidate.id.strip_prefix(&prefix) {
+                if let Some(alias) = config.alias(&candidate.extension_id, command_id) {
+                    candidate.alias = Some(alias);
+                }
+            }
+            candidate
+        })
+        .collect()
+}
+
+/// Applies a reloaded configuration, on the main thread. Re-registers the
+/// launcher hotkey if it changed, brings enabled state and search in line, and
+/// updates the tray. A parse failure keeps the running config and is surfaced.
+fn apply_config_reload(
+    app: &tauri::AppHandle,
+    file_config: &Arc<config::FileConfig>,
+    launcher_hotkey: &Arc<Mutex<Shortcut>>,
+    result: Result<config::Config, config::ConfigError>,
+) {
+    let config = match result {
+        Ok(config) => config,
+        Err(error) => {
+            log_config(&format!("config reload failed: {error}"));
+            set_config_status(app, true);
+            return;
+        }
+    };
+
+    let new_shortcut = launcher_shortcut(&config);
+    file_config.replace(config);
+
+    {
+        let mut current = launcher_hotkey.lock().unwrap();
+        if *current != new_shortcut {
+            let _ = app.global_shortcut().unregister(*current);
+            if let Err(error) = app.global_shortcut().register(new_shortcut) {
+                log_config(&format!(
+                    "could not register the new launcher hotkey: {error}"
+                ));
+            }
+            *current = new_shortcut;
+        }
+    }
+
+    if let Some(host) = app.try_state::<Arc<Mutex<ExtensionHost>>>() {
+        let mut host = host.lock().unwrap();
+        host.reload_enabled();
+        if let Some(pipeline) = app.try_state::<SearchPipeline>() {
+            let candidates = aliased_candidates(&host, file_config);
+            pipeline.reload(
+                Arc::new(StaticCommandSource(candidates)),
+                host.root_providers(),
+            );
+        }
+    }
+
+    set_config_status(app, false);
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let config_path = config::config_path();
@@ -499,6 +601,10 @@ pub fn run() {
     };
     let shortcut = launcher_shortcut(&initial_config);
     let file_config = Arc::new(config::FileConfig::new(config_path, initial_config));
+    // The current launcher chord, shared so a reload can re-register it and the
+    // handler can compare against whatever is registered now.
+    let launcher_hotkey = Arc::new(Mutex::new(shortcut));
+    let handler_hotkey = launcher_hotkey.clone();
 
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
@@ -508,7 +614,9 @@ pub fn run() {
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
                 .with_handler(move |app, received, event| {
-                    if received != &shortcut || event.state() != ShortcutState::Pressed {
+                    if event.state() != ShortcutState::Pressed
+                        || *received != *handler_hotkey.lock().unwrap()
+                    {
                         return;
                     }
                     toggle(app);
@@ -552,9 +660,6 @@ pub fn run() {
             // are collected before it is built. None of them stops Dango from
             // starting.
             let mut notices = Vec::new();
-            if config_error.is_some() {
-                notices.push("Config file error, see log".to_string());
-            }
             app.manage(file_config.clone());
 
             let store: Option<Arc<Store>> = match open_store(app) {
@@ -708,26 +813,7 @@ pub fn run() {
                 None => FrecencyTable::in_memory(),
             });
             let ranker = Arc::new(DangoRanker::new(frecency.clone()));
-            // Apply command aliases the config file sets, over the manifest's.
-            let candidates = host
-                .command_candidates()
-                .into_iter()
-                .map(|mut candidate| {
-                    let prefix = format!("{}.", candidate.extension_id);
-                    if let Some(command_id) = candidate.id.strip_prefix(&prefix) {
-                        if let Some(alias) = file_config
-                            .shared()
-                            .read()
-                            .unwrap()
-                            .alias(&candidate.extension_id, command_id)
-                        {
-                            candidate.alias = Some(alias);
-                        }
-                    }
-                    candidate
-                })
-                .collect();
-            let commands = StaticCommandSource(candidates);
+            let commands = StaticCommandSource(aliased_candidates(&host, &file_config));
             let pipeline = SearchPipeline::new(
                 Arc::new(commands),
                 host.root_providers(),
@@ -744,8 +830,9 @@ pub fn run() {
             app.manage(Arc::new(Invoker::new(Arc::new(HostResolver(host.clone())))));
             app.manage(host);
 
-            if let Err(error) = app.global_shortcut().register(shortcut) {
-                eprintln!("[dango] could not register {SHORTCUT_LABEL}: {error}");
+            let current_shortcut = *launcher_hotkey.lock().unwrap();
+            if let Err(error) = app.global_shortcut().register(current_shortcut) {
+                eprintln!("[dango] could not register the launcher hotkey: {error}");
                 notices.push(format!("{SHORTCUT_LABEL} unavailable, already in use"));
             }
 
@@ -756,15 +843,50 @@ pub fn run() {
                     MenuItem::with_id(app, format!("notice-{i}"), text, false, None::<&str>)
                 })
                 .collect::<Result<Vec<_>, _>>()?;
+            // A live status line for the config file, updated as it is reloaded.
+            let config_status = MenuItem::with_id(
+                app,
+                "config-status",
+                config_status_text(config_error.is_some()),
+                false,
+                None::<&str>,
+            )?;
             let toggle_item = MenuItem::with_id(app, "toggle", "Toggle Dango", true, None::<&str>)?;
             let quit_item = MenuItem::with_id(app, "quit", "Quit Dango", true, None::<&str>)?;
             let mut items: Vec<&dyn IsMenuItem<tauri::Wry>> = notice_items
                 .iter()
                 .map(|item| item as &dyn IsMenuItem<tauri::Wry>)
                 .collect();
+            items.push(&config_status);
             items.push(&toggle_item);
             items.push(&quit_item);
             let menu = Menu::with_items(app, &items)?;
+            app.manage(ConfigStatusItem(config_status.clone()));
+            if config_error.is_some() {
+                log_config("config file did not parse at startup, using defaults");
+            }
+
+            // Apply edits to the config file live, on the main thread.
+            {
+                let handle = app.handle().clone();
+                let file_config = file_config.clone();
+                let launcher_hotkey = launcher_hotkey.clone();
+                let started = config::watch::watch(
+                    config::config_path(),
+                    file_config.own_write(),
+                    move |result| {
+                        let app = handle.clone();
+                        let file_config = file_config.clone();
+                        let launcher_hotkey = launcher_hotkey.clone();
+                        let _ = app.clone().run_on_main_thread(move || {
+                            apply_config_reload(&app, &file_config, &launcher_hotkey, result);
+                        });
+                    },
+                );
+                if !started {
+                    log_config("config file watching is off; edits need a restart");
+                }
+            }
 
             TrayIconBuilder::new()
                 .icon(app.default_window_icon().expect("bundled icon").clone())

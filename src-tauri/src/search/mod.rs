@@ -3,7 +3,7 @@
 //! enabled root items provider, and streams merged snapshots as providers
 //! answer. A slow or hung provider never blocks the rest.
 
-use std::sync::Mutex;
+use std::sync::{Mutex, RwLock};
 use std::time::Duration;
 
 use async_trait::async_trait;
@@ -77,9 +77,15 @@ pub trait Ranker: Send + Sync {
     fn rank(&self, query: &str, candidates: Vec<Candidate>, limit: usize) -> Vec<Candidate>;
 }
 
-pub struct SearchPipeline {
+/// The commands and providers a query draws on. Held behind a lock so a config
+/// reload can swap the enabled set while queries keep running.
+struct Sources {
     commands: std::sync::Arc<dyn CommandSource>,
     providers: Vec<std::sync::Arc<dyn RootProvider>>,
+}
+
+pub struct SearchPipeline {
+    sources: RwLock<Sources>,
     ranker: std::sync::Arc<dyn Ranker>,
     /// A provider that has not answered by this point is abandoned so a hung one
     /// cannot keep the query alive forever. The 50ms responsiveness budget is
@@ -97,13 +103,28 @@ impl SearchPipeline {
         limit: usize,
     ) -> Self {
         Self {
-            commands,
-            providers,
+            sources: RwLock::new(Sources {
+                commands,
+                providers,
+            }),
             ranker,
             straggler_timeout: Duration::from_secs(5),
             limit,
             current: Mutex::new(None),
         }
+    }
+
+    /// Swaps in a new set of commands and providers, so enabling or disabling
+    /// an extension changes what search returns without a restart.
+    pub fn reload(
+        &self,
+        commands: std::sync::Arc<dyn CommandSource>,
+        providers: Vec<std::sync::Arc<dyn RootProvider>>,
+    ) {
+        *self.sources.write().unwrap() = Sources {
+            commands,
+            providers,
+        };
     }
 
     #[cfg(test)]
@@ -122,8 +143,10 @@ impl SearchPipeline {
             previous.abort();
         }
 
-        let commands = self.commands.candidates();
-        let providers = self.providers.clone();
+        let (commands, providers) = {
+            let sources = self.sources.read().unwrap();
+            (sources.commands.candidates(), sources.providers.clone())
+        };
         let ranker = self.ranker.clone();
         let straggler_timeout = self.straggler_timeout;
         let limit = self.limit;

@@ -1,0 +1,78 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://dango.local/config.schema.json",
+  "title": "Dango configuration",
+  "description": "Dango's config.json, kept in ~/.config/dango and shared over git. Every setting is optional; anything omitted uses its built-in default. Unknown keys are preserved, so a newer Dango or a plugin can add to this file safely.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "version": {
+      "type": "integer",
+      "description": "The config schema version.",
+      "minimum": 1
+    },
+    "launcher": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "hotkey": { "$ref": "#/$defs/hotkey" }
+      }
+    },
+    "extensions": {
+      "type": "object",
+      "description": "Per-extension settings, keyed by extension id such as dango.clipboard.",
+      "additionalProperties": { "$ref": "#/$defs/extension" }
+    }
+  },
+  "$defs": {
+    "hotkey": {
+      "description": "A chord, either a portable string like \"mod+shift+k\" or a per-platform object. Modifiers: mod (Cmd on macOS, Ctrl on Windows), ctrl, alt, shift, meta, hyper. The key is a physical position such as space, k, or left.",
+      "oneOf": [
+        { "type": "string" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "macos": { "type": "string" },
+            "windows": { "type": "string" }
+          }
+        }
+      ]
+    },
+    "extension": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Whether the extension runs. Absent means enabled."
+        },
+        "preferences": {
+          "type": "object",
+          "description": "The extension's preference values, overriding its declared defaults.",
+          "additionalProperties": true
+        },
+        "commands": {
+          "type": "object",
+          "description": "Per-command settings, keyed by command id.",
+          "additionalProperties": { "$ref": "#/$defs/command" }
+        }
+      }
+    },
+    "command": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "hotkey": { "$ref": "#/$defs/hotkey" },
+        "alias": {
+          "type": "string",
+          "description": "A short alias that matches this command in root search."
+        },
+        "preferences": {
+          "type": "object",
+          "additionalProperties": true
+        }
+      }
+    }
+  }
+}

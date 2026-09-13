@@ -28,14 +28,14 @@ Pure Rust, no platform and no app wiring, so it is finished and tested first.
 
 ## 5. Live reload and surfacing errors
 
-- [ ] 5.1 Watch the config file with `notify`, debounced, and on a clean parse swap the config, re-register the launcher hotkey if it changed, and enable or disable extensions whose state changed through `ExtensionHost::set_enabled`, with tests over the apply logic driven by hand
-- [ ] 5.2 Suppress the app's own write so a file Dango wrote is not re-applied as an external edit, reusing the own-write pattern, with a test
-- [ ] 5.3 Keep the last good config and surface the error through a tray item and a log file when a reload fails to parse, with a test over the last-good fallback
-- [ ] 5.4 On startup with an unparseable file, run on defaults and surface the error rather than refusing to start, with a test
+- [x] 5.1 Watch the config file with `notify`, debounced, and on a clean parse swap the config, re-register the launcher hotkey if it changed, and enable or disable extensions whose state changed through `ExtensionHost::set_enabled`, with tests over the apply logic driven by hand
+- [x] 5.2 Suppress the app's own write so a file Dango wrote is not re-applied as an external edit, reusing the own-write pattern, with a test
+- [x] 5.3 Keep the last good config and surface the error through a tray item and a log file when a reload fails to parse, with a test over the last-good fallback
+- [x] 5.4 On startup with an unparseable file, run on defaults and surface the error rather than refusing to start, with a test
 
 ## 6. Documentation and example
 
-- [ ] 6.1 Add a `$schema` JSON Schema for the config and a commented example config in the repo (documentation, not the live file), and confirm the example validates against the schema
+- [x] 6.1 Add a `$schema` JSON Schema for the config and a commented example config in the repo (documentation, not the live file), and confirm the example validates against the schema
 
 ## 7. Verification
 

@@ -219,6 +219,22 @@ impl ExtensionHost {
         report
     }
 
+    /// Brings every extension's active state in line with the enabled store,
+    /// without persisting anything. Used on a config reload, where the store
+    /// (the file) is already the new source of truth.
+    pub fn reload_enabled(&mut self) -> LoadReport {
+        let ids: Vec<String> = self.extensions.keys().cloned().collect();
+        let mut report = LoadReport::default();
+        for id in ids {
+            match (self.enabled.is_enabled(&id), self.is_active(&id)) {
+                (true, false) => self.activate(&id, &mut report),
+                (false, true) => self.deactivate(&id),
+                _ => {}
+            }
+        }
+        report
+    }
+
     fn activate(&mut self, extension_id: &str, report: &mut LoadReport) {
         if self.active.contains_key(extension_id) {
             return;
@@ -372,6 +388,27 @@ mod tests {
 
     fn host() -> ExtensionHost {
         ExtensionHost::new(Arc::new(MemoryEnabled::default()))
+    }
+
+    #[test]
+    fn reload_enabled_syncs_active_state_to_the_store() {
+        let enabled = Arc::new(MemoryEnabled::default());
+        let mut host = ExtensionHost::new(enabled.clone());
+        let extension = TestExtension::new("apps", "open");
+        host.register(extension.clone()).unwrap();
+        assert!(host.is_active("apps"));
+
+        // An external edit disables it; a reload brings the runtime in line
+        // without the host calling set_enabled to persist anything back.
+        enabled.set_enabled("apps", false);
+        host.reload_enabled();
+        assert!(!host.is_active("apps"));
+        assert!(host.registry().get("apps.open").is_none());
+
+        enabled.set_enabled("apps", true);
+        host.reload_enabled();
+        assert!(host.is_active("apps"));
+        assert!(host.registry().get("apps.open").is_some());
     }
 
     #[test]
