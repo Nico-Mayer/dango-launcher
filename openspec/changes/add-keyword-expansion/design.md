@@ -92,6 +92,31 @@ a dependency *and* leave the hard part. That conclusion is only allowed because
 the candidates were checked rather than guessed at, which is what the rule
 actually asks for.
 
+### The keyword is a field on the file-backed snippet record
+
+Since this was first planned, `add-file-backed-records` moved snippets out of
+SQLite into `snippets.json`, whose records are held as JSON objects that preserve
+unknown fields. So the keyword is a `keyword` field on the record, not a database
+column, and it travels in the dotfiles with the snippet. Uniqueness is enforced
+in the store at save time, and a snippet whose template has placeholder arguments
+is refused a keyword there, with a message saying why. This replaces the original
+migration-and-unique-index plan, which no longer has a table to attach to.
+
+### The Windows monitor reuses the hook and injection built for the hyperkey
+
+`add-hyperkey` built the Windows pieces this needs: a `WH_KEYBOARD_LL` hook on a
+dedicated pumped thread, `SendInput` for synthetic keys, and the `DANGO_INJECTED`
+`dwExtraInfo` marker (now shared in `platform::windows`) that lets a hook tell
+Dango's own output from the user's. The monitor is a second consumer of that
+pattern: it installs its own listening hook, ignores any event carrying
+`DANGO_INJECTED` so its backspaces and inserts are never observed, and reads the
+character a key produced with `ToUnicodeEx` over `GetKeyboardState` and
+`GetKeyboardLayout`. It lives behind a `KeyMonitor` platform trait beside
+`Hyperkey`, and Windows is built and verified first for the same reason.
+
+Unlike the hyperkey hook, this one never swallows or rewrites a key: it returns
+every event to the chain and only observes.
+
 ### The monitor keeps characters, never keys, and never more than it needs
 
 The buffer is a fixed-size ring of the last N characters typed, where N is the

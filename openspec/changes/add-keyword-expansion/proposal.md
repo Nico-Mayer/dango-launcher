@@ -30,9 +30,11 @@ The rest of M5, the hotkey recorder and conflict detection, stays where it is.
 - Expansion is **skipped entirely while secure input is active**, and in
   applications the user has excluded, reusing the exclusion list the clipboard
   history already has.
-- Covered on Windows and macOS. macOS is built and verified first; the Windows
-  half lands as code plus confirmation tasks, the arrangement the last two
-  changes used.
+- Covered on Windows and macOS. Windows is built and verified first this time,
+  because `add-hyperkey` just built and proved the Windows low-level keyboard
+  hook, the `SendInput` injection path, and the `DANGO_INJECTED` marker the
+  monitor needs to ignore its own output; macOS lands as code plus confirmation
+  tasks, the arrangement the recent changes used.
 
 ## Capabilities
 
@@ -54,8 +56,11 @@ The rest of M5, the hotkey recorder and conflict detection, stays where it is.
   low-level keyboard hook on Windows, behind one trait),
   `src-tauri/src/extensions/snippets/` (the keyword, its matching, and the
   service), `src-tauri/src/text/` (deleting the keyword before inserting).
-- **Database**: a forward-only migration adding a nullable `keyword` column to
-  `snippets`, with a unique index over the live rows.
+- **Storage**: the keyword is a field on the file-backed snippet record.
+  `add-file-backed-records` moved snippets from SQLite to `snippets.json`, whose
+  records already preserve unknown fields, so no database migration is needed;
+  the keyword travels in the dotfiles with the snippet, and uniqueness is checked
+  in the store at save time rather than by a database index.
 - **Dependencies**: none. The evaluation is in design.md and its conclusion is
   unusual: the maintained crates report which *key* was pressed, and matching
   typed text needs which *character* was produced, which is the only hard part
