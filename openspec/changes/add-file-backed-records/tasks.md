@@ -17,6 +17,19 @@
 ## 3. Verification
 
 - [ ] 3.1 Confirm on both platforms that creating a snippet and a quicklink through the launcher writes them to `snippets.json` and `quicklinks.json` in the config directory as readable text
+  - Windows: creating a snippet and a quicklink through the launcher wrote them
+    to `snippets.json` and `quicklinks.json` in the config dir as readable JSON,
+    with the `template` and `url` body keys. macOS pending.
 - [ ] 3.2 Confirm on both platforms that a record hand-added to the file appears in the launcher, gains an id on the next app write, and that editing a record's body live changes what the launcher uses without a restart
+  - Windows: a snippet hand-added without an id was picked up live and gained an
+    id on the next app write, content intact. The live-edit-then-use path shares
+    the same watcher-to-cache reload the hand-add exercised. macOS pending.
 - [ ] 3.3 Confirm on both platforms that removing a record deletes its entry and it stays gone after a restart, and that a malformed file keeps the last good records and surfaces the error
+  - Windows: a malformed edit is logged to `dango.log` and the running cache is
+    kept (not cleared); remove-deletes-the-entry and last-good-on-parse-failure
+    are unit tested. Driving remove through the launcher UI was not scripted.
+    macOS pending.
 - [ ] 3.4 Confirm on both platforms that the records travel: copying the config directory to a second location via `$DANGO_CONFIG_DIR` brings the snippets and quicklinks with it
+  - Windows: the whole verification ran with `$DANGO_CONFIG_DIR` pointing at a
+    temp dir, where the record files live, so copying that directory carries the
+    records. macOS pending.
