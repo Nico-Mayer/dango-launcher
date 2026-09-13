@@ -36,9 +36,14 @@
       "commands": {
         "left-half": {
           // A short alias to match this command in root search.
-          "alias": "lh"
-          // Per-command hotkeys land in a later release; the key is reserved:
-          // "hotkey": "hyper+left"
+          "alias": "lh",
+          // A global hotkey for this command, in the launcher's grammar. Pressing
+          // it runs the command from anywhere: a no-view command (like this one)
+          // runs without showing the launcher and acts on the focused window; a
+          // view command shows the launcher with its view. If two commands claim
+          // one chord, or a command claims the launcher chord, the first wins and
+          // the rest are reported in the tray status and dango.log.
+          "hotkey": "hyper+left"
         }
       }
     }
