@@ -16,20 +16,6 @@ pub trait PreferenceStore: Send + Sync {
     fn set(&self, extension_id: &str, command_id: Option<&str>, key: &str, value: &str);
 }
 
-impl PreferenceStore for crate::store::Store {
-    fn get(&self, extension_id: &str, command_id: Option<&str>, key: &str) -> Option<String> {
-        self.preference(extension_id, command_id, key)
-            .ok()
-            .flatten()
-    }
-
-    fn set(&self, extension_id: &str, command_id: Option<&str>, key: &str, value: &str) {
-        if let Err(error) = self.set_preference(extension_id, command_id, key, value) {
-            eprintln!("[dango] could not persist preference {extension_id}.{key}: {error}");
-        }
-    }
-}
-
 /// One extension's view of its own preferences.
 pub struct Preferences {
     extension_id: String,

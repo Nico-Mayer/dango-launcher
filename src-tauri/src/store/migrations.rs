@@ -4,6 +4,7 @@ pub const MIGRATIONS: &[&str] = &[
     include_str!("migrations/0001_initial.sql"),
     include_str!("migrations/0002_clipboard_history.sql"),
     include_str!("migrations/0003_snippets.sql"),
+    include_str!("migrations/0004_drop_config_tables.sql"),
 ];
 
 #[derive(Debug, thiserror::Error)]
@@ -69,14 +70,12 @@ mod tests {
         let mut connection = Connection::open_in_memory().unwrap();
         run(&mut connection).unwrap();
         assert_eq!(version(&connection).unwrap(), MIGRATIONS.len() as u32);
-        for table in [
-            "extension_state",
-            "preferences",
-            "frecency",
-            "local_app_index",
-            "local_clipboard_history",
-        ] {
+        for table in ["frecency", "local_app_index", "local_clipboard_history"] {
             assert!(table_exists(&connection, table), "{table} missing");
+        }
+        // The configuration tables were retired by migration 0004.
+        for table in ["extension_state", "preferences"] {
+            assert!(!table_exists(&connection, table), "{table} should be gone");
         }
     }
 
@@ -88,8 +87,8 @@ mod tests {
         run_all(&mut connection, &MIGRATIONS[..1]).unwrap();
         connection
             .execute(
-                "INSERT INTO preferences (id, extension_id, key, value, updated_at) \
-                 VALUES ('a', 'ext', 'limit', '20', 1)",
+                "INSERT INTO frecency (id, item_id, launch_count, last_launched_at, updated_at) \
+                 VALUES ('a', 'ext.cmd', 5, 1, 1)",
                 [],
             )
             .unwrap();
@@ -98,14 +97,14 @@ mod tests {
         run(&mut connection).unwrap();
 
         assert!(table_exists(&connection, "local_clipboard_history"));
-        let kept: String = connection
+        let kept: i64 = connection
             .query_row(
-                "SELECT value FROM preferences WHERE key = 'limit'",
+                "SELECT launch_count FROM frecency WHERE item_id = 'ext.cmd'",
                 [],
                 |r| r.get(0),
             )
             .unwrap();
-        assert_eq!(kept, "20", "the upgrade must not touch existing rows");
+        assert_eq!(kept, 5, "the upgrade must not touch existing rows");
     }
 
     #[test]

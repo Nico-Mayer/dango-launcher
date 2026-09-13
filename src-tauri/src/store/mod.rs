@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use rusqlite::{params, Connection, OpenFlags, OptionalExtension};
+use rusqlite::{params, Connection, OpenFlags};
 
 pub use migrations::MigrationError;
 
@@ -94,21 +94,6 @@ impl Store {
         query(&connection)
     }
 
-    /// Enabled unless a row says otherwise, so a never-seen extension defaults
-    /// to on.
-    pub fn extension_enabled(&self, extension_id: &str) -> rusqlite::Result<bool> {
-        self.with(|c| {
-            c.query_row(
-                "SELECT enabled FROM extension_state \
-                 WHERE extension_id = ?1 AND deleted_at IS NULL",
-                [extension_id],
-                |row| row.get::<_, i64>(0),
-            )
-            .optional()
-            .map(|value| value.is_none_or(|enabled| enabled != 0))
-        })
-    }
-
     pub fn load_apps(&self) -> rusqlite::Result<Vec<(String, String, Option<String>)>> {
         self.with(|c| {
             let mut stmt =
@@ -187,74 +172,6 @@ impl Store {
                     item_id,
                     launch_count as i64,
                     last_launched_at,
-                    now
-                ],
-            )?;
-            Ok(())
-        })
-    }
-
-    /// The stored value for a preference, or `None` when it has never been
-    /// set. The declared default belongs to the manifest, so supplying it is
-    /// the caller's job rather than the store's.
-    pub fn preference(
-        &self,
-        extension_id: &str,
-        command_id: Option<&str>,
-        key: &str,
-    ) -> rusqlite::Result<Option<String>> {
-        self.with(|c| {
-            c.query_row(
-                "SELECT value FROM preferences \
-                 WHERE extension_id = ?1 AND coalesce(command_id, '') = ?2 \
-                   AND key = ?3 AND deleted_at IS NULL",
-                params![extension_id, command_id.unwrap_or_default(), key],
-                |row| row.get::<_, String>(0),
-            )
-            .optional()
-        })
-    }
-
-    pub fn set_preference(
-        &self,
-        extension_id: &str,
-        command_id: Option<&str>,
-        key: &str,
-        value: &str,
-    ) -> rusqlite::Result<()> {
-        let now = now_millis();
-        self.with(|c| {
-            c.execute(
-                "INSERT INTO preferences \
-                 (id, extension_id, command_id, key, value, updated_at) \
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6) \
-                 ON CONFLICT(extension_id, coalesce(command_id, ''), key) DO UPDATE SET \
-                 value = ?5, updated_at = ?6, deleted_at = NULL",
-                params![
-                    uuid::Uuid::new_v4().to_string(),
-                    extension_id,
-                    command_id,
-                    key,
-                    value,
-                    now
-                ],
-            )?;
-            Ok(())
-        })
-    }
-
-    pub fn set_extension_enabled(&self, extension_id: &str, enabled: bool) -> rusqlite::Result<()> {
-        let now = now_millis();
-        self.with(|c| {
-            c.execute(
-                "INSERT INTO extension_state (id, extension_id, enabled, updated_at) \
-                 VALUES (?1, ?2, ?3, ?4) \
-                 ON CONFLICT(extension_id) DO UPDATE SET \
-                 enabled = ?3, updated_at = ?4, deleted_at = NULL",
-                params![
-                    uuid::Uuid::new_v4().to_string(),
-                    extension_id,
-                    enabled as i64,
                     now
                 ],
             )?;
@@ -343,69 +260,6 @@ mod tests {
         );
         assert!(opened.store.schema_version().unwrap() > 0);
         cleanup(&path);
-    }
-
-    #[test]
-    fn a_preference_is_stored_and_read_back() {
-        let store = Store::in_memory().unwrap();
-        assert_eq!(store.preference("ext", None, "limit").unwrap(), None);
-
-        store.set_preference("ext", None, "limit", "20").unwrap();
-        assert_eq!(
-            store.preference("ext", None, "limit").unwrap().as_deref(),
-            Some("20")
-        );
-
-        store.set_preference("ext", None, "limit", "30").unwrap();
-        assert_eq!(
-            store.preference("ext", None, "limit").unwrap().as_deref(),
-            Some("30"),
-            "setting it again replaces rather than duplicates"
-        );
-    }
-
-    #[test]
-    fn preference_scopes_do_not_collide() {
-        let store = Store::in_memory().unwrap();
-        store.set_preference("ext", None, "limit", "1").unwrap();
-        store
-            .set_preference("ext", Some("history"), "limit", "2")
-            .unwrap();
-        store.set_preference("other", None, "limit", "3").unwrap();
-
-        assert_eq!(
-            store.preference("ext", None, "limit").unwrap().as_deref(),
-            Some("1")
-        );
-        assert_eq!(
-            store
-                .preference("ext", Some("history"), "limit")
-                .unwrap()
-                .as_deref(),
-            Some("2")
-        );
-        assert_eq!(
-            store.preference("other", None, "limit").unwrap().as_deref(),
-            Some("3")
-        );
-    }
-
-    #[test]
-    fn a_preference_survives_a_restart() {
-        let path = temp_db();
-        {
-            let store = Store::open(&path).unwrap().store;
-            store.set_preference("ext", None, "limit", "42").unwrap();
-        }
-        let reopened = Store::open(&path).unwrap().store;
-        assert_eq!(
-            reopened
-                .preference("ext", None, "limit")
-                .unwrap()
-                .as_deref(),
-            Some("42")
-        );
-        let _ = std::fs::remove_dir_all(path.parent().unwrap());
     }
 
     #[test]

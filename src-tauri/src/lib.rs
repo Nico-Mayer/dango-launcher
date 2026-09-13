@@ -1,3 +1,4 @@
+pub mod config;
 pub mod extension;
 pub mod extensions;
 pub mod invocation;
@@ -134,17 +135,6 @@ impl snippets::OpenUrl for DefaultBrowser {
             .open_url(url, None::<&str>)
             .map_err(|error| error.to_string())
     }
-}
-
-/// Fallback enabled store used only when the database could not be opened, so
-/// extensions still load with their default state.
-struct AlwaysEnabled;
-
-impl EnabledStore for AlwaysEnabled {
-    fn is_enabled(&self, _extension_id: &str) -> bool {
-        true
-    }
-    fn set_enabled(&self, _extension_id: &str, _enabled: bool) {}
 }
 
 #[cfg(target_os = "macos")]
@@ -484,9 +474,31 @@ pub fn platform_attribution() -> Arc<dyn extensions::clipboard::Attribution> {
     platform::attribution()
 }
 
+/// The launcher shortcut from the config file, or the platform default when it
+/// is unset or invalid. Option+Space on macOS and Alt+Space on Windows are the
+/// same chord: Option is Alt.
+fn launcher_shortcut(config: &config::Config) -> Shortcut {
+    if let Some(hotkey) = &config.launcher.hotkey {
+        match hotkey.parse() {
+            Ok(parsed) => return Shortcut::new(Some(parsed.modifiers), parsed.code),
+            Err(error) => eprintln!("[dango] invalid launcher hotkey, using the default: {error}"),
+        }
+    }
+    Shortcut::new(Some(Modifiers::ALT), Code::Space)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    let shortcut = Shortcut::new(Some(Modifiers::ALT), Code::Space);
+    let config_path = config::config_path();
+    let (initial_config, config_error) = match config::Config::load(&config_path) {
+        Ok(config) => (config, None),
+        Err(error) => {
+            eprintln!("[dango] config file error, using defaults: {error}");
+            (config::Config::default(), Some(error.to_string()))
+        }
+    };
+    let shortcut = launcher_shortcut(&initial_config);
+    let file_config = Arc::new(config::FileConfig::new(config_path, initial_config));
 
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
@@ -540,6 +552,10 @@ pub fn run() {
             // are collected before it is built. None of them stops Dango from
             // starting.
             let mut notices = Vec::new();
+            if config_error.is_some() {
+                notices.push("Config file error, see log".to_string());
+            }
+            app.manage(file_config.clone());
 
             let store: Option<Arc<Store>> = match open_store(app) {
                 Ok(Opened {
@@ -565,12 +581,9 @@ pub fn run() {
                 }
             };
 
-            // Without a store, extensions default to enabled and their state
-            // simply does not persist.
-            let enabled: Arc<dyn EnabledStore> = match &store {
-                Some(store) => store.clone(),
-                None => Arc::new(AlwaysEnabled),
-            };
+            // Enable/disable now lives in the config file, so the host reads it
+            // from there rather than the database.
+            let enabled: Arc<dyn EnabledStore> = file_config.clone();
             let mut host = ExtensionHost::new(enabled);
 
             let indexer = platform::app_indexer();
@@ -607,7 +620,7 @@ pub fn run() {
                 let policy = Arc::new(PreferencePolicy(extension::Preferences::new(
                     extensions::clipboard::EXTENSION_ID,
                     extensions::clipboard::preference_declarations(),
-                    store.clone(),
+                    file_config.clone(),
                 )));
                 match extensions::clipboard::CrateClipboard::new() {
                     Some(clipboard) => {
@@ -695,7 +708,26 @@ pub fn run() {
                 None => FrecencyTable::in_memory(),
             });
             let ranker = Arc::new(DangoRanker::new(frecency.clone()));
-            let commands = StaticCommandSource(host.command_candidates());
+            // Apply command aliases the config file sets, over the manifest's.
+            let candidates = host
+                .command_candidates()
+                .into_iter()
+                .map(|mut candidate| {
+                    let prefix = format!("{}.", candidate.extension_id);
+                    if let Some(command_id) = candidate.id.strip_prefix(&prefix) {
+                        if let Some(alias) = file_config
+                            .shared()
+                            .read()
+                            .unwrap()
+                            .alias(&candidate.extension_id, command_id)
+                        {
+                            candidate.alias = Some(alias);
+                        }
+                    }
+                    candidate
+                })
+                .collect();
+            let commands = StaticCommandSource(candidates);
             let pipeline = SearchPipeline::new(
                 Arc::new(commands),
                 host.root_providers(),

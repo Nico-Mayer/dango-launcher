@@ -84,17 +84,6 @@ pub trait EnabledStore: Send + Sync {
     fn set_enabled(&self, extension_id: &str, enabled: bool);
 }
 
-impl EnabledStore for crate::store::Store {
-    fn is_enabled(&self, extension_id: &str) -> bool {
-        self.extension_enabled(extension_id).unwrap_or(true)
-    }
-    fn set_enabled(&self, extension_id: &str, enabled: bool) {
-        if let Err(error) = self.set_extension_enabled(extension_id, enabled) {
-            eprintln!("[dango] could not persist enabled state for {extension_id}: {error}");
-        }
-    }
-}
-
 #[derive(Debug, thiserror::Error)]
 pub enum HostError {
     #[error(transparent)]
