@@ -240,7 +240,7 @@ impl Extension for SnippetsExtension {
                 Err(error) => ActionOutcome::Failed(error.to_string()),
             },
             ACTION_REMOVE => match self.records.remove(item_id) {
-                Ok(()) => ActionOutcome::Replaced(Box::new(self.list_tree())),
+                Ok(()) => ActionOutcome::Removed(Box::new(self.list_tree())),
                 Err(error) => ActionOutcome::Failed(error.to_string()),
             },
             ACTION_COPY | ACTION_INSERT => {
@@ -411,6 +411,7 @@ fn form_tree(record: Option<&Record>, kind: Kind) -> ViewTree {
     ViewTree {
         protocol_version: PROTOCOL_VERSION,
         view: View::Form(FormView {
+            item_id: record.map(|record| record.id.clone()),
             fields,
             actions: vec![Action {
                 id: ACTION_SAVE.into(),
@@ -425,6 +426,7 @@ fn argument_tree(record: &Record, template: &Template, action_id: &str) -> ViewT
     ViewTree {
         protocol_version: PROTOCOL_VERSION,
         view: View::Form(FormView {
+            item_id: Some(record.id.clone()),
             fields: template
                 .prompts()
                 .iter()
@@ -822,9 +824,17 @@ mod tests {
             .records
             .create("Greeting", "Dear {{ name }}, about {{ topic }}.", None)
             .unwrap();
+        let ActionOutcome::Replaced(tree) =
+            f.extension.perform_action(&id, ACTION_INSERT, &no_values())
+        else {
+            panic!("expected the argument form");
+        };
+        let View::Form(form) = tree.view else {
+            panic!("expected the argument form");
+        };
 
         let outcome = f.extension.perform_action(
-            &id,
+            form.item_id.as_deref().unwrap(),
             ACTION_INSERT,
             &values(&[("arg:name", "Nico"), ("arg:topic", "M3")]),
         );
@@ -881,8 +891,8 @@ mod tests {
 
         let outcome = f.extension.perform_action(&id, ACTION_REMOVE, &no_values());
 
-        let ActionOutcome::Replaced(tree) = outcome else {
-            panic!("removing must leave the user where they were");
+        let ActionOutcome::Removed(tree) = outcome else {
+            panic!("removing must refresh the surface the user was on");
         };
         assert_eq!(items(&tree).len(), 1);
     }
@@ -941,6 +951,10 @@ mod tests {
         let ActionOutcome::Replaced(tree) = outcome else {
             panic!("expected the edit form");
         };
+        let View::Form(form) = &tree.view else {
+            panic!("expected the edit form");
+        };
+        assert_eq!(form.item_id.as_deref(), Some(id.as_str()));
         let fields = fields(&tree);
         assert_eq!(fields[0].value.as_deref(), Some("Signature"));
         assert_eq!(fields[1].value.as_deref(), Some("Best, Nico"));

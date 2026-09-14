@@ -136,18 +136,13 @@ than failing silently.
 
 - **WHEN** the user invokes something that reads the selection or inserts text and the permission has not been granted
 - **THEN** nothing is sent to the other application
-- **AND** the launcher explains that the permission is needed and offers to request it
-
-#### Scenario: Requesting the permission on macOS
-
-- **WHEN** the user chooses to request the permission
-- **THEN** the system's permission prompt is shown
-- **AND** no prompt appears at any other time
+- **AND** the launcher explains that the permission is needed
 
 #### Scenario: The permission is granted on macOS
 
-- **WHEN** the permission has been granted
-- **THEN** reading the selection and inserting text work without any further prompting
+- **WHEN** Dango starts with the permission granted
+- **THEN** reading the selection and inserting text work
+- **AND** no permission prompt appears
 
 #### Scenario: Windows needs no permission
 

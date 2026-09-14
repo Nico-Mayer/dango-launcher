@@ -16,7 +16,7 @@ use std::sync::{Arc, Mutex, RwLock};
 
 use serde_json::{Map, Value};
 
-use crate::templates::{Template, TemplateError};
+use crate::templates::{Template, TemplateError, Values};
 
 #[derive(Debug, thiserror::Error)]
 pub enum RecordError {
@@ -26,6 +26,8 @@ pub enum RecordError {
     NoBody(&'static str),
     #[error("{0}")]
     Template(#[from] TemplateError),
+    #[error("give it a valid URL")]
+    InvalidUrl,
     #[error("that one is no longer there")]
     Gone,
     #[error("the records file is not valid JSON: {0}")]
@@ -135,7 +137,11 @@ impl Records {
         if body.trim().is_empty() {
             return Err(RecordError::NoBody(self.kind.missing_body()));
         }
-        Template::parse(body)?;
+        let template = Template::parse(body)?;
+        if self.kind == Kind::Quicklink {
+            let rendered = template.render_url(&Values::default())?;
+            tauri::Url::parse(&rendered.text).map_err(|_| RecordError::InvalidUrl)?;
+        }
         Ok(())
     }
 
@@ -519,6 +525,23 @@ mod tests {
         let records = records(Kind::Quicklink);
         let error = records.create("Search", "  ", None).unwrap_err();
         assert_eq!(error.to_string(), "give it a URL");
+    }
+
+    #[test]
+    fn a_quicklink_refuses_text_that_cannot_form_a_url() {
+        let records = records(Kind::Quicklink);
+        let error = records.create("Search", "not a URL", None).unwrap_err();
+        assert_eq!(error.to_string(), "give it a valid URL");
+        assert!(records.all().unwrap().is_empty());
+    }
+
+    #[test]
+    fn a_quicklink_accepts_a_url_template() {
+        let records = records(Kind::Quicklink);
+        records
+            .create("Search", "https://example.com?q={{ query }}", None)
+            .unwrap();
+        assert_eq!(records.all().unwrap().len(), 1);
     }
 
     #[test]

@@ -39,6 +39,7 @@ export type ActionResponse =
   /// The action changed what the view was showing, so it is replaced and the
   /// user stays where they are.
   | { kind: "replaced"; tree: ViewTree }
+  | { kind: "removed"; tree: ViewTree }
   | { kind: "failed"; message: string };
 
 /// True when the pressed key event matches a declared shortcut.

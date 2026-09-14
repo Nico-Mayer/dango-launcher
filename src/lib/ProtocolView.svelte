@@ -27,7 +27,7 @@
   /// this only forwards.
   function submitForm(values: Record<string, string>) {
     const action = primaryAction();
-    if (action) onaction(action, null, values);
+    if (action) onaction(action, view.kind === "form" ? view.itemId : null, values);
   }
 
   /// Narrowing happens here only when the view says the launcher owns it. A
@@ -60,10 +60,12 @@
     view.kind === "list" ? (selectedItem?.actions ?? []) : view.actions,
   );
 
-  /// Which item the action applies to. A detail or form view has none, and the
-  /// command is expected to already know what it asked about.
+  /// Which item the action applies to. Lists use their selection, forms carry
+  /// the record that opened them, and detail views have none.
   function selectedItemId(): string | null {
-    return view.kind === "list" ? (selectedItem?.id ?? null) : null;
+    if (view.kind === "list") return selectedItem?.id ?? null;
+    if (view.kind === "form") return view.itemId;
+    return null;
   }
 
   function primaryAction(): string | null {

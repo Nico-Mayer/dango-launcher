@@ -31,6 +31,7 @@ pub enum ActionOutcome {
     /// the case that needs it: hiding the launcher after each one would make
     /// clearing several a chore.
     Replaced(Box<crate::protocol::ViewTree>),
+    Removed(Box<crate::protocol::ViewTree>),
     Failed(String),
 }
 

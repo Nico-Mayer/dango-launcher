@@ -16,17 +16,14 @@
 
 ## 3. Verification
 
-- [ ] 3.1 Confirm on both platforms that creating a snippet and a quicklink through the launcher writes them to `snippets.json` and `quicklinks.json` in the config directory as readable text
+- [x] 3.1 Confirm on both platforms that creating a snippet and a quicklink through the launcher writes them to `snippets.json` and `quicklinks.json` in the config directory as readable text
   - Windows: creating a snippet and a quicklink through the launcher wrote them
     to `snippets.json` and `quicklinks.json` in the config dir as readable JSON,
     with the `template` and `url` body keys.
-  - macOS: NOT verified. Driving the launcher's own create form was attempted
-    and abandoned: the form is a webview, and synthesized keystrokes reach it
-    out of order even at 180ms spacing (`ProbeName` arriving as `eNamePro`),
-    while a synthesized Tab is typed into the field instead of moving focus.
-    That is a limitation of driving a webview with synthetic events, not a
-    finding about the records, but it means no record was written by the app on
-    macOS. The file format itself is shared and unchanged from the Windows run.
+  - macOS: created `Mac Cleanup Check` and `Mac cleanup search` through the
+    launcher's forms. Both appeared in root search immediately, and inspection
+    of `~/.config/dango/snippets.json` and `quicklinks.json` confirmed readable
+    JSON entries with generated ids and intact template and URL bodies.
 - [x] 3.2 Confirm on both platforms that a record hand-added to the file appears in the launcher, gains an id on the next app write, and that editing a record's body live changes what the launcher uses without a restart
   - Windows: a snippet hand-added without an id was picked up live and gained an
     id on the next app write, content intact. The live-edit-then-use path shares

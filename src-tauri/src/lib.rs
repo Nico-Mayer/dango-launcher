@@ -96,6 +96,7 @@ enum ActionResponse {
     Done,
     Copy { text: String },
     Replaced { tree: protocol::ViewTree },
+    Removed { tree: protocol::ViewTree },
     Failed { message: String },
 }
 
@@ -304,6 +305,7 @@ async fn run_action(
         }
         ActionOutcome::CopyToClipboard(text) => ActionResponse::Copy { text },
         ActionOutcome::Replaced(tree) => ActionResponse::Replaced { tree: *tree },
+        ActionOutcome::Removed(tree) => ActionResponse::Removed { tree: *tree },
         ActionOutcome::Failed(message) => ActionResponse::Failed { message },
     }
 }
@@ -508,7 +510,9 @@ fn dispatch_application(app: &tauri::AppHandle, name: &str) {
             ActionOutcome::Failed(message) => {
                 report_hotkey_problem(&app, &format!("application \"{}\": {message}", target.name));
             }
-            ActionOutcome::CopyToClipboard(_) | ActionOutcome::Replaced(_) => {}
+            ActionOutcome::CopyToClipboard(_)
+            | ActionOutcome::Replaced(_)
+            | ActionOutcome::Removed(_) => {}
         }
     });
 }

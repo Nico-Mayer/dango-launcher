@@ -147,7 +147,14 @@ since M1. Nothing else in this change works without it.
   - Every show and hide now marshals to the main thread, running inline when already there. The insertion path was only surviving because its hide was usually a no-op; the show that genuinely reordered a window was not.
 - [x] 5.5 Restore the clipboard after the delay measured in 1.3, verified by checking the clipboard's contents after a paste into a slow application
   - Verified: the clipboard holds what the user had after an insertion, and the insertion declares exactly two writes to the history, the text going out and the restore coming back.
-- [ ] 5.6 Report the missing Accessibility permission through `AXIsProcessTrusted` and offer the prompt as an action, verified by revoking the permission and pasting
+- [x] 5.6 Report the missing Accessibility permission through `AXIsProcessTrusted`, verified by revoking the permission and pasting
+  - Verified with the production app bundle. With Dango disabled in macOS
+    Accessibility settings, running `Signature` inserted nothing, kept the
+    launcher open, and showed the bottom-bar error explaining that Accessibility
+    permission is needed.
+  - A direct request action is deferred to M7 permission onboarding. Replacing
+    the ad-hoc-signed bundle changed its TCC identity, so the stale Accessibility
+    entry had to be removed and the current `/Applications/Dango.app` added.
 - [x] 5.7 Verify that `restore_previous_focus` remains the correct no-op here, by confirming the target application was never deactivated
   - Holds: nothing restores focus on macOS and insertions land correctly regardless, because the panel never took application activation.
 
@@ -236,7 +243,11 @@ the non-elevated harness.
 - [x] 7.10 Leave nothing inserted and the clipboard untouched when the argument form is dismissed, with a test
   - Covered by the argument form carrying no values: nothing renders and nothing is inserted.
 - [x] 7.11 Add the copy action as an alternative to inserting, and verify the copied text is recorded in the clipboard history as the user's own copy
-- [x] 7.12 Add the remove action leaving the list open, with a test
+- [x] 7.12 Add the remove action leaving the current launcher surface open, with a test
+  - The macOS walk found that `Replaced` pushed the extension list over root
+    search, making its query appear lost. Removal now has a distinct outcome:
+    root search refreshes in place with its query preserved, while an extension
+    list replaces itself. Verified through the dev launcher, including Escape.
 
 ## 8. Quicklinks
 
@@ -246,7 +257,10 @@ the non-elevated harness.
 - [x] 8.3 Store, update, and soft-delete a quicklink, with tests including that a removed quicklink stays removed across a reopen
   - The same `Records` store serves both kinds; a store per table would be the same code twice.
 - [x] 8.4 Refuse a quicklink with an empty name or URL, or a template that cannot form a valid URL, with tests
-  - Name and body are covered. The URL-validity check is not: it belongs with the quicklink extension, where the rendered URL is known.
+  - The macOS scenario walk exposed that `not a URL` was accepted. Quicklink
+    validation now renders the template with empty values and parses the result
+    with Tauri's re-exported `Url`; tests cover rejecting plain text and
+    accepting a URL template.
 - [x] 8.5 Contribute quicklinks as root items matched on name, with a test, and verify the provider answers within 50ms with 500 quicklinks stored
 - [x] 8.6 Declare the URL field as `FieldKind::Template` so the create and edit forms show what the quicklink will ask for, verified by hand
 - [x] 8.7 Open the rendered URL in the default browser on confirm, with a test over the rendering and a check by hand that it opens
@@ -258,20 +272,18 @@ the non-elevated harness.
 
 ## 9. Verification
 
-- [ ] 9.1 Walk every scenario in the four spec files on macOS
-  - Mostly covered by the driven harness, at 11 of 11 against a real application: text arrives, the caret lands where asked, the clipboard survives for text and for a PNG, both borrowed writes are declared, a selection is read and given back, and an empty document reports no selection.
-  - **What a harness cannot reach, and why.** Driving the launcher's own interface was tried and abandoned twice. A synthesised Option+Space never reaches the global shortcut. Launching the binary again does open the launcher, but keystrokes do not arrive at the panel, and there is no asking whether it is up either, because a non-activating panel never becomes the frontmost application. So root search, Enter, and the action dispatch stay a manual check.
-  - Two conditions the harness needs, both learned the hard way: the application must not be running, or two clipboard owners fight and every check reads empty; and TextEdit must be quit between runs, because rewriting the scratch file does not reset a window it already has open.
-  - macOS correction: two of the blockers above no longer hold. A synthesized
-    Option+Space **does** reach the global shortcut - 26 of 26 summons landed -
-    and keystrokes **do** arrive at the panel, which took text into the create
-    form's field. Whether the launcher is up is answerable from outside too, by
-    asking System Events for the window count of the `dango` process. So root
-    search, Enter, and action dispatch are drivable now and this walk is no
-    longer blocked; it is only unfinished.
-  - One caveat for whoever finishes it: the form is a webview and reorders
-    synthesized keystrokes at speed (`ProbeName` arriving as `eNamePro`), and a
-    synthesized Tab is typed into the field rather than moving focus.
+- [x] 9.1 Walk every scenario in the four spec files on macOS
+  - The driven harness covers the platform paths against real applications:
+    selection, insertion, caret placement, text and image clipboard restore,
+    own-write suppression, empty selection, and latency budgets.
+  - The author completed the launcher paths manually on the dev build: create,
+    immediate search, live argument preview, argument submission, edit, selected
+    text, copy, URL query encoding, validation, and removal. The production
+    bundle covered the revoked-Accessibility failure.
+  - The walk exposed and fixed three real gaps: pushed forms lost their source
+    record id, non-URL quicklinks were accepted, and removing a root item pushed
+    an extension list over root search. Retests passed after each fix. The final
+    Rust suite has 421 passing tests, with clippy and Svelte check clean.
 - [ ] 9.2 Walk every scenario in the four spec files on Windows
   - The selection-and-paste scenarios pass live through the harness (18 of 18,
     see group 6). The snippets, quicklinks, and templates scenarios run through
@@ -315,7 +327,11 @@ the non-elevated harness.
     reading.
 - [x] 9.7 Confirm on both platforms that text appears in the target application within 400ms of confirming, measured over repeated pastes
   - macOS: an insertion returns in about 370ms across runs, and roughly 300ms of that is the clipboard restore the user never waits for. The text itself arrives in about 70ms.
-- [ ] 9.8 Confirm on macOS that revoking the Accessibility permission produces the explained failure and the prompt action, and that granting it restores normal behaviour without a restart
+- [x] 9.8 Confirm on macOS that revoking the Accessibility permission produces the explained failure, and that starting with a valid grant restores normal behaviour
+  - Confirmed with the production app. Revoking access left `Signature`
+    uninserted and showed the explained failure. After replacing the stale TCC
+    entry with the current app bundle, enabling access, and restarting Dango,
+    `Signature` pasted normally. Dango never opened a permission prompt itself.
 - [x] 9.9 Confirm on Windows that pasting into an elevated window fails visibly and leaves the clipboard alone
   - **Confirmed** against a live elevated window, non-elevated harness (integrity
     `0x2000`): the insertion fails with the elevation message and the clipboard

@@ -385,13 +385,23 @@ the field values.
 `perform_action(item_id, action_id, values: &HashMap<String, String>)`, the
 `run_action` Tauri command gains the same parameter, and `ProtocolView`'s
 `onsubmit` calls it with the form's primary action and the collected values.
-`ActionOutcome::Replaced` already covers a submit that should leave the user in
-place, and the three existing extensions ignore the new parameter.
+`FormView` also carries an optional `itemId`, because an argument or edit form
+must return to the record that produced it; field values alone cannot identify
+that record. This is additive to protocol v1. `ActionOutcome::Replaced` already
+covers a submit that should leave the user in place, and the three existing
+extensions ignore the new parameter.
 
 Rejected: a separate `submit_form` command and a separate trait method. It
 doubles the dispatch path for something the action path already models, and it
 would leave two ways to send a form's contents back depending on whether the
 user pressed Enter or clicked an action.
+
+Removal has its own `ActionOutcome`. A removal from root search refreshes that
+query in place, while a removal inside an extension list replaces that list.
+Using `Replaced` for both pushed an extension list over root search, making the
+query appear lost and requiring Escape to return. The distinct outcome keeps
+surface ownership in the frontend without making extensions know where an
+action originated.
 
 Field order is by first occurrence in the template source, because
 `undeclared_variables` returns a `HashSet` and a form whose fields shuffle
@@ -477,11 +487,12 @@ Everything here fails on macOS without Accessibility, and the failure is silent
 at the OS level: the event is posted and discarded.
 
 So `AXIsProcessTrusted` is checked before acting, and a paste that cannot happen
-says so with an action that opens the prompt.
-`enigo`'s `open_prompt_to_get_permissions` is set to false, because a system
-dialog appearing the first time a user pastes, from a process they cannot see,
-is worse than a message in the launcher that explains itself and offers the
-prompt deliberately.
+says that Accessibility permission is needed. `enigo`'s
+`open_prompt_to_get_permissions` is set to false, because a system dialog
+appearing the first time a user pastes, from a process they cannot see, is worse
+than a message in the launcher that explains itself. A direct route to System
+Settings is deferred to M7's permission onboarding, where it can be one coherent
+surface rather than a special action owned by snippets and clipboard history.
 
 Windows needs no permission and so has no such state, except for the ceiling the
 project context already records: a non-elevated Dango cannot inject into an

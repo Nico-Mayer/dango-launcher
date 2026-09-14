@@ -85,6 +85,8 @@ protocol_types! {
 
     #[serde(rename_all = "camelCase")]
     pub struct FormView {
+        #[serde(default)]
+        pub item_id: Option<String>,
         pub fields: Vec<FormField>,
         #[serde(default)]
         pub actions: Vec<Action>,

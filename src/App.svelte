@@ -98,6 +98,8 @@
       // arguments has to ask before it can do anything.
       viewOwner = item.extensionId;
       stack = [response.tree];
+    } else if (response.kind === "removed") {
+      runSearch(query);
     } else if (response.kind === "failed") {
       failure = response.message;
     }
@@ -122,7 +124,7 @@
     if (response.kind === "copy") {
       await navigator.clipboard.writeText(response.text);
       invoke("dismiss");
-    } else if (response.kind === "replaced") {
+    } else if (response.kind === "replaced" || response.kind === "removed") {
       stack = [...stack.slice(0, -1), response.tree];
     } else if (response.kind === "failed") {
       failure = response.message;

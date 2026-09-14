@@ -41,7 +41,7 @@ first-wins conflict handling as command bindings.
 #### Scenario: An application and a command on one chord
 
 - **WHEN** an application and a command are bound to the same chord
-- **THEN** whichever appears first in the file's stable order keeps the chord
+- **THEN** whichever comes first in the configuration's deterministic key order keeps the chord
 - **AND** the collision is surfaced with both named
 
 #### Scenario: The application is not installed on this machine

@@ -2,4 +2,4 @@
 import type { Action } from "./Action";
 import type { FormField } from "./FormField";
 
-export type FormView = { fields: Array<FormField>, actions: Array<Action>, };
+export type FormView = { itemId: string | null, fields: Array<FormField>, actions: Array<Action>, };

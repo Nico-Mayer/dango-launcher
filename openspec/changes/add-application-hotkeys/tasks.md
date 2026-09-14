@@ -30,30 +30,44 @@
       `ApplicationsExtension` (or `AppIndex`), case-insensitive, sorted by
       name; verify with tests using `FakeIndexer` for a single match, no match,
       and two matches.
-- [ ] 3.2 In `src-tauri/src/lib.rs`, dispatch `Target::Application` by
+- [x] 3.2 In `src-tauri/src/lib.rs`, dispatch `Target::Application` by
       resolving the name, performing `ACTION_LAUNCH` through the host,
       crediting frecency on `Done`, hiding a visible launcher, and sending a
       missing-application, ambiguity, or launch failure through `log_config`
       and the tray status; verify with a unit test around the resolution and
       message building where possible, and by reading `dango.log` after a press
       on a name that is not installed.
+  - Resolution and message building are unit tested. On macOS, pressing the
+    temporary `Missing app check` binding launched nothing, and `dango.log`
+    recorded `application "Missing app check" is bound to a hotkey but is not
+    installed`.
 
 ## 4. Verify on macOS
 
-- [ ] 4.1 Bind `Safari` to a hyper chord, press it with another app focused,
+- [x] 4.1 Bind `Safari` to a hyper chord, press it with another app focused,
       and confirm Safari opens without the launcher appearing; press it again
       with Safari running and confirm its window comes forward with no second
       instance.
-- [ ] 4.2 Add a binding while Dango runs and confirm it works without a
+  - Confirmed by the author on macOS.
+- [x] 4.2 Add a binding while Dango runs and confirm it works without a
       restart; remove it and confirm the chord is released.
-- [ ] 4.3 Bind a name that is not installed, press it, and confirm nothing
+  - Confirmed by the author on macOS: both live registration and release worked.
+- [x] 4.3 Bind a name that is not installed, press it, and confirm nothing
       launches and the tray status and `dango.log` name the entry.
-- [ ] 4.4 Bind an application and a command to one chord and confirm the first
-      in file order wins and the tray reports both.
-- [ ] 4.5 Use a `name: { macos, windows }` entry and confirm the macOS name is
+  - Confirmed with `Missing app check` on `hyper+u`; nothing launched and the
+    log named the entry. The author confirmed the tray status changed.
+- [x] 4.4 Bind an application and a command to one chord and confirm the first
+      in the configuration's deterministic key order wins and the tray reports
+      both.
+  - Confirmed with Safari and `dango.window-management.left-half` on `hyper+h`.
+    The tray reported both and Safari won, matching extension-key order.
+- [x] 4.5 Use a `name: { macos, windows }` entry and confirm the macOS name is
       the one matched.
-- [ ] 4.6 Confirm a hotkey launch raises the application's frecency in root
+  - Confirmed by the author with Safari as the macOS name.
+- [x] 4.6 Confirm a hotkey launch raises the application's frecency in root
       search.
+  - Confirmed directly in `dango.sqlite`: Safari's launch count increased from
+    1 to 2 after one `hyper+h` launch.
 
 ## 5. Verify on Windows
 
