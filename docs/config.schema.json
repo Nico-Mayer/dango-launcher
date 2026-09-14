@@ -81,6 +81,11 @@
           "type": "object",
           "description": "Applications bound to global hotkeys, keyed by the name Dango shows for the application in root search. Read by dango.applications only.",
           "additionalProperties": { "$ref": "#/$defs/app" }
+        },
+        "providers": {
+          "type": "object",
+          "description": "Model services, keyed by the name commands refer to them by. That name is also the key its API key is filed under in auth.json. Read by dango.ai only.",
+          "additionalProperties": { "$ref": "#/$defs/provider" }
         }
       }
     },
@@ -105,6 +110,34 @@
         "hotkey": { "$ref": "#/$defs/hotkey" }
       }
     },
+    "provider": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "kind": {
+          "type": "string",
+          "description": "The protocol the service speaks. \"openai\" covers any OpenAI-compatible endpoint, such as OpenRouter, LM Studio, or vLLM. \"cli\" runs a program on this machine that takes a prompt and prints an answer.",
+          "enum": ["anthropic", "openai", "ollama", "cli"]
+        },
+        "baseUrl": {
+          "type": "string",
+          "description": "Where the service lives. Anthropic and Ollama have defaults; an OpenAI-compatible endpoint needs one."
+        },
+        "model": {
+          "type": "string",
+          "description": "The model used by a command that names this provider but no model of its own. A cli provider may leave it out and let the program choose."
+        },
+        "command": {
+          "type": "string",
+          "description": "The program to run, for a provider of the cli kind. Looked up on PATH."
+        },
+        "args": {
+          "type": "array",
+          "description": "What to pass the program. {prompt} and {model} are replaced where they appear; with no {prompt}, the prompt goes in on standard input.",
+          "items": { "type": "string" }
+        }
+      }
+    },
     "command": {
       "type": "object",
       "additionalProperties": true,
@@ -117,6 +150,36 @@
         "preferences": {
           "type": "object",
           "additionalProperties": true
+        },
+        "enabled": {
+          "type": "boolean",
+          "description": "Whether the command is offered. Absent means yes; false removes a command the extension ships."
+        },
+        "title": {
+          "type": "string",
+          "description": "The title root search shows. Needed for a command the file defines from nothing. Read by dango.ai only."
+        },
+        "prompt": {
+          "type": "string",
+          "description": "What the model is asked, as a template. Placeholders: {{ selection }}, {{ clipboard }}, and any other name, which the launcher asks the user for. Read by dango.ai only."
+        },
+        "provider": {
+          "type": "string",
+          "description": "The provider this command uses, by its name under providers. Absent falls back to the extension default. Read by dango.ai only."
+        },
+        "model": {
+          "type": "string",
+          "description": "The model this command uses. Absent falls back to the provider's model. Read by dango.ai only."
+        },
+        "thinking": {
+          "type": "string",
+          "description": "How hard the model should think before answering. A model that cannot think ignores it. Read by dango.ai only.",
+          "enum": ["off", "low", "medium", "high"]
+        },
+        "output": {
+          "type": "string",
+          "description": "What becomes of the answer: shown in the launcher, pasted into the application you came from, or copied. Defaults to view. Read by dango.ai only.",
+          "enum": ["view", "paste", "copy"]
         }
       }
     }

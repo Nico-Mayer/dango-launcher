@@ -309,7 +309,8 @@ pub mod tests {
     async fn run(invoker: &Invoker, command: &str) -> Vec<Output> {
         let mut rx = invoker
             .invoke(&format!("{EXTENSION_ID}.{command}"))
-            .unwrap();
+            .unwrap()
+            .output;
         let mut output = Vec::new();
         while let Some(item) = rx.recv().await {
             output.push(item);

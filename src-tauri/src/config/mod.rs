@@ -2,7 +2,8 @@
 //! dotfiles and shares over git.
 //!
 //! The file is the source of truth for the launcher hotkey, per-extension
-//! enable/disable, preferences, aliases, and command and application hotkeys.
+//! enable/disable, preferences, aliases, command and application hotkeys, and
+//! the commands themselves for an extension that builds them from configuration.
 //! Data stays in SQLite. Everything here is about reading that file safely:
 //! it is optional, a bad file never takes the app down, and keys the running
 //! version does not understand are preserved rather than dropped, so a newer
@@ -21,7 +22,7 @@ mod store;
 pub mod watch;
 
 pub use hotkey::{Hotkey, HotkeyError, ParsedHotkey, PerPlatform};
-pub use location::{config_dir, config_path};
+pub use location::{auth_path, config_dir, config_path};
 pub use store::FileConfig;
 
 #[derive(Debug, thiserror::Error)]
@@ -116,8 +117,81 @@ pub struct Extension {
     /// Only the applications extension reads this branch.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub apps: BTreeMap<String, AppSettings>,
+    /// Model services, keyed by the name commands refer to them by. Only the AI
+    /// extension reads this branch.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub providers: BTreeMap<String, ProviderSettings>,
     #[serde(flatten)]
     pub extra: Map<String, Value>,
+}
+
+/// One model service. The key it is stored under is the name a command uses to
+/// refer to it, and the name its key in `auth.json` is filed under.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProviderSettings {
+    #[serde(default)]
+    pub kind: ProviderKind,
+    /// Where the service lives. Anthropic needs none; an OpenAI-compatible
+    /// endpoint always does; Ollama defaults to the local one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub base_url: Option<String>,
+    /// The model used by a command that names this provider but no model.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model: Option<String>,
+    /// The program to run, for a provider of the `cli` kind.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub command: Option<String>,
+    /// What to pass it. `{prompt}` and `{model}` are replaced where they appear;
+    /// with no `{prompt}`, the prompt goes in on standard input.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub args: Vec<String>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+/// The protocol a provider speaks. An unrecognised kind is carried as written
+/// rather than rejected, so a provider from a newer Dango neither fails the file
+/// nor loses its name when the file is written back.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(from = "String", into = "String")]
+pub enum ProviderKind {
+    Anthropic,
+    Openai,
+    Ollama,
+    /// A program on this machine that takes a prompt and prints an answer.
+    Cli,
+    Unknown(String),
+}
+
+impl Default for ProviderKind {
+    fn default() -> Self {
+        ProviderKind::Unknown(String::new())
+    }
+}
+
+impl From<String> for ProviderKind {
+    fn from(text: String) -> Self {
+        match text.as_str() {
+            "anthropic" => ProviderKind::Anthropic,
+            "openai" => ProviderKind::Openai,
+            "ollama" => ProviderKind::Ollama,
+            "cli" => ProviderKind::Cli,
+            _ => ProviderKind::Unknown(text),
+        }
+    }
+}
+
+impl From<ProviderKind> for String {
+    fn from(kind: ProviderKind) -> Self {
+        match kind {
+            ProviderKind::Anthropic => "anthropic".into(),
+            ProviderKind::Openai => "openai".into(),
+            ProviderKind::Ollama => "ollama".into(),
+            ProviderKind::Cli => "cli".into(),
+            ProviderKind::Unknown(text) => text,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -162,6 +236,25 @@ pub struct CommandSettings {
     pub alias: Option<String>,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub preferences: BTreeMap<String, Value>,
+    /// Off for a command the extension ships but the user does not want.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub enabled: Option<bool>,
+    /// The title root search shows. Required for a command the file defines
+    /// from nothing, absent for one that only overrides a shipped command.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+    /// The fields below belong to commands an extension builds from
+    /// configuration. Only the AI extension reads them.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub prompt: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub provider: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub thinking: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub output: Option<String>,
     #[serde(flatten)]
     pub extra: Map<String, Value>,
 }
@@ -470,5 +563,130 @@ mod tests {
         if let Err(error) = jsonschema::validate(&schema, &instance) {
             panic!("the example config does not match the schema: {error}");
         }
+    }
+
+    #[test]
+    fn the_schema_rejects_a_value_the_ai_extension_could_not_use() {
+        let docs = concat!(env!("CARGO_MANIFEST_DIR"), "/../docs");
+        let schema: Value =
+            serde_json::from_str(&std::fs::read_to_string(format!("{docs}/config.schema.json")).unwrap())
+                .unwrap();
+
+        let bad = [
+            r#"{ "extensions": { "dango.ai": { "providers": { "x": { "kind": "mistral" } } } } }"#,
+            r#"{ "extensions": { "dango.ai": { "commands": { "x": { "thinking": "deep" } } } } }"#,
+            r#"{ "extensions": { "dango.ai": { "commands": { "x": { "output": "speak" } } } } }"#,
+        ];
+        for text in bad {
+            let instance: Value = serde_json::from_str(text).unwrap();
+            assert!(
+                jsonschema::validate(&schema, &instance).is_err(),
+                "the schema accepted {text}"
+            );
+        }
+
+        let good: Value = serde_json::from_str(
+            r#"{ "extensions": { "dango.ai": {
+                "providers": { "x": { "kind": "openai", "baseUrl": "https://example.test/v1" } },
+                "commands": { "y": { "title": "Y", "prompt": "p", "thinking": "high", "output": "paste" } }
+            } } }"#,
+        )
+        .unwrap();
+        assert!(jsonschema::validate(&schema, &good).is_ok());
+    }
+
+    #[test]
+    fn a_provider_branch_parses_and_round_trips() {
+        let text = r#"{
+          "extensions": {
+            "dango.ai": {
+              "providers": {
+                "anthropic": { "kind": "anthropic", "model": "claude-sonnet-5" },
+                "local": { "kind": "ollama", "baseUrl": "http://localhost:11434", "keepAlive": "10m" }
+              }
+            }
+          }
+        }"#;
+        let config = Config::parse(text).unwrap();
+        let providers = &config.extensions["dango.ai"].providers;
+        assert_eq!(providers["anthropic"].kind, ProviderKind::Anthropic);
+        assert_eq!(providers["anthropic"].model.as_deref(), Some("claude-sonnet-5"));
+        assert_eq!(providers["local"].kind, ProviderKind::Ollama);
+        assert_eq!(
+            providers["local"].base_url.as_deref(),
+            Some("http://localhost:11434")
+        );
+
+        let json = config.to_json();
+        assert!(json.contains("baseUrl"), "camelCase key lost: {json}");
+        assert!(json.contains("keepAlive"), "unknown provider key dropped: {json}");
+        let again = Config::parse(&json).unwrap();
+        assert_eq!(again.extensions["dango.ai"].providers["local"].kind, ProviderKind::Ollama);
+    }
+
+    #[test]
+    fn a_command_provider_carries_its_command_and_arguments() {
+        let config = Config::parse(
+            r#"{ "extensions": { "dango.ai": { "providers": {
+                "claude": { "kind": "cli", "command": "claude", "args": ["-p", "{prompt}"] }
+            } } } }"#,
+        )
+        .unwrap();
+        let entry = &config.extensions["dango.ai"].providers["claude"];
+        assert_eq!(entry.kind, ProviderKind::Cli);
+        assert_eq!(entry.command.as_deref(), Some("claude"));
+        assert_eq!(entry.args, ["-p", "{prompt}"]);
+
+        let again = Config::parse(&config.to_json()).unwrap();
+        assert_eq!(again.extensions["dango.ai"].providers["claude"].args, ["-p", "{prompt}"]);
+    }
+
+    #[test]
+    fn an_unrecognised_provider_kind_survives_rather_than_failing() {
+        let config = Config::parse(
+            r#"{ "extensions": { "dango.ai": { "providers": { "future": { "kind": "mistral" } } } } }"#,
+        )
+        .unwrap();
+        assert_eq!(
+            config.extensions["dango.ai"].providers["future"].kind,
+            ProviderKind::Unknown("mistral".into())
+        );
+        assert!(config.to_json().contains("mistral"), "kind rewritten on write-back");
+    }
+
+    #[test]
+    fn ai_command_fields_parse_beside_the_hotkey_and_alias() {
+        let text = r#"{
+          "extensions": {
+            "dango.ai": {
+              "commands": {
+                "improve-writing": { "hotkey": "hyper+i", "alias": "iw", "provider": "local", "thinking": "low" },
+                "make-longer": { "enabled": false },
+                "review-rust": {
+                  "title": "Review Rust",
+                  "prompt": "Review this.\n\n{{ selection }}",
+                  "model": "claude-opus-5",
+                  "output": "view"
+                }
+              }
+            }
+          }
+        }"#;
+        let config = Config::parse(text).unwrap();
+        let commands = &config.extensions["dango.ai"].commands;
+        assert_eq!(commands["improve-writing"].provider.as_deref(), Some("local"));
+        assert_eq!(commands["improve-writing"].thinking.as_deref(), Some("low"));
+        assert_eq!(commands["make-longer"].enabled, Some(false));
+        assert_eq!(commands["review-rust"].title.as_deref(), Some("Review Rust"));
+        assert_eq!(commands["review-rust"].output.as_deref(), Some("view"));
+        assert_eq!(config.alias("dango.ai", "improve-writing"), Some("iw".to_string()));
+
+        let again = Config::parse(&config.to_json()).unwrap();
+        let commands = &again.extensions["dango.ai"].commands;
+        assert!(commands["improve-writing"].hotkey.is_some(), "hotkey lost");
+        assert_eq!(
+            commands["review-rust"].prompt.as_deref(),
+            Some("Review this.\n\n{{ selection }}")
+        );
     }
 }

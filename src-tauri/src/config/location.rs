@@ -19,6 +19,12 @@ pub fn config_path() -> PathBuf {
     config_dir().join("config.json")
 }
 
+/// The provider keys, beside the config file but deliberately not in it: the
+/// config is meant to be committed and this file is not.
+pub fn auth_path() -> PathBuf {
+    config_dir().join("auth.json")
+}
+
 fn resolve(override_dir: Option<PathBuf>, home: PathBuf) -> PathBuf {
     override_dir.unwrap_or_else(|| home.join(".config").join("dango"))
 }

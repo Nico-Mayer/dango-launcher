@@ -25,6 +25,10 @@ pub type FormValues = std::collections::HashMap<String, String>;
 #[derive(Debug, PartialEq)]
 pub enum ActionOutcome {
     Done,
+    /// The action started work that will report for itself, streaming its views
+    /// through the launcher's render channel. Nothing to show yet, and the
+    /// launcher stays where it is.
+    Started,
     CopyToClipboard(String),
     /// The action changed what the view was showing, so the view is replaced
     /// and the user stays where they are. Removing one of a list of things is
@@ -200,6 +204,24 @@ impl ExtensionHost {
         if self.extensions.contains_key(&id) {
             return Err(HostError::DuplicateExtension(id));
         }
+        self.extensions.insert(id.clone(), extension);
+
+        let mut report = LoadReport::default();
+        if self.enabled.is_enabled(&id) {
+            self.activate(&id, &mut report);
+        }
+        Ok(report)
+    }
+
+    /// Swaps an extension for a newly built instance of itself, which is how an
+    /// extension whose commands come from the configuration file follows an edit
+    /// to it. The old one is deactivated first, so its commands are unregistered
+    /// and its services stopped, and the new one is activated when the enabled
+    /// store says it should be.
+    pub fn replace(&mut self, extension: Arc<dyn Extension>) -> Result<LoadReport, HostError> {
+        let id = extension.manifest().id.clone();
+        extension.manifest().validate()?;
+        self.deactivate(&id);
         self.extensions.insert(id.clone(), extension);
 
         let mut report = LoadReport::default();
@@ -441,6 +463,60 @@ mod tests {
         host.set_enabled("apps", true);
         assert!(host.registry().get("apps.open").is_some());
         assert_eq!(extension.activate_count.load(Ordering::SeqCst), 2);
+    }
+
+    #[test]
+    fn replacing_an_extension_swaps_its_commands_live() {
+        let mut host = host();
+        host.register(TestExtension::new("ai", "improve")).unwrap();
+        assert!(host.registry().get("ai.improve").is_some());
+
+        host.replace(TestExtension::new("ai", "translate")).unwrap();
+        assert!(
+            host.registry().get("ai.improve").is_none(),
+            "the old command outlived its extension"
+        );
+        assert!(host.registry().get("ai.translate").is_some());
+        assert!(host.is_active("ai"));
+    }
+
+    #[test]
+    fn replacing_a_disabled_extension_leaves_it_disabled() {
+        let enabled = Arc::new(MemoryEnabled::default());
+        enabled.set_enabled("ai", false);
+        let mut host = ExtensionHost::new(enabled);
+        host.register(TestExtension::new("ai", "improve")).unwrap();
+
+        host.replace(TestExtension::new("ai", "translate")).unwrap();
+        assert!(!host.is_active("ai"));
+        assert!(host.registry().is_empty(), "a disabled extension registered");
+    }
+
+    #[test]
+    fn replacing_stops_the_old_instances_services() {
+        let watcher = Arc::new(Watcher::default());
+        let extension = Arc::new(ServiceExtension {
+            manifest: Manifest {
+                manifest_version: 1,
+                id: "svc".into(),
+                name: "svc".into(),
+                icon: None,
+                commands: vec![],
+                preferences: vec![],
+                root_items: false,
+                services: true,
+            },
+            watcher: watcher.clone(),
+        });
+        let mut host = host();
+        host.register(extension).unwrap();
+        assert!(watcher.running.load(Ordering::SeqCst));
+
+        host.replace(TestExtension::new("svc", "x")).unwrap();
+        assert!(
+            !watcher.running.load(Ordering::SeqCst),
+            "the old instance's service kept running"
+        );
     }
 
     #[test]

@@ -52,6 +52,73 @@
       }
     },
 
+    "dango.ai": {
+      // Where the AI commands go for an answer. The key of each entry is the
+      // name commands refer to it by, and the name its API key is filed under
+      // in auth.json (which lives beside this file and must stay out of git).
+      "providers": {
+        // "kind": "anthropic" speaks Anthropic's own protocol.
+        "anthropic": { "kind": "anthropic", "model": "claude-sonnet-5" },
+        // "kind": "ollama" is a model on this machine. No key, nothing leaves
+        // the machine. The baseUrl defaults to http://localhost:11434.
+        "local": { "kind": "ollama", "model": "qwen3:8b" },
+        // "kind": "openai" is any OpenAI-compatible endpoint: OpenRouter, LM
+        // Studio, vLLM, and most others. It needs a baseUrl.
+        "openrouter": {
+          "kind": "openai",
+          "baseUrl": "https://openrouter.ai/api/v1",
+          "model": "z-ai/glm-4.6"
+        },
+        // "kind": "cli" runs a program that takes a prompt and prints an answer.
+        // It needs no key: the program is already signed in, which is how a
+        // ChatGPT or Claude subscription pays for a transform instead of API
+        // credits. {prompt} and {model} are replaced in the arguments; with no
+        // {prompt}, the prompt goes in on standard input. Expect seconds of
+        // startup, so keep these for the commands you do not run from a hotkey.
+        "claude": { "kind": "cli", "command": "claude", "args": ["-p"] },
+        "codex": { "kind": "cli", "command": "codex", "args": ["exec", "-"] },
+        "pi": { "kind": "cli", "command": "pi", "args": ["--print", "{prompt}"] }
+      },
+
+      "preferences": {
+        // The provider a command uses when it names none. With exactly one
+        // provider configured, that one is the default and this can be omitted.
+        "provider": "local",
+        // How hard the model thinks when a command does not say: off, low,
+        // medium, or high. Models that cannot think ignore it. Default off.
+        "thinking": "off"
+      },
+
+      "commands": {
+        // Dango ships Improve Writing, Fix Spelling and Grammar, Make Shorter,
+        // Make Longer, Make Simpler, Make Professional, Summarize, Explain This,
+        // and Translate. Each one acts on the text you have selected.
+        //
+        // Give a shipped command its own model, a hotkey, and what to do with
+        // the answer: "view" shows it (the default), "paste" puts it back where
+        // you were, replacing the selection, and "copy" puts it on the clipboard.
+        "improve-writing": {
+          "provider": "anthropic",
+          "thinking": "low",
+          "output": "paste",
+          "hotkey": "hyper+i"
+        },
+
+        // Turn off one you do not want.
+        "make-longer": { "enabled": false },
+
+        // Add your own: a title and a prompt make a command of it. A name in
+        // double braces that is not "selection" or "clipboard" is asked for
+        // before the command runs.
+        "review-rust": {
+          "title": "Review Rust",
+          "prompt": "Review this Rust for correctness and idiom. Answer with the issues only, as plain prose.\n\n{{ selection }}",
+          "model": "claude-opus-5",
+          "alias": "rr"
+        }
+      }
+    },
+
     "dango.window-management": {
       "commands": {
         "left-half": {

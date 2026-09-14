@@ -32,6 +32,10 @@
   /// The extension whose command pushed what is on the stack, so an action
   /// chosen inside its view goes back to it.
   let viewOwner = $state<string | null>(null);
+  /// The run whose tree is on top of the stack. A streaming command replaces
+  /// its own view as the answer grows, so a tree from the run already showing
+  /// takes the place of the one there rather than pushing another.
+  let shownInvocation: number | null = null;
   let failure = $state<string | null>(null);
   // The title of a command that has been invoked and has neither finished nor
   // shown a view yet.
@@ -75,6 +79,7 @@
     results = [];
     stack = [];
     viewOwner = null;
+    shownInvocation = null;
     panelOpen = false;
     protocolError = false;
     workingTitle = null;
@@ -99,6 +104,7 @@
       // arguments has to ask before it can do anything.
       viewOwner = item.extensionId;
       stack = [response.tree];
+      shownInvocation = null;
     } else if (response.kind === "removed") {
       runSearch(query);
     } else if (response.kind === "failed") {
@@ -127,9 +133,12 @@
       invoke("dismiss");
     } else if (response.kind === "replaced" || response.kind === "removed") {
       stack = [...stack.slice(0, -1), response.tree];
+      shownInvocation = null;
     } else if (response.kind === "failed") {
       failure = response.message;
     }
+    // "started" leaves the view where it is; what it started arrives on the
+    // render channel and pushes its own.
   }
 
   /// Confirming a result acts on it: a command is invoked, anything else runs
@@ -169,6 +178,10 @@
       event.preventDefault();
       failure = null;
       if (stack.length > 0) {
+        // A command may still be working behind this view, and the user has
+        // left it: stop it rather than paying for an answer nobody will read.
+        invoke("cancel_invocation");
+        shownInvocation = null;
         stack = stack.slice(0, -1);
         if (stack.length === 0) viewOwner = null;
       } else if (query.length > 0) {
@@ -225,7 +238,12 @@
           return;
         }
         viewOwner = event.payload.owner;
-        stack = [...stack, event.payload.tree];
+        if (shownInvocation === event.payload.invocation && stack.length > 0) {
+          stack = [...stack.slice(0, -1), event.payload.tree];
+        } else {
+          stack = [...stack, event.payload.tree];
+        }
+        shownInvocation = event.payload.invocation;
       }),
     ];
     return () => unlisten.forEach((p) => p.then((un) => un()));

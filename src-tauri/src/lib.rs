@@ -4,6 +4,7 @@ pub mod extensions;
 pub mod hotkeys;
 pub mod invocation;
 mod latency;
+pub mod log;
 pub mod platform;
 pub mod protocol;
 pub mod ranking;
@@ -23,12 +24,13 @@ use tauri::{
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
 
 use extension::{ActionOutcome, EnabledStore, ExtensionHost, FormValues, HostResolver};
+use extensions::ai::{AiExtension, AuthFile, CliClient, Clients, GenAiClient};
 use extensions::applications::{AppIndex, ApplicationsExtension, IconCache};
-use extensions::clipboard::{ClipboardExtension, History, PreferencePolicy, Watcher};
+use extensions::clipboard::{ClipboardExtension, ClipboardSource, History, PreferencePolicy, Watcher};
 use extensions::snippets::{self, SnippetsExtension};
 use extensions::system::SystemExtension;
 use extensions::window_management::WindowManagementExtension;
-use invocation::{InvokeError, Invoker, Outcome, Output};
+use invocation::{InvocationContext, InvokeError, Invoker, Outcome, Output};
 use latency::LatencyProbe;
 use platform::LauncherWindow;
 use ranking::{now_millis, DangoRanker, FrecencyTable};
@@ -83,10 +85,16 @@ struct ResultsPayload {
 /// A view tree with the extension whose command produced it. The frontend needs
 /// the owner to send an action back, and a command started from its own hotkey
 /// never goes through `invoke_command`, so the tree has to carry it.
+///
+/// `invocation` says which run produced the tree. A streaming command emits
+/// many, and they replace one another rather than stacking up, which is what
+/// tells the launcher the difference between the next frame of this answer and
+/// a new view.
 #[derive(Clone, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 struct RenderPayload {
     owner: String,
+    invocation: u64,
     tree: protocol::ViewTree,
 }
 
@@ -94,6 +102,9 @@ struct RenderPayload {
 #[serde(tag = "kind", rename_all = "camelCase")]
 enum ActionResponse {
     Done,
+    /// The action started work that reports through the render channel. The
+    /// launcher leaves the view it is showing alone and waits.
+    Started,
     Copy { text: String },
     Replaced { tree: protocol::ViewTree },
     Removed { tree: protocol::ViewTree },
@@ -130,7 +141,7 @@ struct HideLauncher(tauri::AppHandle);
 
 impl text::Launcher for HideLauncher {
     fn dismiss(&self) {
-        hide_after_launch(&self.0);
+        hide_for_work(&self.0);
     }
 }
 
@@ -213,6 +224,12 @@ fn hide(app: &tauri::AppHandle) -> bool {
 /// A command still working when the launcher goes away has nowhere to put its
 /// output, and the user has moved on. Its later output is dropped rather than
 /// waiting to surprise them on the next activation.
+fn visible(app: &tauri::AppHandle) -> bool {
+    app.get_webview_window("main")
+        .and_then(|window| window.is_visible().ok())
+        .unwrap_or(false)
+}
+
 fn abandon_running_command(app: &tauri::AppHandle) {
     if let Some(invoker) = app.try_state::<Arc<Invoker>>() {
         invoker.abandon();
@@ -246,6 +263,14 @@ fn dismiss(app: tauri::AppHandle) {
             app.state::<LatencyProbe>().note("dismissed by frontend");
         }
     });
+}
+
+/// Stops whatever the launcher started. Hiding already does this; this is for
+/// leaving a view while its work is still running, where the launcher stays
+/// open and the work is no longer wanted.
+#[tauri::command]
+fn cancel_invocation(app: tauri::AppHandle) {
+    abandon_running_command(&app);
 }
 
 /// Runs a query and streams merged snapshots to the frontend as providers
@@ -303,6 +328,7 @@ async fn run_action(
             hide_after_launch(&app);
             ActionResponse::Done
         }
+        ActionOutcome::Started => ActionResponse::Started,
         ActionOutcome::CopyToClipboard(text) => ActionResponse::Copy { text },
         ActionOutcome::Replaced(tree) => ActionResponse::Replaced { tree: *tree },
         ActionOutcome::Removed(tree) => ActionResponse::Removed { tree: *tree },
@@ -390,18 +416,36 @@ fn run_command(app: &tauri::AppHandle, command_id: &str) -> Result<(), InvokeErr
     let invoker = app
         .try_state::<Arc<Invoker>>()
         .ok_or(InvokeError::HostUnavailable)?;
-    let mut rx = invoker.invoke(command_id)?;
+    let running = invoker.invoke(command_id)?;
     if let Some(frecency) = app.try_state::<Arc<FrecencyTable>>() {
         frecency.record_launch(command_id, now_millis());
     }
 
+    pump(app, owner, running);
+    Ok(())
+}
+
+/// Carries one invocation's output to the webview: a view goes out as a render
+/// event, success hides the launcher, a failure is reported. Every tree carries
+/// the invocation that produced it, so the launcher replaces the tree it is
+/// already showing for that invocation rather than stacking another on top.
+fn pump(app: &tauri::AppHandle, owner: String, running: invocation::Running) {
     let app = app.clone();
+    let invocation = running.invocation;
+    let mut output = running.output;
     tauri::async_runtime::spawn(async move {
-        while let Some(output) = rx.recv().await {
-            match output {
+        while let Some(next) = output.recv().await {
+            match next {
                 Output::View(tree) => {
+                    // A command that read the selection hid the launcher to do
+                    // it. It has something to show now, so the launcher comes
+                    // back rather than streaming into a window nobody can see.
+                    if !visible(&app) {
+                        show(&app, None);
+                    }
                     let payload = RenderPayload {
                         owner: owner.clone(),
+                        invocation,
                         tree,
                     };
                     if app
@@ -422,7 +466,6 @@ fn run_command(app: &tauri::AppHandle, command_id: &str) -> Result<(), InvokeErr
             }
         }
     });
-    Ok(())
 }
 
 /// Invokes a command from its hotkey. A no-view command runs without showing the
@@ -510,11 +553,51 @@ fn dispatch_application(app: &tauri::AppHandle, name: &str) {
             ActionOutcome::Failed(message) => {
                 report_hotkey_problem(&app, &format!("application \"{}\": {message}", target.name));
             }
-            ActionOutcome::CopyToClipboard(_)
+            ActionOutcome::Started
+            | ActionOutcome::CopyToClipboard(_)
             | ActionOutcome::Replaced(_)
             | ActionOutcome::Removed(_) => {}
         }
     });
+}
+
+/// What the AI extension needs besides the configuration. Kept so a config
+/// reload can build the extension again: its commands come from the file, so an
+/// edit means a new instance rather than a mutated one.
+struct AiParts {
+    keys: Arc<dyn extensions::ai::Keys>,
+    client: Arc<dyn extensions::ai::Completions>,
+    text: Option<Arc<dyn text::TextTarget>>,
+    clipboard: Option<Arc<dyn ClipboardSource>>,
+    runner: Arc<dyn extensions::ai::Runner>,
+}
+
+impl AiParts {
+    fn build(&self, config: &config::Config) -> (Arc<AiExtension>, Vec<String>) {
+        let (extension, problems) = AiExtension::new(
+            config,
+            self.keys.clone(),
+            self.client.clone(),
+            self.text.clone(),
+            self.clipboard.clone(),
+            Some(self.runner.clone()),
+        );
+        (Arc::new(extension), problems)
+    }
+}
+
+/// Starts an invocation for work an extension begins itself. A submitted
+/// argument form has an answer to stream but no command running behind it, so
+/// it asks for one and its output reaches the launcher the usual way.
+struct ViewRunner(tauri::AppHandle);
+
+impl extensions::ai::Runner for ViewRunner {
+    fn start(&self) -> Option<Arc<InvocationContext>> {
+        let invoker = self.0.try_state::<Arc<Invoker>>()?;
+        let (ctx, running) = invoker.detached(extensions::ai::EXTENSION_ID);
+        pump(&self.0, extensions::ai::EXTENSION_ID.to_string(), running);
+        Some(Arc::new(ctx))
+    }
 }
 
 /// A press that could not do what the file asked has no launcher on screen to
@@ -527,12 +610,35 @@ fn report_hotkey_problem(app: &tauri::AppHandle, message: &str) {
 /// Hides the launcher without restoring the previous foreground, because the
 /// just-launched application should keep focus rather than the window that was
 /// in front before.
+///
+/// Abandoning is tied to the window actually going away here, not to the call:
+/// this is also the window's focus-loss handler, which fires when a command
+/// hides the launcher to do its own work. Abandoning there would cancel the
+/// command that asked for the hide.
 fn hide_after_launch(app: &tauri::AppHandle) {
+    on_main_thread(app, |app| {
+        if let Some(window) = app.get_webview_window("main") {
+            if window.is_visible().unwrap_or(false) {
+                let _ = window.hide();
+                abandon_running_command(app);
+            }
+        }
+        let _ = app.emit_to("main", "dango://reset", ());
+    });
+}
+
+/// Gets the launcher out of the way on a running command's behalf, which
+/// reading the selection and inserting text both need: the keystrokes have to
+/// land in the application the user came from, not in the search field.
+///
+/// Deliberately does not abandon anything. The launcher is going away because
+/// the command asked, so the command is still wanted; if it has something to
+/// show afterwards, its next view brings the launcher back.
+fn hide_for_work(app: &tauri::AppHandle) {
     on_main_thread(app, |app| {
         if let Some(window) = app.get_webview_window("main") {
             let _ = window.hide();
         }
-        abandon_running_command(app);
         let _ = app.emit_to("main", "dango://reset", ());
     });
 }
@@ -630,18 +736,7 @@ fn set_config_status(app: &tauri::AppHandle, error: bool) {
 /// Appends a config problem to a log file beside the config. A release build has
 /// `windows_subsystem = "windows"`, so stderr is not visible; the log is.
 fn log_config(message: &str) {
-    let path = config::config_dir().join("dango.log");
-    if let Some(parent) = path.parent() {
-        let _ = std::fs::create_dir_all(parent);
-    }
-    if let Ok(mut file) = std::fs::OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(&path)
-    {
-        use std::io::Write;
-        let _ = writeln!(file, "{message}");
-    }
+    crate::log::append(message);
 }
 
 /// Command candidates with the config file's aliases applied over the manifest's.
@@ -701,6 +796,22 @@ fn apply_config_reload(
     if let Some(host) = app.try_state::<Arc<Mutex<ExtensionHost>>>() {
         let mut host = host.lock().unwrap();
         host.reload_enabled();
+        // The AI extension's commands are in the file, so an edit means a new
+        // instance. Done before the candidates and the hotkeys are rebuilt, so
+        // both see the command set the file now describes.
+        if let Some(parts) = app.try_state::<Arc<AiParts>>() {
+            let (extension, problems) = {
+                let config = file_config.shared();
+                let config = config.read().unwrap();
+                parts.build(&config)
+            };
+            for problem in &problems {
+                log_config(problem);
+            }
+            if let Err(error) = host.replace(extension) {
+                log_config(&format!("ai: {error}"));
+            }
+        }
         if let Some(pipeline) = app.try_state::<SearchPipeline>() {
             let candidates = aliased_candidates(&host, file_config);
             pipeline.reload(
@@ -860,6 +971,7 @@ pub fn run() {
             search,
             run_action,
             invoke_command,
+            cancel_invocation,
             inspect_template
         ])
         .setup(move |app| {
@@ -958,6 +1070,9 @@ pub fn run() {
                 )));
                 match extensions::clipboard::CrateClipboard::new() {
                     Some(clipboard) => {
+                        // Shared, so the AI extension can put an answer on the
+                        // clipboard without opening a second connection to it.
+                        app.manage(clipboard.clone());
                         let watcher = Arc::new(Watcher::new(
                             clipboard.clone(),
                             attribution,
@@ -1086,6 +1201,42 @@ pub fn run() {
                 Ok(report) if report.is_clean() => {}
                 Ok(report) => eprintln!("[dango] window-management loaded with issues: {report:?}"),
                 Err(error) => eprintln!("[dango] window-management failed to load: {error}"),
+            }
+
+            {
+                let parts = AiParts {
+                    keys: Arc::new(AuthFile::new(config::auth_path())),
+                    client: Arc::new(Clients {
+                        service: Arc::new(GenAiClient::new(
+                            tauri::async_runtime::handle().inner().clone(),
+                        )),
+                        command: Arc::new(CliClient),
+                    }),
+                    text: app
+                        .try_state::<Arc<TextExchange>>()
+                        .map(|state| state.inner().clone() as Arc<dyn text::TextTarget>),
+                    clipboard: app
+                        .try_state::<Arc<extensions::clipboard::CrateClipboard>>()
+                        .map(|state| state.inner().clone() as Arc<dyn ClipboardSource>),
+                    runner: Arc::new(ViewRunner(app.handle().clone())),
+                };
+                let (extension, problems) = {
+                    let config = file_config.shared();
+                    let config = config.read().unwrap();
+                    parts.build(&config)
+                };
+                for problem in &problems {
+                    log_config(problem);
+                }
+                if !problems.is_empty() {
+                    notices.push("An AI command has an error, see dango.log".to_string());
+                }
+                match host.register(extension) {
+                    Ok(report) if report.is_clean() => {}
+                    Ok(report) => eprintln!("[dango] ai loaded with issues: {report:?}"),
+                    Err(error) => eprintln!("[dango] ai failed to load: {error}"),
+                }
+                app.manage(Arc::new(parts));
             }
 
             let frecency = Arc::new(match &store {

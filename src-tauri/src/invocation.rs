@@ -34,6 +34,12 @@ pub enum Output {
 pub trait Sink: Send + Sync {
     fn push_view(&self, tree: ViewTree);
     fn finish(&self, outcome: Outcome);
+    /// Whether this invocation's output is still wanted. A command that runs
+    /// for a while polls it, so an abandoned request stops costing anything
+    /// rather than only having its output dropped.
+    fn superseded(&self) -> bool {
+        false
+    }
 }
 
 /// Handed to a command for the length of one invocation.
@@ -63,6 +69,12 @@ impl InvocationContext {
 
     pub fn fail(&self, message: impl Into<String>) {
         self.sink.finish(Outcome::Failure(message.into()));
+    }
+
+    /// True once the launcher has moved on: hidden, or a newer invocation
+    /// started. Long work checks it between steps and gives up.
+    pub fn is_cancelled(&self) -> bool {
+        self.sink.superseded()
     }
 }
 
@@ -117,6 +129,13 @@ pub enum InvokeError {
 /// not interrupt the running command, which may be mid-way through an operating
 /// system call that cannot be abandoned safely; it stops its output being
 /// delivered, which is what the user can observe.
+/// A started invocation: the identity the launcher uses to tell one
+/// invocation's trees from another's, and the channel they arrive on.
+pub struct Running {
+    pub invocation: u64,
+    pub output: mpsc::UnboundedReceiver<Output>,
+}
+
 pub struct Invoker {
     resolver: Arc<dyn CommandResolver>,
     hosts: HashMap<Host, Arc<dyn CommandHost>>,
@@ -142,10 +161,7 @@ impl Invoker {
         }
     }
 
-    pub fn invoke(
-        &self,
-        qualified_id: &str,
-    ) -> Result<mpsc::UnboundedReceiver<Output>, InvokeError> {
+    pub fn invoke(&self, qualified_id: &str) -> Result<Running, InvokeError> {
         let resolved = self
             .resolver
             .resolve(qualified_id)
@@ -167,7 +183,33 @@ impl Invoker {
             }),
         };
         host.run(resolved.command, ctx);
-        Ok(rx)
+        Ok(Running {
+            invocation: generation,
+            output: rx,
+        })
+    }
+
+    /// A context for work an extension starts itself, such as a form submit
+    /// that streams an answer. It supersedes and is superseded exactly like an
+    /// invoked command, so one abandon covers both.
+    pub fn detached(&self, label: &str) -> (InvocationContext, Running) {
+        let generation = self.generation.fetch_add(1, Ordering::SeqCst) + 1;
+        let (tx, rx) = mpsc::unbounded_channel();
+        let ctx = InvocationContext {
+            command_id: label.to_string(),
+            sink: Arc::new(ChannelSink {
+                generation,
+                current: self.generation.clone(),
+                tx,
+            }),
+        };
+        (
+            ctx,
+            Running {
+                invocation: generation,
+                output: rx,
+            },
+        )
     }
 
     /// Makes whatever is running irrelevant, so its later output is dropped.
@@ -190,6 +232,10 @@ impl ChannelSink {
 }
 
 impl Sink for ChannelSink {
+    fn superseded(&self) -> bool {
+        ChannelSink::superseded(self)
+    }
+
     fn push_view(&self, tree: ViewTree) {
         if !self.superseded() {
             let _ = self.tx.send(Output::View(tree));
@@ -303,7 +349,7 @@ mod tests {
             Arc::new(Succeeds),
             Host::Builtin,
         )]));
-        let mut rx = invoker.invoke("sys.lock").unwrap();
+        let mut rx = invoker.invoke("sys.lock").unwrap().output;
         assert!(matches!(
             rx.recv().await,
             Some(Output::Finished(Outcome::Success))
@@ -317,7 +363,7 @@ mod tests {
             Arc::new(PushesTwoTrees),
             Host::Builtin,
         )]));
-        let mut rx = invoker.invoke("sys.list").unwrap();
+        let mut rx = invoker.invoke("sys.list").unwrap().output;
         assert!(matches!(rx.recv().await, Some(Output::View(_))));
         assert!(matches!(rx.recv().await, Some(Output::View(_))));
         assert!(matches!(rx.recv().await, Some(Output::Finished(_))));
@@ -330,8 +376,8 @@ mod tests {
             HashMap::new(),
         );
         assert_eq!(
-            invoker.invoke("sys.lock").unwrap_err(),
-            InvokeError::HostUnavailable
+            invoker.invoke("sys.lock").err(),
+            Some(InvokeError::HostUnavailable)
         );
     }
 
@@ -350,17 +396,72 @@ mod tests {
                 Host::Builtin,
             ),
         ]));
-        let mut rx = invoker.invoke("apps.quit").unwrap();
+        let mut rx = invoker.invoke("apps.quit").unwrap().output;
         rx.recv().await;
         assert_eq!(*ran.lock().unwrap(), ["applications"]);
+    }
+
+    /// A command that keeps working until it is told not to, the shape a
+    /// streaming answer has.
+    struct Streams(Arc<AtomicU64>);
+
+    impl Command for Streams {
+        fn invoke(&self, ctx: &InvocationContext) {
+            while !ctx.is_cancelled() {
+                self.0.fetch_add(1, Ordering::SeqCst);
+                ctx.push_view(tree());
+                std::thread::sleep(std::time::Duration::from_millis(5));
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn abandoning_a_running_command_stops_it_working() {
+        let pushes = Arc::new(AtomicU64::new(0));
+        let invoker = Arc::new(Invoker::new(Fixed::new(vec![(
+            "ai.improve",
+            Arc::new(Streams(pushes.clone())) as Arc<dyn Command>,
+            Host::Builtin,
+        )])));
+        let running = invoker.invoke("ai.improve").unwrap();
+        tokio::time::sleep(std::time::Duration::from_millis(30)).await;
+
+        invoker.abandon();
+        tokio::time::sleep(std::time::Duration::from_millis(30)).await;
+        let after_abandon = pushes.load(Ordering::SeqCst);
+        tokio::time::sleep(std::time::Duration::from_millis(30)).await;
+
+        assert_eq!(
+            pushes.load(Ordering::SeqCst),
+            after_abandon,
+            "the command kept working after being abandoned"
+        );
+        drop(running);
+    }
+
+    #[tokio::test]
+    async fn a_detached_context_carries_output_and_supersedes_the_same_way() {
+        let invoker = Invoker::new(Fixed::new(vec![]));
+        let (ctx, mut running) = invoker.detached("dango.ai");
+        assert!(!ctx.is_cancelled());
+        ctx.push_view(tree());
+        assert!(matches!(running.output.recv().await, Some(Output::View(_))));
+
+        invoker.abandon();
+        assert!(ctx.is_cancelled());
+        ctx.push_view(tree());
+        assert!(
+            running.output.try_recv().is_err(),
+            "a superseded detached run still delivered"
+        );
     }
 
     #[test]
     fn an_unknown_command_is_unavailable_rather_than_a_panic() {
         let invoker = Invoker::new(Fixed::new(vec![]));
         assert_eq!(
-            invoker.invoke("sys.gone").unwrap_err(),
-            InvokeError::Unavailable
+            invoker.invoke("sys.gone").err(),
+            Some(InvokeError::Unavailable)
         );
     }
 
@@ -372,8 +473,8 @@ mod tests {
             ("sys.quick", Arc::new(Succeeds), Host::Builtin),
         ]));
 
-        let mut slow = invoker.invoke("sys.slow").unwrap();
-        let mut quick = invoker.invoke("sys.quick").unwrap();
+        let mut slow = invoker.invoke("sys.slow").unwrap().output;
+        let mut quick = invoker.invoke("sys.quick").unwrap().output;
         assert!(matches!(
             quick.recv().await,
             Some(Output::Finished(Outcome::Success))
@@ -393,7 +494,7 @@ mod tests {
             Arc::new(Blocks(release.clone())),
             Host::Builtin,
         )]));
-        let mut rx = invoker.invoke("sys.slow").unwrap();
+        let mut rx = invoker.invoke("sys.slow").unwrap().output;
         invoker.abandon();
         *release.lock().unwrap() = true;
         assert!(rx.recv().await.is_none());
@@ -402,7 +503,7 @@ mod tests {
     #[tokio::test]
     async fn a_failing_command_reports_a_failure() {
         let invoker = Invoker::new(Fixed::new(vec![("sys.x", Arc::new(Fails), Host::Builtin)]));
-        let mut rx = invoker.invoke("sys.x").unwrap();
+        let mut rx = invoker.invoke("sys.x").unwrap().output;
         assert!(
             matches!(rx.recv().await, Some(Output::Finished(Outcome::Failure(m))) if m == "no good")
         );
@@ -415,7 +516,7 @@ mod tests {
             Arc::new(Panics),
             Host::Builtin,
         )]));
-        let mut rx = invoker.invoke("sys.boom").unwrap();
+        let mut rx = invoker.invoke("sys.boom").unwrap().output;
         assert!(matches!(
             rx.recv().await,
             Some(Output::Finished(Outcome::Failure(_)))
