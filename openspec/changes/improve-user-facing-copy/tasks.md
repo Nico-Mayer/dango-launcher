@@ -115,21 +115,21 @@
 
 ## 7. Verify on macOS
 
-- [ ] 7.1 Walk every surface and check it against design.md: root placeholder
+- [x] 7.1 Walk every surface and check it against design.md: root placeholder
       and empty state, an application's action panel, the clipboard history
       list and panel, the snippet and quicklink lists, forms, and empty
       states, the quit-application list, and the empty-trash confirmation.
-- [ ] 7.2 Revoke the Accessibility permission, paste a history entry, insert
+- [x] 7.2 Revoke the Accessibility permission, paste a history entry, insert
       a snippet, and run Left Half; confirm each banner names the permission
       and System Settings, and contains no code.
-- [ ] 7.3 Disable the snippets extension in `config.json` while its results
+- [x] 7.3 Disable the snippets extension in `config.json` while its results
       are on screen and confirm the banner reads the "isn't available any
       more" message on Enter.
-- [ ] 7.4 Break `snippets.json` on disk, open Search Snippets, and confirm
+- [x] 7.4 Break `snippets.json` on disk, open Search Snippets, and confirm
       the empty state reads "Couldn't read your snippets" with the JSON detail
       below; confirm the tray shows "snippets.json has an error, see
       dango.log".
-- [ ] 7.5 Register Option+Space in another app, start Dango, and confirm the
+- [x] 7.5 Register Option+Space in another app, start Dango, and confirm the
       tray reads "Option+Space is in use, set launcher.hotkey".
 
 ## 8. Verify on Windows
