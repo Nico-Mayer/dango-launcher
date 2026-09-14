@@ -116,6 +116,7 @@
   <Command.Root
     shouldFilter={false}
     disablePointerSelection
+    vimBindings={false}
     bind:value={() => selectedId, (id) => inUserGesture() && (pickedId = id)}
     class="flex min-h-0 flex-1 flex-col"
   >

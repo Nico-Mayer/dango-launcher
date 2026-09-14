@@ -879,17 +879,30 @@ pub fn run() {
                         // so the exchange is built against this one.
                         let dismisser: Arc<dyn text::Launcher> =
                             Arc::new(HideLauncher(app.handle().clone()));
-                        if let Some(exchange) = platform::text_exchange(
+                        let exchange = platform::text_exchange(
                             clipboard,
                             watcher.clone(),
                             dismisser,
                             Arc::new(OnMainThread(app.handle().clone())),
-                        ) {
-                            app.manage(Arc::new(exchange));
-                        } else {
-                            eprintln!("[dango] no key injection, so pasting is off");
+                        )
+                        .map(Arc::new);
+                        match &exchange {
+                            Some(exchange) => {
+                                app.manage(exchange.clone());
+                            }
+                            None => eprintln!("[dango] no key injection, so pasting is off"),
                         }
-                        let extension = Arc::new(ClipboardExtension::new(history, watcher));
+                        let preferences = extension::Preferences::new(
+                            extensions::clipboard::EXTENSION_ID,
+                            extensions::clipboard::preference_declarations(),
+                            file_config.clone(),
+                        );
+                        let extension = Arc::new(ClipboardExtension::new(
+                            history,
+                            watcher,
+                            preferences,
+                            exchange.map(|exchange| exchange as Arc<dyn text::TextTarget>),
+                        ));
                         match host.register(extension) {
                             Ok(report) if report.is_clean() => {}
                             Ok(report) => {

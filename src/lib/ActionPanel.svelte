@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { pointerActive } from "./input.svelte";
+  import { shortcutLabel } from "./platform";
   import type { ActionDto } from "./types";
 
   interface Props {
@@ -36,10 +37,7 @@
 
   function label(action: ActionDto): string {
     if (!action.shortcut) return "";
-    const mods = action.shortcut.modifiers
-      .map((m) => (m === "cmd" || m === "ctrl" ? "Ctrl" : m[0].toUpperCase() + m.slice(1)))
-      .join("+");
-    return mods ? `${mods}+${action.shortcut.key.toUpperCase()}` : action.shortcut.key.toUpperCase();
+    return shortcutLabel(action.shortcut.key, action.shortcut.modifiers);
   }
 </script>
 

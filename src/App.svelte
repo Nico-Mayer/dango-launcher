@@ -6,6 +6,7 @@
   import ActionPanel from "./lib/ActionPanel.svelte";
   import Icon from "./lib/Icon.svelte";
   import { inUserGesture, pointerActive } from "./lib/input.svelte";
+  import { modKey } from "./lib/platform";
   import ProtocolView from "./lib/ProtocolView.svelte";
   import ResultRow from "./lib/ResultRow.svelte";
   import { matchesShortcut, type ActionResponse, type ResultItem, type ResultsPayload } from "./lib/types";
@@ -233,12 +234,13 @@
     runSearch(q);
   });
   /// The footer should say what Enter does here rather than always "Select".
-  /// A view declares its primary action, so the label comes from the tree.
+  /// A detail or form view declares its own actions; a list's live on its
+  /// items, and every list so far gives all its items the same set.
   function stackPrimaryLabel(): string {
     const view = stack[stack.length - 1]?.view;
     if (!view) return "Select";
-    if ("actions" in view && view.actions.length > 0) return view.actions[0].title;
-    return "Select";
+    const actions = view.kind === "list" ? (view.items[0]?.actions ?? []) : view.actions;
+    return actions[0]?.title ?? "Select";
   }
 
   /// A template field needs plain Enter for a newline, so the footer has to
@@ -247,7 +249,7 @@
     const view = stack[stack.length - 1]?.view;
     const hasTemplate =
       view?.kind === "form" && view.fields.some((field) => field.kind === "template");
-    return hasTemplate ? "⌘↵" : "↵";
+    return hasTemplate ? `${modKey}↵` : "↵";
   }
 </script>
 
@@ -265,7 +267,7 @@
       </span>
       <span class="flex items-center gap-1.5">
         Actions
-        <kbd class="bg-muted rounded px-1.5 py-0.5 font-sans">Ctrl K</kbd>
+        <kbd class="bg-muted rounded px-1.5 py-0.5 font-sans">{modKey} K</kbd>
       </span>
     </div>
   </div>
@@ -301,6 +303,7 @@
   <Command.Root
     shouldFilter={false}
     disablePointerSelection
+    vimBindings={false}
     bind:value={() => selectedId, (id) => inUserGesture() && (pickedId = id)}
     class="border-border-card bg-background flex h-screen w-screen flex-col overflow-hidden rounded-[14px] border"
   >

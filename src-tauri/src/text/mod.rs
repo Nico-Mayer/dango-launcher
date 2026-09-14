@@ -123,6 +123,10 @@ pub trait TextTarget: Send + Sync {
     /// For keyword expansion, where the focus is already the target and no
     /// launcher is involved.
     fn expand(&self, backspaces: usize, text: &str, caret: Option<usize>) -> Result<(), TextError>;
+    /// Puts `content` on the clipboard and pastes it, leaving it there. Unlike
+    /// `insert`, nothing is restored afterwards: the content is the user's own
+    /// choice of what the clipboard should hold.
+    fn paste_content(&self, content: &Content) -> Result<(), TextError>;
     fn selection(&self) -> Result<Option<String>, TextError>;
     fn clipboard_text(&self) -> Option<String>;
 }
@@ -130,6 +134,10 @@ pub trait TextTarget: Send + Sync {
 impl TextTarget for TextExchange {
     fn insert(&self, text: &str, caret: Option<usize>) -> Result<(), TextError> {
         TextExchange::insert(self, text, caret)
+    }
+
+    fn paste_content(&self, content: &Content) -> Result<(), TextError> {
+        TextExchange::paste_content(self, content)
     }
 
     fn expand(&self, backspaces: usize, text: &str, caret: Option<usize>) -> Result<(), TextError> {
@@ -279,6 +287,26 @@ impl TextExchange {
         pasted
     }
 
+    /// Pastes a clipboard history entry. The order is what makes the failure
+    /// cases clean: a missing permission or a missing target returns before
+    /// the clipboard is written, so only a paste that fails after the write
+    /// leaves the entry on the clipboard, where the user can still paste it.
+    pub fn paste_content(&self, content: &Content) -> Result<(), TextError> {
+        if !self.keys.permitted() {
+            return Err(TextError::PermissionMissing);
+        }
+
+        self.launcher.dismiss();
+        self.handoff.yield_to_previous()?;
+
+        self.own_writes.expect(content);
+        self.write(content);
+
+        let pasted = self.keys.paste();
+        self.handoff.settle_after_paste();
+        pasted
+    }
+
     /// Replaces a just-typed keyword with `text`: deletes the keyword with
     /// `backspaces` backspaces, then pastes the text and restores the clipboard.
     ///
@@ -365,9 +393,13 @@ impl TextExchange {
             return;
         }
         self.own_writes.expect(&saved);
-        match saved {
-            Content::Text(text) => self.clipboard.set_text(&text),
-            Content::Image(png) => self.clipboard.set_image(&png),
+        self.write(&saved);
+    }
+
+    fn write(&self, content: &Content) {
+        match content {
+            Content::Text(text) => self.clipboard.set_text(text),
+            Content::Image(png) => self.clipboard.set_image(png),
         }
     }
 }
@@ -765,6 +797,87 @@ mod tests {
         assert!(f.keys.events().is_empty(), "nothing reaches the other app");
         assert_eq!(
             f.clipboard.now(),
+            Some(Content::Text("what the user had".into()))
+        );
+    }
+
+    #[test]
+    fn pasting_content_leaves_it_on_the_clipboard() {
+        let f = fixture(holding("what the user had"), FakeKeys::working());
+
+        f.exchange
+            .paste_content(&Content::Text("from the history".into()))
+            .unwrap();
+
+        assert_eq!(f.keys.events(), vec!["paste"]);
+        assert_eq!(f.launcher.dismissals(), 1);
+        assert_eq!(*f.handoff.yielded.lock().unwrap(), 1);
+        assert_eq!(
+            f.clipboard.now(),
+            Some(Content::Text("from the history".into())),
+            "the entry is what the user chose to have on the clipboard"
+        );
+        assert_eq!(
+            f.writes.declared(),
+            vec![Content::Text("from the history".into())],
+            "one write, declared so the history neither records nor reorders it"
+        );
+    }
+
+    #[test]
+    fn pasting_an_image_puts_the_image_on_the_clipboard() {
+        let png = vec![0x89, b'P', b'N', b'G', 4, 5, 6];
+        let f = fixture(holding("what the user had"), FakeKeys::working());
+
+        f.exchange
+            .paste_content(&Content::Image(png.clone()))
+            .unwrap();
+
+        assert_eq!(f.keys.events(), vec!["paste"]);
+        assert_eq!(f.clipboard.now(), Some(Content::Image(png)));
+    }
+
+    #[test]
+    fn pasting_content_without_the_permission_touches_nothing() {
+        let f = fixture(holding("what the user had"), Arc::new(FakeKeys::default()));
+
+        assert_eq!(
+            f.exchange
+                .paste_content(&Content::Text("from the history".into())),
+            Err(TextError::PermissionMissing)
+        );
+        assert_eq!(f.launcher.dismissals(), 0);
+        assert!(f.writes.declared().is_empty());
+        assert_eq!(
+            f.clipboard.now(),
+            Some(Content::Text("what the user had".into()))
+        );
+    }
+
+    #[test]
+    fn pasting_content_with_nowhere_to_go_touches_nothing() {
+        let handoff = Arc::new(FakeHandoff {
+            fails: Some(TextError::NoTarget),
+            ..Default::default()
+        });
+        let clipboard = holding("what the user had");
+        let writes = Arc::new(RecordingWrites::default());
+        let exchange = TextExchange::new(
+            clipboard.clone(),
+            FakeKeys::working(),
+            handoff,
+            None,
+            writes.clone(),
+            Arc::new(FakeLauncher::default()),
+        );
+
+        assert_eq!(
+            exchange.paste_content(&Content::Text("from the history".into())),
+            Err(TextError::NoTarget)
+        );
+        assert!(writes.declared().is_empty());
+        assert_eq!(
+            clipboard.now(),
             Some(Content::Text("what the user had".into()))
         );
     }

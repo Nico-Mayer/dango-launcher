@@ -28,7 +28,11 @@
       // Override an extension's preferences, by the extension's own keys.
       "preferences": {
         "entries": 200,
-        "excluded-applications": "Proton Pass, 1Password"
+        "excluded-applications": "Proton Pass, 1Password",
+        // What Enter does to a history entry: "paste" puts it into the app you
+        // were in and leaves it on the clipboard; "copy" only puts it on the
+        // clipboard. The other one stays in the action panel. Default "paste".
+        "primary-action": "copy"
       }
     },
 

@@ -13,6 +13,7 @@ use crate::protocol::{
     Action, EmptyState, Filtering, ListItem, ListView, Modifier, Shortcut, View, ViewTree,
     PROTOCOL_VERSION,
 };
+use crate::text::{TextError, TextTarget};
 
 use super::history::{Bounds, Entry, History, Kind};
 use super::watcher::{Policy, WatchService, Watcher};
@@ -21,6 +22,7 @@ use super::DEFAULT_EXCLUDED_APPLICATIONS;
 pub const EXTENSION_ID: &str = "dango.clipboard";
 pub const COMMAND_HISTORY: &str = "history";
 
+pub const ACTION_INSERT: &str = "insert";
 pub const ACTION_RESTORE: &str = "restore";
 pub const ACTION_REMOVE: &str = "remove";
 
@@ -28,6 +30,7 @@ pub const PREF_ENTRIES: &str = "entries";
 pub const PREF_ENTRY_MEGABYTES: &str = "entry-megabytes";
 pub const PREF_TOTAL_MEGABYTES: &str = "total-megabytes";
 pub const PREF_EXCLUDED: &str = "excluded-applications";
+pub const PREF_PRIMARY_ACTION: &str = "primary-action";
 
 const MEGABYTE: f64 = 1024.0 * 1024.0;
 
@@ -38,23 +41,32 @@ pub struct ClipboardExtension {
     manifest: Manifest,
     history: Arc<History>,
     watcher: Arc<Watcher>,
+    preferences: Arc<Preferences>,
+    text: Option<Arc<dyn TextTarget>>,
 }
 
 impl ClipboardExtension {
-    pub fn new(history: Arc<History>, watcher: Arc<Watcher>) -> Self {
+    pub fn new(
+        history: Arc<History>,
+        watcher: Arc<Watcher>,
+        preferences: Preferences,
+        text: Option<Arc<dyn TextTarget>>,
+    ) -> Self {
         Self {
             manifest: manifest(),
             history,
             watcher,
+            preferences: Arc::new(preferences),
+            text,
         }
     }
 
     fn list(&self) -> ViewTree {
         match self.history.entries() {
-            Ok(entries) => history_view(&entries),
+            Ok(entries) => history_view(&entries, primary_action(&self.preferences)),
             Err(error) => {
                 eprintln!("[dango] could not read the clipboard history: {error}");
-                history_view(&[])
+                history_view(&[], primary_action(&self.preferences))
             }
         }
     }
@@ -73,6 +85,7 @@ impl Extension for ClipboardExtension {
         match command_id {
             COMMAND_HISTORY => Some(Arc::new(HistoryCommand {
                 history: self.history.clone(),
+                preferences: self.preferences.clone(),
             })),
             _ => None,
         }
@@ -85,6 +98,14 @@ impl Extension for ClipboardExtension {
         _values: &FormValues,
     ) -> ActionOutcome {
         match action_id {
+            ACTION_INSERT => match (&self.text, self.history.content(item_id)) {
+                (None, _) => ActionOutcome::Failed(TextError::PermissionMissing.to_string()),
+                (Some(text), Ok(content)) => match text.paste_content(&content) {
+                    Ok(()) => ActionOutcome::Done,
+                    Err(error) => ActionOutcome::Failed(error.to_string()),
+                },
+                (_, Err(error)) => ActionOutcome::Failed(error.to_string()),
+            },
             ACTION_RESTORE => match self.history.content(item_id) {
                 Ok(content) => {
                     self.watcher.restore(&content);
@@ -138,6 +159,13 @@ fn manifest() -> Manifest {
                 key: PREF_EXCLUDED.into(),
                 kind: PreferenceKind::String,
                 default: Some(DEFAULT_EXCLUDED_APPLICATIONS.join(", ").into()),
+                required: false,
+            },
+            PreferenceDecl {
+                command_id: None,
+                key: PREF_PRIMARY_ACTION.into(),
+                kind: PreferenceKind::String,
+                default: Some("paste".into()),
                 required: false,
             },
         ],
@@ -198,20 +226,37 @@ fn megabytes(preferences: &Preferences, key: &str, fallback: usize) -> usize {
         .unwrap_or(fallback)
 }
 
+/// What Enter does to an entry. Anything the preference says that is not
+/// `copy` is read as the default, in keeping with a bad value falling back
+/// rather than refusing to open the history.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PrimaryAction {
+    Paste,
+    Copy,
+}
+
+fn primary_action(preferences: &Preferences) -> PrimaryAction {
+    match preferences.string(PREF_PRIMARY_ACTION) {
+        Some(value) if value.trim().eq_ignore_ascii_case("copy") => PrimaryAction::Copy,
+        _ => PrimaryAction::Paste,
+    }
+}
+
 struct HistoryCommand {
     history: Arc<History>,
+    preferences: Arc<Preferences>,
 }
 
 impl Command for HistoryCommand {
     fn invoke(&self, ctx: &InvocationContext) {
         match self.history.entries() {
-            Ok(entries) => ctx.push_view(history_view(&entries)),
+            Ok(entries) => ctx.push_view(history_view(&entries, primary_action(&self.preferences))),
             Err(error) => ctx.fail(error.to_string()),
         }
     }
 }
 
-pub fn history_view(entries: &[Entry]) -> ViewTree {
+pub fn history_view(entries: &[Entry], primary: PrimaryAction) -> ViewTree {
     ViewTree {
         protocol_version: PROTOCOL_VERSION,
         view: View::List(ListView {
@@ -224,12 +269,12 @@ pub fn history_view(entries: &[Entry]) -> ViewTree {
                         .into(),
                 ),
             }),
-            items: entries.iter().map(item).collect(),
+            items: entries.iter().map(|entry| item(entry, primary)).collect(),
         }),
     }
 }
 
-fn item(entry: &Entry) -> ListItem {
+fn item(entry: &Entry, primary: PrimaryAction) -> ListItem {
     let (title, icon) = match entry.kind {
         Kind::Text => (
             preview(entry.text.as_deref().unwrap_or_default()),
@@ -239,26 +284,34 @@ fn item(entry: &Entry) -> ListItem {
         // one copied image from another.
         Kind::Image => ("Image".to_string(), entry.path.clone()),
     };
+    let paste = Action {
+        id: ACTION_INSERT.into(),
+        title: "Paste to Active App".into(),
+        shortcut: None,
+    };
+    let copy = Action {
+        id: ACTION_RESTORE.into(),
+        title: "Copy to Clipboard".into(),
+        shortcut: None,
+    };
+    let remove = Action {
+        id: ACTION_REMOVE.into(),
+        title: "Remove from History".into(),
+        shortcut: Some(Shortcut {
+            key: "x".into(),
+            modifiers: vec![Modifier::Ctrl],
+        }),
+    };
+    let actions = match primary {
+        PrimaryAction::Paste => vec![paste, copy, remove],
+        PrimaryAction::Copy => vec![copy, paste, remove],
+    };
     ListItem {
         id: entry.id.clone(),
         title,
         subtitle: None,
         icon,
-        actions: vec![
-            Action {
-                id: ACTION_RESTORE.into(),
-                title: "Copy to Clipboard".into(),
-                shortcut: None,
-            },
-            Action {
-                id: ACTION_REMOVE.into(),
-                title: "Remove from History".into(),
-                shortcut: Some(Shortcut {
-                    key: "x".into(),
-                    modifiers: vec![Modifier::Ctrl],
-                }),
-            },
-        ],
+        actions,
     }
 }
 
@@ -335,25 +388,97 @@ mod tests {
         ))
     }
 
-    fn setup() -> (ClipboardExtension, Arc<History>, Arc<StubClipboard>) {
+    #[derive(Default)]
+    struct FakeTarget {
+        pasted: Mutex<Vec<Content>>,
+        fails: bool,
+    }
+
+    impl TextTarget for FakeTarget {
+        fn insert(&self, _text: &str, _caret: Option<usize>) -> Result<(), TextError> {
+            unreachable!("the history never inserts rendered text")
+        }
+        fn expand(
+            &self,
+            _backspaces: usize,
+            _text: &str,
+            _caret: Option<usize>,
+        ) -> Result<(), TextError> {
+            unreachable!("the history never expands a keyword")
+        }
+        fn paste_content(&self, content: &Content) -> Result<(), TextError> {
+            if self.fails {
+                return Err(TextError::PermissionMissing);
+            }
+            self.pasted.lock().unwrap().push(content.clone());
+            Ok(())
+        }
+        fn selection(&self) -> Result<Option<String>, TextError> {
+            Ok(None)
+        }
+        fn clipboard_text(&self) -> Option<String> {
+            None
+        }
+    }
+
+    struct Fixture {
+        extension: ClipboardExtension,
+        history: Arc<History>,
+        clipboard: Arc<StubClipboard>,
+        store: Arc<MemoryPreferences>,
+        target: Arc<FakeTarget>,
+    }
+
+    fn build(target: Option<Arc<FakeTarget>>) -> Fixture {
         let dir = std::env::temp_dir().join(format!("dango-ext-{}", uuid::Uuid::new_v4()));
         let history = Arc::new(History::new(
             Arc::new(crate::store::Store::in_memory().unwrap()),
             dir,
         ));
         let clipboard = Arc::new(StubClipboard::default());
+        let store = Arc::new(MemoryPreferences::default());
         let watcher = Arc::new(Watcher::new(
             clipboard.clone(),
             Arc::new(NoAttribution),
             history.clone(),
-            Arc::new(policy(Arc::new(MemoryPreferences::default()))),
+            Arc::new(policy(store.clone())),
         ));
         watcher.start();
-        (
-            ClipboardExtension::new(history.clone(), watcher),
+        let recorded = target.clone().unwrap_or_default();
+        let text = target.map(|target| target as Arc<dyn TextTarget>);
+        Fixture {
+            extension: ClipboardExtension::new(
+                history.clone(),
+                watcher,
+                Preferences::new(EXTENSION_ID, manifest().preferences, store.clone()),
+                text,
+            ),
             history,
             clipboard,
-        )
+            store,
+            target: recorded,
+        }
+    }
+
+    fn setup() -> (ClipboardExtension, Arc<History>, Arc<StubClipboard>) {
+        let f = build(Some(Arc::new(FakeTarget::default())));
+        (f.extension, f.history, f.clipboard)
+    }
+
+    fn record_text(history: &History, text: &str) -> String {
+        history
+            .record(Content::Text(text.into()), Bounds::default(), 1)
+            .unwrap();
+        history.entries().unwrap()[0].id.clone()
+    }
+
+    fn action_ids(extension: &ClipboardExtension) -> Vec<String> {
+        let tree = extension.list();
+        list_of(&tree).items[0]
+            .actions
+            .iter()
+            .map(|action| action.id.clone())
+            .collect()
     }
 
     fn list_of(tree: &ViewTree) -> &ListView {
@@ -373,7 +498,7 @@ mod tests {
             !manifest.root_items,
             "the history opens through its command"
         );
-        assert_eq!(manifest.preferences.len(), 4);
+        assert_eq!(manifest.preferences.len(), 5);
     }
 
     #[test]
@@ -395,7 +520,8 @@ mod tests {
                 PREF_ENTRIES,
                 PREF_ENTRY_MEGABYTES,
                 PREF_TOTAL_MEGABYTES,
-                PREF_EXCLUDED
+                PREF_EXCLUDED,
+                PREF_PRIMARY_ACTION
             ],
             "a reader built without these reads every value as absent"
         );
@@ -492,6 +618,119 @@ mod tests {
         let path = item.icon.clone().expect("an image entry has a thumbnail");
         assert!(path.ends_with(".png"));
         assert!(std::path::Path::new(&path).exists());
+    }
+
+    #[test]
+    fn enter_pastes_unless_told_otherwise() {
+        let f = build(Some(Arc::new(FakeTarget::default())));
+        record_text(&f.history, "hello");
+
+        assert_eq!(
+            action_ids(&f.extension),
+            [ACTION_INSERT, ACTION_RESTORE, ACTION_REMOVE]
+        );
+
+        f.store.set(EXTENSION_ID, None, PREF_PRIMARY_ACTION, "copy");
+        assert_eq!(
+            action_ids(&f.extension),
+            [ACTION_RESTORE, ACTION_INSERT, ACTION_REMOVE],
+            "read on every list build, so a config edit applies next time"
+        );
+
+        f.store
+            .set(EXTENSION_ID, None, PREF_PRIMARY_ACTION, "teleport");
+        assert_eq!(
+            action_ids(&f.extension),
+            [ACTION_INSERT, ACTION_RESTORE, ACTION_REMOVE],
+            "a value that is neither falls back to the default"
+        );
+    }
+
+    #[test]
+    fn the_command_builds_its_view_with_the_same_order() {
+        let f = build(Some(Arc::new(FakeTarget::default())));
+        record_text(&f.history, "hello");
+        f.store.set(EXTENSION_ID, None, PREF_PRIMARY_ACTION, "copy");
+
+        let sink = Arc::new(RecordingSink::default());
+        let command = f.extension.command(COMMAND_HISTORY).unwrap();
+        command.invoke(&InvocationContext::for_test(COMMAND_HISTORY, sink.clone()));
+
+        let tree = sink.0.lock().unwrap().clone().expect("a view was pushed");
+        assert_eq!(list_of(&tree).items[0].actions[0].id, ACTION_RESTORE);
+    }
+
+    #[test]
+    fn pasting_a_text_entry_hands_it_to_the_target() {
+        let f = build(Some(Arc::new(FakeTarget::default())));
+        let id = record_text(&f.history, "hello");
+
+        assert_eq!(
+            f.extension
+                .perform_action(&id, ACTION_INSERT, &FormValues::new()),
+            ActionOutcome::Done
+        );
+        assert_eq!(
+            *f.target.pasted.lock().unwrap(),
+            vec![Content::Text("hello".into())]
+        );
+    }
+
+    #[test]
+    fn pasting_an_image_entry_hands_the_image_to_the_target() {
+        let f = build(Some(Arc::new(FakeTarget::default())));
+        f.history
+            .record(Content::Image(vec![9, 9, 9]), Bounds::default(), 1)
+            .unwrap();
+        let id = f.history.entries().unwrap()[0].id.clone();
+
+        assert_eq!(
+            f.extension
+                .perform_action(&id, ACTION_INSERT, &FormValues::new()),
+            ActionOutcome::Done
+        );
+        assert_eq!(
+            *f.target.pasted.lock().unwrap(),
+            vec![Content::Image(vec![9, 9, 9])]
+        );
+    }
+
+    #[test]
+    fn a_paste_the_target_refuses_is_reported() {
+        let f = build(Some(Arc::new(FakeTarget {
+            fails: true,
+            ..Default::default()
+        })));
+        let id = record_text(&f.history, "hello");
+
+        assert_eq!(
+            f.extension
+                .perform_action(&id, ACTION_INSERT, &FormValues::new()),
+            ActionOutcome::Failed(TextError::PermissionMissing.to_string())
+        );
+        assert_eq!(*f.clipboard.0.lock().unwrap(), None, "nothing was written");
+    }
+
+    #[test]
+    fn pasting_without_key_injection_fails_the_same_way() {
+        let f = build(None);
+        let id = record_text(&f.history, "hello");
+
+        assert_eq!(
+            f.extension
+                .perform_action(&id, ACTION_INSERT, &FormValues::new()),
+            ActionOutcome::Failed(TextError::PermissionMissing.to_string())
+        );
+    }
+
+    #[derive(Default)]
+    struct RecordingSink(Mutex<Option<ViewTree>>);
+
+    impl crate::invocation::Sink for RecordingSink {
+        fn push_view(&self, tree: ViewTree) {
+            *self.0.lock().unwrap() = Some(tree);
+        }
+        fn finish(&self, _outcome: crate::invocation::Outcome) {}
     }
 
     #[test]

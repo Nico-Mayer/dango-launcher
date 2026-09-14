@@ -575,6 +575,12 @@ mod tests {
         ) -> Result<(), TextError> {
             self.insert(text, caret)
         }
+        fn paste_content(
+            &self,
+            _content: &crate::extensions::clipboard::Content,
+        ) -> Result<(), TextError> {
+            unreachable!("a snippet never pastes clipboard content")
+        }
         fn selection(&self) -> Result<Option<String>, TextError> {
             Ok(self.selection.clone())
         }
