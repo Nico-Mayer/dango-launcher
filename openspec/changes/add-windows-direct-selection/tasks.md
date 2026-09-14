@@ -22,8 +22,29 @@
 
 ## 5. Verification on both platforms
 
-- [ ] 5.1 Verify on Windows: selecting text in Zed's Helix mode and running an AI command reads the selection, or, if Zed exposes nothing, that naming it leaves the buffer untouched and says why. Either way the block must not be commented out
+- [x] 5.1 Verify on Windows: selecting text in Zed's Helix mode and running an AI command reads the selection, or, if Zed exposes nothing, that naming it leaves the buffer untouched and says why. Either way the block must not be commented out
+  - Zed exposes nothing, so it is the naming case. With Zed named, running
+    Improve Writing left the buffer byte-identical (checked against git, and by
+    eye at the end of the file) and the banner read "Dango can't read the
+    selection in Zed. Copy the text first, then run this command."
+  - The first attempt at this failed and toggled Zed's comments again, which is
+    what found the foreground bug now recorded in the design: the refusal was
+    being decided while the launcher held the foreground, so it never matched.
 - [ ] 5.2 Verify on Windows: Notepad, a browser text field, and Windows Terminal each read correctly, and that the clipboard holds what it held before in every case
-- [ ] 5.3 Verify on Windows: an application with nothing selected reports an empty selection without a keystroke, and one with no text pattern still works through the fallback
-- [ ] 5.4 Verify on Windows: a 1,000 character selection is returned within the 300ms the spec gives it, measured rather than estimated
+  - Notepad: done, end to end. A selection was read and a command routed through
+    it answered, with the clipboard holding what it held before the read.
+  - Browser text field: done through the probe. The address bar answers with its
+    selection in about 2ms.
+  - Windows Terminal: not exercised. It is not installed on this machine, so
+    `wt.exe` could not be started.
+- [x] 5.3 Verify on Windows: an application with nothing selected reports an empty selection without a keystroke, and one with no text pattern still works through the fallback
+  - Nothing selected: a collapsed cursor in Notepad answers with an empty range,
+    which is an empty selection rather than the whole document. Worth stating
+    plainly, because the other reading would have transformed the entire file.
+  - No text pattern: page content in a browser has none, and a command run
+    against a page selection read it through the clipboard fallback as before.
+- [x] 5.4 Verify on Windows: a 1,000 character selection is returned within the 300ms the spec gives it, measured rather than estimated
+  - Measured over four samples of a ~1,000 character selection in Notepad:
+    10.1ms, 1.66ms, 1.67ms, 1.65ms. The first call pays for COM initialisation.
+    Well inside both the 200ms deadline and the 300ms budget.
 - [ ] 5.5 Verify on macOS: reading a selection, pasting, snippets, and keyword expansion all behave exactly as before, since the trait they share changed shape

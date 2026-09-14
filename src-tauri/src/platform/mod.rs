@@ -257,6 +257,23 @@ pub fn text_exchange(
     }
 }
 
+/// The application the launcher is covering, for a question about the
+/// application the user came from rather than about Dango.
+///
+/// On Windows the launcher holds the foreground, so this is the window it
+/// replaced. On macOS the launcher is a panel that never took activation, so
+/// the frontmost application already is the one being asked about.
+pub fn covered_app() -> Option<String> {
+    #[cfg(target_os = "windows")]
+    {
+        windows::covered_app()
+    }
+    #[cfg(target_os = "macos")]
+    {
+        foreground_app()
+    }
+}
+
 /// Which application did the copying. The clipboard itself is a crate; this is
 /// the one question it cannot answer.
 ///

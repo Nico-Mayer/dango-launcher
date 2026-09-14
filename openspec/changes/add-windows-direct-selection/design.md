@@ -131,6 +131,26 @@ behaviour, since `AXSelectedText` does not distinguish the two either. Changing
 the trait touches macOS, which is why this change verifies macOS as unchanged
 rather than assuming it.
 
+### The launcher has to get out of the way first, on Windows
+
+Found in verification, not in planning. On Windows the launcher genuinely takes
+the foreground, so at the moment a selection is read, "the focused element" is
+Dango's own search field and "the frontmost application" is Dango. The direct
+read would have returned the launcher's empty input, and the exclusion list
+would never have matched anything, which is exactly what the first live run did:
+the chord went to Zed and toggled its comments again.
+
+`DirectSelection` therefore declares whether it needs the foreground handed back
+first. Windows says yes, and the exchange dismisses the launcher and yields
+before asking anything, which is the same dance the clipboard fallback already
+does. macOS says no: its launcher is a panel that never took activation, so the
+application being asked about is still frontmost, and hiding it would be a
+regression in how the platform behaves.
+
+The cost on Windows is that the launcher still disappears for the duration of a
+read, as it does today. What the direct route removes there is the keystroke and
+the clipboard borrow, not the focus dance.
+
 ### A hung application must not hold the launcher
 
 A cross-process COM call into a busy application can block, and the spec gives

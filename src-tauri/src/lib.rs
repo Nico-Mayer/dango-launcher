@@ -605,7 +605,8 @@ impl extensions::ai::Runner for ViewRunner {
 /// a restart, and so the answer is about whatever is in front right now.
 fn refuses_fallback(config: Arc<config::FileConfig>) -> text::RefusesFallback {
     Arc::new(move || {
-        let application = platform::foreground_app()?;
+        // The application behind the launcher, not the launcher itself.
+        let application = platform::covered_app()?;
         let shared = config.shared();
         let refused = shared.read().ok()?.selection.refuses(&application);
         refused.then_some(application)

@@ -93,6 +93,18 @@ pub enum Selected {
 /// answer `Unavailable` for an application that exposes nothing.
 pub trait DirectSelection: Send + Sync {
     fn selected_text(&self) -> Selected;
+
+    /// Whether the launcher has to be out of the way first.
+    ///
+    /// Windows answers yes, and it is not an optimisation: the launcher holds
+    /// the foreground there, so "the focused element" is Dango's own search
+    /// field and "the frontmost application" is Dango. Both questions are about
+    /// the application behind it. macOS answers no, because its launcher is a
+    /// panel that never took activation, so the application being asked about
+    /// is still the frontmost one.
+    fn needs_foreground(&self) -> bool {
+        false
+    }
 }
 
 /// Declares a write Dango is about to make so the clipboard history ignores it.
@@ -238,7 +250,15 @@ impl TextExchange {
         if !self.keys.permitted() {
             return Err(TextError::PermissionMissing);
         }
+        // Decided first, and deliberately before the launcher moves: a refusal
+        // is a message, and a message needs something on screen to appear on.
+        let refused = self.refused_application();
+
         if let Some(direct) = &self.direct {
+            if direct.needs_foreground() {
+                self.launcher.dismiss();
+                self.handoff.yield_to_previous()?;
+            }
             match direct.selected_text() {
                 Selected::Text(text) if !text.is_empty() => return Ok(Some(text)),
                 // Answered, with nothing selected. Not a reason to start typing
@@ -247,7 +267,7 @@ impl TextExchange {
                 Selected::Unavailable => {}
             }
         }
-        if let Some(refused) = self.refused_application() {
+        if let Some(refused) = refused {
             return Err(TextError::SelectionRefused(refused));
         }
         self.selection_through_clipboard()
@@ -1063,6 +1083,24 @@ mod tests {
         }
     }
 
+    /// A direct route that only answers about whatever is in front, the way
+    /// Windows does.
+    struct FrontmostOnly(Selected, Arc<FakeLauncher>);
+
+    impl DirectSelection for FrontmostOnly {
+        fn selected_text(&self) -> Selected {
+            assert!(
+                self.1.dismissals() > 0,
+                "asked while the launcher still had the foreground"
+            );
+            self.0.clone()
+        }
+
+        fn needs_foreground(&self) -> bool {
+            true
+        }
+    }
+
     #[test]
     fn the_direct_route_is_preferred_and_touches_nothing() {
         let clipboard = holding("what the user had");
@@ -1090,6 +1128,68 @@ mod tests {
 
     fn refusing(application: &'static str) -> RefusesFallback {
         Arc::new(move || Some(application.to_string()))
+    }
+
+    #[test]
+    fn a_route_that_needs_the_foreground_gets_it_before_being_asked() {
+        let launcher = Arc::new(FakeLauncher::default());
+        let keys = FakeKeys::working();
+        let exchange = TextExchange::new(
+            holding("what the user had"),
+            keys.clone(),
+            FakeHandoff::working(),
+            Some(Arc::new(FrontmostOnly(
+                Selected::Text("from the app behind".into()),
+                launcher.clone(),
+            ))),
+            Arc::new(RecordingWrites::default()),
+            launcher.clone(),
+            None,
+        );
+
+        // The assertion that matters is inside the fake: it fails if it is
+        // asked while the launcher is still in front.
+        assert_eq!(
+            exchange.selection().unwrap().as_deref(),
+            Some("from the app behind")
+        );
+        assert!(keys.events().is_empty(), "still no keystroke");
+    }
+
+    /// A refusal is a message, and a message needs the launcher on screen to
+    /// appear on. So it is decided before the launcher moves, which it can be:
+    /// the platform names the application behind it without moving anything.
+    #[test]
+    fn the_refusal_is_decided_while_the_launcher_is_still_up() {
+        let launcher = Arc::new(FakeLauncher::default());
+        let keys = FakeKeys::working();
+        let asked_after_dismiss = Arc::new(Mutex::new(None));
+        let seen = asked_after_dismiss.clone();
+        let watcher = launcher.clone();
+        let refuses: RefusesFallback = Arc::new(move || {
+            *seen.lock().unwrap() = Some(watcher.dismissals());
+            Some("Zed".to_string())
+        });
+        let exchange = TextExchange::new(
+            holding("what the user had"),
+            keys.clone(),
+            FakeHandoff::working(),
+            Some(Arc::new(FrontmostOnly(Selected::Unavailable, launcher.clone()))),
+            Arc::new(RecordingWrites::default()),
+            launcher,
+            Some(refuses),
+        );
+
+        assert_eq!(
+            exchange.selection(),
+            Err(TextError::SelectionRefused("Zed".into()))
+        );
+        assert!(keys.events().is_empty(), "a keystroke reached a refused app");
+        assert_eq!(
+            *asked_after_dismiss.lock().unwrap(),
+            Some(0),
+            "asked only after the launcher had gone, leaving nowhere to say so"
+        );
     }
 
     #[test]

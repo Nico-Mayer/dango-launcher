@@ -235,6 +235,28 @@ pub(super) fn foreground_app() -> Option<String> {
     }
 }
 
+/// The application the launcher is covering, named the same way as the
+/// foreground one. Asked before the launcher gets out of the way, so a question
+/// about that application can be answered while it is still on screen: with the
+/// launcher in front, `foreground_app` would answer "Dango".
+pub(super) fn covered_app() -> Option<String> {
+    use windows::Win32::Foundation::HWND as WindowsHwnd;
+    use windows::Win32::UI::WindowsAndMessaging::GetWindowThreadProcessId;
+    unsafe {
+        let previous = text::previous_foreground()?;
+        // Already the same pointer type; casting it is the lint the project
+        // context warns about.
+        let handle = WindowsHwnd(previous);
+        let mut pid = 0u32;
+        GetWindowThreadProcessId(handle, Some(&mut pid));
+        if pid == 0 {
+            return None;
+        }
+        apps::init_com();
+        system::identify(handle, pid).map(|identity| identity.name)
+    }
+}
+
 /// Records the current foreground as the previous-foreground the paste settle
 /// waits on. Keyword expansion inserts into the application already focused, so
 /// this points the settle at it.
