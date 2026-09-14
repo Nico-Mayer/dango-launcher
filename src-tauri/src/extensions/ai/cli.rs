@@ -200,7 +200,12 @@ mod tests {
     use super::*;
     use crate::config::ProviderKind;
     use crate::extensions::ai::provider::{Next, Thinking};
+    use std::sync::Mutex;
     use std::time::Duration;
+
+    /// Both abandonment tests count sleeping processes machine-wide, so running
+    /// them at once has one seeing the other's child come and go.
+    static SLEEPERS: Mutex<()> = Mutex::new(());
 
     fn request(command: &str, args: &[&str]) -> Request {
         Request {
@@ -355,6 +360,7 @@ mod tests {
 
     #[test]
     fn abandoning_the_answer_stops_the_program() {
+        let _sleepers = SLEEPERS.lock().unwrap_or_else(|held| held.into_inner());
         let args: Vec<&str> = if cfg!(windows) {
             vec!["/c", "ping -n 30 127.0.0.1 > nul"]
         } else {
@@ -377,6 +383,8 @@ mod tests {
     /// sleeping program it starts is the grandchild.
     #[test]
     fn abandoning_stops_what_the_program_itself_started() {
+        let _sleepers = SLEEPERS.lock().unwrap_or_else(|held| held.into_inner());
+
         fn sleepers() -> usize {
             let listing = if cfg!(windows) {
                 std::process::Command::new("tasklist")
