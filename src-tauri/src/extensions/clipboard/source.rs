@@ -7,9 +7,22 @@
 //! exclusion list needs, so attribution stays behind a platform trait.
 
 use std::sync::Arc;
+use std::time::{Duration, Instant};
 
 use clipboard_rs::common::RustImage;
 use clipboard_rs::{Clipboard, ClipboardContext, RustImageData};
+
+/// How long to wait for another process to let go of the clipboard.
+///
+/// Windows opens the clipboard to one window at a time. A paste target reading
+/// what it was sent, or the system's clipboard history looking at a change,
+/// holds it for a few milliseconds, and a read or write that lands in that
+/// window fails with access denied. The crate retries only with a scheduler
+/// yield, which is not long enough, so the wait happens here. Without it a
+/// restore is skipped or lost and the user's clipboard ends up holding what
+/// Dango pasted.
+const BUSY_WAIT: Duration = Duration::from_millis(250);
+const BUSY_POLL: Duration = Duration::from_millis(2);
 
 /// The pixel size of encoded image bytes, or `None` when they cannot be
 /// decoded. Used to recognise Dango's own image writes, which come back from
@@ -65,33 +78,128 @@ impl CrateClipboard {
 
 impl ClipboardSource for CrateClipboard {
     fn formats(&self) -> Vec<String> {
-        self.context.available_formats().unwrap_or_default()
+        until_free(
+            || {
+                let formats = self.context.available_formats().unwrap_or_default();
+                if formats.is_empty() && busy::holds_anything() {
+                    Err(())
+                } else {
+                    Ok(formats)
+                }
+            },
+            busy::holds_anything,
+        )
+        .unwrap_or_default()
     }
 
     fn text(&self) -> Option<String> {
-        self.context.get_text().ok()
+        until_free(|| self.context.get_text(), busy::holds_text).ok()
     }
 
     fn image(&self) -> Option<Vec<u8>> {
-        let image = self.context.get_image().ok()?;
+        let image = until_free(|| self.context.get_image(), busy::holds_image).ok()?;
         Some(image.to_png().ok()?.get_bytes().to_vec())
     }
 
     fn set_text(&self, text: &str) {
-        if let Err(error) = self.context.set_text(text.to_string()) {
+        let written = until_free(|| self.context.set_text(text.to_string()), busy::possible);
+        if let Err(error) = written {
             eprintln!("[dango] could not put text back on the clipboard: {error}");
         }
     }
 
     fn set_image(&self, png: &[u8]) {
-        match RustImageData::from_bytes(png) {
-            Ok(image) => {
-                if let Err(error) = self.context.set_image(image) {
-                    eprintln!("[dango] could not put an image back on the clipboard: {error}");
-                }
+        let mut decoded = match RustImageData::from_bytes(png) {
+            Ok(image) => Some(image),
+            Err(error) => {
+                eprintln!("[dango] could not decode a stored image: {error}");
+                return;
             }
-            Err(error) => eprintln!("[dango] could not decode a stored image: {error}"),
+        };
+        let written = until_free(
+            || {
+                let image = match decoded.take() {
+                    Some(image) => image,
+                    None => RustImageData::from_bytes(png)?,
+                };
+                self.context.set_image(image)
+            },
+            busy::possible,
+        );
+        if let Err(error) = written {
+            eprintln!("[dango] could not put an image back on the clipboard: {error}");
         }
+    }
+}
+
+/// Retries `attempt` while `worth_waiting` says a failure is the clipboard
+/// being busy rather than the content being absent, up to `BUSY_WAIT`.
+fn until_free<T, E>(
+    mut attempt: impl FnMut() -> Result<T, E>,
+    worth_waiting: impl Fn() -> bool,
+) -> Result<T, E> {
+    let deadline = Instant::now() + BUSY_WAIT;
+    loop {
+        match attempt() {
+            Ok(value) => return Ok(value),
+            Err(_) if Instant::now() < deadline && worth_waiting() => {
+                std::thread::sleep(BUSY_POLL);
+            }
+            Err(error) => return Err(error),
+        }
+    }
+}
+
+/// Whether a failed clipboard call can be the clipboard being held by another
+/// window. These ask without opening the clipboard, so they answer while it
+/// is held.
+#[cfg(target_os = "windows")]
+mod busy {
+    use windows_sys::Win32::System::DataExchange::{
+        CountClipboardFormats, IsClipboardFormatAvailable,
+    };
+    use windows_sys::Win32::System::Ole::{CF_BITMAP, CF_DIB, CF_DIBV5, CF_UNICODETEXT};
+
+    pub fn possible() -> bool {
+        true
+    }
+
+    pub fn holds_anything() -> bool {
+        unsafe { CountClipboardFormats() > 0 }
+    }
+
+    pub fn holds_text() -> bool {
+        holds(&[CF_UNICODETEXT])
+    }
+
+    pub fn holds_image() -> bool {
+        holds(&[CF_BITMAP, CF_DIB, CF_DIBV5])
+    }
+
+    fn holds(formats: &[u16]) -> bool {
+        formats
+            .iter()
+            .any(|format| unsafe { IsClipboardFormatAvailable(u32::from(*format)) } != 0)
+    }
+}
+
+/// The macOS pasteboard has no exclusive open, so a failure is never "busy".
+#[cfg(not(target_os = "windows"))]
+mod busy {
+    pub fn possible() -> bool {
+        false
+    }
+
+    pub fn holds_anything() -> bool {
+        false
+    }
+
+    pub fn holds_text() -> bool {
+        false
+    }
+
+    pub fn holds_image() -> bool {
+        false
     }
 }
 
@@ -99,8 +207,9 @@ impl ClipboardSource for CrateClipboard {
 mod tests {
     use super::*;
 
-    /// Needs a real clipboard, so it runs on a desktop rather than in CI:
-    /// `cargo test -- --ignored`.
+    /// Needs a real clipboard, so it runs on a desktop rather than in CI, and
+    /// one test at a time since they share it:
+    /// `cargo test -- --ignored --test-threads=1`.
     #[test]
     #[ignore]
     fn text_survives_a_round_trip() {
@@ -114,6 +223,50 @@ mod tests {
                 .any(|f| f.to_ascii_lowercase().contains("text")),
             "the format list is what the privacy check reads"
         );
+    }
+
+    /// Another process holding the clipboard open, as a target does while it
+    /// reads a paste and as the system's clipboard history does after every
+    /// change. The holder must be another process and must open with a real
+    /// window: an open with no window, or from this process, does not block.
+    #[cfg(target_os = "windows")]
+    #[test]
+    #[ignore]
+    fn a_busy_clipboard_is_waited_for() {
+        use std::io::{BufRead, BufReader};
+        use std::process::{Command, Stdio};
+
+        let clipboard = CrateClipboard::new().unwrap();
+        clipboard.set_text("dango before busy");
+        let mut holder = Command::new("powershell")
+            .args([
+                "-NoProfile",
+                "-Command",
+                concat!(
+                    "Add-Type -AssemblyName System.Windows.Forms;",
+                    "Add-Type -Name C -Namespace W -MemberDefinition '",
+                    "[DllImport(\"user32.dll\")] public static extern bool OpenClipboard(IntPtr h);",
+                    "[DllImport(\"user32.dll\")] public static extern bool CloseClipboard();';",
+                    "$form = New-Object System.Windows.Forms.Form;",
+                    "if (-not [W.C]::OpenClipboard($form.Handle)) { Write-Output failed; exit 1 };",
+                    "Write-Output held; [Console]::Out.Flush();",
+                    "Start-Sleep -Milliseconds 60; [W.C]::CloseClipboard() | Out-Null"
+                ),
+            ])
+            .stdout(Stdio::piped())
+            .spawn()
+            .unwrap();
+        let mut line = String::new();
+        BufReader::new(holder.stdout.take().unwrap())
+            .read_line(&mut line)
+            .unwrap();
+        assert_eq!(line.trim(), "held");
+
+        let read = clipboard.text();
+        clipboard.set_text("dango during busy");
+        holder.wait().unwrap();
+        assert_eq!(read.as_deref(), Some("dango before busy"));
+        assert_eq!(clipboard.text().as_deref(), Some("dango during busy"));
     }
 
     #[test]
