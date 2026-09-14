@@ -329,10 +329,12 @@ the non-elevated harness.
     `local_clipboard_history` either side of an expansion. The history is
     byte-for-byte identical: the pasted snippet never appears, and the newest
     entry keeps its timestamp rather than being reordered by the restore.
-- [ ] 9.5 Confirm on both platforms that a snippet with a caret position leaves the caret where the template declared it, in at least two applications
+- [x] 9.5 Confirm on both platforms that a snippet with a caret position leaves the caret where the template declared it, in at least two applications
   - Windows: verified live in the WinForms edit control that typing after an
     insertion lands at the declared caret (`<b>HERE</b>`). A second application
     is the remaining manual step.
+  - Windows, second application: confirmed in Notepad through the launcher.
+    Expanding a `<b>{{ cursor }}</b>` snippet and typing produced `<b>HERE</b>`.
   - macOS: verified in two applications. Typing after expanding a
     `<b>{{cursor}}</b>` snippet produced `<b>HERE</b>` in the harness's own
     window and again in TextEdit, so the caret landed where the template
