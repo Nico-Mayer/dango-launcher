@@ -90,8 +90,15 @@ context: |
     small and this stays true even for streaming AI output.
   - Every syncable table carries a UUID `id`, `updated_at`, and `deleted_at` from
     the first migration, even though sync ships last.
-  - Secrets go in the OS keychain (macOS Keychain, Windows Credential Manager).
-    Never in SQLite, never in a config file.
+  - Secrets live in `auth.json` in the config directory, in plain text, keyed by
+    provider. Never in `config.json`, never in SQLite, never in a log or a
+    message on screen: the config file is committed and shared, the key file is
+    not. Dango only reads that file, and restricts it to its owner where the
+    platform expresses permissions. The OS keychain was the earlier rule and is
+    still the better answer for more than one user; it was dropped in M6 because
+    one person with two machines is better served by a file they can copy. The
+    read sits behind one function, so the `keyring` crate can take it over
+    without touching a command.
   - Clipboard history must honour platform privacy markers so password managers
     do not leak into it. Internal copy-and-restore tricks are excluded from
     history.

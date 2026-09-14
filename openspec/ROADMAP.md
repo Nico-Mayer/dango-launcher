@@ -18,7 +18,7 @@ M3  plumbing    selection capture, paste + focus restore, template engine
                 -> snippets + quicklinks
 M4  windows     window-management extension
 M5  keys        hotkey binding UI, conflict detection, hyperkey
-M6  ai          BYOK providers, keychain, streaming, user-defined AI commands
+M6  ai          BYOK providers, auth.json, streaming, user-defined AI commands
 M7  polish      preferences window, permission onboarding, autostart
 M8  3rd party   script commands, then a sandboxed extension runtime
 M9  sync        file-based, deliberately small
@@ -117,6 +117,25 @@ User-defined AI commands come almost free from the M3 template engine: a named
 prompt template with placeholders, a hotkey, and an output action.
 
 Explicitly not a chat interface. One-shot transforms only.
+
+Shipped as one change, `add-ai-commands`. The `dango.ai` extension contributes
+nine transforms (Improve Writing, Fix Spelling and Grammar, Make Shorter, Make
+Longer, Make Simpler, Make Professional, Summarize, Explain This, Translate),
+each one a prompt template the config file can override, disable, or add to.
+Commands come from `config.json`, so a new prompt is a command with a hotkey and
+an alias, rebuilt live on an edit. Providers are Anthropic, any OpenAI-compatible
+endpoint, and Ollama on the machine, resolved per command along with the model
+and the thinking level. The provider adapters are the `genai` crate behind a thin
+trait rather than two hand-rolled ones.
+
+Two deliberate departures from the plan above. Keys live in plain `auth.json` in
+the config directory rather than the OS keychain: one user with two machines is
+better served by a file that can be copied, and the constraint in `config.yaml`
+was amended to say so. And the answer is shown by default rather than pasted;
+pasting and copying are per-command settings and actions on the result.
+
+Left out: markdown rendering of the answer, model discovery, and any accounting
+of tokens or cost.
 
 ### M7 - polish
 
