@@ -85,6 +85,10 @@ Reading a selection and inserting text MAY use the clipboard, and the user SHALL
 NOT be able to observe that it did. The clipboard's contents SHALL be the same
 before and after, for text and for images alike.
 
+The one exception is pasting an entry from the clipboard history. There the
+user has chosen content that lives on the clipboard, so the entry SHALL be left
+on the clipboard after it is pasted, ready to be pasted again.
+
 #### Scenario: The clipboard is restored after an insertion
 
 - **WHEN** the user has content on the clipboard and Dango inserts text
@@ -101,6 +105,12 @@ before and after, for text and for images alike.
 - **WHEN** the clipboard's contents change between Dango saving them and restoring them
 - **THEN** the restore is abandoned
 - **AND** what the user copied is left on the clipboard
+
+#### Scenario: A pasted history entry stays on the clipboard
+
+- **WHEN** the user pastes an entry from the clipboard history
+- **THEN** the clipboard holds that entry once the paste has finished
+- **AND** pasting again in the application pastes the same entry
 
 ### Requirement: Dango's own clipboard use never reaches the history
 
