@@ -8,9 +8,10 @@
 use std::collections::VecDeque;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
+use std::time::{Duration, Instant};
 
 use super::history::{Bounds, Content, History};
-use super::source::{Attribution, ClipboardSource};
+use super::source::{Attribution, ClipboardSource, image_dimensions};
 
 /// Markers meaning "not for history". Some applications set one; the spike
 /// found a mainstream password manager that sets none, so nothing depends on
@@ -36,6 +37,25 @@ pub trait Policy: Send + Sync {
 /// second insertion without ever growing into a standing rule about content.
 const PENDING_OWN_WRITES: usize = 4;
 
+/// How long an image write stays recognisable as Dango's own.
+///
+/// An image never comes back byte for byte: macOS re-encodes what is put on the
+/// pasteboard, so a 1.5 KB favicon reads back as a 5.4 KB PNG. Suppression
+/// therefore falls back to "an image of the same size that we wrote a moment
+/// ago", and the crate polls the clipboard every 500ms, so the window has to
+/// cover a poll plus the copying application finishing. The cost of it being
+/// too wide is a user's own image copy going unrecorded in that window, which
+/// is the same asymmetry the exclusion checks accept.
+const OWN_IMAGE_WINDOW: Duration = Duration::from_secs(2);
+
+/// A write Dango made, waiting for the change it causes.
+struct Pending {
+    content: Content,
+    /// Images only, and only when they could be decoded.
+    dimensions: Option<(u32, u32)>,
+    at: Instant,
+}
+
 pub struct Watcher {
     source: Arc<dyn ClipboardSource>,
     attribution: Arc<dyn Attribution>,
@@ -44,7 +64,7 @@ pub struct Watcher {
     /// What Dango itself just put on the clipboard, which must not come back as
     /// a new entry. One shot and content-matched: a later copy of the same
     /// thing by the user is still theirs.
-    ours: Mutex<VecDeque<Content>>,
+    ours: Mutex<VecDeque<Pending>>,
     running: AtomicBool,
 }
 
@@ -141,11 +161,29 @@ impl Watcher {
     /// recorded. A paste makes two: the text going out and the user's own
     /// content going back, which is why this is a queue rather than one slot.
     pub fn expect_own_write(&self, content: &Content) {
+        let dimensions = match content {
+            Content::Image(png) => image_dimensions(png),
+            Content::Text(_) => None,
+        };
         let mut ours = self.ours.lock().unwrap();
         if ours.len() == PENDING_OWN_WRITES {
             ours.pop_front();
         }
-        ours.push_back(content.clone());
+        ours.push_back(Pending {
+            content: content.clone(),
+            dimensions,
+            at: Instant::now(),
+        });
+    }
+
+    /// Ages every pending write, so a test can watch the window close without
+    /// waiting for it.
+    #[cfg(test)]
+    fn age_pending_writes(&self, by: Duration) {
+        let mut ours = self.ours.lock().unwrap();
+        for pending in ours.iter_mut() {
+            pending.at -= by;
+        }
     }
 
     /// Matched entries are consumed, so a suppression covers exactly the one
@@ -153,7 +191,26 @@ impl Watcher {
     /// when it happens to hold the same content.
     fn was_ours(&self, content: &Content) -> bool {
         let mut ours = self.ours.lock().unwrap();
-        match ours.iter().position(|pending| pending == content) {
+        if let Some(index) = ours.iter().position(|pending| &pending.content == content) {
+            ours.remove(index);
+            return true;
+        }
+        // Text matches exactly or not at all. An image does not: the pasteboard
+        // hands back its own encoding, so the only honest question left is
+        // whether an image of this size is one we wrote a moment ago.
+        let Content::Image(png) = content else {
+            return false;
+        };
+        let dimensions = image_dimensions(png);
+        if dimensions.is_none() {
+            return false;
+        }
+        let index = ours.iter().position(|pending| {
+            matches!(pending.content, Content::Image(_))
+                && pending.dimensions == dimensions
+                && pending.at.elapsed() < OWN_IMAGE_WINDOW
+        });
+        match index {
             Some(index) => {
                 ours.remove(index);
                 true
@@ -369,6 +426,65 @@ mod tests {
             .into_iter()
             .filter_map(|e| e.text)
             .collect()
+    }
+
+    /// A real PNG and a re-encoding of it: different bytes, same picture, which
+    /// is exactly what the pasteboard hands back after Dango writes an image.
+    fn favicon_and_its_reencoding() -> (Vec<u8>, Vec<u8>) {
+        use clipboard_rs::common::RustImage;
+
+        let png = std::fs::read(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../static/favicon.png"
+        ))
+        .unwrap();
+        let reencoded = clipboard_rs::RustImageData::from_bytes(&png)
+            .unwrap()
+            .to_png()
+            .unwrap()
+            .get_bytes()
+            .to_vec();
+        assert_ne!(png, reencoded, "the test needs two encodings of one image");
+        (png, reencoded)
+    }
+
+    #[test]
+    fn an_image_we_wrote_is_not_recorded_when_it_comes_back_reencoded() {
+        let f = setup();
+        let (png, reencoded) = favicon_and_its_reencoding();
+        f.watcher.expect_own_write(&Content::Image(png));
+        f.clipboard.copy_image(&reencoded);
+        assert!(!f.watcher.handle_change(1));
+        assert!(f.history.entries().unwrap().is_empty());
+    }
+
+    #[test]
+    fn an_image_the_user_copies_later_is_still_theirs() {
+        let f = setup();
+        let (png, reencoded) = favicon_and_its_reencoding();
+        f.watcher.expect_own_write(&Content::Image(png));
+        f.watcher.age_pending_writes(OWN_IMAGE_WINDOW);
+        f.clipboard.copy_image(&reencoded);
+        assert!(f.watcher.handle_change(1));
+    }
+
+    #[test]
+    fn a_different_image_is_recorded_even_while_a_write_is_pending() {
+        use clipboard_rs::common::RustImage;
+
+        let f = setup();
+        let (png, _) = favicon_and_its_reencoding();
+        let smaller = clipboard_rs::RustImageData::from_bytes(&png)
+            .unwrap()
+            .thumbnail(16, 16)
+            .unwrap()
+            .to_png()
+            .unwrap()
+            .get_bytes()
+            .to_vec();
+        f.watcher.expect_own_write(&Content::Image(png));
+        f.clipboard.copy_image(&smaller);
+        assert!(f.watcher.handle_change(1));
     }
 
     #[test]

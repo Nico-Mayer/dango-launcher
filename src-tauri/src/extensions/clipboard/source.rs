@@ -11,6 +11,13 @@ use std::sync::Arc;
 use clipboard_rs::common::RustImage;
 use clipboard_rs::{Clipboard, ClipboardContext, RustImageData};
 
+/// The pixel size of encoded image bytes, or `None` when they cannot be
+/// decoded. Used to recognise Dango's own image writes, which come back from
+/// the pasteboard re-encoded rather than byte for byte.
+pub fn image_dimensions(bytes: &[u8]) -> Option<(u32, u32)> {
+    RustImageData::from_bytes(bytes).ok().map(|image| image.get_size())
+}
+
 /// Which applications could have put the current contents there.
 ///
 /// Windows can name the owner exactly. macOS cannot, and answers with every
