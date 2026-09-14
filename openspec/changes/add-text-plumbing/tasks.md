@@ -375,7 +375,10 @@ the non-elevated harness.
   - Note: `add-file-backed-records` has since moved these out of SQLite, so this
     is now a check on the JSON files rather than on the tables the Windows note
     describes.
-- [ ] 9.11 Confirm on both platforms that the save form's argument preview catches a pasted doubled-brace expression before it is stored
+- [x] 9.11 Confirm on both platforms that the save form's argument preview catches a pasted doubled-brace expression before it is stored
+  - Windows: confirmed through the launcher's create form. Pasting
+    `runs-on: ${{ matrix.os }}` into the template field showed
+    `Will ask for: matrix` before anything was saved.
   - macOS: confirmed by the author, who saved a GitHub Actions expression and later met its argument prompt. Windows outstanding.
   - Windows: reading the live preview is inside the launcher's webview form, which
     the harness cannot introspect, so it stays an author confirmation like
