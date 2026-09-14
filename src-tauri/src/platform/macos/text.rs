@@ -18,7 +18,7 @@ use objc2_app_kit::NSWorkspace;
 use objc2_application_services::{AXError, AXUIElement};
 use objc2_core_foundation::{CFRetained, CFString, CFType};
 
-use crate::text::{DirectSelection, Handoff, Keys, MainThread, TextError};
+use crate::text::{DirectSelection, Handoff, Keys, MainThread, Selected, TextError};
 
 const FOCUSED_ELEMENT: &str = "AXFocusedUIElement";
 const SELECTED_TEXT: &str = "AXSelectedText";
@@ -180,10 +180,11 @@ impl Handoff for MacHandoff {
 pub struct MacSelection;
 
 impl DirectSelection for MacSelection {
-    fn selected_text(&self) -> Option<String> {
+    fn selected_text(&self) -> Selected {
         frontmost_pid()
             .and_then(|pid| selected_text_from(unsafe { AXUIElement::new_application(pid) }))
             .or_else(|| selected_text_from(unsafe { AXUIElement::new_system_wide() }))
+            .map_or(Selected::Unavailable, Selected::Text)
     }
 }
 

@@ -86,6 +86,8 @@ pub fn run() {
         Arc::new(NoLauncher),
         // The harness runs everything on the main thread already.
         Arc::new(HereIsFine),
+        // The walkthrough refuses nothing: it is here to exercise the paths.
+        None,
     ) else {
         eprintln!("no key injection");
         return;
