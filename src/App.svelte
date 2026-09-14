@@ -54,6 +54,15 @@
     invoke("search", { query: q });
   }
 
+  /// A failure deliberately survives this.
+  ///
+  /// An action that pastes hides the launcher before it does the work, so it
+  /// can only report a failure once the window is already gone, and whether
+  /// that report arrives before or after this reset is a race. Clearing it here
+  /// lost the reason perhaps half the time, which is how a broken paste came to
+  /// look like nothing happening at all. The message is carried to the next
+  /// activation instead, and cleared as soon as the user types, acts, or
+  /// presses Escape.
   function resetToRoot() {
     query = "";
     results = [];
@@ -61,7 +70,6 @@
     viewOwner = null;
     panelOpen = false;
     protocolError = false;
-    failure = null;
     working = false;
     runSearch("");
   }
@@ -153,9 +161,9 @@
 
     if (event.key === "Escape") {
       event.preventDefault();
+      failure = null;
       if (stack.length > 0) {
         stack = stack.slice(0, -1);
-        failure = null;
         if (stack.length === 0) viewOwner = null;
       } else if (query.length > 0) {
         query = "";
@@ -309,7 +317,7 @@
   >
     <Command.Input
       bind:ref={inputEl}
-      bind:value={() => query, (q) => ((query = q), (pickedId = ""))}
+      bind:value={() => query, (q) => ((query = q), (pickedId = ""), (failure = null))}
       placeholder="Search for apps and commands..."
       spellcheck={false}
       autocomplete="off"
