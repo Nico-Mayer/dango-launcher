@@ -91,5 +91,8 @@
     Notepad opened (shown as `Editor` on a German Windows), one process, so the
     Windows name was the one matched. Note the shown name of Windows Terminal is
     `Terminal` in `shell:AppsFolder`, not `Windows Terminal`.
-- [ ] 5.3 Confirm CI is green on `windows-latest` and `macos-latest`, including
+- [x] 5.3 Confirm CI is green on `windows-latest` and `macos-latest`, including
       clippy, before the change is considered done.
+  - Confirmed by the author on the run for main at `2702ada`: both jobs green,
+    clippy included. The run before it needed a rustfmt fix on two clipboard
+    files that had landed unformatted from macOS.
