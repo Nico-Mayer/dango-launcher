@@ -182,6 +182,11 @@ context: |
     for behaviour it genuinely does not provide, such as the launcher's
     two-stage Escape, and say in the design what the primitive lacked and why
     the patch was necessary.
+  - Anything the user reads is written with the `ux-writing` skill and against
+    the `interface-copy` spec: sentence case except command and extension
+    titles, verb-first action labels, failures that say what failed and what to
+    do, no internal identifiers or error codes on screen. Every new or changed
+    user-facing string is quoted in the change's design.
 
 rules:
   proposal:
@@ -199,6 +204,7 @@ rules:
     - Call out anything that locks in the extension manifest or view protocol, since those are versioned contracts.
     - A change that adds or reworks UI names the Bits UI primitive each surface is built on. If a primitive is patched or a surface is hand-rolled, state what the primitive lacked and why.
     - Skip the design artifact for changes that introduce no new architectural decision.
+    - A change that adds or edits text the user can see quotes every new or changed string, written with the ux-writing skill and checked against openspec/specs/interface-copy/spec.md.
 
   tasks:
     - Group tasks so that each group leaves the app in a runnable state.
