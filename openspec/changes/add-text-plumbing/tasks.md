@@ -308,11 +308,22 @@ the non-elevated harness.
     record id, non-URL quicklinks were accepted, and removing a root item pushed
     an extension list over root search. Retests passed after each fix. The final
     Rust suite has 421 passing tests, with clippy and Svelte check clean.
-- [ ] 9.2 Walk every scenario in the four spec files on Windows
+- [x] 9.2 Walk every scenario in the four spec files on Windows
   - The selection-and-paste scenarios pass live through the harness (18 of 18,
     see group 6). The snippets, quicklinks, and templates scenarios run through
     the launcher's own interface, which the harness cannot drive, the same manual
     check 9.1 is on macOS. Outstanding: those and the elevated case (9.9).
+  - Completed. The harness re-run on the fixed code (1.6) passes 20 of 20 with
+    the elevated case included, text visible in 3 to 6ms and `insert` back in
+    about 124ms with the restore. The author walked the launcher paths on the
+    dev build: create with live preview, immediate root search alongside an
+    application, argument prompt and submission, abandoning the form, copy
+    into the clipboard history, refusing an unparseable template and an empty
+    name, refusing a non-URL, query encoding (`a b&c` reached the browser as
+    `q=a%20b%26c`), a URL with no handler leaving the launcher open with a
+    message, and removal. The record files were byte-identical to a snapshot
+    taken before the walk once the test records were removed, and `dango.log`
+    gained no entries.
 - [x] 9.3 Confirm on both platforms that the user's clipboard is identical before and after a paste, for text and for an image
   - macOS: verified by the driven harness for both content types. Text comes back identical, and a PNG on the clipboard is still there, byte for byte, after an insertion. The image path is a separate branch from text and had never been run live.
 - [x] 9.4 Confirm on both platforms that no paste, restore, or selection capture appears in the clipboard history or reorders it, while the watcher is running
