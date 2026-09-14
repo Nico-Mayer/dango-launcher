@@ -63,4 +63,48 @@
   - Measured over four samples of a ~1,000 character selection in Notepad:
     10.1ms, 1.66ms, 1.67ms, 1.65ms. The first call pays for COM initialisation.
     Well inside both the 200ms deadline and the 300ms budget.
-- [ ] 5.5 Verify on macOS: reading a selection, pasting, snippets, and keyword expansion all behave exactly as before, since the trait they share changed shape
+- [x] 5.5 Verify on macOS: reading a selection, pasting, snippets, and keyword expansion all behave exactly as before, since the trait they share changed shape
+  - The baseline did not build on macOS, which is the finding this task exists
+    to catch. `MacSelection::selected_text` still returned `Option<String>`
+    against a trait that now returns `Selected`, and the macOS walkthrough had
+    never been given the `refuses` argument the Windows one got. Both are the
+    macOS half of work ticked off in 2.1 and 4.2: only the Windows side is
+    compiled on Windows, so neither error could show up there. Fixed as 2.1
+    specifies, mapping `None` to `Unavailable`, not worked around.
+  - Verified with the walkthrough harness against TextEdit, which drives the
+    real `TextExchange`: 20 checks, all passing, with the AI and exclusion legs
+    enabled. Insertion, the clipboard restore, an image on the clipboard, the
+    declared writes, and the caret all behave as they did.
+  - The read takes the direct route, measured rather than assumed. The clipboard
+    fallback declares its sentinel write to the history and the accessibility
+    route declares nothing, so a read that declares nothing never reached the
+    clipboard. The harness now asserts that, which is what tells this apart from
+    a fallback that happens to return the same text.
+  - The launcher stays on screen. `MacSelection::needs_foreground` is false, so
+    `selection()` never dismisses, and two tests now pin it: one that a direct
+    route which does not need the foreground leaves the launcher up, the mirror
+    of the existing Windows-shaped one, and one on `MacSelection` itself.
+    Nothing had pinned either before.
+  - A template using `{{ selection }}` renders and arrives, and a typed keyword
+    still expands in place with the clipboard given back. Keyword expansion goes
+    through `expand`, which nothing in this harness reached before.
+  - An AI command reading the selection answers, through Ollama on `gemma3:4b`,
+    driving the whole composition: read the selection, render the shipped
+    Improve Writing prompt around it, ask the model.
+  - The exclusion list was verifiable after all. Zed exposes nothing through
+    `AXSelectedText` on macOS either, with a full selection made and the
+    application element asked directly, so it is the same case it was on
+    Windows. Named in `selection.excluded-applications` it produced exactly
+    "Dango can't read the selection in Zed. Copy the text first, then run this
+    command." and declared no clipboard write, so no keystroke was sent.
+  - One asymmetry worth stating, deliberate rather than a regression. On macOS
+    an empty selection still falls through to the clipboard: `AXSelectedText`
+    answers with an empty string, which is filtered to `None` and so becomes
+    `Unavailable`. Windows tells those two apart and macOS does not, which is
+    exactly what 2.1 asked for in keeping macOS identical, but it does mean the
+    "answered, but empty" rule the spec states is only live on Windows.
+  - The harness had its own bug, found while adding the Zed check and fixed:
+    `focus` waited on `NSWorkspace` with a sleep, and the frontmost application
+    only changes while a run loop is pumping, so once Zed took the front it
+    could never observe TextEdit coming back. It now pumps, which is the trap
+    the selection spike had already recorded.
