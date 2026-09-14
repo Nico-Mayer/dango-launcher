@@ -44,7 +44,8 @@ template, change either afterwards, and delete it, without leaving the launcher.
 
 - **WHEN** the user removes a quicklink
 - **THEN** it no longer appears in root search
-- **AND** the list the user was looking at stays open
+- **AND** the launcher surface the user was looking at stays open
+- **AND** a root-search query remains unchanged
 
 ### Requirement: Quicklinks are found in root search
 
