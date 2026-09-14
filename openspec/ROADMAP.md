@@ -134,8 +134,24 @@ better served by a file that can be copied, and the constraint in `config.yaml`
 was amended to say so. And the answer is shown by default rather than pasted;
 pasting and copying are per-command settings and actions on the result.
 
+A fourth provider kind arrived with it that the plan above did not have: `cli`,
+which runs a program that takes a prompt and prints an answer. It is how a
+ChatGPT or Claude subscription pays for a transform, through the client the
+vendor ships and the user has already signed in to, rather than through API
+credit. It needs no key, streams what the program prints, runs it in an empty
+directory, and takes the whole process tree down when an answer is abandoned.
+
 Left out: markdown rendering of the answer, model discovery, and any accounting
 of tokens or cost.
+
+Carried forward, unverified: no hosted provider has been exercised on either
+platform, because there is no key with credit on one. Ollama and the `cli` kind
+were both driven end to end on Windows and macOS, so what is untested is
+narrowly the request path to a hosted endpoint. The failures around it are
+covered: missing key, rejected key, unknown model, unreachable and rate limited
+all have tests, and the missing-key message was shown live on both platforms.
+Tasks 6.1 and 6.2 of `add-ai-commands` stay unticked for this, and are the first
+thing to run once a key exists.
 
 ### M7 - polish
 
