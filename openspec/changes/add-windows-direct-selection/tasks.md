@@ -30,13 +30,29 @@
   - The first attempt at this failed and toggled Zed's comments again, which is
     what found the foreground bug now recorded in the design: the refusal was
     being decided while the launcher held the foreground, so it never matched.
-- [ ] 5.2 Verify on Windows: Notepad, a browser text field, and Windows Terminal each read correctly, and that the clipboard holds what it held before in every case
+- [x] 5.2 Verify on Windows: Notepad, a browser text field, and Windows Terminal each read correctly, and that the clipboard holds what it held before in every case
   - Notepad: done, end to end. A selection was read and a command routed through
     it answered, with the clipboard holding what it held before the read.
   - Browser text field: done through the probe. The address bar answers with its
-    selection in about 2ms.
-  - Windows Terminal: not exercised. It is not installed on this machine, so
-    `wt.exe` could not be started.
+    selection in about 2ms, and browser page content answers through
+    `Chrome_RenderWidgetHostHWND` rather than not at all, which corrects the
+    earlier note that page content exposes nothing: the element sampled then was
+    a video player, not text.
+  - Windows Terminal: done through the probe, with two caveats worth keeping.
+    Its focused element is `TermControl/Text` and it does expose a text pattern,
+    answering with the buffer selection in 1.7ms to 11ms.
+    - A selection made at the prompt with Shift+Home is invisible to it. That is
+      a PSReadLine input selection, which the shell renders itself; UI Automation
+      reports the terminal buffer, so only a buffer selection (mark mode, or the
+      mouse) is read. Not a defect, but it means "selected" in a terminal means
+      something narrower than elsewhere.
+    - The end-to-end through the launcher was not driven. Mark mode holds the
+      keyboard, so the launcher chord never reaches the system while a buffer
+      selection is being made, and a mouse-driven attempt was abandoned after it
+      clicked on the wrong window. The read itself is the part this change
+      touches, and that is measured above.
+  - The window is titled by its profile ("PowerShell"), not "Terminal", which is
+    why an earlier search for it found nothing and reported it as not installed.
 - [x] 5.3 Verify on Windows: an application with nothing selected reports an empty selection without a keystroke, and one with no text pattern still works through the fallback
   - Nothing selected: a collapsed cursor in Notepad answers with an empty range,
     which is an empty selection rather than the whole document. Worth stating
