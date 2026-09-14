@@ -134,13 +134,13 @@
 
 ## 8. Verify on Windows
 
-- [ ] 8.1 Repeat 7.1 on Windows, checking "Show in File Explorer", "Empty
+- [x] 8.1 Repeat 7.1 on Windows, checking "Show in File Explorer", "Empty
       Recycle Bin", and Ctrl in place of Cmd.
-- [ ] 8.2 Run Left Half with an elevated window focused and confirm the banner
+- [x] 8.2 Run Left Half with an elevated window focused and confirm the banner
       reads the "running as administrator" message; repeat for pasting a
       history entry into the elevated window.
-- [ ] 8.3 Register Alt+Space in another app, start Dango, and confirm the tray
+- [x] 8.3 Register Alt+Space in another app, start Dango, and confirm the tray
       reads "Alt+Space is in use, set launcher.hotkey".
-- [ ] 8.4 Repeat 7.3 and 7.4 on Windows.
+- [x] 8.4 Repeat 7.3 and 7.4 on Windows.
 - [x] 8.5 Confirm CI is green on both `windows-latest` and `macos-latest`
       before the change is considered done.
