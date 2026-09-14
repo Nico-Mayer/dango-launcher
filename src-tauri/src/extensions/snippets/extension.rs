@@ -42,6 +42,13 @@ fn icon(kind: Kind) -> String {
     }
 }
 
+fn tint(kind: Kind) -> &'static str {
+    match kind {
+        Kind::Snippet => "green",
+        Kind::Quicklink => "pink",
+    }
+}
+
 pub const COMMAND_CREATE: &str = "create";
 pub const COMMAND_SEARCH: &str = "search";
 
@@ -499,7 +506,7 @@ fn failure_tree(message: &str, kind: Kind) -> ViewTree {
     }
 }
 
-fn manifest(kind: Kind) -> Manifest {
+pub(crate) fn manifest(kind: Kind) -> Manifest {
     let (name, create, search, keyword) = match kind {
         Kind::Snippet => ("Snippets", "Create Snippet", "Search Snippets", "snippet"),
         Kind::Quicklink => (
@@ -514,6 +521,7 @@ fn manifest(kind: Kind) -> Manifest {
         id: extension_id(kind).into(),
         name: name.into(),
         icon: Some(icon(kind)),
+        tint: Some(tint(kind).into()),
         commands: vec![
             CommandDecl {
                 id: COMMAND_CREATE.into(),

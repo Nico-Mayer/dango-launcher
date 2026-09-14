@@ -13,6 +13,8 @@ pub use auth::{AuthError, AuthFile, Keys};
 pub use cli::CliClient;
 pub use client::GenAiClient;
 pub use commands::EXTENSION_ID;
+#[cfg(test)]
+pub(crate) use extension::manifest;
 pub use extension::{AiExtension, Runner};
 pub use provider::{AiError, Chunks, Completions, Next, ProviderKind, Request, Thinking};
 

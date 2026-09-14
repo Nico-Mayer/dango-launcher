@@ -15,6 +15,8 @@ export interface ResultItem {
   title: string;
   subtitle?: string | null;
   icon?: string | null;
+  /// The colour its extension named, or nothing for one that named none.
+  tint?: string | null;
   actions: ActionDto[];
   matchPositions: number[];
 }

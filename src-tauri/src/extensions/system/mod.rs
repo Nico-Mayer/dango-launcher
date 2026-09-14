@@ -85,12 +85,13 @@ impl Extension for SystemExtension {
     }
 }
 
-fn manifest() -> Manifest {
+pub(crate) fn manifest() -> Manifest {
     Manifest {
         manifest_version: 1,
         id: EXTENSION_ID.into(),
         name: "System".into(),
         icon: None,
+        tint: Some("red".into()),
         commands: vec![
             command(
                 COMMAND_LOCK,

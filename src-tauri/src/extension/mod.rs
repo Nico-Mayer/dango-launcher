@@ -146,6 +146,19 @@ impl ExtensionHost {
             .collect()
     }
 
+    /// The tint every registered extension declared, keyed by extension id.
+    /// Declared once and never changed at runtime, so the caller can hold the
+    /// result rather than asking again per query.
+    pub fn tints(&self) -> HashMap<String, String> {
+        self.extensions
+            .values()
+            .filter_map(|extension| {
+                let manifest = extension.manifest();
+                Some((manifest.id.clone(), manifest.tint.clone()?))
+            })
+            .collect()
+    }
+
     /// Finds the code behind a qualified command identity. A command whose
     /// extension was disabled is gone from the registry, so this answers `None`
     /// and the caller reports it as unavailable.
@@ -373,6 +386,7 @@ mod tests {
                     id: id.into(),
                     name: id.into(),
                     icon: None,
+                    tint: None,
                     commands: vec![CommandDecl {
                         id: command_id.into(),
                         title: command_id.into(),
@@ -501,6 +515,7 @@ mod tests {
                 id: "svc".into(),
                 name: "svc".into(),
                 icon: None,
+                tint: None,
                 commands: vec![],
                 preferences: vec![],
                 root_items: false,
@@ -575,6 +590,7 @@ mod tests {
                 id: self.0.into(),
                 name: self.0.into(),
                 icon: None,
+                tint: None,
                 commands: vec![],
                 preferences: vec![],
                 root_items: true,
@@ -695,6 +711,7 @@ mod tests {
                 id: "clip".into(),
                 name: "Clipboard".into(),
                 icon: None,
+                tint: None,
                 commands: vec![],
                 preferences: vec![],
                 root_items: false,

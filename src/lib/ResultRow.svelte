@@ -2,6 +2,7 @@
   import { convertFileSrc } from "@tauri-apps/api/core";
   import Icon, { namedIcon } from "./Icon.svelte";
   import { highlight } from "./highlight";
+  import { tintClasses } from "./tint";
 
   interface Props {
     title: string;
@@ -11,6 +12,9 @@
     /// Character offsets in the title that matched the query. Empty where the
     /// list does not rank, such as a view a command pushed.
     matchPositions?: number[];
+    /// The colour the contributing extension named, drawn behind a named icon
+    /// so results from different extensions are told apart at a glance.
+    tint?: string | null;
     /// Whether the icon is content in its own right, as a copied image is,
     /// rather than a symbol standing for the row. Content gets a frame and a
     /// little more room, because one screenshot has to be told from another.
@@ -23,14 +27,19 @@
     icon = null,
     matchPositions = [],
     iconIsContent = false,
+    tint = null,
   }: Props = $props();
 
   const named = $derived(namedIcon(icon));
   const file = $derived(!named && icon ? convertFileSrc(icon) : null);
+  const tinted = $derived(tintClasses(tint));
 </script>
 
 {#if named}
-  <div class="text-foreground-alt flex size-8 shrink-0 items-center justify-center">
+  <div
+    class="flex size-8 shrink-0 items-center justify-center rounded-md {tinted ||
+      'text-foreground-alt'}"
+  >
     <Icon name={named} size={20} />
   </div>
 {:else if file}

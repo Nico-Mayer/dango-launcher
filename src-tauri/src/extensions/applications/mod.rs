@@ -22,6 +22,20 @@ pub const ACTION_LAUNCH: &str = "launch";
 pub const ACTION_REVEAL: &str = "reveal";
 pub const ACTION_COPY_PATH: &str = "copy-path";
 
+pub(crate) fn manifest() -> Manifest {
+    Manifest {
+        manifest_version: 1,
+        id: EXTENSION_ID.into(),
+        name: "Applications".into(),
+        icon: None,
+        tint: None,
+        commands: vec![],
+        preferences: vec![],
+        root_items: true,
+        services: true,
+    }
+}
+
 pub struct ApplicationsExtension {
     manifest: Manifest,
     index: Arc<AppIndex>,
@@ -36,16 +50,7 @@ impl ApplicationsExtension {
             icons: icons.clone(),
         });
         Self {
-            manifest: Manifest {
-                manifest_version: 1,
-                id: EXTENSION_ID.into(),
-                name: "Applications".into(),
-                icon: None,
-                commands: vec![],
-                preferences: vec![],
-                root_items: true,
-                services: true,
-            },
+            manifest: manifest(),
             index,
             icons,
             provider,

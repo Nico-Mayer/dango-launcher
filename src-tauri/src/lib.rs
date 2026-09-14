@@ -56,13 +56,15 @@ struct ResultItem {
     title: String,
     subtitle: Option<String>,
     icon: Option<String>,
+    tint: Option<String>,
     actions: Vec<protocol::Action>,
     match_positions: Vec<usize>,
 }
 
-impl From<Candidate> for ResultItem {
-    fn from(c: Candidate) -> Self {
+impl ResultItem {
+    fn new(c: Candidate, tints: &TintTable) -> Self {
         Self {
+            tint: tints.0.get(&c.extension_id).cloned(),
             extension_id: c.extension_id,
             id: c.id,
             title: c.title,
@@ -73,6 +75,11 @@ impl From<Candidate> for ResultItem {
         }
     }
 }
+
+/// What each extension declared as its tint, so a result can be drawn in its
+/// owner's colour. Held apart from the host, whose lock has no business on the
+/// path that streams results.
+struct TintTable(std::collections::HashMap<String, String>);
 
 #[derive(Clone, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -284,9 +291,14 @@ async fn search(app: tauri::AppHandle, query: String) {
     let mut rx = pipeline.query(query);
     tauri::async_runtime::spawn(async move {
         while let Some(results) = rx.recv().await {
+            let tints = app.state::<TintTable>();
             let payload = ResultsPayload {
                 query: results.query,
-                items: results.items.into_iter().map(ResultItem::from).collect(),
+                items: results
+                    .items
+                    .into_iter()
+                    .map(|c| ResultItem::new(c, &tints))
+                    .collect(),
                 complete: results.complete,
             };
             if app.emit_to("main", EVENT_RESULTS, payload).is_err() {
@@ -359,6 +371,45 @@ fn inspect_template(source: String) -> TemplateInspection {
             arguments: Vec::new(),
             error: Some(error.to_string()),
         },
+    }
+}
+
+#[cfg(test)]
+mod tint_tests {
+    use super::{Candidate, ResultItem, TintTable};
+
+    fn candidate(extension_id: &str) -> Candidate {
+        Candidate {
+            extension_id: extension_id.into(),
+            id: format!("{extension_id}.one"),
+            title: "One".into(),
+            subtitle: None,
+            icon: Some("icon:lock".into()),
+            keywords: vec![],
+            alias: None,
+            source: crate::search::Source::Command,
+            actions: vec![],
+            match_positions: vec![],
+        }
+    }
+
+    fn table() -> TintTable {
+        TintTable(std::collections::HashMap::from([(
+            "dango.system".to_string(),
+            "red".to_string(),
+        )]))
+    }
+
+    #[test]
+    fn a_result_carries_the_tint_its_extension_declared() {
+        let item = ResultItem::new(candidate("dango.system"), &table());
+        assert_eq!(item.tint.as_deref(), Some("red"));
+    }
+
+    #[test]
+    fn a_result_from_an_untinted_extension_carries_none() {
+        let item = ResultItem::new(candidate("dango.applications"), &table());
+        assert_eq!(item.tint, None);
     }
 }
 
@@ -1267,6 +1318,8 @@ pub fn run() {
             );
             app.manage(pipeline);
             app.manage(frecency);
+
+            app.manage(TintTable(host.tints()));
 
             // Shared rather than owned by the invoker, because resolving a
             // command has to see the host as it is now: an extension disabled

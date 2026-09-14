@@ -383,12 +383,13 @@ fn argument_tree(command: &AiCommand, template: &Template) -> ViewTree {
     }
 }
 
-fn manifest(commands: &[AiCommand]) -> Manifest {
+pub(crate) fn manifest(commands: &[AiCommand]) -> Manifest {
     Manifest {
         manifest_version: 1,
         id: EXTENSION_ID.into(),
         name: "AI".into(),
         icon: Some(format!("{NAMED_ICON}{ICON}")),
+        tint: Some("purple".into()),
         commands: commands
             .iter()
             .map(|command| CommandDecl {

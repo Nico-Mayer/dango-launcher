@@ -392,6 +392,7 @@
                 subtitle={item.subtitle}
                 icon={item.icon}
                 matchPositions={item.matchPositions}
+                tint={item.tint}
               />
             </Command.Item>
           {/each}

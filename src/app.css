@@ -16,6 +16,19 @@
   --accent: hsl(204 94% 94%);
   --accent-foreground: hsl(204 80% 16%);
   --destructive: hsl(347 77% 50%);
+
+  --tint-red: hsl(0 94% 94%);
+  --tint-red-foreground: hsl(0 80% 16%);
+  --tint-amber: hsl(45 94% 94%);
+  --tint-amber-foreground: hsl(45 80% 16%);
+  --tint-green: hsl(142 94% 94%);
+  --tint-green-foreground: hsl(142 80% 16%);
+  --tint-blue: hsl(204 94% 94%);
+  --tint-blue-foreground: hsl(204 80% 16%);
+  --tint-purple: hsl(270 94% 94%);
+  --tint-purple-foreground: hsl(270 80% 16%);
+  --tint-pink: hsl(330 94% 94%);
+  --tint-pink-foreground: hsl(330 80% 16%);
 }
 
 .dark {
@@ -31,6 +44,19 @@
   --accent: hsl(204 80% 16%);
   --accent-foreground: hsl(204 94% 94%);
   --destructive: hsl(347 77% 50%);
+
+  --tint-red: hsl(0 80% 16%);
+  --tint-red-foreground: hsl(0 94% 94%);
+  --tint-amber: hsl(45 80% 16%);
+  --tint-amber-foreground: hsl(45 94% 94%);
+  --tint-green: hsl(142 80% 16%);
+  --tint-green-foreground: hsl(142 94% 94%);
+  --tint-blue: hsl(204 80% 16%);
+  --tint-blue-foreground: hsl(204 94% 94%);
+  --tint-purple: hsl(270 80% 16%);
+  --tint-purple-foreground: hsl(270 94% 94%);
+  --tint-pink: hsl(330 80% 16%);
+  --tint-pink-foreground: hsl(330 94% 94%);
 }
 
 @theme inline {
@@ -46,6 +72,18 @@
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
+  --color-tint-red: var(--tint-red);
+  --color-tint-red-foreground: var(--tint-red-foreground);
+  --color-tint-amber: var(--tint-amber);
+  --color-tint-amber-foreground: var(--tint-amber-foreground);
+  --color-tint-green: var(--tint-green);
+  --color-tint-green-foreground: var(--tint-green-foreground);
+  --color-tint-blue: var(--tint-blue);
+  --color-tint-blue-foreground: var(--tint-blue-foreground);
+  --color-tint-purple: var(--tint-purple);
+  --color-tint-purple-foreground: var(--tint-purple-foreground);
+  --color-tint-pink: var(--tint-pink);
+  --color-tint-pink-foreground: var(--tint-pink-foreground);
   --radius-card: 0.875rem;
   --radius-button: 0.5rem;
 }

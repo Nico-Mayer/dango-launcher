@@ -9,6 +9,11 @@ pub const SUPPORTED_MANIFEST_VERSION: u32 = 1;
 /// anything without the prefix is a path to an image file.
 pub const NAMED_ICON: &str = "icon:";
 
+/// The colour names the launcher's palette holds. Kept in step with the tokens
+/// in `src/app.css` and the registry in `src/lib/tint.ts` by the test over the
+/// built-in manifests; a name outside it renders with no tint at all.
+pub const TINTS: [&str; 6] = ["red", "amber", "green", "blue", "purple", "pink"];
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Manifest {
     pub manifest_version: u32,
@@ -17,6 +22,11 @@ pub struct Manifest {
     /// Either `icon:<name>` for a named icon or a path to an image file.
     #[serde(default)]
     pub icon: Option<String>,
+    /// One colour name from the launcher's palette, drawn behind the named
+    /// icons of everything this extension contributes. A name the palette does
+    /// not hold is presented untinted rather than refused.
+    #[serde(default)]
+    pub tint: Option<String>,
     #[serde(default)]
     pub commands: Vec<CommandDecl>,
     #[serde(default)]
@@ -167,6 +177,7 @@ mod tests {
             id: "test".into(),
             name: "Test".into(),
             icon: None,
+            tint: None,
             commands,
             preferences: vec![],
             root_items: false,

@@ -132,12 +132,13 @@ pub fn preference_declarations() -> Vec<PreferenceDecl> {
     manifest().preferences
 }
 
-fn manifest() -> Manifest {
+pub(crate) fn manifest() -> Manifest {
     Manifest {
         manifest_version: 1,
         id: EXTENSION_ID.into(),
         name: "Clipboard History".into(),
         icon: Some(format!("{NAMED_ICON}clipboard-list")),
+        tint: Some("amber".into()),
         commands: vec![CommandDecl {
             id: COMMAND_HISTORY.into(),
             title: "Clipboard History".into(),

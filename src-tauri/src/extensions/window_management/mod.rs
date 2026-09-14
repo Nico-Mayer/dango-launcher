@@ -200,12 +200,13 @@ impl Command for Arrange {
     }
 }
 
-fn manifest() -> Manifest {
+pub(crate) fn manifest() -> Manifest {
     Manifest {
         manifest_version: 1,
         id: EXTENSION_ID.into(),
         name: "Window Management".into(),
         icon: None,
+        tint: Some("blue".into()),
         commands: vec![
             command(
                 COMMAND_LEFT_HALF,
