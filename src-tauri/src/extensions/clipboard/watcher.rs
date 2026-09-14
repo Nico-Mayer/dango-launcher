@@ -11,7 +11,7 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use super::history::{Bounds, Content, History};
-use super::source::{Attribution, ClipboardSource, image_dimensions};
+use super::source::{image_dimensions, Attribution, ClipboardSource};
 
 /// Markers meaning "not for history". Some applications set one; the spike
 /// found a mainstream password manager that sets none, so nothing depends on

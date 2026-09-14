@@ -15,7 +15,9 @@ use clipboard_rs::{Clipboard, ClipboardContext, RustImageData};
 /// decoded. Used to recognise Dango's own image writes, which come back from
 /// the pasteboard re-encoded rather than byte for byte.
 pub fn image_dimensions(bytes: &[u8]) -> Option<(u32, u32)> {
-    RustImageData::from_bytes(bytes).ok().map(|image| image.get_size())
+    RustImageData::from_bytes(bytes)
+        .ok()
+        .map(|image| image.get_size())
 }
 
 /// Which applications could have put the current contents there.
