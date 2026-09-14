@@ -45,7 +45,27 @@ expensive to answer late.
     keystroke first, which is what a hotkey does. The target window also asserts
     the foreground itself on open, standing in for the app the user was in.
 
-- [ ] 1.6 On Windows, confirm the clipboard round trip reads a selection from a native app, a browser, an Electron app, and a terminal
+- [x] 1.6 On Windows, confirm the clipboard round trip reads a selection from a native app, a browser, an Electron app, and a terminal
+  - Browser (Brave), Electron (Teams), and terminal (Windows Terminal) confirmed
+    live with a `<sel>{{ selection }}</sel>` snippet. Over ten traced runs in
+    Brave and Teams the copy landed 12 to 39ms after the keystroke and a
+    clipboard marker seeded beforehand survived every run. In the terminal the
+    wrapped text is typed after the word rather than replacing it, because a
+    terminal's mouse selection is not an input selection; the selection itself
+    was read correctly.
+  - **Two defects found and fixed.** First, the launcher insert restored the
+    clipboard straight after the `WM_NULL` acknowledgement, and in Brave and
+    Teams the bare user clipboard was pasted instead of the snippet: a sent
+    message is handled before the posted paste keystroke, and a Chromium
+    renderer reads the clipboard later still, so the acknowledgement is a
+    liveness signal, not a paste acknowledgement. The insert now waits the
+    same 120ms grace the keyword expansion already did. Second, a read or write
+    that landed while another window held the clipboard open (a paste target
+    reading it, or the clipboard history service reading a change) failed with
+    access denied and was silently dropped, so a restore was skipped or lost
+    and the clipboard ended up holding the pasted text. The adapter now waits
+    up to 250ms while the clipboard is busy; a desktop-only test holds the
+    clipboard from a second process to reproduce it.
   - The harness reads a selection from its own WinForms edit control, which is a
     real Win32 native control and a .NET application at once. Browser, Electron,
     and terminal still need a manual pass, since those depend on each app's own
@@ -201,6 +221,10 @@ the non-elevated harness.
   - Verified live against the WinForms (.NET) target: the acknowledgement returns
     only after the paste is handled, so the paste always read the intended
     clipboard and never the decoy written right after (marker 10, decoy 0).
+  - Later corrected by 1.6: this holds for a WinForms control, which pastes
+    synchronously on its UI thread, but not for Chromium-based applications,
+    which read the clipboard from a renderer after the acknowledgement. A grace
+    before the restore is what makes the paste land first.
 - [x] 6.6 Report the elevated-window ceiling as a clear failure rather than a silent one, verified by pasting into an elevated window
   - **A runtime bug the CI build could not catch.** The first version probed the
     target with `OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION)` and read a
