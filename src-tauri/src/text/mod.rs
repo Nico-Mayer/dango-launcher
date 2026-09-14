@@ -1156,6 +1156,31 @@ mod tests {
         assert!(keys.events().is_empty(), "still no keystroke");
     }
 
+    /// The mirror of the test above, and the macOS shape. There the launcher is
+    /// a panel that never took activation, so the application being asked about
+    /// is already frontmost: hiding it would be a regression the user watches
+    /// happen for no reason.
+    #[test]
+    fn a_route_that_does_not_need_the_foreground_leaves_the_launcher_up() {
+        let launcher = Arc::new(FakeLauncher::default());
+        let exchange = TextExchange::new(
+            holding("what the user had"),
+            FakeKeys::working(),
+            FakeHandoff::working(),
+            Some(Arc::new(FakeDirect(Selected::Text("selected".into())))),
+            Arc::new(RecordingWrites::default()),
+            launcher.clone(),
+            None,
+        );
+
+        assert_eq!(exchange.selection().unwrap().as_deref(), Some("selected"));
+        assert_eq!(
+            launcher.dismissals(),
+            0,
+            "the launcher went off screen to read a selection it could already see"
+        );
+    }
+
     /// A refusal is a message, and a message needs the launcher on screen to
     /// appear on. So it is decided before the launcher moves, which it can be:
     /// the platform names the application behind it without moving anything.

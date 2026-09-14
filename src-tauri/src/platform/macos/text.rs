@@ -224,3 +224,16 @@ unsafe fn copy_attribute(
         other => Err(other),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The panel never took activation, so the application being asked about is
+    /// already the frontmost one. Windows answers the opposite, and getting
+    /// this wrong here would hide the launcher on every selection read.
+    #[test]
+    fn reading_a_selection_does_not_need_the_launcher_out_of_the_way() {
+        assert!(!MacSelection.needs_foreground());
+    }
+}

@@ -26,9 +26,15 @@ use clipboard_rs::common::RustImage;
 use clipboard_rs::{Clipboard, ClipboardContext};
 use enigo::{Direction, Enigo, Key, Keyboard, Settings};
 use objc2_app_kit::NSWorkspace;
+use objc2_foundation::{NSDate, NSRunLoop};
 
 use dango_lib::extensions::clipboard::{Content, CrateClipboard};
+use dango_lib::config::Config;
+use dango_lib::extensions::ai::{
+    Completions, GenAiClient, Next, ProviderKind, Request, Thinking,
+};
 use dango_lib::platform;
+use dango_lib::templates::{Template, Values};
 use dango_lib::text::{HereIsFine, Launcher, OwnWrites, TextExchange};
 
 const SCRATCH: &str = "/tmp/dango-walkthrough.txt";
@@ -135,6 +141,10 @@ pub fn run() {
     harness.the_caret_lands_where_asked();
     harness.the_selection_is_read();
     harness.an_empty_selection_is_reported_as_empty();
+    harness.a_selection_template_renders_and_arrives();
+    harness.a_keyword_expands_in_place();
+    harness.an_ai_command_reads_the_selection_and_answers();
+    harness.a_named_application_is_refused_rather_than_typed_at();
     harness.insertion_is_prompt();
 
     let _ = harness.clipboard.set_text(String::new());
@@ -192,13 +202,7 @@ impl Harness {
     /// Nothing may be read without this answering true.
     fn focus(&mut self) -> bool {
         let _ = Command::new("open").arg("-e").arg(SCRATCH).status();
-        for _ in 0..10 {
-            std::thread::sleep(Duration::from_millis(200));
-            if frontmost() == "TextEdit" {
-                return true;
-            }
-        }
-        false
+        wait_for_frontmost("TextEdit")
     }
 
     fn clear(&mut self) -> bool {
@@ -474,7 +478,13 @@ impl Harness {
         self.chord('a');
         std::thread::sleep(Duration::from_millis(250));
 
+        // Which route answered, observably. The clipboard fallback declares
+        // its sentinel write to the history; the accessibility route declares
+        // nothing because it touches nothing. So a read that declares nothing
+        // is a read that never reached the clipboard.
+        let declared_before = self.declared.count();
         let read = self.exchange.selection();
+        let declared = self.declared.count() - declared_before;
 
         match read {
             Ok(Some(text)) => {
@@ -492,6 +502,11 @@ impl Harness {
                     after == USER_CLIPBOARD,
                     format!("the clipboard holds {after:?}"),
                 );
+                self.check(
+                    "the selection is read directly, without the clipboard",
+                    declared == 0,
+                    format!("declared {declared} clipboard writes, expected none"),
+                );
             }
             Ok(None) => self.check(
                 "the selection comes back",
@@ -500,6 +515,106 @@ impl Harness {
             ),
             Err(error) => self.check("the selection comes back", false, format!("{error}")),
         }
+    }
+
+    /// The composition snippets and quicklinks actually perform: read the
+    /// selection, render a template that asks for it, insert the result. The
+    /// trait underneath `selection()` changed shape, so this is the path that
+    /// has to still work, not just the read on its own.
+    fn a_selection_template_renders_and_arrives(&mut self) {
+        println!("-- a template that asks for the selection still renders");
+        if !self.clear() {
+            self.check("TextEdit is drivable", false, "could not focus it".into());
+            return;
+        }
+        if !self.focus() {
+            return;
+        }
+        let _ = self.enigo.text("quoted material");
+        std::thread::sleep(Duration::from_millis(300));
+        self.set_user_clipboard();
+        self.chord('a');
+        std::thread::sleep(Duration::from_millis(250));
+
+        let template = Template::parse("Re: {{ selection }}").expect("a valid template");
+        self.check(
+            "the template declares that it uses the selection",
+            template.uses("selection"),
+            "uses(\"selection\") was false".into(),
+        );
+
+        let values = Values {
+            selection: self.exchange.selection().ok().flatten(),
+            ..Default::default()
+        };
+        let Ok(rendered) = template.render(&values) else {
+            self.check("the template renders", false, "render failed".into());
+            return;
+        };
+        if let Err(error) = self.exchange.insert(&rendered.text, rendered.caret) {
+            self.check("the rendered text is inserted", false, format!("{error}"));
+            return;
+        }
+
+        let Some(landed) = self.contents() else {
+            self.check(
+                "the document could be read back",
+                false,
+                "TextEdit was not frontmost".into(),
+            );
+            return;
+        };
+        let lower = landed.to_lowercase();
+        self.check(
+            "the selection is interpolated into the template",
+            lower.contains("re: quoted material"),
+            format!("the document holds {}", Self::brief(&landed)),
+        );
+    }
+
+    /// Keyword expansion takes a different method from everything above:
+    /// `expand` backspaces over the typed keyword before it pastes, with no
+    /// launcher involved. Nothing else in this harness reaches it.
+    fn a_keyword_expands_in_place(&mut self) {
+        println!("-- a typed keyword still expands in place");
+        if !self.clear() {
+            self.check("TextEdit is drivable", false, "could not focus it".into());
+            return;
+        }
+        self.set_user_clipboard();
+        if !self.focus() {
+            return;
+        }
+        let _ = self.enigo.text(";sig");
+        std::thread::sleep(Duration::from_millis(300));
+
+        if let Err(error) = self.exchange.expand(4, "Nico Mayer, Nextron Systems", None) {
+            self.check("the expansion succeeds", false, format!("{error}"));
+            return;
+        }
+        std::thread::sleep(Duration::from_millis(300));
+
+        let after = self.clipboard.get_text().unwrap_or_default();
+        self.check(
+            "the expansion gives the clipboard back",
+            after == USER_CLIPBOARD,
+            format!("the clipboard holds {after:?}"),
+        );
+
+        let Some(landed) = self.contents() else {
+            self.check(
+                "the document could be read back",
+                false,
+                "TextEdit was not frontmost".into(),
+            );
+            return;
+        };
+        let lower = landed.to_lowercase();
+        self.check(
+            "the keyword is replaced by its expansion",
+            lower.contains("nextron systems") && !lower.contains(";sig"),
+            format!("the document holds {}", Self::brief(&landed)),
+        );
     }
 
     fn an_empty_selection_is_reported_as_empty(&mut self) {
@@ -525,6 +640,182 @@ impl Harness {
             "and leaves the clipboard alone",
             after == USER_CLIPBOARD,
             format!("the clipboard holds {after:?}"),
+        );
+    }
+
+    /// The whole AI path, end to end: select text, let the exchange read it,
+    /// render the shipped prompt around it, and ask a real model. Off by
+    /// default because it needs Ollama on this machine; set
+    /// `DANGO_WALKTHROUGH_AI` and optionally `DANGO_TEST_MODEL` to run it.
+    ///
+    /// The prompt mirrors the shipped Improve Writing command, which is not
+    /// public to a harness.
+    fn an_ai_command_reads_the_selection_and_answers(&mut self) {
+        println!("-- an AI command reading the selection still answers");
+        if std::env::var_os("DANGO_WALKTHROUGH_AI").is_none() {
+            println!("  SKIP  set DANGO_WALKTHROUGH_AI to run this (needs Ollama)");
+            return;
+        }
+        if !self.clear() {
+            self.check("TextEdit is drivable", false, "could not focus it".into());
+            return;
+        }
+        if !self.focus() {
+            return;
+        }
+        let _ = self.enigo.text("the report was wrote by him quick");
+        std::thread::sleep(Duration::from_millis(300));
+        self.set_user_clipboard();
+        self.chord('a');
+        std::thread::sleep(Duration::from_millis(250));
+
+        let prompt = Template::parse(
+            "Improve the writing below. Keep its meaning, its language, and roughly \
+             its length. Reply with the improved text only, as plain prose.\n\n{{ selection }}",
+        )
+        .expect("a valid prompt");
+
+        let values = Values {
+            selection: self.exchange.selection().ok().flatten(),
+            ..Default::default()
+        };
+        let read_something = values
+            .selection
+            .as_deref()
+            .is_some_and(|text| text.to_lowercase().contains("the report was wrote"));
+        self.check(
+            "the command reads the selection it will ask about",
+            read_something,
+            format!("read {:?}", values.selection),
+        );
+        if !read_something {
+            return;
+        }
+        let Ok(rendered) = prompt.render(&values) else {
+            self.check("the prompt renders", false, "render failed".into());
+            return;
+        };
+
+        let model = std::env::var("DANGO_TEST_MODEL").unwrap_or_else(|_| "gemma3:4b".into());
+        let Ok(runtime) = tokio::runtime::Runtime::new() else {
+            self.check("a runtime starts", false, "tokio refused".into());
+            return;
+        };
+        let client = GenAiClient::new(runtime.handle().clone());
+        let chunks = client.stream(Request {
+            provider: "local".into(),
+            kind: ProviderKind::Ollama,
+            base_url: None,
+            model: model.clone(),
+            thinking: Thinking::Off,
+            prompt: rendered.text,
+            key: None,
+            cli: None,
+        });
+
+        let mut answer = String::new();
+        let deadline = Instant::now() + Duration::from_secs(90);
+        let failure = loop {
+            match chunks.next(Duration::from_millis(200)) {
+                Next::Text(text) => answer.push_str(&text),
+                Next::Done => break None,
+                Next::Failed(error) => break Some(error.to_string()),
+                Next::Idle if Instant::now() > deadline => break Some("nothing in 90s".into()),
+                Next::Idle => {}
+            }
+        };
+
+        match failure {
+            Some(error) => self.check("the model answers", false, error),
+            None => self.check(
+                "the model answers about the selection",
+                !answer.trim().is_empty(),
+                format!("{model} answered {}", Self::brief(&answer)),
+            ),
+        }
+    }
+
+    /// The exclusion list, against the one application on this machine that
+    /// answers nothing through `AXSelectedText`. Off by default because it
+    /// needs Zed installed and brings it to the front; set
+    /// `DANGO_WALKTHROUGH_EXCLUDE` to run it.
+    ///
+    /// Zed is the same application the Windows half of this change had to
+    /// refuse, and it exposes no selection on either platform.
+    fn a_named_application_is_refused_rather_than_typed_at(&mut self) {
+        println!("-- a named application is refused rather than typed at");
+        if std::env::var_os("DANGO_WALKTHROUGH_EXCLUDE").is_none() {
+            println!("  SKIP  set DANGO_WALKTHROUGH_EXCLUDE to run this (needs Zed)");
+            return;
+        }
+
+        let config = match Config::parse(r#"{ "selection": { "excluded-applications": "Zed" } }"#) {
+            Ok(config) => config,
+            Err(error) => {
+                self.check("the exclusion parses", false, format!("{error}"));
+                return;
+            }
+        };
+        let Some(source) = CrateClipboard::new() else {
+            self.check("a clipboard is available", false, "none".into());
+            return;
+        };
+        let declared = Arc::new(Declared::default());
+        // The same shape as the launcher's own: the application behind the
+        // launcher, matched against the user's list.
+        let refuses: dango_lib::text::RefusesFallback = Arc::new(move || {
+            let application = platform::covered_app()?;
+            config.selection.refuses(&application).then_some(application)
+        });
+        let Some(exchange) = platform::text_exchange(
+            source,
+            declared.clone(),
+            Arc::new(NoLauncher),
+            Arc::new(HereIsFine),
+            Some(refuses),
+        ) else {
+            self.check("an exchange is available", false, "no key injection".into());
+            return;
+        };
+
+        let _ = Command::new("osascript")
+            .args(["-e", "tell application \"Zed\" to activate"])
+            .status();
+        if !wait_for_frontmost("Zed") {
+            println!("  SKIP  Zed did not come to the front ({})", frontmost());
+            return;
+        }
+        // A selection, so a failure here means the route refused rather than
+        // that there was nothing to read.
+        self.chord('a');
+        std::thread::sleep(Duration::from_millis(400));
+
+        self.set_user_clipboard();
+        let before = declared.count();
+        let read = exchange.selection();
+        let writes = declared.count() - before;
+
+        match read {
+            Err(error) => {
+                let message = error.to_string();
+                self.check(
+                    "the refusal names the application and says what to do",
+                    message
+                        == "Dango can't read the selection in Zed. \
+                            Copy the text first, then run this command.",
+                    format!("said {message:?}"),
+                );
+            }
+            Ok(other) => self.check(
+                "the read is refused",
+                false,
+                format!("it returned {other:?} instead of refusing"),
+            ),
+        }
+        self.check(
+            "nothing was typed at the refused application",
+            writes == 0,
+            format!("declared {writes} clipboard writes, so the fallback ran"),
         );
     }
 
@@ -561,6 +852,22 @@ impl Harness {
         }
         println!("\nscratch document left at {SCRATCH}");
     }
+}
+
+/// Waits for an application to actually be in front.
+///
+/// Not a sleep. `NSWorkspace` only notices that the frontmost application
+/// changed while a run loop is pumping, so sleeping here pins the answer to
+/// whatever was in front when the wait started. The selection spike recorded
+/// this exact trap and it was walked into again here.
+fn wait_for_frontmost(name: &str) -> bool {
+    for _ in 0..25 {
+        if frontmost() == name {
+            return true;
+        }
+        NSRunLoop::currentRunLoop().runUntilDate(&NSDate::dateWithTimeIntervalSinceNow(0.2));
+    }
+    false
 }
 
 fn frontmost() -> String {
