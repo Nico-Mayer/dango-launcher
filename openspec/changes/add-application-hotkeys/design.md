@@ -52,9 +52,9 @@ See proposal.md - Why for the motivation. What shapes the approach:
 "dango.applications": {
   "apps": {
     "Safari": { "hotkey": "hyper+b" },
-    "terminal": {
-      "name": { "macos": "Terminal", "windows": "Windows Terminal" },
-      "hotkey": "hyper+t"
+    "editor": {
+      "name": { "macos": "TextEdit", "windows": "Notepad" },
+      "hotkey": "hyper+e"
     }
   }
 }

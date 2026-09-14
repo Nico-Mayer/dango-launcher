@@ -43,10 +43,11 @@
       "apps": {
         "Safari": { "hotkey": "hyper+b" },
         // When the name differs per platform, name it for each. A missing side
-        // means the entry does nothing on that platform.
-        "terminal": {
-          "name": { "macos": "Terminal", "windows": "Windows Terminal" },
-          "hotkey": "hyper+t"
+        // means the entry does nothing on that platform. The name is the one
+        // root search shows, so it follows the system language.
+        "editor": {
+          "name": { "macos": "TextEdit", "windows": "Notepad" },
+          "hotkey": "hyper+e"
         }
       }
     },

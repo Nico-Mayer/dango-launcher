@@ -21,15 +21,14 @@ the same handling of an entry that turns out to be gone.
 
 #### Scenario: Matching the shown name on Windows
 
-- **WHEN** an entry is keyed `windows terminal` and the shell lists an
-  application named "Windows Terminal"
+- **WHEN** an entry is keyed `notepad` and the shell lists an application
+  named "Notepad"
 - **THEN** the entry addresses that application
 
 #### Scenario: A name that differs per platform
 
-- **WHEN** an entry carries `name: { macos: "Terminal", windows: "Windows
-  Terminal" }`
-- **THEN** macOS addresses "Terminal" and Windows addresses "Windows Terminal"
+- **WHEN** an entry carries `name: { macos: "TextEdit", windows: "Notepad" }`
+- **THEN** macOS addresses "TextEdit" and Windows addresses "Notepad"
 
 #### Scenario: A name given for the other platform only
 
