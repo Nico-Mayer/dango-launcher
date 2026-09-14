@@ -80,6 +80,16 @@ struct ResultsPayload {
     complete: bool,
 }
 
+/// A view tree with the extension whose command produced it. The frontend needs
+/// the owner to send an action back, and a command started from its own hotkey
+/// never goes through `invoke_command`, so the tree has to carry it.
+#[derive(Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+struct RenderPayload {
+    owner: String,
+    tree: protocol::ViewTree,
+}
+
 #[derive(serde::Serialize)]
 #[serde(tag = "kind", rename_all = "camelCase")]
 enum ActionResponse {
@@ -360,22 +370,21 @@ mod inspect_tests {
 /// extension that owns it, so an action chosen inside a view the command pushes
 /// can be sent back to the right place, or the reason it could not start.
 #[tauri::command]
-async fn invoke_command(app: tauri::AppHandle, command_id: String) -> Result<String, String> {
-    let owner = app
-        .try_state::<Arc<Mutex<ExtensionHost>>>()
-        .and_then(|host| {
-            let host = host.lock().ok()?;
-            Some(host.registry().get(&command_id)?.extension_id.clone())
-        })
-        .ok_or_else(|| InvokeError::Unavailable.to_string())?;
-    run_command(&app, &command_id).map_err(|error| error.to_string())?;
-    Ok(owner)
+async fn invoke_command(app: tauri::AppHandle, command_id: String) -> Result<(), String> {
+    run_command(&app, &command_id).map_err(|error| error.to_string())
 }
 
 /// Runs a command through the invoker and streams its output the same way for a
 /// launcher selection and a hotkey press: a view goes to the webview, success
 /// hides the launcher, a failure is reported.
 fn run_command(app: &tauri::AppHandle, command_id: &str) -> Result<(), InvokeError> {
+    let owner = app
+        .try_state::<Arc<Mutex<ExtensionHost>>>()
+        .and_then(|host| {
+            let host = host.lock().ok()?;
+            Some(host.registry().get(command_id)?.extension_id.clone())
+        })
+        .ok_or(InvokeError::Unavailable)?;
     let invoker = app
         .try_state::<Arc<Invoker>>()
         .ok_or(InvokeError::HostUnavailable)?;
@@ -389,7 +398,11 @@ fn run_command(app: &tauri::AppHandle, command_id: &str) -> Result<(), InvokeErr
         while let Some(output) = rx.recv().await {
             match output {
                 Output::View(tree) => {
-                    if app.emit_to("main", protocol::EVENT_RENDER, tree).is_err() {
+                    let payload = RenderPayload {
+                        owner: owner.clone(),
+                        tree,
+                    };
+                    if app.emit_to("main", protocol::EVENT_RENDER, payload).is_err() {
                         break;
                     }
                 }

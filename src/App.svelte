@@ -9,7 +9,13 @@
   import { modKey } from "./lib/platform";
   import ProtocolView from "./lib/ProtocolView.svelte";
   import ResultRow from "./lib/ResultRow.svelte";
-  import { matchesShortcut, type ActionResponse, type ResultItem, type ResultsPayload } from "./lib/types";
+  import {
+    matchesShortcut,
+    type ActionResponse,
+    type RenderPayload,
+    type ResultItem,
+    type ResultsPayload,
+  } from "./lib/types";
   import type { ViewTree } from "./protocol/ViewTree";
 
   const PROTOCOL_VERSION = 1;
@@ -132,15 +138,12 @@
       failure = null;
       panelOpen = false;
       working = true;
-      const owner = await invoke<string>("invoke_command", { commandId: item.id }).then(
-        (id) => id,
-        (reason) => {
-          failure = String(reason);
-          working = false;
-          return null;
-        },
-      );
-      if (owner) viewOwner = owner;
+      // The view that follows carries its own owner, so nothing is read back
+      // here; only a refusal to start the command needs handling.
+      await invoke("invoke_command", { commandId: item.id }).catch((reason) => {
+        failure = String(reason);
+        working = false;
+      });
       return;
     }
     runAction(item, item.actions[0].id);
@@ -212,13 +215,14 @@
         if (event.payload.query !== liveQuery) return;
         results = event.payload.items;
       }),
-      listen<ViewTree>("dango://render", (event) => {
+      listen<RenderPayload>("dango://render", (event) => {
         working = false;
-        if (event.payload.protocolVersion !== PROTOCOL_VERSION) {
+        if (event.payload.tree.protocolVersion !== PROTOCOL_VERSION) {
           protocolError = true;
           return;
         }
-        stack = [...stack, event.payload];
+        viewOwner = event.payload.owner;
+        stack = [...stack, event.payload.tree];
       }),
     ];
     return () => unlisten.forEach((p) => p.then((un) => un()));

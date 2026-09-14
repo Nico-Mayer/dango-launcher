@@ -25,6 +25,14 @@ export interface ResultsPayload {
   complete: boolean;
 }
 
+/// A pushed view with the extension whose command produced it. A command can be
+/// started from its own hotkey, without the frontend ever asking for it, so the
+/// owner arrives with the tree rather than from the invocation.
+export interface RenderPayload {
+  owner: string;
+  tree: ViewTree;
+}
+
 export type ActionResponse =
   | { kind: "done" }
   | { kind: "copy"; text: string }
