@@ -600,6 +600,18 @@ impl extensions::ai::Runner for ViewRunner {
     }
 }
 
+/// Names the frontmost application when the user has refused the keystroke
+/// fallback there. Read fresh per call, so an edit to the file applies without
+/// a restart, and so the answer is about whatever is in front right now.
+fn refuses_fallback(config: Arc<config::FileConfig>) -> text::RefusesFallback {
+    Arc::new(move || {
+        let application = platform::foreground_app()?;
+        let shared = config.shared();
+        let refused = shared.read().ok()?.selection.refuses(&application);
+        refused.then_some(application)
+    })
+}
+
 /// A press that could not do what the file asked has no launcher on screen to
 /// say so; the tray status line and the log are where it is visible.
 fn report_hotkey_problem(app: &tauri::AppHandle, message: &str) {
@@ -1088,6 +1100,7 @@ pub fn run() {
                             watcher.clone(),
                             dismisser,
                             Arc::new(OnMainThread(app.handle().clone())),
+                            Some(refuses_fallback(file_config.clone())),
                         )
                         .map(Arc::new);
                         match &exchange {

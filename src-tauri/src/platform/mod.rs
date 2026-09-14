@@ -214,11 +214,15 @@ pub fn injection_guard() -> InjectionGuard {
 ///
 /// `own_writes` is how the clipboard history is told to ignore what this
 /// borrows. Pass `crate::text::Unwatched` when the clipboard extension is off.
+/// `refuses` names the frontmost application when the user has refused the
+/// keystroke fallback there, so the exchange can say so instead of pressing a
+/// chord that application binds to something else.
 pub fn text_exchange(
     clipboard: std::sync::Arc<dyn crate::extensions::clipboard::ClipboardSource>,
     own_writes: std::sync::Arc<dyn crate::text::OwnWrites>,
     launcher: std::sync::Arc<dyn crate::text::Launcher>,
     main: std::sync::Arc<dyn crate::text::MainThread>,
+    refuses: Option<crate::text::RefusesFallback>,
 ) -> Option<crate::text::TextExchange> {
     #[cfg(target_os = "macos")]
     {
@@ -230,6 +234,7 @@ pub fn text_exchange(
             Some(std::sync::Arc::new(macos::MacSelection)),
             own_writes,
             launcher,
+            refuses,
         ))
     }
     #[cfg(target_os = "windows")]
@@ -242,12 +247,12 @@ pub fn text_exchange(
             clipboard,
             keys,
             std::sync::Arc::new(windows::WindowsHandoff),
-            // No accessibility route worth having here: the UI Automation text
-            // pattern only answers in applications that implement it, and the
-            // clipboard round trip has to be right anyway.
-            None,
+            // UI Automation answers for anything with an ordinary control, and
+            // reports itself unavailable for the rest, which still falls back.
+            Some(std::sync::Arc::new(windows::WindowsSelection)),
             own_writes,
             launcher,
+            refuses,
         ))
     }
 }

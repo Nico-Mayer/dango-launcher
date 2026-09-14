@@ -16,6 +16,20 @@ mod tests {
     use uiautomation::patterns::UITextPattern;
     use uiautomation::UIAutomation;
 
+    /// What the exclusion list has to be written against: the name Dango
+    /// resolves for whatever is in front.
+    #[test]
+    #[ignore]
+    fn probe_foreground_name() {
+        for sample in 1..=6 {
+            std::thread::sleep(Duration::from_secs(3));
+            println!(
+                "[{sample}] foreground_app() = {:?}",
+                crate::platform::windows::foreground_app()
+            );
+        }
+    }
+
     #[test]
     #[ignore]
     fn probe_focused_selection() {

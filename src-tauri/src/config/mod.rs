@@ -46,6 +46,8 @@ pub struct Config {
     /// The system-wide hyperkey. Present means on; absent means off.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub hyperkey: Option<Hyperkey>,
+    #[serde(default, skip_serializing_if = "Selection::is_empty")]
+    pub selection: Selection,
     #[serde(flatten)]
     pub extra: Map<String, Value>,
 }
@@ -89,6 +91,48 @@ fn default_true() -> bool {
 
 fn is_true(value: &bool) -> bool {
     *value
+}
+
+/// How Dango reads what the user has selected. Beside `hyperkey` rather than
+/// under an extension, because the text plumbing belongs to the application.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub struct Selection {
+    /// Applications where the copy chord must never be sent, because they bind
+    /// it to something of their own. Comma separated, matched ignoring case,
+    /// the way the clipboard history names its exclusions.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub excluded_applications: Option<String>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+impl Selection {
+    fn is_empty(&self) -> bool {
+        self.excluded_applications.is_none() && self.extra.is_empty()
+    }
+
+    /// The names as written, split and trimmed. Empty by default: an exclusion
+    /// shipped as a default would quietly disable a working feature for someone
+    /// whose editor does not have the problem.
+    pub fn excluded(&self) -> Vec<String> {
+        match &self.excluded_applications {
+            Some(value) => value
+                .split(',')
+                .map(str::trim)
+                .filter(|name| !name.is_empty())
+                .map(str::to_string)
+                .collect(),
+            None => Vec::new(),
+        }
+    }
+
+    /// Whether the keystroke fallback is refused for this application.
+    pub fn refuses(&self, application: &str) -> bool {
+        self.excluded()
+            .iter()
+            .any(|name| name.eq_ignore_ascii_case(application))
+    }
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -593,6 +637,30 @@ mod tests {
         )
         .unwrap();
         assert!(jsonschema::validate(&schema, &good).is_ok());
+    }
+
+    #[test]
+    fn a_selection_block_parses_and_round_trips() {
+        let config =
+            Config::parse(r#"{ "selection": { "excluded-applications": "Zed, Neovim" } }"#).unwrap();
+        assert_eq!(config.selection.excluded(), ["Zed", "Neovim"]);
+        assert!(config.selection.refuses("zed"), "matched ignoring case");
+        assert!(!config.selection.refuses("Notepad"));
+
+        let json = config.to_json();
+        assert!(json.contains("excluded-applications"), "key renamed: {json}");
+        assert!(Config::parse(&json).unwrap().selection.refuses("Zed"));
+    }
+
+    #[test]
+    fn no_selection_block_excludes_nothing() {
+        let config = Config::parse("{}").unwrap();
+        assert!(config.selection.excluded().is_empty());
+        assert!(!config.selection.refuses("Zed"));
+        assert!(
+            !config.to_json().contains("selection"),
+            "an empty block was written back"
+        );
     }
 
     #[test]

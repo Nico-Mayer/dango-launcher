@@ -23,6 +23,17 @@
       "description": "Per-extension settings, keyed by extension id such as dango.clipboard.",
       "additionalProperties": { "$ref": "#/$defs/extension" }
     },
+    "selection": {
+      "type": "object",
+      "description": "How Dango reads the text you have selected.",
+      "additionalProperties": true,
+      "properties": {
+        "excluded-applications": {
+          "type": "string",
+          "description": "Applications where Dango must never send the copy chord to read a selection, comma separated and matched ignoring case. For editors that bind Ctrl+C to something of their own, such as a Helix keymap. Dango reads these directly where it can, and says it cannot read the selection otherwise."
+        }
+      }
+    },
     "hyperkey": {
       "type": "object",
       "description": "A physical key remapped to act as the hyper modifier system-wide. Present means on; omit the block to turn it off.",

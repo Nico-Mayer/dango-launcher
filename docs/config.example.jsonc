@@ -136,6 +136,19 @@
     }
   },
 
+  // How Dango reads the text you have selected. It asks the application
+  // directly first, and only borrows the clipboard with a synthetic copy when
+  // the application exposes nothing.
+  //
+  // That copy is a chord the application is free to bind elsewhere: a modal
+  // editor in a Helix keymap treats Ctrl+C as toggle comments, so the read
+  // would comment your code out instead. Name those applications here and
+  // Dango says it cannot read the selection rather than typing at them.
+  // Empty by default.
+  "selection": {
+    "excluded-applications": "Zed"
+  },
+
   // A physical key remapped to act as the hyper modifier system-wide, the way
   // Raycast and Hyperkey do. While it is held, Ctrl+Alt+Shift+Super are in
   // effect, so a chord like "hyper+left" fires from this one key. Omit the block

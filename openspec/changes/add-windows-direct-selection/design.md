@@ -95,6 +95,19 @@ Chromium's own UI return the selection in single-digit milliseconds, against a
 clipboard borrow, a synthesized keystroke, and the wait for both, which is worth
 having on its own.
 
+### The fallback chord cannot be fixed either
+
+Before accepting that Zed gets a refusal, the obvious alternative was measured:
+`Ctrl+Insert`, the legacy Windows copy binding, which a Helix keymap is unlikely
+to claim. Sent to Zed with the clipboard holding a sentinel, it copied nothing,
+so Zed does not honour it. Zed's own buffer was untouched, which is the one
+thing that had to be checked.
+
+The measurement cannot separate "not bound" from "nothing was selected at that
+moment", and it does not need to: a chord that cannot be relied on is not a
+route. There is no keystroke that reads a selection from this editor, which
+leaves the exclusion list as the whole remedy there.
+
 ### Answering, but empty, is not a failure
 
 The current fallback cannot tell "no selection" from "cannot ask"; the sentinel

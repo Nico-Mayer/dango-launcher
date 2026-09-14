@@ -40,6 +40,8 @@ pub enum TextError {
     TargetUnavailable(String),
     #[error("Couldn't use the clipboard. Try again.")]
     Clipboard,
+    #[error("Dango can't read the selection in {0}. Copy the text first, then run this command.")]
+    SelectionRefused(String),
 }
 
 /// The keystrokes, per platform: `Cmd` on macOS, `Ctrl` on Windows, and the
@@ -74,11 +76,23 @@ pub trait Handoff: Send + Sync {
     fn settle_after_paste(&self);
 }
 
+/// What the frontmost application said when asked directly. The three answers
+/// are not interchangeable: an application that answers "nothing is selected"
+/// has answered, and pressing a copy chord at it would be both pointless and,
+/// in a modal editor, destructive. Only an application that cannot be asked at
+/// all is worth the clipboard round trip.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Selected {
+    Text(String),
+    Empty,
+    Unavailable,
+}
+
 /// Reading the selection without the clipboard, where the platform can. macOS
-/// asks the accessibility API; Windows has no implementation and falls through
-/// to the clipboard round trip.
+/// asks the accessibility API, Windows asks UI Automation, and either may still
+/// answer `Unavailable` for an application that exposes nothing.
 pub trait DirectSelection: Send + Sync {
-    fn selected_text(&self) -> Option<String>;
+    fn selected_text(&self) -> Selected;
 }
 
 /// Declares a write Dango is about to make so the clipboard history ignores it.
@@ -163,6 +177,12 @@ impl TextTarget for TextExchange {
 
 /// The shared round trip. Both directions borrow the clipboard, so both live
 /// here rather than in either platform.
+/// Answers with the frontmost application's name when the user has refused the
+/// keystroke fallback there, and `None` when it is allowed. A closure rather
+/// than a trait because both halves of it, the platform's idea of what is in
+/// front and the user's list, already live where it is built.
+pub type RefusesFallback = Arc<dyn Fn() -> Option<String> + Send + Sync>;
+
 pub struct TextExchange {
     clipboard: Arc<dyn ClipboardSource>,
     keys: Arc<dyn Keys>,
@@ -170,6 +190,7 @@ pub struct TextExchange {
     direct: Option<Arc<dyn DirectSelection>>,
     own_writes: Arc<dyn OwnWrites>,
     launcher: Arc<dyn Launcher>,
+    refuses: Option<RefusesFallback>,
 }
 
 impl TextExchange {
@@ -180,6 +201,7 @@ impl TextExchange {
         direct: Option<Arc<dyn DirectSelection>>,
         own_writes: Arc<dyn OwnWrites>,
         launcher: Arc<dyn Launcher>,
+        refuses: Option<RefusesFallback>,
     ) -> Self {
         Self {
             clipboard,
@@ -188,6 +210,7 @@ impl TextExchange {
             direct,
             own_writes,
             launcher,
+            refuses,
         }
     }
 
@@ -216,11 +239,25 @@ impl TextExchange {
             return Err(TextError::PermissionMissing);
         }
         if let Some(direct) = &self.direct {
-            if let Some(text) = direct.selected_text() {
-                return Ok(Some(text).filter(|text| !text.is_empty()));
+            match direct.selected_text() {
+                Selected::Text(text) if !text.is_empty() => return Ok(Some(text)),
+                // Answered, with nothing selected. Not a reason to start typing
+                // at it.
+                Selected::Text(_) | Selected::Empty => return Ok(None),
+                Selected::Unavailable => {}
             }
         }
+        if let Some(refused) = self.refused_application() {
+            return Err(TextError::SelectionRefused(refused));
+        }
         self.selection_through_clipboard()
+    }
+
+    /// The frontmost application's name when the user has refused the keystroke
+    /// fallback there, which is the only honest answer for an editor that
+    /// exposes nothing and binds the copy chord to a command of its own.
+    fn refused_application(&self) -> Option<String> {
+        self.refuses.as_ref().and_then(|refuses| refuses())
     }
 
     /// Copying with nothing selected leaves the clipboard exactly as it was, so
@@ -608,6 +645,7 @@ mod tests {
                 None,
                 writes.clone(),
                 launcher.clone(),
+                None,
             ),
             clipboard,
             keys,
@@ -872,6 +910,7 @@ mod tests {
             None,
             writes.clone(),
             Arc::new(FakeLauncher::default()),
+            None,
         );
 
         assert_eq!(
@@ -899,6 +938,7 @@ mod tests {
             None,
             Arc::new(RecordingWrites::default()),
             Arc::new(FakeLauncher::default()),
+            None,
         );
 
         assert_eq!(exchange.insert("text", None), Err(TextError::NoTarget));
@@ -963,6 +1003,7 @@ mod tests {
             None,
             Arc::new(RecordingWrites::default()),
             Arc::new(FakeLauncher::default()),
+            None,
         );
 
         exchange.selection().unwrap();
@@ -1014,10 +1055,10 @@ mod tests {
         assert!(f.keys.events().is_empty());
     }
 
-    struct FakeDirect(Option<String>);
+    struct FakeDirect(Selected);
 
     impl DirectSelection for FakeDirect {
-        fn selected_text(&self) -> Option<String> {
+        fn selected_text(&self) -> Selected {
             self.0.clone()
         }
     }
@@ -1030,9 +1071,10 @@ mod tests {
             clipboard.clone(),
             keys.clone(),
             FakeHandoff::working(),
-            Some(Arc::new(FakeDirect(Some("selected directly".into())))),
+            Some(Arc::new(FakeDirect(Selected::Text("selected directly".into())))),
             Arc::new(RecordingWrites::default()),
             Arc::new(FakeLauncher::default()),
+            None,
         );
 
         assert_eq!(
@@ -1043,6 +1085,103 @@ mod tests {
         assert_eq!(
             clipboard.now(),
             Some(Content::Text("what the user had".into()))
+        );
+    }
+
+    fn refusing(application: &'static str) -> RefusesFallback {
+        Arc::new(move || Some(application.to_string()))
+    }
+
+    #[test]
+    fn an_application_that_answers_with_nothing_is_an_empty_selection() {
+        let clipboard = holding("what the user had");
+        let keys = FakeKeys::working();
+        let exchange = TextExchange::new(
+            clipboard.clone(),
+            keys.clone(),
+            FakeHandoff::working(),
+            Some(Arc::new(FakeDirect(Selected::Empty))),
+            Arc::new(RecordingWrites::default()),
+            Arc::new(FakeLauncher::default()),
+            None,
+        );
+
+        assert_eq!(exchange.selection(), Ok(None));
+        assert!(
+            keys.events().is_empty(),
+            "it answered; pressing copy at it is what this change exists to stop"
+        );
+        assert_eq!(
+            clipboard.now(),
+            Some(Content::Text("what the user had".into()))
+        );
+    }
+
+    #[test]
+    fn an_application_answering_an_empty_string_is_the_same_as_empty() {
+        let keys = FakeKeys::working();
+        let exchange = TextExchange::new(
+            holding("what the user had"),
+            keys.clone(),
+            FakeHandoff::working(),
+            Some(Arc::new(FakeDirect(Selected::Text(String::new())))),
+            Arc::new(RecordingWrites::default()),
+            Arc::new(FakeLauncher::default()),
+            None,
+        );
+
+        assert_eq!(exchange.selection(), Ok(None));
+        assert!(keys.events().is_empty());
+    }
+
+    #[test]
+    fn a_refused_application_is_never_sent_the_copy_chord() {
+        let clipboard = holding("what the user had");
+        let keys = FakeKeys::working();
+        let exchange = TextExchange::new(
+            clipboard.clone(),
+            keys.clone(),
+            FakeHandoff::working(),
+            Some(Arc::new(FakeDirect(Selected::Unavailable))),
+            Arc::new(RecordingWrites::default()),
+            Arc::new(FakeLauncher::default()),
+            Some(refusing("Zed")),
+        );
+
+        assert_eq!(
+            exchange.selection(),
+            Err(TextError::SelectionRefused("Zed".into()))
+        );
+        assert!(keys.events().is_empty(), "a keystroke reached a refused app");
+        assert_eq!(
+            clipboard.now(),
+            Some(Content::Text("what the user had".into())),
+            "the clipboard was borrowed for a read that never happened"
+        );
+    }
+
+    #[test]
+    fn a_refused_application_that_answers_is_still_read_directly() {
+        let keys = FakeKeys::working();
+        let exchange = TextExchange::new(
+            holding("what the user had"),
+            keys.clone(),
+            FakeHandoff::working(),
+            Some(Arc::new(FakeDirect(Selected::Text("read directly".into())))),
+            Arc::new(RecordingWrites::default()),
+            Arc::new(FakeLauncher::default()),
+            Some(refusing("Zed")),
+        );
+
+        assert_eq!(exchange.selection().unwrap().as_deref(), Some("read directly"));
+        assert!(keys.events().is_empty());
+    }
+
+    #[test]
+    fn the_refusal_says_which_application_it_is_about() {
+        assert_eq!(
+            TextError::SelectionRefused("Zed".into()).to_string(),
+            "Dango can't read the selection in Zed. Copy the text first, then run this command."
         );
     }
 
@@ -1058,9 +1197,10 @@ mod tests {
             clipboard,
             keys.clone(),
             FakeHandoff::working(),
-            Some(Arc::new(FakeDirect(None))),
+            Some(Arc::new(FakeDirect(Selected::Unavailable))),
             Arc::new(RecordingWrites::default()),
             Arc::new(FakeLauncher::default()),
+            None,
         );
 
         assert_eq!(

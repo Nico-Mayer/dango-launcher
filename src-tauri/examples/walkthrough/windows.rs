@@ -180,6 +180,8 @@ pub fn run() {
         declared.clone(),
         Arc::new(NoLauncher),
         Arc::new(HereIsFine),
+        // The walkthrough refuses nothing: it is here to exercise the paths.
+        None,
     ) else {
         eprintln!("no key injection");
         return;
