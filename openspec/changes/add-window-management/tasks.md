@@ -35,10 +35,14 @@ Built and verified first, on the author's daily-use machine.
     the work area within a pixel or two, with the invisible-border inset undone.
 - [x] 4.3 List the displays' work areas in order for move-to-next-display, per-monitor DPI aware
   - Displays are listed in a stable left-to-right, top-to-bottom order.
-- [ ] 4.4 Refuse an elevated target window with a clear message, reusing M3's integrity-level comparison, verified by tiling an elevated window
+- [x] 4.4 Refuse an elevated target window with a clear message, reusing M3's integrity-level comparison, verified by tiling an elevated window
   - Reuses M3's `is_out_of_reach` integrity comparison, which M3 verified live
     against an elevated window (its task 9.9). The harness has the check; it
     needs a `dango-elevated` window opened elevated to run, which is a UAC step.
+  - Verified: with an elevated PowerShell titled `dango-elevated` open through
+    UAC, `window_walkthrough` ran from a medium-integrity shell and reported
+    24 passed, 0 failed, 0 skipped, including "an elevated target is
+    unreachable".
 - [x] 4.5 Check symbol names and module paths against the vendored crate source before pushing, and verify CI's `cargo clippy --all-targets -- -D warnings` passes on `windows-latest`
   - `cargo clippy --all-targets -- -D warnings` is clean locally, including the
     new module, the platform code, and the walkthrough example.
@@ -172,9 +176,13 @@ application was still the one behind it.
     about 1ms against Finder, both far inside 100ms. A first Accessibility
     write into a cold application is slower, around 30ms, because each write is
     a round trip; still inside the budget.
-- [ ] 6.5 Confirm on Windows that tiling an elevated window fails visibly and leaves it unchanged
+- [x] 6.5 Confirm on Windows that tiling an elevated window fails visibly and leaves it unchanged
   - Needs a `dango-elevated` window opened elevated (a UAC step); the harness
     check skips without it. The refusal path is M3-verified (9.9).
+  - Confirmed live: with the elevated window focused, running Left Half from
+    root search showed "that window belongs to an elevated program, which Dango
+    cannot reach", and the window's frame read back identical before and after
+    the attempt (`GetWindowRect` 453,243,1605,1080 both times).
 - [x] 6.6 Confirm on macOS that revoking Accessibility produces the explained failure and the prompt, and that granting it restores normal behaviour without a restart
   - Confirmed by the author: revoking produces the explained failure and the
     prompt, and granting it again restores normal behaviour with no restart.
