@@ -82,16 +82,16 @@
 
 ## 5. macOS platform strings
 
-- [ ] 5.1 In `src-tauri/src/platform/macos/window.rs`, rewrite
+- [x] 5.1 In `src-tauri/src/platform/macos/window.rs`, rewrite
       `PERMISSION_MISSING`, the `Unreachable` message, and collapse the
       attribute-read failures into "Couldn't read the window's position. Try
       again." with the attribute and `AXError` code logged via `eprintln!`;
       verify `cargo test` passes on macOS.
-- [ ] 5.2 In `src-tauri/src/platform/macos/system.rs`, rewrite the lock,
+- [x] 5.2 In `src-tauri/src/platform/macos/system.rs`, rewrite the lock,
       sleep, trash-count, and not-an-app messages per design.md, logging
       Finder's and `pmset`'s output instead of showing it; verify `cargo
       test` passes on macOS.
-- [ ] 5.3 In `src-tauri/src/platform/macos/text.rs`, replace the enigo and
+- [x] 5.3 In `src-tauri/src/platform/macos/text.rs`, replace the enigo and
       main-thread messages with "Couldn't send the keystroke. Try again." and
       log the detail; verify `cargo test` passes on macOS.
 
@@ -110,7 +110,7 @@
 - [x] 6.4 In `src-tauri/src/platform/windows/apps.rs`, change the shell
       launch failure to "Couldn't open {name}. Try again."; verify by reading
       the diff.
-- [ ] 6.5 Push and confirm CI is green on `windows-latest`, including clippy
+- [x] 6.5 Push and confirm CI is green on `windows-latest`, including clippy
       and the new `Display` tests.
 
 ## 7. Verify on macOS
@@ -142,5 +142,5 @@
 - [ ] 8.3 Register Alt+Space in another app, start Dango, and confirm the tray
       reads "Alt+Space is in use, set launcher.hotkey".
 - [ ] 8.4 Repeat 7.3 and 7.4 on Windows.
-- [ ] 8.5 Confirm CI is green on both `windows-latest` and `macos-latest`
+- [x] 8.5 Confirm CI is green on both `windows-latest` and `macos-latest`
       before the change is considered done.
