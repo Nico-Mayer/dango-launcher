@@ -71,10 +71,25 @@
 
 ## 5. Verify on Windows
 
-- [ ] 5.1 Repeat 4.1 through 4.4 with a Store application and a desktop
+- [x] 5.1 Repeat 4.1 through 4.4 with a Store application and a desktop
       application, confirming the focused window is not disturbed until the
       launched app takes the foreground.
-- [ ] 5.2 Use the same `name: { macos, windows }` entry as 4.5 and confirm the
+  - Confirmed on a debug build with the launcher running. `Rechner` (Store) on
+    `hyper+b`: two presses left exactly one `CalculatorApp` process and the
+    launcher never appeared. `Zed` (desktop) on `hyper+z`: two presses brought
+    it forward with its process count unchanged. The bindings were added to
+    `config.json` while Dango ran and worked without a restart; restoring the
+    file released the chords, so `hyper+b` did nothing and `hyper+left` tiled
+    again. `Missing app check` on `hyper+u` launched nothing and `dango.log`
+    recorded `application "Missing app check" is bound to a hotkey but is not
+    installed`. `Brave` and `dango.window-management.left-half` on `hyper+left`:
+    Brave won, the log said `application "Brave" keeps it`, and the tray showed
+    "Config error" and "Hotkey conflict".
+- [x] 5.2 Use the same `name: { macos, windows }` entry as 4.5 and confirm the
       Windows name is the one matched.
+  - Confirmed with `{ "macos": "TextEdit", "windows": "Editor" }` on `hyper+e`:
+    Notepad opened (shown as `Editor` on a German Windows), one process, so the
+    Windows name was the one matched. Note the shown name of Windows Terminal is
+    `Terminal` in `shell:AppsFolder`, not `Windows Terminal`.
 - [ ] 5.3 Confirm CI is green on `windows-latest` and `macos-latest`, including
       clippy, before the change is considered done.
