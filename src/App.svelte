@@ -47,6 +47,21 @@
   // dropped so cancelled results never show.
   let liveQuery = "";
 
+  /// The same idea for views. Cancelling a streaming command does not recall the
+  /// tree it has already emitted, so one more can land after the user has left:
+  /// with nothing on the stack to replace it goes on as a new view, and the
+  /// answer they walked away from is back on screen, frozen part-written.
+  /// Invocation ids only ever go up, so one high-water mark covers every run at
+  /// or before the one abandoned.
+  let lastInvocation = -1;
+  let abandonedInvocation = -1;
+
+  /// Leaves whatever is showing, and with it anything still arriving for it.
+  function abandonShownView() {
+    abandonedInvocation = lastInvocation;
+    shownInvocation = null;
+  }
+
   const selectedId = $derived(
     results.some((r) => r.id === pickedId) ? pickedId : (results[0]?.id ?? ""),
   );
@@ -79,6 +94,9 @@
     results = [];
     stack = [];
     viewOwner = null;
+    // Deliberately not abandoning: `hide_for_work` resets through here too, on
+    // behalf of a command that is still wanted and whose next view is what
+    // brings the launcher back.
     shownInvocation = null;
     panelOpen = false;
     protocolError = false;
@@ -181,7 +199,7 @@
         // A command may still be working behind this view, and the user has
         // left it: stop it rather than paying for an answer nobody will read.
         invoke("cancel_invocation");
-        shownInvocation = null;
+        abandonShownView();
         stack = stack.slice(0, -1);
         if (stack.length === 0) viewOwner = null;
       } else if (query.length > 0) {
@@ -232,6 +250,8 @@
         results = event.payload.items;
       }),
       listen<RenderPayload>("dango://render", (event) => {
+        if (event.payload.invocation <= abandonedInvocation) return;
+        lastInvocation = event.payload.invocation;
         workingTitle = null;
         if (event.payload.tree.protocolVersion !== PROTOCOL_VERSION) {
           protocolError = true;
