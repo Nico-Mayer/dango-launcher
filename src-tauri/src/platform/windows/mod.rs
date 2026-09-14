@@ -2,6 +2,8 @@ mod apps;
 mod clipboard;
 mod hyperkey;
 mod keymonitor;
+#[cfg(test)]
+mod probe;
 mod system;
 mod text;
 mod window;

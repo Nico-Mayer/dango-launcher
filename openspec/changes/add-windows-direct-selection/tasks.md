@@ -1,6 +1,6 @@
 ## 1. Find out what the editors actually expose
 
-- [ ] 1.1 Write a throwaway probe (an ignored test or a small example) that takes the focused element through UI Automation and prints whether it has a text pattern and what its selection is, and run it against Zed in Helix mode, Zed in normal mode, Notepad, a browser text field, and Windows Terminal
+- [x] 1.1 Write a throwaway probe (an ignored test or a small example) that takes the focused element through UI Automation and prints whether it has a text pattern and what its selection is, and run it against Zed in Helix mode, Zed in normal mode, Notepad, a browser text field, and Windows Terminal
 - [ ] 1.2 Record the answer in the design under a "What the probe found" heading, including which of those applications need the fallback, and confirm the rest of the plan still holds before building it
 
 ## 2. The three-way answer

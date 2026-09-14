@@ -69,6 +69,32 @@ Two limits, both accepted:
 - A multi-range selection (column selection) returns the first range only.
   Everything downstream takes one string.
 
+### What the probe found
+
+Measured with `probe_focused_selection` against the focused element, sampling
+while each application was brought to the front:
+
+| Application | Focused element | Text pattern | Time |
+| --- | --- | --- | --- |
+| Zed (Helix mode) | `Zed::Window` / Window | **none** | 2-6ms |
+| Notepad | `RichEditD2DPT` / Document | yes, selection returned | 2-8ms |
+| Brave address bar | `BraveOmniboxViewViews` / Edit | yes, selection returned | 2ms |
+| Brave web content (video player) | page element / Group | none, as expected for a non-text element | 2-3ms |
+
+Two things follow.
+
+**Zed exposes nothing.** Its focused element is the bare window: no text pattern,
+so no selection, so the fallback is the only route there and the keystroke that
+comments the block out is still what gets sent. UI Automation does not fix the
+case that started this change. The exclusion list is what fixes it, which moves
+that from a secondary guard to the primary remedy for editors of this kind.
+
+**Everything with a normal control answers, and answers fast.** Notepad and
+Chromium's own UI return the selection in single-digit milliseconds, against a
+200ms deadline and a 300ms budget. For those applications the change removes a
+clipboard borrow, a synthesized keystroke, and the wait for both, which is worth
+having on its own.
+
 ### Answering, but empty, is not a failure
 
 The current fallback cannot tell "no selection" from "cannot ask"; the sentinel

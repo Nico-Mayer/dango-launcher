@@ -51,6 +51,9 @@ jsonschema = { version = "0.26", default-features = false }
 ts-rs = "12.0.1"
 
 [target.'cfg(target_os = "windows")'.dependencies]
+# Reading the focused element's selection without touching the keyboard. Wraps
+# the COM lifetime and initialisation rules that are the actual work here.
+uiautomation = "0.25"
 windows-sys = { version = "0.61", features = [
   "Win32_Foundation",
   "Win32_Graphics_Dwm",
