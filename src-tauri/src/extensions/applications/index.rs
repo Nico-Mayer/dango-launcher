@@ -82,6 +82,21 @@ impl AppIndex {
             .cloned()
     }
 
+    /// Every application whose shown name is `name`, ignoring case, in a
+    /// stable order so a hotkey with two candidates always picks the same one.
+    pub fn find_by_name(&self, name: &str) -> Vec<IndexedApp> {
+        let mut found: Vec<IndexedApp> = self
+            .apps
+            .read()
+            .unwrap()
+            .iter()
+            .filter(|a| a.name.eq_ignore_ascii_case(name))
+            .cloned()
+            .collect();
+        found.sort_by(|a, b| a.name.cmp(&b.name).then_with(|| a.id.cmp(&b.id)));
+        found
+    }
+
     /// Re-enumerates and replaces the index, persisting the result. Picks up
     /// installs and uninstalls without a restart.
     pub fn rebuild(&self) {

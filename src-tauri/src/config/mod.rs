@@ -2,11 +2,12 @@
 //! dotfiles and shares over git.
 //!
 //! The file is the source of truth for the launcher hotkey, per-extension
-//! enable/disable, preferences, and aliases. Data stays in SQLite. Everything
-//! here is about reading that file safely: it is optional, a bad file never
-//! takes the app down, and keys the running version does not understand are
-//! preserved rather than dropped, so a newer Dango or a plugin can share the
-//! file and a future settings UI can write it back without losing anything.
+//! enable/disable, preferences, aliases, and command and application hotkeys.
+//! Data stays in SQLite. Everything here is about reading that file safely:
+//! it is optional, a bad file never takes the app down, and keys the running
+//! version does not understand are preserved rather than dropped, so a newer
+//! Dango or a plugin can share the file and a future settings UI can write it
+//! back without losing anything.
 
 use std::collections::BTreeMap;
 
@@ -19,7 +20,7 @@ mod location;
 mod store;
 pub mod watch;
 
-pub use hotkey::{Hotkey, HotkeyError, ParsedHotkey};
+pub use hotkey::{Hotkey, HotkeyError, ParsedHotkey, PerPlatform};
 pub use location::{config_dir, config_path};
 pub use store::FileConfig;
 
@@ -111,8 +112,45 @@ pub struct Extension {
     pub preferences: BTreeMap<String, Value>,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub commands: BTreeMap<String, CommandSettings>,
+    /// Applications bound to hotkeys, keyed by the name root search shows.
+    /// Only the applications extension reads this branch.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub apps: BTreeMap<String, AppSettings>,
     #[serde(flatten)]
     pub extra: Map<String, Value>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct AppSettings {
+    /// The shown name when it differs from the entry's key, or differs per
+    /// platform. Absent means the key is the name on both platforms.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub name: Option<AppName>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub hotkey: Option<Hotkey>,
+    #[serde(flatten)]
+    pub extra: Map<String, Value>,
+}
+
+/// An application's shown name: one string for both platforms, or one per
+/// platform, the same two shapes a hotkey may take.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum AppName {
+    Portable(String),
+    PerPlatform(PerPlatform),
+}
+
+impl AppSettings {
+    /// The name to look for on this platform, or `None` when the entry only
+    /// names the other platform's application and so is not for this machine.
+    pub fn name_for_platform<'a>(&'a self, key: &'a str) -> Option<&'a str> {
+        match &self.name {
+            None => Some(key),
+            Some(AppName::Portable(name)) => Some(name),
+            Some(AppName::PerPlatform(per)) => per.for_platform(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -355,6 +393,53 @@ mod tests {
         assert!(json.contains("keepMe"));
         assert!(json.contains("keepThis"));
         assert!(json.contains("\"enabled\": false"));
+    }
+
+    #[test]
+    fn application_bindings_parse_in_both_shapes_and_round_trip() {
+        let text = r#"{
+          "extensions": { "dango.applications": { "apps": {
+            "Safari": { "hotkey": "hyper+b" },
+            "terminal": { "name": { "macos": "Terminal", "windows": "Windows Terminal" }, "hotkey": "hyper+t" },
+            "elsewhere": { "name": { "windows": "Only There" }, "hotkey": "hyper+e" },
+            "renamed": { "name": "Visual Studio Code", "hotkey": "hyper+c" }
+          } } }
+        }"#;
+        let config = Config::parse(text).unwrap();
+        let apps = &config.extensions["dango.applications"].apps;
+        assert_eq!(apps["Safari"].name_for_platform("Safari"), Some("Safari"));
+        assert_eq!(
+            apps["renamed"].name_for_platform("renamed"),
+            Some("Visual Studio Code")
+        );
+        #[cfg(target_os = "macos")]
+        {
+            assert_eq!(
+                apps["terminal"].name_for_platform("terminal"),
+                Some("Terminal")
+            );
+            assert_eq!(apps["elsewhere"].name_for_platform("elsewhere"), None);
+        }
+        #[cfg(not(target_os = "macos"))]
+        {
+            assert_eq!(
+                apps["terminal"].name_for_platform("terminal"),
+                Some("Windows Terminal")
+            );
+            assert_eq!(
+                apps["elsewhere"].name_for_platform("elsewhere"),
+                Some("Only There")
+            );
+        }
+
+        let again = Config::parse(&config.to_json()).unwrap();
+        let apps = &again.extensions["dango.applications"].apps;
+        assert_eq!(apps.len(), 4);
+        assert!(apps["terminal"].hotkey.is_some());
+        assert!(matches!(
+            apps["terminal"].name,
+            Some(AppName::PerPlatform(_))
+        ));
     }
 
     #[test]

@@ -76,7 +76,33 @@
           "type": "object",
           "description": "Per-command settings, keyed by command id.",
           "additionalProperties": { "$ref": "#/$defs/command" }
+        },
+        "apps": {
+          "type": "object",
+          "description": "Applications bound to global hotkeys, keyed by the name Dango shows for the application in root search. Read by dango.applications only.",
+          "additionalProperties": { "$ref": "#/$defs/app" }
         }
+      }
+    },
+    "app": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "name": {
+          "description": "The application's shown name when it differs from the key, either one string or a per-platform object. An object with no value for the running platform means the entry is skipped there.",
+          "oneOf": [
+            { "type": "string" },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "macos": { "type": "string" },
+                "windows": { "type": "string" }
+              }
+            }
+          ]
+        },
+        "hotkey": { "$ref": "#/$defs/hotkey" }
       }
     },
     "command": {

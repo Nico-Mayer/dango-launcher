@@ -56,6 +56,10 @@ impl ApplicationsExtension {
         self.provider.clone()
     }
 
+    pub fn find_by_name(&self, name: &str) -> Vec<IndexedApp> {
+        self.index.find_by_name(name)
+    }
+
     /// Runs a chosen action, removing an entry that turns out to be gone.
     fn perform(&self, app_id: &str, action: &str) -> ActionOutcome {
         let Some(app) = self.index.get(app_id) else {
@@ -276,6 +280,23 @@ mod tests {
         assert_eq!(items.len(), 1);
         assert_eq!(items[0].title, "VS Code");
         assert_eq!(items[0].subtitle.as_deref(), Some("/a/code"));
+    }
+
+    #[test]
+    fn find_by_name_ignores_case_and_orders_duplicates_stably() {
+        let indexer = Arc::new(FakeIndexer::with_apps(&[
+            ("z-code", "Code", None),
+            ("a-code", "Code", None),
+            ("safari", "Safari", None),
+        ]));
+        let index = AppIndex::new(indexer, None);
+        index.rebuild();
+        let ext = ApplicationsExtension::new(index, IconCache::in_temp());
+
+        let ids: Vec<_> = ext.find_by_name("code").into_iter().map(|a| a.id).collect();
+        assert_eq!(ids, ["a-code", "z-code"]);
+        assert_eq!(ext.find_by_name("SAFARI").len(), 1);
+        assert!(ext.find_by_name("Nope").is_empty());
     }
 
     #[test]

@@ -26,22 +26,26 @@ pub struct PerPlatform {
     pub windows: Option<String>,
 }
 
+impl PerPlatform {
+    pub fn for_platform(&self) -> Option<&str> {
+        #[cfg(target_os = "macos")]
+        {
+            self.macos.as_deref()
+        }
+        #[cfg(not(target_os = "macos"))]
+        {
+            self.windows.as_deref()
+        }
+    }
+}
+
 impl Hotkey {
     /// The chord string for the platform this build runs on, if the file gave
     /// one for it.
     pub fn for_platform(&self) -> Option<&str> {
         match self {
             Hotkey::Portable(spec) => Some(spec),
-            Hotkey::PerPlatform(per) => {
-                #[cfg(target_os = "macos")]
-                {
-                    per.macos.as_deref()
-                }
-                #[cfg(not(target_os = "macos"))]
-                {
-                    per.windows.as_deref()
-                }
-            }
+            Hotkey::PerPlatform(per) => per.for_platform(),
         }
     }
 

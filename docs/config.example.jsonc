@@ -36,6 +36,21 @@
       }
     },
 
+    "dango.applications": {
+      // Open an application, or bring it to the front, from a global hotkey. The
+      // key is the name Dango shows for the app in root search, matched ignoring
+      // case. A chord bound here and to a command is reported, first wins.
+      "apps": {
+        "Safari": { "hotkey": "hyper+b" },
+        // When the name differs per platform, name it for each. A missing side
+        // means the entry does nothing on that platform.
+        "terminal": {
+          "name": { "macos": "Terminal", "windows": "Windows Terminal" },
+          "hotkey": "hyper+t"
+        }
+      }
+    },
+
     "dango.window-management": {
       "commands": {
         "left-half": {

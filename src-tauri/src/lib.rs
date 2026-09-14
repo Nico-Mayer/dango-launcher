@@ -402,7 +402,10 @@ fn run_command(app: &tauri::AppHandle, command_id: &str) -> Result<(), InvokeErr
                         owner: owner.clone(),
                         tree,
                     };
-                    if app.emit_to("main", protocol::EVENT_RENDER, payload).is_err() {
+                    if app
+                        .emit_to("main", protocol::EVENT_RENDER, payload)
+                        .is_err()
+                    {
                         break;
                     }
                 }
@@ -438,9 +441,14 @@ fn dispatch_command(app: &tauri::AppHandle, command_id: &str) {
         return;
     }
 
-    // A headless command that reshapes or types into the user's window needs the
-    // window that was focused at the press; the launcher never showed to record
-    // it, so capture it now.
+    remember_focused_window();
+    let _ = run_command(app, command_id);
+}
+
+/// A headless press that reshapes, types into, or launches over the user's
+/// window needs the window that was focused at the press; the launcher never
+/// showed to record it, so capture it now.
+fn remember_focused_window() {
     #[cfg(target_os = "windows")]
     unsafe {
         use windows_sys::Win32::UI::WindowsAndMessaging::GetForegroundWindow;
@@ -449,7 +457,67 @@ fn dispatch_command(app: &tauri::AppHandle, command_id: &str) {
             platform::remember_previous_foreground(foreground as isize);
         }
     }
-    let _ = run_command(app, command_id);
+}
+
+/// Launches an application from its hotkey: the same launch action Enter runs
+/// on the result, with the same frecency credit. The name is resolved now
+/// rather than when the chord was registered, so a binding shared from another
+/// machine starts working the moment the application is installed here.
+fn dispatch_application(app: &tauri::AppHandle, name: &str) {
+    let Some(applications) = app.try_state::<Arc<ApplicationsExtension>>() else {
+        report_hotkey_problem(app, "application hotkeys need the applications extension");
+        return;
+    };
+    let target = match hotkeys::resolve_application(name, applications.find_by_name(name)) {
+        hotkeys::Resolution::Missing(message) => {
+            report_hotkey_problem(app, &message);
+            return;
+        }
+        hotkeys::Resolution::Launch {
+            app: target,
+            ambiguity,
+        } => {
+            if let Some(note) = ambiguity {
+                report_hotkey_problem(app, &note);
+            }
+            target
+        }
+    };
+    remember_focused_window();
+
+    let app = app.clone();
+    // Off the shortcut handler's thread, as a result's launch runs off the
+    // command thread: the launch may wait on the operating system.
+    std::thread::spawn(move || {
+        let Some(host) = app.try_state::<Arc<Mutex<ExtensionHost>>>() else {
+            return;
+        };
+        let outcome = host.lock().unwrap().perform_action(
+            extensions::applications::EXTENSION_ID,
+            &target.id,
+            extensions::applications::ACTION_LAUNCH,
+            &FormValues::new(),
+        );
+        match outcome {
+            ActionOutcome::Done => {
+                if let Some(frecency) = app.try_state::<Arc<FrecencyTable>>() {
+                    frecency.record_launch(&target.id, now_millis());
+                }
+                hide_after_launch(&app);
+            }
+            ActionOutcome::Failed(message) => {
+                report_hotkey_problem(&app, &format!("application \"{}\": {message}", target.name));
+            }
+            ActionOutcome::CopyToClipboard(_) | ActionOutcome::Replaced(_) => {}
+        }
+    });
+}
+
+/// A press that could not do what the file asked has no launcher on screen to
+/// say so; the tray status line and the log are where it is visible.
+fn report_hotkey_problem(app: &tauri::AppHandle, message: &str) {
+    log_config(message);
+    set_config_status(app, true);
 }
 
 /// Hides the launcher without restoring the previous foreground, because the
@@ -597,7 +665,7 @@ fn apply_config_reload(
     app: &tauri::AppHandle,
     file_config: &Arc<config::FileConfig>,
     launcher_hotkey: &Arc<Mutex<Shortcut>>,
-    bindings: &Arc<Mutex<Vec<(Shortcut, String)>>>,
+    bindings: &Arc<Mutex<Vec<(Shortcut, hotkeys::Target)>>>,
     hyperkey: &HyperkeyHandle,
     result: Result<config::Config, config::ConfigError>,
 ) {
@@ -661,22 +729,22 @@ fn apply_command_hotkeys(
     app: &tauri::AppHandle,
     config: &config::Config,
     launcher: Shortcut,
-    bindings: &Arc<Mutex<Vec<(Shortcut, String)>>>,
+    bindings: &Arc<Mutex<Vec<(Shortcut, hotkeys::Target)>>>,
 ) -> Vec<String> {
-    let previous: Vec<(Shortcut, String)> = bindings.lock().unwrap().drain(..).collect();
+    let previous: Vec<(Shortcut, hotkeys::Target)> = bindings.lock().unwrap().drain(..).collect();
     for (chord, _) in previous {
         let _ = app.global_shortcut().unregister(chord);
     }
 
-    let built = crate::hotkeys::command_bindings(config, launcher);
+    let built = crate::hotkeys::bindings(config, launcher);
     let mut conflicts = built.conflicts;
     let mut table = bindings.lock().unwrap();
     for binding in built.bindings {
         match app.global_shortcut().register(binding.chord) {
-            Ok(()) => table.push((binding.chord, binding.command_id)),
+            Ok(()) => table.push((binding.chord, binding.target)),
             Err(error) => conflicts.push(format!(
                 "{}: could not register its hotkey, {error}",
-                binding.command_id
+                binding.target
             )),
         }
     }
@@ -745,7 +813,7 @@ pub fn run() {
     let handler_hotkey = launcher_hotkey.clone();
     // Command hotkeys, as (chord, qualified command id). Shared so the handler
     // dispatches on a press and a reload can rebuild the set.
-    let bindings: Arc<Mutex<Vec<(Shortcut, String)>>> = Arc::new(Mutex::new(Vec::new()));
+    let bindings: Arc<Mutex<Vec<(Shortcut, hotkeys::Target)>>> = Arc::new(Mutex::new(Vec::new()));
     let handler_bindings = bindings.clone();
     let hyperkey: HyperkeyHandle = Arc::new(Mutex::new(None));
 
@@ -764,14 +832,18 @@ pub fn run() {
                         toggle(app);
                         return;
                     }
-                    let command = handler_bindings
+                    let target = handler_bindings
                         .lock()
                         .unwrap()
                         .iter()
                         .find(|(chord, _)| chord == received)
-                        .map(|(_, id)| id.clone());
-                    if let Some(command_id) = command {
-                        dispatch_command(app, &command_id);
+                        .map(|(_, target)| target.clone());
+                    match target {
+                        Some(hotkeys::Target::Command(id)) => dispatch_command(app, &id),
+                        Some(hotkeys::Target::Application(name)) => {
+                            dispatch_application(app, &name)
+                        }
+                        None => {}
                     }
                 })
                 .build(),
