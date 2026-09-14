@@ -84,8 +84,13 @@ impl WindowsKeys {
             enigo.key(Key::Control, Direction::Release)?;
             pressed
         };
-        send(&mut enigo).map_err(|error| TextError::TargetUnavailable(error.to_string()))
+        send(&mut enigo).map_err(keystroke_failed)
     }
+}
+
+fn keystroke_failed(error: enigo::InputError) -> TextError {
+    eprintln!("[dango] keystroke failed: {error}");
+    TextError::TargetUnavailable(crate::text::KEYSTROKE_FAILED.into())
 }
 
 impl Keys for WindowsKeys {
@@ -102,7 +107,7 @@ impl Keys for WindowsKeys {
         for _ in 0..times {
             enigo
                 .key(Key::LeftArrow, Direction::Click)
-                .map_err(|error| TextError::TargetUnavailable(error.to_string()))?;
+                .map_err(keystroke_failed)?;
         }
         Ok(())
     }
@@ -112,7 +117,7 @@ impl Keys for WindowsKeys {
         for _ in 0..times {
             enigo
                 .key(Key::Backspace, Direction::Click)
-                .map_err(|error| TextError::TargetUnavailable(error.to_string()))?;
+                .map_err(keystroke_failed)?;
         }
         Ok(())
     }
@@ -135,7 +140,7 @@ impl Handoff for WindowsHandoff {
         };
         if is_out_of_reach(previous) {
             return Err(TextError::TargetUnavailable(
-                "that window belongs to an elevated program, which Dango cannot reach".into(),
+                "Dango can't paste into programs running as administrator.".into(),
             ));
         }
 
@@ -154,7 +159,8 @@ impl Handoff for WindowsHandoff {
             }
             if Instant::now() >= deadline {
                 return Err(TextError::TargetUnavailable(
-                    "the previous window would not come back to the foreground".into(),
+                    "The previous app didn't come back to the front. Click into it and try again."
+                        .into(),
                 ));
             }
             std::thread::sleep(FOREGROUND_POLL);

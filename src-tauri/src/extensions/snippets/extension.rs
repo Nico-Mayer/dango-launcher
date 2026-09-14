@@ -170,7 +170,7 @@ impl SnippetsExtension {
             Err(error) => return ActionOutcome::Failed(error.to_string()),
         };
         let Some(opener) = &self.opener else {
-            return ActionOutcome::Failed("nothing here can open a URL".into());
+            return ActionOutcome::Failed("Dango can't open URLs on this platform.".into());
         };
         match opener.open(&url) {
             Ok(()) => ActionOutcome::Done,
@@ -181,7 +181,7 @@ impl SnippetsExtension {
     fn list_tree(&self) -> ViewTree {
         let items = match self.records.all() {
             Ok(records) => records,
-            Err(error) => return failure_tree(&error.to_string()),
+            Err(error) => return failure_tree(&error.to_string(), self.records.kind()),
         };
         list_tree(&items, self.records.kind())
     }
@@ -273,7 +273,7 @@ impl Extension for SnippetsExtension {
                     (_, Kind::Snippet) => self.insert(&record, arguments),
                 }
             }
-            _ => ActionOutcome::Failed("that is not something a snippet can do".into()),
+            _ => ActionOutcome::Failed("That action isn't available.".into()),
         }
     }
 }
@@ -321,7 +321,7 @@ impl RootProvider for SnippetProvider {
 
 fn item_actions(kind: Kind) -> Vec<Action> {
     let primary = match kind {
-        Kind::Snippet => "Insert",
+        Kind::Snippet => "Paste",
         Kind::Quicklink => "Open",
     };
     vec![
@@ -342,7 +342,7 @@ fn item_actions(kind: Kind) -> Vec<Action> {
         },
         Action {
             id: ACTION_REMOVE.into(),
-            title: "Remove".into(),
+            title: "Delete".into(),
             shortcut: None,
         },
     ]
@@ -380,8 +380,8 @@ impl Command for ShowList {
 
 fn form_tree(record: Option<&Record>, kind: Kind) -> ViewTree {
     let (body_label, save_title) = match kind {
-        Kind::Snippet => ("Snippet", "Save Snippet"),
-        Kind::Quicklink => ("URL", "Save Quicklink"),
+        Kind::Snippet => ("Text", "Save snippet"),
+        Kind::Quicklink => ("URL", "Save quicklink"),
     };
     let mut fields = vec![
         FormField {
@@ -480,14 +480,18 @@ fn list_tree(records: &[Record], kind: Kind) -> ViewTree {
     }
 }
 
-fn failure_tree(message: &str) -> ViewTree {
+fn failure_tree(message: &str, kind: Kind) -> ViewTree {
+    let title = match kind {
+        Kind::Snippet => "Couldn't read your snippets",
+        Kind::Quicklink => "Couldn't read your quicklinks",
+    };
     ViewTree {
         protocol_version: PROTOCOL_VERSION,
         view: View::List(ListView {
             filtering: Filtering::Launcher,
             loading: false,
             empty_state: Some(EmptyState {
-                title: "That did not work".into(),
+                title: title.into(),
                 description: Some(message.into()),
             }),
             items: vec![],

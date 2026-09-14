@@ -612,9 +612,9 @@ fn launcher_shortcut(config: &config::Config) -> Shortcut {
 /// The tray line describing the config file's health.
 fn config_status_text(error: bool) -> &'static str {
     if error {
-        "Config error, see log"
+        "Config file has an error, see dango.log"
     } else {
-        "Config loaded"
+        "Config file loaded"
     }
 }
 
@@ -898,7 +898,7 @@ pub fn run() {
                 }) => {
                     if let Some(aside) = recovered_from {
                         eprintln!("[dango] database was corrupt, moved to {}", aside.display());
-                        notices.push("Database was corrupt, started empty".to_string());
+                        notices.push("Database was reset, see dango.log".to_string());
                     }
                     eprintln!(
                         "[dango] store ready at schema version {}",
@@ -910,7 +910,7 @@ pub fn run() {
                 }
                 Err(error) => {
                     eprintln!("[dango] database unavailable: {error}");
-                    notices.push("Database unavailable, see log".to_string());
+                    notices.push("Database unavailable, see dango.log".to_string());
                     None
                 }
             };
@@ -1032,7 +1032,7 @@ pub fn run() {
                     let (records, load_error) = snippets::Records::open(&records_dir, kind);
                     if let Some(error) = load_error {
                         log_config(&format!("{}: {error}", kind.file_name()));
-                        notices.push(format!("{} has an error, see log", kind.file_name()));
+                        notices.push(format!("{} has an error, see dango.log", kind.file_name()));
                     }
                     // Apply hand-edits to the file live, on the main thread for
                     // the tray, keeping the last good records on a parse failure.
@@ -1113,7 +1113,7 @@ pub fn run() {
             let current_shortcut = *launcher_hotkey.lock().unwrap();
             if let Err(error) = app.global_shortcut().register(current_shortcut) {
                 eprintln!("[dango] could not register the launcher hotkey: {error}");
-                notices.push(format!("{SHORTCUT_LABEL} unavailable, already in use"));
+                notices.push(format!("{SHORTCUT_LABEL} is in use, set launcher.hotkey"));
             }
 
             // Register the command hotkeys from the config, surfacing conflicts.
@@ -1127,7 +1127,7 @@ pub fn run() {
                     for conflict in &conflicts {
                         log_config(conflict);
                     }
-                    notices.push("Hotkey conflict, see log".to_string());
+                    notices.push("Some hotkeys are already in use, see dango.log".to_string());
                 }
             }
 
@@ -1138,7 +1138,7 @@ pub fn run() {
                 let config = config.read().unwrap();
                 if let Some(message) = apply_hyperkey(&config, &hyperkey) {
                     log_config(&message);
-                    notices.push("Hyperkey unavailable, see log".to_string());
+                    notices.push("Hyperkey didn't start, see dango.log".to_string());
                 }
             }
             app.manage(HyperkeyState(hyperkey.clone()));
@@ -1158,7 +1158,8 @@ pub fn run() {
                 false,
                 None::<&str>,
             )?;
-            let toggle_item = MenuItem::with_id(app, "toggle", "Toggle Dango", true, None::<&str>)?;
+            let toggle_item =
+                MenuItem::with_id(app, "toggle", "Show or hide Dango", true, None::<&str>)?;
             let quit_item = MenuItem::with_id(app, "quit", "Quit Dango", true, None::<&str>)?;
             let mut items: Vec<&dyn IsMenuItem<tauri::Wry>> = notice_items
                 .iter()

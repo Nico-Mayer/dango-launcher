@@ -29,13 +29,17 @@ impl WindowManager for WindowsWindowManager {
         let hwnd = previous_foreground().ok_or(WindowError::NoTarget)?;
         if is_out_of_reach(hwnd) {
             return Err(WindowError::Unreachable(
-                "that window belongs to an elevated program, which Dango cannot reach".into(),
+                "Dango can't move windows of programs running as administrator.".into(),
             ));
         }
-        let frame = visible_frame(hwnd)
-            .ok_or_else(|| WindowError::Failed("could not read the window's frame".into()))?;
-        let work_area = work_area(hwnd)
-            .ok_or_else(|| WindowError::Failed("could not read the display".into()))?;
+        let frame = visible_frame(hwnd).ok_or_else(|| {
+            eprintln!("[dango] could not read the window's frame");
+            WindowError::Failed(crate::platform::WINDOW_READ_FAILED.into())
+        })?;
+        let work_area = work_area(hwnd).ok_or_else(|| {
+            eprintln!("[dango] could not read the display");
+            WindowError::Failed(crate::platform::WINDOW_READ_FAILED.into())
+        })?;
         Ok(Placement { frame, work_area })
     }
 
@@ -59,7 +63,7 @@ impl WindowManager for WindowsWindowManager {
         let hwnd = previous_foreground().ok_or(WindowError::NoTarget)?;
         if is_out_of_reach(hwnd) {
             return Err(WindowError::Unreachable(
-                "that window belongs to an elevated program, which Dango cannot reach".into(),
+                "Dango can't move windows of programs running as administrator.".into(),
             ));
         }
 
@@ -89,7 +93,9 @@ impl WindowManager for WindowsWindowManager {
             )
         };
         if ok == 0 {
-            return Err(WindowError::Failed("the window refused to move".into()));
+            return Err(WindowError::Failed(
+                "That window didn't move. It may have a fixed size.".into(),
+            ));
         }
         Ok(())
     }

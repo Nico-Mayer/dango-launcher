@@ -41,8 +41,10 @@ pub struct WindowsSystemControl;
 
 impl SystemControl for WindowsSystemControl {
     fn lock(&self) -> Result<(), SystemError> {
-        unsafe { LockWorkStation() }
-            .map_err(|error| SystemError::Failed(format!("the system refused to lock ({error})")))
+        unsafe { LockWorkStation() }.map_err(|error| {
+            eprintln!("[dango] LockWorkStation failed: {error}");
+            SystemError::Failed("The screen didn't lock. Try again.".into())
+        })
     }
 
     /// `SetSuspendState` does not return until the machine wakes again, so it
@@ -55,9 +57,10 @@ impl SystemControl for WindowsSystemControl {
             let _ = tx.send((suspended, error));
         });
         match rx.recv_timeout(SUSPEND_GRACE) {
-            Ok((false, error)) => Err(SystemError::Failed(format!(
-                "the system refused to sleep ({error})"
-            ))),
+            Ok((false, error)) => {
+                eprintln!("[dango] SetSuspendState failed: {error}");
+                Err(SystemError::Failed("Sleep didn't start. Try again.".into()))
+            }
             _ => Ok(()),
         }
     }
@@ -68,7 +71,8 @@ impl SystemControl for WindowsSystemControl {
             ..Default::default()
         };
         unsafe { SHQueryRecycleBinW(PCWSTR::null(), &mut info) }.map_err(|error| {
-            SystemError::Failed(format!("the recycle bin could not be read ({error})"))
+            eprintln!("[dango] SHQueryRecycleBin failed: {error}");
+            SystemError::Failed("Couldn't check the Recycle Bin.".into())
         })?;
         Ok(info.i64NumItems.max(0) as usize)
     }
@@ -81,9 +85,12 @@ impl SystemControl for WindowsSystemControl {
             Ok(()) => Ok(()),
             // Emptying a bin that is already empty is reported as E_UNEXPECTED.
             Err(error) if error.code() == E_UNEXPECTED => Ok(()),
-            Err(error) => Err(SystemError::Failed(format!(
-                "the recycle bin could not be emptied ({error})"
-            ))),
+            Err(error) => {
+                eprintln!("[dango] SHEmptyRecycleBin failed: {error}");
+                Err(SystemError::Failed(
+                    "Couldn't empty the Recycle Bin.".into(),
+                ))
+            }
         }
     }
 
@@ -117,14 +124,14 @@ impl SystemControl for WindowsSystemControl {
     fn quit(&self, app_id: &str) -> Result<(), SystemError> {
         let pid: u32 = app_id
             .parse()
-            .map_err(|_| SystemError::Failed("that is not an application".into()))?;
+            .map_err(|_| SystemError::Failed("That isn't an app Dango can quit.".into()))?;
         let windows: Vec<HWND> = unsafe { switcher_windows() }
             .into_iter()
             .filter(|hwnd| unsafe { owning_pid(*hwnd) } == Some(pid))
             .collect();
         if windows.is_empty() {
             return Err(if unsafe { process_is_alive(pid) } {
-                SystemError::Failed("that application has no window left to close".into())
+                SystemError::Failed("That app has no window left to close.".into())
             } else {
                 SystemError::Gone
             });

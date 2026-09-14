@@ -19,27 +19,34 @@ impl SystemControl for MacSystemControl {
             let handle = libc::dlopen(FRAMEWORK.as_ptr(), libc::RTLD_LAZY);
             if handle.is_null() {
                 return Err(SystemError::Failed(
-                    "this version of macOS has no lock entry point".into(),
+                    "Lock screen isn't supported on this version of macOS.".into(),
                 ));
             }
             let symbol = libc::dlsym(handle, SYMBOL.as_ptr());
             if symbol.is_null() {
                 return Err(SystemError::Failed(
-                    "this version of macOS has no lock entry point".into(),
+                    "Lock screen isn't supported on this version of macOS.".into(),
                 ));
             }
             let lock_screen: extern "C" fn() -> i32 = std::mem::transmute(symbol);
             match lock_screen() {
                 0 => Ok(()),
-                status => Err(SystemError::Failed(format!(
-                    "the system refused to lock ({status})"
-                ))),
+                status => {
+                    eprintln!("[dango] the lock call returned {status}");
+                    Err(SystemError::Failed(
+                        "The screen didn't lock. Try again.".into(),
+                    ))
+                }
             }
         }
     }
 
     fn sleep(&self) -> Result<(), SystemError> {
-        run("/usr/bin/pmset", &["sleepnow"])
+        run(
+            "/usr/bin/pmset",
+            &["sleepnow"],
+            "Sleep didn't start. Try again.",
+        )
     }
 
     /// Through Finder, not the filesystem. `~/.Trash` is behind Full Disk
@@ -47,15 +54,22 @@ impl SystemControl for MacSystemControl {
     /// already has it. The cost is that the first call prompts once for
     /// permission to control Finder.
     fn trash_count(&self) -> Result<usize, SystemError> {
-        let count = osascript("tell application \"Finder\" to count items of trash")?;
-        count
-            .trim()
-            .parse()
-            .map_err(|_| SystemError::Failed(format!("Finder answered '{}'", count.trim())))
+        let count = osascript(
+            "tell application \"Finder\" to count items of trash",
+            "Couldn't check the Trash.",
+        )?;
+        count.trim().parse().map_err(|_| {
+            eprintln!("[dango] Finder answered '{}'", count.trim());
+            SystemError::Failed("Couldn't check the Trash.".into())
+        })
     }
 
     fn empty_trash(&self) -> Result<(), SystemError> {
-        osascript("tell application \"Finder\" to empty trash").map(|_| ())
+        osascript(
+            "tell application \"Finder\" to empty trash",
+            "Couldn't empty the Trash.",
+        )
+        .map(|_| ())
     }
 
     fn running_apps(&self) -> Vec<RunningApp> {
@@ -91,7 +105,7 @@ impl SystemControl for MacSystemControl {
     fn quit(&self, app_id: &str) -> Result<(), SystemError> {
         let pid: i32 = app_id
             .parse()
-            .map_err(|_| SystemError::Failed("that is not an application".into()))?;
+            .map_err(|_| SystemError::Failed("That isn't an app Dango can quit.".into()))?;
         let app = objc2_app_kit::NSRunningApplication::runningApplicationWithProcessIdentifier(pid)
             .ok_or(SystemError::Gone)?;
         // terminate is a request. An application holding an unsaved document
@@ -102,26 +116,22 @@ impl SystemControl for MacSystemControl {
     }
 }
 
-/// Denial is the interesting failure here: refusing Dango permission to control
-/// Finder comes back as an error, and the message is worth showing rather than
-/// swallowing.
-fn osascript(script: &str) -> Result<String, SystemError> {
+/// Finder's own error text, including a refused permission to control it, goes
+/// to the log; the user sees `failure`.
+fn osascript(script: &str, failure: &str) -> Result<String, SystemError> {
     let output = std::process::Command::new("/usr/bin/osascript")
         .args(["-e", script])
         .output()
-        .map_err(|error| SystemError::Failed(error.to_string()))?;
+        .map_err(|error| {
+            eprintln!("[dango] osascript did not start: {error}");
+            SystemError::Failed(failure.into())
+        })?;
     if output.status.success() {
         Ok(String::from_utf8_lossy(&output.stdout).into_owned())
     } else {
         let message = String::from_utf8_lossy(&output.stderr);
-        Err(SystemError::Failed(
-            message
-                .rsplit("execution error: ")
-                .next()
-                .unwrap_or("Finder refused the request")
-                .trim()
-                .to_string(),
-        ))
+        eprintln!("[dango] osascript failed: {}", message.trim());
+        Err(SystemError::Failed(failure.into()))
     }
 }
 
@@ -132,17 +142,19 @@ fn display_name(path: &str) -> String {
         .unwrap_or_else(|| path.to_owned())
 }
 
-fn run(program: &str, args: &[&str]) -> Result<(), SystemError> {
+fn run(program: &str, args: &[&str], failure: &str) -> Result<(), SystemError> {
     let status = std::process::Command::new(program)
         .args(args)
         .status()
-        .map_err(|error| SystemError::Failed(error.to_string()))?;
+        .map_err(|error| {
+            eprintln!("[dango] {program} did not start: {error}");
+            SystemError::Failed(failure.into())
+        })?;
     if status.success() {
         Ok(())
     } else {
-        Err(SystemError::Failed(format!(
-            "{program} refused the request"
-        )))
+        eprintln!("[dango] {program} exited with {status}");
+        Err(SystemError::Failed(failure.into()))
     }
 }
 

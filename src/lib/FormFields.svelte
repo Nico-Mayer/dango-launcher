@@ -102,7 +102,7 @@
             Will ask for: {inspections[field.id].arguments.join(", ")}
           </span>
         {:else}
-          <span class="text-muted-foreground text-xs">Asks for nothing</span>
+          <span class="text-muted-foreground text-xs">Nothing to fill in</span>
         {/if}
       {:else}
         <input

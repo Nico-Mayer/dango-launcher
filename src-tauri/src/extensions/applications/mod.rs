@@ -63,26 +63,31 @@ impl ApplicationsExtension {
     /// Runs a chosen action, removing an entry that turns out to be gone.
     fn perform(&self, app_id: &str, action: &str) -> ActionOutcome {
         let Some(app) = self.index.get(app_id) else {
-            return ActionOutcome::Failed("application is no longer in the index".into());
+            return ActionOutcome::Failed(
+                "That app is no longer installed. It's been removed from results.".into(),
+            );
         };
         match action {
             ACTION_LAUNCH => match self.index.launch(&app) {
                 Ok(()) => ActionOutcome::Done,
                 Err(LaunchError::NotFound) => {
                     self.index.remove(app_id);
-                    ActionOutcome::Failed("application no longer exists".into())
+                    ActionOutcome::Failed(LaunchError::NotFound.to_string())
                 }
                 Err(LaunchError::Failed(message)) => ActionOutcome::Failed(message),
             },
             ACTION_REVEAL => match self.index.reveal(&app) {
                 Ok(()) => ActionOutcome::Done,
-                Err(error) => ActionOutcome::Failed(error.to_string()),
+                Err(error) => {
+                    eprintln!("[dango] could not reveal {}: {error}", app.name);
+                    ActionOutcome::Failed(format!("Couldn't show {} in {FILE_MANAGER}.", app.name))
+                }
             },
             ACTION_COPY_PATH => match app.target {
                 Some(path) => ActionOutcome::CopyToClipboard(path),
-                None => ActionOutcome::Failed("this application has no file path".into()),
+                None => ActionOutcome::Failed("This app has no file path to copy.".into()),
             },
-            other => ActionOutcome::Failed(format!("unknown action '{other}'")),
+            _ => ActionOutcome::Failed("That action isn't available.".into()),
         }
     }
 }
@@ -149,22 +154,22 @@ impl RootProvider for AppProvider {
 }
 
 #[cfg(target_os = "macos")]
-const REVEAL_TITLE: &str = "Reveal in Finder";
+const FILE_MANAGER: &str = "Finder";
 #[cfg(not(target_os = "macos"))]
-const REVEAL_TITLE: &str = "Reveal in File Explorer";
+const FILE_MANAGER: &str = "File Explorer";
 
 /// The action panel for an application result. Launch is primary; reveal and
 /// copy are offered only when the app has a filesystem path.
 fn app_actions(has_path: bool) -> Vec<Action> {
     let mut actions = vec![Action {
         id: ACTION_LAUNCH.into(),
-        title: "Launch".into(),
+        title: "Open".into(),
         shortcut: None,
     }];
     if has_path {
         actions.push(Action {
             id: ACTION_REVEAL.into(),
-            title: REVEAL_TITLE.into(),
+            title: format!("Show in {FILE_MANAGER}"),
             shortcut: Some(Shortcut {
                 key: "r".into(),
                 modifiers: vec![Modifier::Ctrl],
@@ -172,7 +177,7 @@ fn app_actions(has_path: bool) -> Vec<Action> {
         });
         actions.push(Action {
             id: ACTION_COPY_PATH.into(),
-            title: "Copy Path".into(),
+            title: "Copy path".into(),
             shortcut: Some(Shortcut {
                 key: "c".into(),
                 modifiers: vec![Modifier::Ctrl],

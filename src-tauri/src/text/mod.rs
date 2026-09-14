@@ -28,15 +28,17 @@ const COPY_POLL: std::time::Duration = std::time::Duration::from_millis(5);
 /// inside the 400ms an insertion and the 500ms an expansion are allowed.
 const PASTE_GRACE: std::time::Duration = std::time::Duration::from_millis(120);
 
+pub const KEYSTROKE_FAILED: &str = "Couldn't send the keystroke. Try again.";
+
 #[derive(Debug, thiserror::Error, PartialEq, Eq, Clone)]
 pub enum TextError {
-    #[error("Dango needs the Accessibility permission to do that")]
+    #[error("Dango needs the Accessibility permission to paste. Grant it in System Settings, Privacy & Security.")]
     PermissionMissing,
-    #[error("there is no application to put that into")]
+    #[error("Nothing to paste into. Switch to an app first.")]
     NoTarget,
     #[error("{0}")]
     TargetUnavailable(String),
-    #[error("the clipboard could not be used")]
+    #[error("Couldn't use the clipboard. Try again.")]
     Clipboard,
 }
 
@@ -1066,5 +1068,25 @@ mod tests {
             Some("what was selected")
         );
         assert_eq!(keys.events(), vec!["copy"]);
+    }
+}
+
+#[cfg(test)]
+mod display_tests {
+    use super::{TextError, KEYSTROKE_FAILED};
+
+    #[test]
+    fn every_message_is_a_sentence() {
+        let errors = [
+            TextError::PermissionMissing,
+            TextError::NoTarget,
+            TextError::TargetUnavailable(KEYSTROKE_FAILED.into()),
+            TextError::Clipboard,
+        ];
+        for error in errors {
+            let text = error.to_string();
+            assert!(text.starts_with(char::is_uppercase), "{text}");
+            assert!(text.ends_with('.'), "{text}");
+        }
     }
 }

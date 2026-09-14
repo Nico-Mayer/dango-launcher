@@ -24,14 +24,15 @@ use objc2_application_services::{AXError, AXUIElement, AXValue, AXValueType};
 use objc2_core_foundation::{CFRetained, CFString, CFType, CGPoint, CGRect, CGSize};
 use objc2_foundation::MainThreadMarker;
 
-use crate::platform::{Placement, Rect, WindowError, WindowManager};
+use crate::platform::{Placement, Rect, WindowError, WindowManager, WINDOW_READ_FAILED};
 use crate::text::MainThread;
 
 const FOCUSED_WINDOW: &str = "AXFocusedWindow";
 const POSITION: &str = "AXPosition";
 const SIZE: &str = "AXSize";
 
-const PERMISSION_MISSING: &str = "Dango needs the Accessibility permission to move windows";
+const PERMISSION_MISSING: &str = "Dango needs the Accessibility permission to move windows. Grant it in System Settings, Privacy & Security.";
+const NOT_MOVABLE: &str = "That app doesn't let Dango move its windows.";
 
 /// Long enough that a briefly busy main thread still answers, short enough that
 /// a wedged one fails rather than hanging the command.
@@ -72,8 +73,10 @@ impl WindowManager for MacWindowManager {
     fn target(&self) -> Result<Placement, WindowError> {
         let window = focused_window()?;
         let frame = read_frame(&window)?;
-        let work_area = work_area_for(frame, &self.screens())
-            .ok_or_else(|| WindowError::Failed("could not read the display".into()))?;
+        let work_area = work_area_for(frame, &self.screens()).ok_or_else(|| {
+            eprintln!("[dango] no screen contains the window's frame");
+            WindowError::Failed(WINDOW_READ_FAILED.into())
+        })?;
         Ok(Placement { frame, work_area })
     }
 
@@ -114,7 +117,10 @@ fn focused_window() -> Result<CFRetained<AXUIElement>, WindowError> {
         .map_err(ax_error)?
         .ok_or(WindowError::NoTarget)?
         .downcast::<AXUIElement>()
-        .map_err(|_| WindowError::Failed("the focused window could not be read".into()))
+        .map_err(|_| {
+            eprintln!("[dango] the focused window was not an AXUIElement");
+            WindowError::Failed(WINDOW_READ_FAILED.into())
+        })
 }
 
 fn read_frame(window: &AXUIElement) -> Result<Rect, WindowError> {
@@ -135,15 +141,22 @@ fn read_value<T: Default>(
 ) -> Result<T, WindowError> {
     let value = unsafe { copy_attribute(window, attribute) }
         .map_err(ax_error)?
-        .ok_or_else(|| WindowError::Unreachable(format!("that window has no {attribute}")))?
+        .ok_or_else(|| {
+            eprintln!("[dango] that window has no {attribute}");
+            WindowError::Unreachable(NOT_MOVABLE.into())
+        })?
         .downcast::<AXValue>()
-        .map_err(|_| WindowError::Failed(format!("{attribute} was not an AXValue")))?;
+        .map_err(|_| {
+            eprintln!("[dango] {attribute} was not an AXValue");
+            WindowError::Failed(WINDOW_READ_FAILED.into())
+        })?;
 
     let mut out = T::default();
     let decoded = unsafe { value.value(kind, NonNull::from(&mut out).cast()) };
-    decoded
-        .then_some(out)
-        .ok_or_else(|| WindowError::Failed(format!("{attribute} could not be read")))
+    decoded.then_some(out).ok_or_else(|| {
+        eprintln!("[dango] {attribute} could not be read");
+        WindowError::Failed(WINDOW_READ_FAILED.into())
+    })
 }
 
 fn write_value<T>(
@@ -152,8 +165,11 @@ fn write_value<T>(
     kind: AXValueType,
     mut value: T,
 ) -> Result<(), WindowError> {
-    let boxed = unsafe { AXValue::new(kind, NonNull::from(&mut value).cast()) }
-        .ok_or_else(|| WindowError::Failed(format!("{attribute} could not be encoded")))?;
+    let boxed =
+        unsafe { AXValue::new(kind, NonNull::from(&mut value).cast()) }.ok_or_else(|| {
+            eprintln!("[dango] {attribute} could not be encoded");
+            WindowError::Failed(WINDOW_READ_FAILED.into())
+        })?;
     let name = CFString::from_str(attribute);
     let value: &CFType = &boxed;
     match unsafe { window.set_attribute_value(&name, value) } {
@@ -184,11 +200,12 @@ unsafe fn copy_attribute(
 fn ax_error(error: AXError) -> WindowError {
     match error {
         AXError::APIDisabled => WindowError::Failed(PERMISSION_MISSING.into()),
-        AXError::NotImplemented => {
-            WindowError::Unreachable("that application does not let Dango move its windows".into())
-        }
+        AXError::NotImplemented => WindowError::Unreachable(NOT_MOVABLE.into()),
         AXError::InvalidUIElement => WindowError::NoTarget,
-        other => WindowError::Failed(format!("that window could not be reached ({})", other.0)),
+        other => {
+            eprintln!("[dango] accessibility error {}", other.0);
+            WindowError::Failed("Couldn't reach that window. Try again.".into())
+        }
     }
 }
 

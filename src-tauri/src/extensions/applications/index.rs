@@ -20,7 +20,7 @@ pub struct IconRgba {
 
 #[derive(Debug, thiserror::Error)]
 pub enum LaunchError {
-    #[error("application no longer exists")]
+    #[error("That app is no longer installed. It's been removed from results.")]
     NotFound,
     #[error("{0}")]
     Failed(String),

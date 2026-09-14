@@ -25,9 +25,9 @@ const CARET_SENTINEL: char = '\u{E000}';
 
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
 pub enum TemplateError {
-    #[error("{0}")]
+    #[error("This template can't be read: {0}")]
     Parse(String),
-    #[error("{0}")]
+    #[error("This template couldn't be filled in: {0}")]
     Render(String),
 }
 
@@ -524,5 +524,22 @@ mod tests {
             elapsed < std::time::Duration::from_millis(5),
             "rendering took {elapsed:?}, the budget is 5ms"
         );
+    }
+}
+
+#[cfg(test)]
+mod display_tests {
+    use super::TemplateError;
+
+    #[test]
+    fn every_message_leads_with_a_sentence() {
+        let errors = [
+            TemplateError::Parse("unexpected end of input".into()),
+            TemplateError::Render("undefined value".into()),
+        ];
+        for error in errors {
+            let text = error.to_string();
+            assert!(text.starts_with(char::is_uppercase), "{text}");
+        }
     }
 }

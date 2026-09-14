@@ -20,21 +20,21 @@ use crate::templates::{Template, TemplateError, Values};
 
 #[derive(Debug, thiserror::Error)]
 pub enum RecordError {
-    #[error("give it a name")]
+    #[error("Enter a name.")]
     NoName,
     #[error("{0}")]
     NoBody(&'static str),
     #[error("{0}")]
     Template(#[from] TemplateError),
-    #[error("give it a valid URL")]
+    #[error("Enter a valid URL, such as https://example.com.")]
     InvalidUrl,
-    #[error("that one is no longer there")]
+    #[error("That one no longer exists. Go back to refresh the list.")]
     Gone,
-    #[error("the records file is not valid JSON: {0}")]
+    #[error("The file isn't valid JSON: {0}")]
     Parse(String),
-    #[error("a snippet with a fill-in-the-blank cannot have a keyword")]
+    #[error("A snippet that asks for input can't have a keyword.")]
     KeywordNeedsPlainSnippet,
-    #[error("another snippet already uses the keyword '{0}'")]
+    #[error("Another snippet already uses the keyword {0}.")]
     KeywordTaken(String),
 }
 
@@ -75,8 +75,8 @@ impl Kind {
 
     fn missing_body(self) -> &'static str {
         match self {
-            Kind::Snippet => "give it some text",
-            Kind::Quicklink => "give it a URL",
+            Kind::Snippet => "Enter the snippet text.",
+            Kind::Quicklink => "Enter a URL.",
         }
     }
 }
@@ -524,14 +524,17 @@ mod tests {
     fn a_quicklink_says_it_needs_a_url() {
         let records = records(Kind::Quicklink);
         let error = records.create("Search", "  ", None).unwrap_err();
-        assert_eq!(error.to_string(), "give it a URL");
+        assert_eq!(error.to_string(), "Enter a URL.");
     }
 
     #[test]
     fn a_quicklink_refuses_text_that_cannot_form_a_url() {
         let records = records(Kind::Quicklink);
         let error = records.create("Search", "not a URL", None).unwrap_err();
-        assert_eq!(error.to_string(), "give it a valid URL");
+        assert_eq!(
+            error.to_string(),
+            "Enter a valid URL, such as https://example.com."
+        );
         assert!(records.all().unwrap().is_empty());
     }
 
@@ -604,5 +607,41 @@ mod tests {
         // Re-saving the same record keeps its own keyword.
         let id = records.create("Three", "third", Some(";x")).unwrap();
         assert!(records.update(&id, "Three", "third", Some(";x")).is_ok());
+    }
+}
+
+#[cfg(test)]
+mod display_tests {
+    use super::{Kind, RecordError};
+    use crate::templates::TemplateError;
+
+    #[test]
+    fn every_fixed_message_is_a_sentence() {
+        let errors = [
+            RecordError::NoName,
+            RecordError::NoBody(Kind::Snippet.missing_body()),
+            RecordError::NoBody(Kind::Quicklink.missing_body()),
+            RecordError::InvalidUrl,
+            RecordError::Gone,
+            RecordError::KeywordNeedsPlainSnippet,
+            RecordError::KeywordTaken("sig".into()),
+        ];
+        for error in errors {
+            let text = error.to_string();
+            assert!(text.starts_with(char::is_uppercase), "{text}");
+            assert!(text.ends_with('.'), "{text}");
+        }
+    }
+
+    #[test]
+    fn a_message_carrying_detail_still_starts_with_a_sentence() {
+        let errors = [
+            RecordError::Parse("expected value".into()),
+            RecordError::Template(TemplateError::Parse("unexpected end".into())),
+        ];
+        for error in errors {
+            let text = error.to_string();
+            assert!(text.starts_with(char::is_uppercase), "{text}");
+        }
     }
 }

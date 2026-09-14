@@ -67,7 +67,7 @@ pub trait Extension: Send + Sync {
         _action_id: &str,
         _values: &FormValues,
     ) -> ActionOutcome {
-        ActionOutcome::Failed("this extension has no actions".into())
+        ActionOutcome::Failed("That action isn't available.".into())
     }
 }
 
@@ -164,11 +164,11 @@ impl ExtensionHost {
         values: &FormValues,
     ) -> ActionOutcome {
         if !self.is_active(extension_id) {
-            return ActionOutcome::Failed("that extension is not available".into());
+            return ActionOutcome::Failed("That extension is turned off.".into());
         }
         match self.extensions.get(extension_id) {
             Some(extension) => extension.perform_action(item_id, action_id, values),
-            None => ActionOutcome::Failed("that extension is not available".into()),
+            None => ActionOutcome::Failed("That extension is turned off.".into()),
         }
     }
 

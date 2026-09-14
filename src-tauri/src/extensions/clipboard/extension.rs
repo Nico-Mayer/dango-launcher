@@ -119,7 +119,7 @@ impl Extension for ClipboardExtension {
                 Ok(()) => ActionOutcome::Replaced(Box::new(self.list())),
                 Err(error) => ActionOutcome::Failed(error.to_string()),
             },
-            other => ActionOutcome::Failed(format!("unknown action '{other}'")),
+            _ => ActionOutcome::Failed("That action isn't available.".into()),
         }
     }
 }
@@ -265,7 +265,7 @@ pub fn history_view(entries: &[Entry], primary: PrimaryAction) -> ViewTree {
             empty_state: Some(EmptyState {
                 title: "Nothing copied yet".into(),
                 description: Some(
-                    "What you copy from now on will show up here, unless it came from an excluded application."
+                    "Text and images you copy will show up here. Copies from excluded apps are left out."
                         .into(),
                 ),
             }),
@@ -286,17 +286,17 @@ fn item(entry: &Entry, primary: PrimaryAction) -> ListItem {
     };
     let paste = Action {
         id: ACTION_INSERT.into(),
-        title: "Paste to Active App".into(),
+        title: "Paste".into(),
         shortcut: None,
     };
     let copy = Action {
         id: ACTION_RESTORE.into(),
-        title: "Copy to Clipboard".into(),
+        title: "Copy".into(),
         shortcut: None,
     };
     let remove = Action {
         id: ACTION_REMOVE.into(),
-        title: "Remove from History".into(),
+        title: "Delete from history".into(),
         shortcut: Some(Shortcut {
             key: "x".into(),
             modifiers: vec![Modifier::Ctrl],

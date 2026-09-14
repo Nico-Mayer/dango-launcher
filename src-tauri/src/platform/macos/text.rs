@@ -96,10 +96,18 @@ impl MacKeys {
         }));
         match wait.recv_timeout(MAIN_THREAD_TIMEOUT) {
             Ok(Ok(())) => Ok(()),
-            Ok(Err(error)) => Err(TextError::TargetUnavailable(error)),
-            Err(_) => Err(TextError::TargetUnavailable(
-                "the main thread did not run the keystroke".into(),
-            )),
+            Ok(Err(error)) => {
+                eprintln!("[dango] keystroke failed: {error}");
+                Err(TextError::TargetUnavailable(
+                    crate::text::KEYSTROKE_FAILED.into(),
+                ))
+            }
+            Err(_) => {
+                eprintln!("[dango] the main thread did not run the keystroke");
+                Err(TextError::TargetUnavailable(
+                    crate::text::KEYSTROKE_FAILED.into(),
+                ))
+            }
         }
     }
 }

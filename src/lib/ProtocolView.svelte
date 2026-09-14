@@ -125,7 +125,7 @@
     <Command.Input
       bind:ref={inputEl}
       bind:value={() => query, (q) => ((query = q), (pickedId = ""))}
-      placeholder="Search..."
+      placeholder="Search"
       spellcheck={false}
       autocomplete="off"
       class="text-foreground placeholder:text-muted-foreground h-16 w-full shrink-0 bg-transparent px-5 text-2xl focus:outline-none"
@@ -155,11 +155,11 @@
           {#if items.length === 0}
             <div class="text-muted-foreground px-3 py-4 text-sm">
               {#if view.loading}
-                Loading...
+                Loading…
               {:else if query.length > 0}
-                No results
+                <span class="block truncate">No results for “{query}”</span>
               {:else}
-                {view.emptyState?.title ?? "Nothing here"}
+                {view.emptyState?.title ?? "Nothing to show"}
                 {#if view.emptyState?.description}
                   <p class="mt-1 text-xs">{view.emptyState.description}</p>
                 {/if}

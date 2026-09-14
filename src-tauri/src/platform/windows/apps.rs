@@ -69,7 +69,7 @@ impl AppIndexer for WindowsAppIndexer {
                 Ok(())
             } else {
                 Err(LaunchError::Failed(format!(
-                    "shell refused to launch {}",
+                    "Couldn't open {}. Try again.",
                     app.name
                 )))
             }

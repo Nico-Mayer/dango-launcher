@@ -80,7 +80,7 @@ impl Extension for SystemExtension {
                 Ok(()) => ActionOutcome::Done,
                 Err(error) => ActionOutcome::Failed(error.to_string()),
             },
-            other => ActionOutcome::Failed(format!("unknown action '{other}'")),
+            _ => ActionOutcome::Failed("That action isn't available.".into()),
         }
     }
 }
@@ -192,7 +192,7 @@ fn running_list(apps: Vec<crate::platform::RunningApp>, icons: &IconCache) -> Vi
             filtering: Filtering::Launcher,
             loading: false,
             empty_state: Some(crate::protocol::EmptyState {
-                title: "Nothing is running".into(),
+                title: "No apps to quit".into(),
                 description: None,
             }),
             items: apps

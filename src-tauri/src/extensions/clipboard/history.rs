@@ -102,16 +102,17 @@ impl Default for Bounds {
 
 #[derive(Debug, thiserror::Error)]
 pub enum HistoryError {
-    #[error("that item is too large to keep")]
+    #[error("That entry is too large to keep.")]
     TooLarge,
-    #[error("that entry is no longer there")]
+    #[error("That entry was already deleted.")]
     Gone,
-    #[error("{0}")]
+    #[error("Couldn't read the clipboard history. Try again.")]
     Failed(String),
 }
 
 impl From<rusqlite::Error> for HistoryError {
     fn from(error: rusqlite::Error) -> Self {
+        eprintln!("[dango] clipboard history: {error}");
         HistoryError::Failed(error.to_string())
     }
 }
@@ -150,8 +151,10 @@ impl History {
             Content::Text(text) => (Kind::Text, Some(text.clone()), None),
             Content::Image(image) => {
                 let path = self.images.join(format!("{id}.png"));
-                std::fs::write(&path, image)
-                    .map_err(|error| HistoryError::Failed(error.to_string()))?;
+                std::fs::write(&path, image).map_err(|error| {
+                    eprintln!("[dango] clipboard history image: {error}");
+                    HistoryError::Failed(error.to_string())
+                })?;
                 (Kind::Image, None, Some(path.to_string_lossy().into_owned()))
             }
         };
@@ -509,5 +512,24 @@ mod tests {
             history.content("nope").unwrap_err(),
             HistoryError::Gone
         ));
+    }
+}
+
+#[cfg(test)]
+mod display_tests {
+    use super::HistoryError;
+
+    #[test]
+    fn every_message_is_a_sentence() {
+        let errors = [
+            HistoryError::TooLarge,
+            HistoryError::Gone,
+            HistoryError::Failed("disk I/O error".into()),
+        ];
+        for error in errors {
+            let text = error.to_string();
+            assert!(text.starts_with(char::is_uppercase), "{text}");
+            assert!(text.ends_with('.'), "{text}");
+        }
     }
 }

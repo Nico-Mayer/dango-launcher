@@ -33,8 +33,9 @@
   /// chosen inside its view goes back to it.
   let viewOwner = $state<string | null>(null);
   let failure = $state<string | null>(null);
-  // A view command has been invoked and its first tree has not arrived yet.
-  let working = $state(false);
+  // The title of a command that has been invoked and has neither finished nor
+  // shown a view yet.
+  let workingTitle = $state<string | null>(null);
   let inputEl = $state<HTMLInputElement | null>(null);
   let listEl = $state<HTMLElement | null>(null);
 
@@ -76,7 +77,7 @@
     viewOwner = null;
     panelOpen = false;
     protocolError = false;
-    working = false;
+    workingTitle = null;
     runSearch("");
   }
 
@@ -139,12 +140,12 @@
     if (item.actions.length === 0) {
       failure = null;
       panelOpen = false;
-      working = true;
+      workingTitle = item.title;
       // The view that follows carries its own owner, so nothing is read back
       // here; only a refusal to start the command needs handling.
       await invoke("invoke_command", { commandId: item.id }).catch((reason) => {
         failure = String(reason);
-        working = false;
+        workingTitle = null;
       });
       return;
     }
@@ -211,14 +212,14 @@
       listen("dango://reset", () => resetToRoot()),
       listen<string>("dango://failed", (event) => {
         failure = event.payload;
-        working = false;
+        workingTitle = null;
       }),
       listen<ResultsPayload>("dango://results", (event) => {
         if (event.payload.query !== liveQuery) return;
         results = event.payload.items;
       }),
       listen<RenderPayload>("dango://render", (event) => {
-        working = false;
+        workingTitle = null;
         if (event.payload.tree.protocolVersion !== PROTOCOL_VERSION) {
           protocolError = true;
           return;
@@ -324,7 +325,7 @@
     <Command.Input
       bind:ref={inputEl}
       bind:value={() => query, (q) => ((query = q), (pickedId = ""), (failure = null))}
-      placeholder="Search for apps and commands..."
+      placeholder="Search apps and commands"
       spellcheck={false}
       autocomplete="off"
       class="text-foreground placeholder:text-muted-foreground h-16 w-full shrink-0 bg-transparent px-5 text-2xl focus:outline-none"
@@ -357,18 +358,20 @@
             </Command.Item>
           {/each}
           {#if results.length === 0 && query.length > 0}
-            <div class="text-muted-foreground px-3 py-4 text-sm">No results</div>
+            <div class="text-muted-foreground truncate px-3 py-4 text-sm">
+              No results for “{query}”
+            </div>
           {/if}
         </Command.Viewport>
       </Command.List>
     </div>
 
-    {#if working}
+    {#if workingTitle}
       <div
         class="text-muted-foreground border-border-card flex shrink-0 items-center gap-2 border-t px-5 py-2 text-sm"
       >
         <Icon name="loader-circle" size={16} class="animate-spin" />
-        Working...
+        <span class="truncate">Running {workingTitle}…</span>
       </div>
     {/if}
     {#if failure}
