@@ -1,3 +1,4 @@
 [tools]
 node = "24.21.0"
+hk = "2.0.0"
 "npm:@fission-ai/openspec" = "1.12.0"

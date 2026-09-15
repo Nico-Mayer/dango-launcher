@@ -612,9 +612,10 @@ mod tests {
     #[test]
     fn the_schema_rejects_a_value_the_ai_extension_could_not_use() {
         let docs = concat!(env!("CARGO_MANIFEST_DIR"), "/../docs");
-        let schema: Value =
-            serde_json::from_str(&std::fs::read_to_string(format!("{docs}/config.schema.json")).unwrap())
-                .unwrap();
+        let schema: Value = serde_json::from_str(
+            &std::fs::read_to_string(format!("{docs}/config.schema.json")).unwrap(),
+        )
+        .unwrap();
 
         let bad = [
             r#"{ "extensions": { "dango.ai": { "providers": { "x": { "kind": "mistral" } } } } }"#,
@@ -642,13 +643,17 @@ mod tests {
     #[test]
     fn a_selection_block_parses_and_round_trips() {
         let config =
-            Config::parse(r#"{ "selection": { "excluded-applications": "Zed, Neovim" } }"#).unwrap();
+            Config::parse(r#"{ "selection": { "excluded-applications": "Zed, Neovim" } }"#)
+                .unwrap();
         assert_eq!(config.selection.excluded(), ["Zed", "Neovim"]);
         assert!(config.selection.refuses("zed"), "matched ignoring case");
         assert!(!config.selection.refuses("Notepad"));
 
         let json = config.to_json();
-        assert!(json.contains("excluded-applications"), "key renamed: {json}");
+        assert!(
+            json.contains("excluded-applications"),
+            "key renamed: {json}"
+        );
         assert!(Config::parse(&json).unwrap().selection.refuses("Zed"));
     }
 
@@ -678,7 +683,10 @@ mod tests {
         let config = Config::parse(text).unwrap();
         let providers = &config.extensions["dango.ai"].providers;
         assert_eq!(providers["anthropic"].kind, ProviderKind::Anthropic);
-        assert_eq!(providers["anthropic"].model.as_deref(), Some("claude-sonnet-5"));
+        assert_eq!(
+            providers["anthropic"].model.as_deref(),
+            Some("claude-sonnet-5")
+        );
         assert_eq!(providers["local"].kind, ProviderKind::Ollama);
         assert_eq!(
             providers["local"].base_url.as_deref(),
@@ -687,9 +695,15 @@ mod tests {
 
         let json = config.to_json();
         assert!(json.contains("baseUrl"), "camelCase key lost: {json}");
-        assert!(json.contains("keepAlive"), "unknown provider key dropped: {json}");
+        assert!(
+            json.contains("keepAlive"),
+            "unknown provider key dropped: {json}"
+        );
         let again = Config::parse(&json).unwrap();
-        assert_eq!(again.extensions["dango.ai"].providers["local"].kind, ProviderKind::Ollama);
+        assert_eq!(
+            again.extensions["dango.ai"].providers["local"].kind,
+            ProviderKind::Ollama
+        );
     }
 
     #[test]
@@ -706,7 +720,10 @@ mod tests {
         assert_eq!(entry.args, ["-p", "{prompt}"]);
 
         let again = Config::parse(&config.to_json()).unwrap();
-        assert_eq!(again.extensions["dango.ai"].providers["claude"].args, ["-p", "{prompt}"]);
+        assert_eq!(
+            again.extensions["dango.ai"].providers["claude"].args,
+            ["-p", "{prompt}"]
+        );
     }
 
     #[test]
@@ -719,7 +736,10 @@ mod tests {
             config.extensions["dango.ai"].providers["future"].kind,
             ProviderKind::Unknown("mistral".into())
         );
-        assert!(config.to_json().contains("mistral"), "kind rewritten on write-back");
+        assert!(
+            config.to_json().contains("mistral"),
+            "kind rewritten on write-back"
+        );
     }
 
     #[test]
@@ -742,12 +762,21 @@ mod tests {
         }"#;
         let config = Config::parse(text).unwrap();
         let commands = &config.extensions["dango.ai"].commands;
-        assert_eq!(commands["improve-writing"].provider.as_deref(), Some("local"));
+        assert_eq!(
+            commands["improve-writing"].provider.as_deref(),
+            Some("local")
+        );
         assert_eq!(commands["improve-writing"].thinking.as_deref(), Some("low"));
         assert_eq!(commands["make-longer"].enabled, Some(false));
-        assert_eq!(commands["review-rust"].title.as_deref(), Some("Review Rust"));
+        assert_eq!(
+            commands["review-rust"].title.as_deref(),
+            Some("Review Rust")
+        );
         assert_eq!(commands["review-rust"].output.as_deref(), Some("view"));
-        assert_eq!(config.alias("dango.ai", "improve-writing"), Some("iw".to_string()));
+        assert_eq!(
+            config.alias("dango.ai", "improve-writing"),
+            Some("iw".to_string())
+        );
 
         let again = Config::parse(&config.to_json()).unwrap();
         let commands = &again.extensions["dango.ai"].commands;

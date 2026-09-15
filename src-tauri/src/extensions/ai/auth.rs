@@ -45,9 +45,8 @@ impl Keys for AuthFile {
             return Ok(None);
         };
         restrict_to_owner(&self.path);
-        let value: Value = serde_json::from_str(&text).map_err(|error| AuthError::Parse {
-            line: error.line(),
-        })?;
+        let value: Value =
+            serde_json::from_str(&text).map_err(|error| AuthError::Parse { line: error.line() })?;
         Ok(value
             .get(provider)
             .and_then(Value::as_str)
@@ -103,9 +102,15 @@ mod tests {
     #[test]
     fn a_key_is_read_for_its_provider() {
         let dir = temp_dir("read");
-        let path = write(&dir, r#"{ "anthropic": "sk-ant-test", "openrouter": "sk-or" }"#);
+        let path = write(
+            &dir,
+            r#"{ "anthropic": "sk-ant-test", "openrouter": "sk-or" }"#,
+        );
         let auth = AuthFile::new(path);
-        assert_eq!(auth.key("anthropic").unwrap().as_deref(), Some("sk-ant-test"));
+        assert_eq!(
+            auth.key("anthropic").unwrap().as_deref(),
+            Some("sk-ant-test")
+        );
         assert_eq!(auth.key("openrouter").unwrap().as_deref(), Some("sk-or"));
         assert_eq!(auth.key("ollama").unwrap(), None);
     }
@@ -134,7 +139,10 @@ mod tests {
             !message.contains("sk-ant-secret"),
             "the key reached the error: {message}"
         );
-        assert!(message.contains("auth.json"), "the file is not named: {message}");
+        assert!(
+            message.contains("auth.json"),
+            "the file is not named: {message}"
+        );
     }
 
     #[test]
@@ -144,7 +152,10 @@ mod tests {
         let auth = AuthFile::new(path.clone());
         assert_eq!(auth.key("anthropic").unwrap(), None);
         std::fs::write(&path, r#"{ "anthropic": "sk-ant-new" }"#).unwrap();
-        assert_eq!(auth.key("anthropic").unwrap().as_deref(), Some("sk-ant-new"));
+        assert_eq!(
+            auth.key("anthropic").unwrap().as_deref(),
+            Some("sk-ant-new")
+        );
     }
 
     #[cfg(unix)]
@@ -157,7 +168,10 @@ mod tests {
         std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o644)).unwrap();
 
         let auth = AuthFile::new(path.clone());
-        assert_eq!(auth.key("anthropic").unwrap().as_deref(), Some("sk-ant-test"));
+        assert_eq!(
+            auth.key("anthropic").unwrap().as_deref(),
+            Some("sk-ant-test")
+        );
 
         let mode = std::fs::metadata(&path).unwrap().permissions().mode();
         assert_eq!(mode & 0o777, 0o600, "file left readable by others");

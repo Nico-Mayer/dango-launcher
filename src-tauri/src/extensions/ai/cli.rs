@@ -262,7 +262,11 @@ mod tests {
     fn the_prompt_goes_in_on_standard_input_by_default() {
         // `sort` and `more` both read stdin and print it; `more` is the one both
         // platforms have.
-        let args: Vec<&str> = if cfg!(windows) { vec!["/c", "more"] } else { vec!["-c", "cat"] };
+        let args: Vec<&str> = if cfg!(windows) {
+            vec!["/c", "more"]
+        } else {
+            vec!["-c", "cat"]
+        };
         let chunks = CliClient.stream(request(shell(), &args));
         assert_eq!(collect(&chunks).unwrap().trim(), "say hello");
     }
@@ -313,7 +317,11 @@ mod tests {
 
     #[test]
     fn the_child_runs_somewhere_with_none_of_the_users_files() {
-        let args: Vec<&str> = if cfg!(windows) { vec!["/c", "cd"] } else { vec!["-c", "pwd"] };
+        let args: Vec<&str> = if cfg!(windows) {
+            vec!["/c", "cd"]
+        } else {
+            vec!["-c", "pwd"]
+        };
         let chunks = CliClient.stream(request(shell(), &args));
         let answer = collect(&chunks).unwrap();
         assert!(
@@ -352,10 +360,15 @@ mod tests {
         request.prompt = "Reply with exactly one word: pong".into();
 
         let answer = collect(&CliClient.stream(request)).unwrap();
-        println!("--- answer ---
+        println!(
+            "--- answer ---
 {answer}
---- end ---");
-        assert!(!answer.trim().is_empty(), "the program answered with nothing");
+--- end ---"
+        );
+        assert!(
+            !answer.trim().is_empty(),
+            "the program answered with nothing"
+        );
     }
 
     #[test]
@@ -391,7 +404,9 @@ mod tests {
                     .args(["/fi", "imagename eq PING.EXE", "/nh"])
                     .output()
             } else {
-                std::process::Command::new("pgrep").args(["-x", "sleep"]).output()
+                std::process::Command::new("pgrep")
+                    .args(["-x", "sleep"])
+                    .output()
             };
             let Ok(listing) = listing else { return 0 };
             let text = String::from_utf8_lossy(&listing.stdout).to_lowercase();

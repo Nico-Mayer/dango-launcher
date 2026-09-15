@@ -26,7 +26,9 @@ use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut,
 use extension::{ActionOutcome, EnabledStore, ExtensionHost, FormValues, HostResolver};
 use extensions::ai::{AiExtension, AuthFile, CliClient, Clients, GenAiClient};
 use extensions::applications::{AppIndex, ApplicationsExtension, IconCache};
-use extensions::clipboard::{ClipboardExtension, ClipboardSource, History, PreferencePolicy, Watcher};
+use extensions::clipboard::{
+    ClipboardExtension, ClipboardSource, History, PreferencePolicy, Watcher,
+};
 use extensions::snippets::{self, SnippetsExtension};
 use extensions::system::SystemExtension;
 use extensions::window_management::WindowManagementExtension;
@@ -114,10 +116,18 @@ enum ActionResponse {
     /// The action started work that reports through the render channel. The
     /// launcher leaves the view it is showing alone and waits.
     Started,
-    Copy { text: String },
-    Replaced { tree: protocol::ViewTree },
-    Removed { tree: protocol::ViewTree },
-    Failed { message: String },
+    Copy {
+        text: String,
+    },
+    Replaced {
+        tree: protocol::ViewTree,
+    },
+    Removed {
+        tree: protocol::ViewTree,
+    },
+    Failed {
+        message: String,
+    },
 }
 
 /// Hops a closure onto the main thread and waits for it.
@@ -1218,7 +1228,9 @@ pub fn run() {
                     .app_cache_dir()
                     .unwrap_or_else(|_| std::env::temp_dir())
                     .join("favicons");
-                let _ = app.asset_protocol_scope().allow_directory(&favicon_dir, true);
+                let _ = app
+                    .asset_protocol_scope()
+                    .allow_directory(&favicon_dir, true);
                 let favicons = snippets::FaviconCache::new(favicon_dir);
                 let favicon_source = snippets::HttpFavicons::new();
                 for kind in [snippets::Kind::Snippet, snippets::Kind::Quicklink] {

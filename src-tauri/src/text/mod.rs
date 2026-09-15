@@ -1109,7 +1109,9 @@ mod tests {
             clipboard.clone(),
             keys.clone(),
             FakeHandoff::working(),
-            Some(Arc::new(FakeDirect(Selected::Text("selected directly".into())))),
+            Some(Arc::new(FakeDirect(Selected::Text(
+                "selected directly".into(),
+            )))),
             Arc::new(RecordingWrites::default()),
             Arc::new(FakeLauncher::default()),
             None,
@@ -1199,7 +1201,10 @@ mod tests {
             holding("what the user had"),
             keys.clone(),
             FakeHandoff::working(),
-            Some(Arc::new(FrontmostOnly(Selected::Unavailable, launcher.clone()))),
+            Some(Arc::new(FrontmostOnly(
+                Selected::Unavailable,
+                launcher.clone(),
+            ))),
             Arc::new(RecordingWrites::default()),
             launcher,
             Some(refuses),
@@ -1209,7 +1214,10 @@ mod tests {
             exchange.selection(),
             Err(TextError::SelectionRefused("Zed".into()))
         );
-        assert!(keys.events().is_empty(), "a keystroke reached a refused app");
+        assert!(
+            keys.events().is_empty(),
+            "a keystroke reached a refused app"
+        );
         assert_eq!(
             *asked_after_dismiss.lock().unwrap(),
             Some(0),
@@ -1277,7 +1285,10 @@ mod tests {
             exchange.selection(),
             Err(TextError::SelectionRefused("Zed".into()))
         );
-        assert!(keys.events().is_empty(), "a keystroke reached a refused app");
+        assert!(
+            keys.events().is_empty(),
+            "a keystroke reached a refused app"
+        );
         assert_eq!(
             clipboard.now(),
             Some(Content::Text("what the user had".into())),
@@ -1298,7 +1309,10 @@ mod tests {
             Some(refusing("Zed")),
         );
 
-        assert_eq!(exchange.selection().unwrap().as_deref(), Some("read directly"));
+        assert_eq!(
+            exchange.selection().unwrap().as_deref(),
+            Some("read directly")
+        );
         assert!(keys.events().is_empty());
     }
 

@@ -28,11 +28,9 @@ use enigo::{Direction, Enigo, Key, Keyboard, Settings};
 use objc2_app_kit::NSWorkspace;
 use objc2_foundation::{NSDate, NSRunLoop};
 
-use dango_lib::extensions::clipboard::{Content, CrateClipboard};
 use dango_lib::config::Config;
-use dango_lib::extensions::ai::{
-    Completions, GenAiClient, Next, ProviderKind, Request, Thinking,
-};
+use dango_lib::extensions::ai::{Completions, GenAiClient, Next, ProviderKind, Request, Thinking};
+use dango_lib::extensions::clipboard::{Content, CrateClipboard};
 use dango_lib::platform;
 use dango_lib::templates::{Template, Values};
 use dango_lib::text::{HereIsFine, Launcher, OwnWrites, TextExchange};
@@ -765,7 +763,10 @@ impl Harness {
         // launcher, matched against the user's list.
         let refuses: dango_lib::text::RefusesFallback = Arc::new(move || {
             let application = platform::covered_app()?;
-            config.selection.refuses(&application).then_some(application)
+            config
+                .selection
+                .refuses(&application)
+                .then_some(application)
         });
         let Some(exchange) = platform::text_exchange(
             source,

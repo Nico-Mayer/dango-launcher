@@ -127,7 +127,9 @@ const WORKING: &str = "Working…";
 
 impl Inner {
     fn find(&self, command_id: &str) -> Option<&AiCommand> {
-        self.commands.iter().find(|command| command.id == command_id)
+        self.commands
+            .iter()
+            .find(|command| command.id == command_id)
     }
 
     /// Starts a run that no invocation is behind yet, which is what submitting
@@ -625,7 +627,10 @@ mod tests {
         };
         assert_eq!(first.markdown, "Working…");
         assert!(first.loading, "the first view is not marked loading");
-        assert!(first.actions.is_empty(), "a half-written answer offers actions");
+        assert!(
+            first.actions.is_empty(),
+            "a half-written answer offers actions"
+        );
     }
 
     #[test]
@@ -648,14 +653,26 @@ mod tests {
             "providers": { "local": { "kind": "ollama", "model": "qwen3:8b" } },
             "commands": { "joke": { "title": "Joke", "prompt": "Tell me a joke." } }
         } } }"#;
-        let fixture = fixture(config, Scripted::answering(&["Why did..."]), selected("text"));
+        let fixture = fixture(
+            config,
+            Scripted::answering(&["Why did..."]),
+            selected("text"),
+        );
         run(&fixture, "joke", Arc::new(Recorded::default()));
-        assert_eq!(*fixture.text.reads.lock().unwrap(), 0, "the selection was read");
+        assert_eq!(
+            *fixture.text.reads.lock().unwrap(),
+            0,
+            "the selection was read"
+        );
     }
 
     #[test]
     fn nothing_selected_stops_before_any_request() {
-        let fixture = fixture(LOCAL, Scripted::answering(&["Better."]), FakeText::default());
+        let fixture = fixture(
+            LOCAL,
+            Scripted::answering(&["Better."]),
+            FakeText::default(),
+        );
         let sink = Arc::new(Recorded::default());
         run(&fixture, "improve-writing", sink.clone());
 
@@ -663,7 +680,10 @@ mod tests {
             sink.failure().as_deref(),
             Some("Select some text first, then run this command.")
         );
-        assert!(fixture.client.last_request().is_none(), "a request was made");
+        assert!(
+            fixture.client.last_request().is_none(),
+            "a request was made"
+        );
     }
 
     #[test]
@@ -678,7 +698,10 @@ mod tests {
         assert_eq!(form.item_id.as_deref(), Some("translate"));
         assert_eq!(form.fields[0].id, "arg:language");
         assert_eq!(form.actions[0].id, ACTION_RUN);
-        assert!(fixture.client.last_request().is_none(), "asked and ran anyway");
+        assert!(
+            fixture.client.last_request().is_none(),
+            "asked and ran anyway"
+        );
     }
 
     #[test]
@@ -687,9 +710,7 @@ mod tests {
         let mut values = FormValues::new();
         values.insert("arg:language".into(), "Spanish".into());
         let ctx = InvocationContext::for_test("translate", Arc::new(Recorded::default()));
-        fixture
-            .inner()
-            .run("translate", arguments(&values), &ctx);
+        fixture.inner().run("translate", arguments(&values), &ctx);
 
         let request = fixture.client.last_request().expect("a request was made");
         assert!(request.prompt.contains("Spanish"), "{}", request.prompt);
@@ -733,7 +754,11 @@ mod tests {
             "providers": { "local": { "kind": "ollama", "model": "qwen3:8b" } },
             "commands": { "improve-writing": { "output": "paste" } }
         } } }"#;
-        let fixture = fixture(config, Scripted::answering(&["Better text."]), selected("bad"));
+        let fixture = fixture(
+            config,
+            Scripted::answering(&["Better text."]),
+            selected("bad"),
+        );
         let sink = Arc::new(Recorded::default());
         run(&fixture, "improve-writing", sink.clone());
 
@@ -747,13 +772,20 @@ mod tests {
             "providers": { "local": { "kind": "ollama", "model": "qwen3:8b" } },
             "commands": { "summarize": { "output": "copy" } }
         } } }"#;
-        let fixture = fixture(config, Scripted::answering(&["Short."]), selected("long text"));
+        let fixture = fixture(
+            config,
+            Scripted::answering(&["Short."]),
+            selected("long text"),
+        );
         let sink = Arc::new(Recorded::default());
         run(&fixture, "summarize", sink.clone());
 
         assert_eq!(*fixture.clipboard.written.lock().unwrap(), ["Short."]);
         assert!(sink.succeeded());
-        assert!(fixture.text.inserted.lock().unwrap().is_empty(), "it pasted too");
+        assert!(
+            fixture.text.inserted.lock().unwrap().is_empty(),
+            "it pasted too"
+        );
     }
 
     #[test]
@@ -821,7 +853,10 @@ mod tests {
             .inner()
             .run("improve-writing", FormValues::new(), &ctx);
 
-        assert!(sink.failure().is_none(), "a cancelled run reported a failure");
+        assert!(
+            sink.failure().is_none(),
+            "a cancelled run reported a failure"
+        );
         assert!(!sink.succeeded());
     }
 

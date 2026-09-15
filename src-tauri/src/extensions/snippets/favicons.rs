@@ -214,7 +214,11 @@ fn age(path: &Path) -> Option<Duration> {
     let modified = std::fs::metadata(path).ok()?.modified().ok()?;
     // A clock that moved backwards leaves the file in the future; treat it as
     // brand new rather than refetching everything.
-    Some(SystemTime::now().duration_since(modified).unwrap_or_default())
+    Some(
+        SystemTime::now()
+            .duration_since(modified)
+            .unwrap_or_default(),
+    )
 }
 
 /// A host as a file name. Dots and hyphens are kept, so a normal host reads as
@@ -374,7 +378,9 @@ impl FaviconService {
             match self.source.fetch(&site) {
                 Ok(image) => {
                     if let Err(error) = self.cache.store(&host, &image) {
-                        crate::log::append(&format!("favicon for {host} could not be saved: {error}"));
+                        crate::log::append(&format!(
+                            "favicon for {host} could not be saved: {error}"
+                        ));
                     }
                 }
                 Err(error) => {
@@ -471,7 +477,10 @@ mod tests {
     fn a_written_icon_is_found_by_path() {
         let cache = FaviconCache::in_temp();
         cache.store("example.com", &png()).unwrap();
-        assert!(cache.path("example.com").unwrap().ends_with("example.com.png"));
+        assert!(cache
+            .path("example.com")
+            .unwrap()
+            .ends_with("example.com.png"));
     }
 
     #[test]
@@ -538,7 +547,10 @@ mod tests {
             )
             .unwrap();
         assert!(!cache.dir.join("example.com.png").exists());
-        assert!(cache.path("example.com").unwrap().ends_with("example.com.svg"));
+        assert!(cache
+            .path("example.com")
+            .unwrap()
+            .ends_with("example.com.svg"));
     }
 
     #[test]
@@ -553,7 +565,11 @@ mod tests {
             ("image/gif", "gif"),
             ("IMAGE/PNG; charset=binary", "png"),
         ] {
-            assert_eq!(extension_for(content_type), Some(extension), "{content_type}");
+            assert_eq!(
+                extension_for(content_type),
+                Some(extension),
+                "{content_type}"
+            );
         }
     }
 
@@ -701,7 +717,9 @@ mod tests {
     fn a_stale_icon_is_fetched_again() {
         let source = FakeSource::serving("png");
         let (service, records) = service(source.clone(), true);
-        records.create("Docs", "https://example.com/", None).unwrap();
+        records
+            .create("Docs", "https://example.com/", None)
+            .unwrap();
         service.sweep();
         age_file(
             &service.cache.dir.join("example.com.png"),
@@ -715,7 +733,9 @@ mod tests {
     fn a_host_that_has_no_icon_keeps_the_quicklink_usable() {
         let source = FakeSource::failing();
         let (service, records) = service(source.clone(), true);
-        records.create("Docs", "https://example.com/", None).unwrap();
+        records
+            .create("Docs", "https://example.com/", None)
+            .unwrap();
         service.sweep();
         assert!(service.cache.path("example.com").is_none());
         service.sweep();
@@ -726,7 +746,9 @@ mod tests {
     fn a_sweep_with_the_preference_off_asks_for_nothing() {
         let source = FakeSource::serving("png");
         let (service, records) = service(source.clone(), false);
-        records.create("Docs", "https://example.com/", None).unwrap();
+        records
+            .create("Docs", "https://example.com/", None)
+            .unwrap();
         service.sweep();
         assert!(source.asked().is_empty());
     }
@@ -735,7 +757,9 @@ mod tests {
     fn a_host_no_longer_used_is_not_fetched_again() {
         let source = FakeSource::serving("png");
         let (service, records) = service(source.clone(), true);
-        let id = records.create("Docs", "https://example.com/", None).unwrap();
+        let id = records
+            .create("Docs", "https://example.com/", None)
+            .unwrap();
         service.sweep();
         records.remove(&id).unwrap();
         age_file(
@@ -750,17 +774,24 @@ mod tests {
     fn a_new_quicklink_is_picked_up_without_a_restart() {
         let source = FakeSource::serving("png");
         let (service, records) = service(source.clone(), true);
-        records.create("Docs", "https://example.com/", None).unwrap();
+        records
+            .create("Docs", "https://example.com/", None)
+            .unwrap();
         service.start().unwrap();
         let added = wait_until(|| !source.asked().is_empty());
         assert!(added, "the first sweep should have run");
 
         let before = service.fingerprint();
-        records.create("Other", "https://other.example/", None).unwrap();
+        records
+            .create("Other", "https://other.example/", None)
+            .unwrap();
         assert_ne!(service.fingerprint(), before, "the file changed");
         let followed = wait_until(|| source.asked().len() == 2);
         service.stop();
-        assert!(followed, "a new quicklink should be fetched without a restart");
+        assert!(
+            followed,
+            "a new quicklink should be fetched without a restart"
+        );
     }
 
     /// Polls rather than sleeping a fixed time, so the test is neither slow nor
@@ -783,7 +814,9 @@ mod tests {
     fn turning_the_preference_back_on_resumes_fetching_without_a_restart() {
         let source = FakeSource::serving("png");
         let (service, records, switch) = switchable_service(source.clone(), false);
-        records.create("Docs", "https://example.com/", None).unwrap();
+        records
+            .create("Docs", "https://example.com/", None)
+            .unwrap();
         service.start().unwrap();
         assert!(
             !wait_ticks(5, || !source.asked().is_empty()),
@@ -802,20 +835,30 @@ mod tests {
         let (service, records, switch) = switchable_service(source.clone(), true);
         for i in 0..20 {
             records
-                .create(&format!("Link {i}"), &format!("https://host{i}.example/"), None)
+                .create(
+                    &format!("Link {i}"),
+                    &format!("https://host{i}.example/"),
+                    None,
+                )
                 .unwrap();
         }
         // Off after the first host, so the rest of the sweep must be abandoned.
         source.on_first_fetch(move || switch.store(false, Ordering::SeqCst));
         service.sweep();
-        assert_eq!(source.asked().len(), 1, "the sweep should stop where it was");
+        assert_eq!(
+            source.asked().len(),
+            1,
+            "the sweep should stop where it was"
+        );
     }
 
     #[test]
     fn stopping_ends_the_loop() {
         let source = FakeSource::serving("png");
         let (service, records) = service(source.clone(), true);
-        records.create("Docs", "https://example.com/", None).unwrap();
+        records
+            .create("Docs", "https://example.com/", None)
+            .unwrap();
         service.start().unwrap();
         service.stop();
         std::thread::sleep(TICK * 3);
@@ -836,8 +879,14 @@ mod tests {
             "https://news.ycombinator.com/",
         ] {
             let url = Url::parse(site).unwrap();
-            let image = source.fetch(&url).unwrap_or_else(|error| panic!("{site}: {error}"));
-            println!("{site} -> .{} ({} bytes)", image.extension, image.bytes.len());
+            let image = source
+                .fetch(&url)
+                .unwrap_or_else(|error| panic!("{site}: {error}"));
+            println!(
+                "{site} -> .{} ({} bytes)",
+                image.extension,
+                image.bytes.len()
+            );
             assert!(DRAWABLE.contains(&image.extension));
             assert!(!image.bytes.is_empty());
         }

@@ -9,8 +9,8 @@ mod store;
 #[cfg(test)]
 pub(crate) use extension::manifest;
 pub use extension::{
-    extension_id, preference_declarations, OpenUrl, SnippetsExtension, PREF_FAVICONS, QUICKLINKS_ID,
-    SNIPPETS_ID,
+    extension_id, preference_declarations, OpenUrl, SnippetsExtension, PREF_FAVICONS,
+    QUICKLINKS_ID, SNIPPETS_ID,
 };
 pub use favicons::{FaviconCache, FaviconService, FaviconsEnabled, HttpFavicons};
 pub use matcher::{match_keyword, KeywordEntry};

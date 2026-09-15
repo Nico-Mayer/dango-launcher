@@ -1,0 +1,46 @@
+amends "package://github.com/jdx/hk/releases/download/v2.0.0/hk@2.0.0#/Config.pkl"
+import "package://github.com/jdx/hk/releases/download/v2.0.0/hk@2.0.0#/Builtins.pkl"
+
+local cargoFmt = Builtins.cargo_fmt
+
+local clippy = (Builtins.cargo_clippy) {
+  check = new CommandSpec {
+    command = "cargo clippy --manifest-path {{workspace_indicator}} --all-targets -- -D warnings"
+    effect = "read"
+  }
+  fix = null
+}
+
+local svelteCheck = new Step {
+  glob = List("src/**/*", "*.ts", "svelte.config.js", "tsconfig.json", "package.json")
+  check = "npm run check"
+}
+
+hooks {
+  ["pre-commit"] {
+    fix = true
+    stash = "git"
+    steps {
+      ["cargo-fmt"] = cargoFmt
+    }
+  }
+  ["pre-push"] {
+    steps {
+      ["clippy"] = clippy
+      ["svelte-check"] = svelteCheck
+    }
+  }
+  ["check"] {
+    steps {
+      ["cargo-fmt"] = cargoFmt
+      ["clippy"] = clippy
+      ["svelte-check"] = svelteCheck
+    }
+  }
+  ["fix"] {
+    fix = true
+    steps {
+      ["cargo-fmt"] = cargoFmt
+    }
+  }
+}

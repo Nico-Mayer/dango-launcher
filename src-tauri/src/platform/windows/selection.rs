@@ -46,7 +46,9 @@ impl DirectSelection for WindowsSelection {
         std::thread::spawn(move || {
             let _ = sender.send(read());
         });
-        receiver.recv_timeout(DEADLINE).unwrap_or(Selected::Unavailable)
+        receiver
+            .recv_timeout(DEADLINE)
+            .unwrap_or(Selected::Unavailable)
     }
 }
 

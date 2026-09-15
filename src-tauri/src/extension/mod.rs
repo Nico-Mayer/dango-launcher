@@ -504,7 +504,10 @@ mod tests {
 
         host.replace(TestExtension::new("ai", "translate")).unwrap();
         assert!(!host.is_active("ai"));
-        assert!(host.registry().is_empty(), "a disabled extension registered");
+        assert!(
+            host.registry().is_empty(),
+            "a disabled extension registered"
+        );
     }
 
     #[test]

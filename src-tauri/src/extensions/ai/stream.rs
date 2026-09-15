@@ -146,7 +146,10 @@ mod tests {
         let Ended::Failed(error) = ended else {
             panic!("expected a timeout");
         };
-        assert_eq!(error.to_string(), "The model didn't answer in time. Try again.");
+        assert_eq!(
+            error.to_string(),
+            "The model didn't answer in time. Try again."
+        );
     }
 
     #[test]

@@ -332,8 +332,14 @@ mod tests {
         let built = build(&config("{}"));
         assert_eq!(built.commands.len(), SHIPPED.len());
         assert!(built.problems.is_empty());
-        assert_eq!(find(&built, "improve-writing").unwrap().title, "Improve Writing");
-        assert_eq!(find(&built, "improve-writing").unwrap().output, Output::View);
+        assert_eq!(
+            find(&built, "improve-writing").unwrap().title,
+            "Improve Writing"
+        );
+        assert_eq!(
+            find(&built, "improve-writing").unwrap().output,
+            Output::View
+        );
     }
 
     #[test]
@@ -359,8 +365,14 @@ mod tests {
             } } } }"#,
         ));
         let command = find(&built, "improve-writing").unwrap();
-        assert_eq!(command.title, "Improve Writing", "the shipped title is kept");
-        assert!(command.prompt.contains("{{ selection }}"), "the shipped prompt is kept");
+        assert_eq!(
+            command.title, "Improve Writing",
+            "the shipped title is kept"
+        );
+        assert!(
+            command.prompt.contains("{{ selection }}"),
+            "the shipped prompt is kept"
+        );
         assert_eq!(command.provider.as_deref(), Some("local"));
         assert_eq!(command.model.as_deref(), Some("qwen3:8b"));
         assert_eq!(command.thinking, Some(Thinking::Low));
@@ -412,7 +424,10 @@ mod tests {
             } } } }"#,
         ));
         assert!(find(&built, "half-written").is_none());
-        assert!(find(&built, "review-rust").is_some(), "the good one survived");
+        assert!(
+            find(&built, "review-rust").is_some(),
+            "the good one survived"
+        );
         assert_eq!(built.problems.len(), 1);
         assert!(built.problems[0].contains("half-written"));
     }
@@ -439,7 +454,11 @@ mod tests {
         assert!(built.problems.is_empty());
     }
 
-    fn command(provider: Option<&str>, model: Option<&str>, thinking: Option<Thinking>) -> AiCommand {
+    fn command(
+        provider: Option<&str>,
+        model: Option<&str>,
+        thinking: Option<Thinking>,
+    ) -> AiCommand {
         AiCommand {
             id: "test".into(),
             title: "Test".into(),
@@ -471,7 +490,9 @@ mod tests {
     #[test]
     fn a_command_naming_a_provider_uses_that_ones_model() {
         let providers = Providers::from_config(&config(TWO_PROVIDERS));
-        let request = providers.resolve(&command(Some("local"), None, None)).unwrap();
+        let request = providers
+            .resolve(&command(Some("local"), None, None))
+            .unwrap();
         assert_eq!(request.provider, "local");
         assert_eq!(request.model, "qwen3:8b");
         assert_eq!(request.kind, ProviderKind::Ollama);
@@ -506,7 +527,11 @@ mod tests {
         ));
         let request = providers.resolve(&command(None, None, None)).unwrap();
         assert_eq!(request.provider, "local");
-        assert_eq!(request.thinking, Thinking::Off, "thinking is off by default");
+        assert_eq!(
+            request.thinking,
+            Thinking::Off,
+            "thinking is off by default"
+        );
     }
 
     #[test]
@@ -542,14 +567,18 @@ mod tests {
                 "local": { "kind": "ollama", "model": "qwen3:8b" }
             } } } }"#,
         ));
-        let request = providers.resolve(&command(Some("local"), None, None)).unwrap();
+        let request = providers
+            .resolve(&command(Some("local"), None, None))
+            .unwrap();
         assert_eq!(request.provider, "local");
     }
 
     #[test]
     fn a_provider_that_is_not_configured_says_so() {
         let providers = Providers::from_config(&config(TWO_PROVIDERS));
-        let error = providers.resolve(&command(Some("openrouter"), None, None)).unwrap_err();
+        let error = providers
+            .resolve(&command(Some("openrouter"), None, None))
+            .unwrap_err();
         assert_eq!(
             error.to_string(),
             "This command uses a provider that isn't set up. Check your config file."

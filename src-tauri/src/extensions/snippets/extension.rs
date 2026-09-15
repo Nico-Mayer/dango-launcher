@@ -250,10 +250,7 @@ impl Extension for SnippetsExtension {
     fn command(&self, command_id: &str) -> Option<Arc<dyn Command>> {
         match command_id {
             COMMAND_CREATE => Some(Arc::new(ShowForm(None, self.kind()))),
-            COMMAND_SEARCH => Some(Arc::new(ShowList(
-                self.records.clone(),
-                self.icons.clone(),
-            ))),
+            COMMAND_SEARCH => Some(Arc::new(ShowList(self.records.clone(), self.icons.clone()))),
             _ => None,
         }
     }
@@ -1349,7 +1346,11 @@ mod tests {
 
         let snippets = fixture_with(Kind::Snippet, FakeTarget::working())
             .extension
-            .with_favicons(FaviconCache::in_temp(), Arc::new(NoSource), Arc::new(|| true));
+            .with_favicons(
+                FaviconCache::in_temp(),
+                Arc::new(NoSource),
+                Arc::new(|| true),
+            );
         assert_eq!(
             snippets.services().len(),
             1,
@@ -1363,13 +1364,23 @@ mod tests {
         for i in 0..500 {
             fixture
                 .records
-                .create(&format!("link {i}"), &format!("https://host{i}.example/"), None)
+                .create(
+                    &format!("link {i}"),
+                    &format!("https://host{i}.example/"),
+                    None,
+                )
                 .unwrap();
         }
         // Every one resolves to a cached icon, which is the slowest case: each
         // record is parsed, rendered and looked up.
         for i in 0..500 {
-            fixture.extension.icons.favicons.as_ref().unwrap().seed(&format!("host{i}.example"));
+            fixture
+                .extension
+                .icons
+                .favicons
+                .as_ref()
+                .unwrap()
+                .seed(&format!("host{i}.example"));
         }
 
         let provider = provider(&fixture.extension);

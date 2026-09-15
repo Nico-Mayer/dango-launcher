@@ -159,7 +159,10 @@ fn effort(thinking: Thinking) -> Option<ReasoningEffort> {
 /// Turns a library error into the sentence the user reads, and puts the cause
 /// where only the author will see it.
 fn translate(request: &Request, error: &genai::Error) -> AiError {
-    crate::log::append(&format!("ai: request to {} failed: {error}", request.provider));
+    crate::log::append(&format!(
+        "ai: request to {} failed: {error}",
+        request.provider
+    ));
     match status_of(error) {
         Some(401 | 403) => AiError::KeyRejected {
             provider: request.provider.clone(),
@@ -223,9 +226,9 @@ fn timed_out(error: &genai::Error) -> bool {
             WebError::Reqwest(error) => error.is_timeout(),
             _ => false,
         },
-        genai::Error::WebStream { error, .. } => error
-            .downcast_ref::<genai::Error>()
-            .is_some_and(timed_out),
+        genai::Error::WebStream { error, .. } => {
+            error.downcast_ref::<genai::Error>().is_some_and(timed_out)
+        }
         _ => false,
     }
 }
@@ -253,8 +256,14 @@ mod tests {
             adapter_kind(&ProviderKind::Anthropic),
             Some(AdapterKind::Anthropic)
         );
-        assert_eq!(adapter_kind(&ProviderKind::Openai), Some(AdapterKind::OpenAI));
-        assert_eq!(adapter_kind(&ProviderKind::Ollama), Some(AdapterKind::Ollama));
+        assert_eq!(
+            adapter_kind(&ProviderKind::Openai),
+            Some(AdapterKind::OpenAI)
+        );
+        assert_eq!(
+            adapter_kind(&ProviderKind::Ollama),
+            Some(AdapterKind::Ollama)
+        );
         assert_eq!(adapter_kind(&ProviderKind::Unknown("mistral".into())), None);
     }
 
@@ -264,8 +273,14 @@ mod tests {
             base_url(&request(ProviderKind::Anthropic, None)),
             ANTHROPIC_BASE_URL
         );
-        assert_eq!(base_url(&request(ProviderKind::Ollama, None)), OLLAMA_BASE_URL);
-        assert_eq!(base_url(&request(ProviderKind::Openai, None)), OPENAI_BASE_URL);
+        assert_eq!(
+            base_url(&request(ProviderKind::Ollama, None)),
+            OLLAMA_BASE_URL
+        );
+        assert_eq!(
+            base_url(&request(ProviderKind::Openai, None)),
+            OPENAI_BASE_URL
+        );
     }
 
     #[test]
@@ -286,9 +301,18 @@ mod tests {
     #[test]
     fn a_thinking_level_maps_to_a_reasoning_effort() {
         assert!(matches!(effort(Thinking::Low), Some(ReasoningEffort::Low)));
-        assert!(matches!(effort(Thinking::Medium), Some(ReasoningEffort::Medium)));
-        assert!(matches!(effort(Thinking::High), Some(ReasoningEffort::High)));
-        assert!(effort(Thinking::Off).is_none(), "off should ask for nothing");
+        assert!(matches!(
+            effort(Thinking::Medium),
+            Some(ReasoningEffort::Medium)
+        ));
+        assert!(matches!(
+            effort(Thinking::High),
+            Some(ReasoningEffort::High)
+        ));
+        assert!(
+            effort(Thinking::Off).is_none(),
+            "off should ask for nothing"
+        );
     }
 
     fn http(status: u16) -> genai::Error {
@@ -320,7 +344,10 @@ mod tests {
     #[test]
     fn too_many_requests_says_the_provider_is_busy() {
         let error = translate(&request(ProviderKind::Anthropic, None), &http(429));
-        assert_eq!(error.to_string(), "test is busy right now. Try again in a moment.");
+        assert_eq!(
+            error.to_string(),
+            "test is busy right now. Try again in a moment."
+        );
     }
 
     #[test]
@@ -422,15 +449,20 @@ mod tests {
                 super::super::provider::Next::Idle => {}
             }
         }
-        println!("--- answer ---
+        println!(
+            "--- answer ---
 {answer}
---- end ---");
+--- end ---"
+        );
         assert!(!answer.trim().is_empty(), "the model answered with nothing");
     }
 
     #[test]
     fn no_message_carries_the_library_error() {
         let error = translate(&request(ProviderKind::Anthropic, None), &http(500));
-        assert!(!error.to_string().contains("500"), "a code reached the user");
+        assert!(
+            !error.to_string().contains("500"),
+            "a code reached the user"
+        );
     }
 }
