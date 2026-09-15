@@ -73,11 +73,25 @@
 
 ## 5. Verification
 
-- [ ] 5.1 Verify on macOS: quicklinks for at least four sites, at least one of
+- [x] 5.1 Verify on macOS: quicklinks for at least four sites, at least one of
       them serving an `.ico` and one an `.svg`, all showing their favicons in
       root search and in Search Quicklinks; a brand new quicklink picking up its
       icon without a restart; the icons still there after a restart with no
       refetch.
+      Done: nine quicklinks over github.com (svg), www.google.com (ico),
+      en.wikipedia.org (ico), developer.mozilla.org (ico), news.ycombinator.com
+      (svg), www.rust-lang.org (png), docs.rs (ico) and two hosts with no icon.
+      The icons show in root search and in Search Quicklinks, with no snippet
+      glyph in the list. A restart left every cached file's checksum and mtime
+      untouched, so nothing was fetched again.
+      It found a bug: a quicklink added by a hand edit was not fetched until the
+      file changed a second time. The sweep woke on the file's mtime but read the
+      records the watcher had not reloaded yet, and then took its next baseline
+      from the new mtime, so the edit was swallowed. The sweep now reads the
+      records from the file, and the wait's baseline is taken before the sweep
+      rather than after it, so an edit made while a sweep runs is still seen.
+      Re-verified live: a quicklink added by a plain write and one added by an
+      editor's atomic rename were both fetched about a second later.
 - [x] 5.2 Verify on Windows: the same list, with attention to ICO rendering in
       WebView2 and to the cache directory resolving under the app cache path.
       Done: release build, seven quicklinks over github.com (svg),
@@ -88,7 +102,7 @@
       cache resolved to `%LOCALAPPDATA%\com.nimayer.dango\favicons\`, and the
       four new hosts were written within two seconds of start without the
       already cached github.com and www.google.com being touched.
-- [ ] 5.3 Verify on both platforms that the launcher stays inside its budget
+- [x] 5.3 Verify on both platforms that the launcher stays inside its budget
       with 500 quicklinks stored, using `env DANGO_MEASURE=1` and a generated
       quicklinks file, and that no request goes out while typing.
       Windows done: release build with `DANGO_MEASURE=1` and a generated file of
@@ -96,7 +110,15 @@
       17.7ms, median 23.9ms, p90 29.2ms, max 37.0ms, none over 80ms. Twenty
       queries typed against the 500 records left the process with zero TCP
       connections at every sample, the cache directory unchanged, and no new log
-      line. macOS still to run.
+      line.
+      macOS done: release build with `DANGO_MEASURE=1` and the same generated
+      file of 500 quicklinks over eight hosts. 58 activations by the global
+      hotkey: min 31.8ms, median 41.5ms, p90 48.7ms, max 51.2ms, none over 80ms.
+      Typing against the 500 records left the process with zero TCP connections
+      across 473 one-second samples, the cache byte for byte unchanged, and not
+      one new line in `dango.log`. The provider's own 50ms budget at that record
+      count is held by
+      `the_provider_stays_in_budget_with_five_hundred_quicklinks_and_their_icons`.
 - [x] 5.4 Verify on both platforms with the machine offline and with a quicklink
       pointing at a host that does not exist: no message on screen, every
       quicklink still opens, the failure in `dango.log`, and no repeated attempt
