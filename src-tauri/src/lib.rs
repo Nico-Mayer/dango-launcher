@@ -1208,6 +1208,16 @@ pub fn run() {
                     Arc::new(move || policy.excluded_applications())
                 };
                 let records_dir = config::config_dir();
+                // Quicklinks wear the icon of the site they open, cached beside
+                // the application icons and served through the asset protocol.
+                let favicon_dir = app
+                    .path()
+                    .app_cache_dir()
+                    .unwrap_or_else(|_| std::env::temp_dir())
+                    .join("favicons");
+                let _ = app.asset_protocol_scope().allow_directory(&favicon_dir, true);
+                let favicons = snippets::FaviconCache::new(favicon_dir);
+                let favicon_source = snippets::HttpFavicons::new();
                 for kind in [snippets::Kind::Snippet, snippets::Kind::Quicklink] {
                     let (records, load_error) = snippets::Records::open(&records_dir, kind);
                     if let Some(error) = load_error {
@@ -1235,12 +1245,24 @@ pub fn run() {
                             },
                         );
                     }
-                    let extension = Arc::new(SnippetsExtension::new(
+                    let mut extension = SnippetsExtension::new(
                         records,
                         exchange.clone(),
                         Some(opener.clone()),
                         excluded.clone(),
-                    ));
+                    );
+                    if let Some(source) = favicon_source.clone() {
+                        let preferences = extension::Preferences::new(
+                            snippets::extension_id(kind),
+                            snippets::preference_declarations(kind),
+                            file_config.clone(),
+                        );
+                        let wanted: snippets::FaviconsEnabled = Arc::new(move || {
+                            preferences.boolean(snippets::PREF_FAVICONS).unwrap_or(true)
+                        });
+                        extension = extension.with_favicons(favicons.clone(), source, wanted);
+                    }
+                    let extension = Arc::new(extension);
                     match host.register(extension) {
                         Ok(report) if report.is_clean() => {}
                         Ok(report) => eprintln!("[dango] {kind:?} loaded with issues: {report:?}"),

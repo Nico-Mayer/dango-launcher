@@ -48,7 +48,7 @@
     alt=""
     class="size-8 shrink-0 {iconIsContent
       ? 'border-border-card rounded border object-cover'
-      : ''}"
+      : 'object-contain'}"
   />
 {:else}
   <div class="bg-muted size-8 shrink-0 rounded"></div>

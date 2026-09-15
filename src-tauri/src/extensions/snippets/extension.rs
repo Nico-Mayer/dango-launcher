@@ -10,8 +10,8 @@ use std::sync::Arc;
 use async_trait::async_trait;
 
 use crate::extension::{
-    ActionOutcome, CommandDecl, Extension, FormValues, InvocationMode, Manifest, Service,
-    NAMED_ICON,
+    ActionOutcome, CommandDecl, Extension, FormValues, InvocationMode, Manifest, PreferenceDecl,
+    PreferenceKind, Service, NAMED_ICON,
 };
 use crate::invocation::{Command, InvocationContext};
 use crate::protocol::{
@@ -22,6 +22,7 @@ use crate::search::{Candidate, RootProvider, Source};
 use crate::templates::{Template, Values};
 use crate::text::{TextError, TextTarget};
 
+use super::favicons::{site_of, FaviconCache, FaviconService, FaviconSource, FaviconsEnabled};
 use super::service::{ExcludedApps, KeywordExpansion};
 use super::store::{Kind, Record, Records};
 
@@ -65,6 +66,10 @@ const FIELD_KEYWORD: &str = "keyword";
 /// "name" cannot collide with the snippet's own name field.
 const ARGUMENT_PREFIX: &str = "arg:";
 
+/// Whether a quicklink wears the icon of the site it opens. Off stops Dango
+/// asking those sites for anything.
+pub const PREF_FAVICONS: &str = "favicons";
+
 pub struct SnippetsExtension {
     manifest: Manifest,
     records: Arc<Records>,
@@ -76,6 +81,7 @@ pub struct SnippetsExtension {
     /// The keyword-expansion service, only for snippets and only when text can
     /// be inserted. Its lifetime follows the extension's enabled state.
     services: Vec<Arc<dyn Service>>,
+    icons: Icons,
 }
 
 /// Opening a URL in whatever the user's default browser is. A trait so the
@@ -105,7 +111,32 @@ impl SnippetsExtension {
             text,
             opener,
             services,
+            icons: Icons::default(),
         }
+    }
+
+    /// Adds the site icons: the cache the search path reads and the service that
+    /// fills it. Only quicklinks have a URL to take an icon from.
+    pub fn with_favicons(
+        mut self,
+        cache: Arc<FaviconCache>,
+        source: Arc<dyn FaviconSource>,
+        enabled: FaviconsEnabled,
+    ) -> Self {
+        if self.kind() != Kind::Quicklink {
+            return self;
+        }
+        self.services.push(Arc::new(FaviconService::new(
+            self.records.clone(),
+            cache.clone(),
+            source,
+            enabled.clone(),
+        )));
+        self.icons = Icons {
+            favicons: Some(cache),
+            enabled: Some(enabled),
+        };
+        self
     }
 
     fn kind(&self) -> Kind {
@@ -190,7 +221,7 @@ impl SnippetsExtension {
             Ok(records) => records,
             Err(error) => return failure_tree(&error.to_string(), self.records.kind()),
         };
-        list_tree(&items, self.records.kind())
+        list_tree(&items, &self.icons.sheet(self.kind()))
     }
 }
 
@@ -208,6 +239,7 @@ impl Extension for SnippetsExtension {
         Some(Arc::new(SnippetProvider {
             records: self.records.clone(),
             kind: self.kind(),
+            icons: self.icons.clone(),
         }))
     }
 
@@ -218,7 +250,10 @@ impl Extension for SnippetsExtension {
     fn command(&self, command_id: &str) -> Option<Arc<dyn Command>> {
         match command_id {
             COMMAND_CREATE => Some(Arc::new(ShowForm(None, self.kind()))),
-            COMMAND_SEARCH => Some(Arc::new(ShowList(self.records.clone()))),
+            COMMAND_SEARCH => Some(Arc::new(ShowList(
+                self.records.clone(),
+                self.icons.clone(),
+            ))),
             _ => None,
         }
     }
@@ -298,14 +333,54 @@ fn strip_prefix(values: &FormValues) -> FormValues {
         .collect()
 }
 
+/// Where a record's icon comes from. Empty for snippets, which have no site to
+/// take one from, and for a quicklink extension wired without a cache.
+#[derive(Clone, Default)]
+struct Icons {
+    favicons: Option<Arc<FaviconCache>>,
+    enabled: Option<FaviconsEnabled>,
+}
+
+impl Icons {
+    /// Fixes what is in play for one list. The preference is read here rather
+    /// than per record, because it is read from the config file.
+    fn sheet(&self, kind: Kind) -> Sheet<'_> {
+        let wanted = self.enabled.as_ref().is_none_or(|enabled| enabled());
+        Sheet {
+            kind,
+            favicons: wanted.then_some(self.favicons.as_deref()).flatten(),
+        }
+    }
+}
+
+/// The icon choice for the records of one list, made without a syscall so it can
+/// run on the search path.
+struct Sheet<'a> {
+    kind: Kind,
+    favicons: Option<&'a FaviconCache>,
+}
+
+impl Sheet<'_> {
+    fn of(&self, record: &Record) -> String {
+        self.favicons
+            .and_then(|cache| {
+                let (host, _) = site_of(record)?;
+                cache.path(&host)
+            })
+            .unwrap_or_else(|| icon(self.kind))
+    }
+}
+
 struct SnippetProvider {
     records: Arc<Records>,
     kind: Kind,
+    icons: Icons,
 }
 
 #[async_trait]
 impl RootProvider for SnippetProvider {
     async fn items(&self, _query: String) -> Vec<Candidate> {
+        let sheet = self.icons.sheet(self.kind);
         self.records
             .all()
             .unwrap_or_default()
@@ -313,7 +388,7 @@ impl RootProvider for SnippetProvider {
             .map(|record| Candidate {
                 extension_id: extension_id(self.kind).into(),
                 subtitle: Some(one_line(&record.body)),
-                icon: Some(icon(self.kind)),
+                icon: Some(sheet.of(&record)),
                 title: record.name,
                 id: record.id,
                 keywords: vec![],
@@ -374,12 +449,12 @@ impl Command for ShowForm {
     }
 }
 
-struct ShowList(Arc<Records>);
+struct ShowList(Arc<Records>, Icons);
 
 impl Command for ShowList {
     fn invoke(&self, ctx: &InvocationContext) {
         match self.0.all() {
-            Ok(records) => ctx.push_view(list_tree(&records, self.0.kind())),
+            Ok(records) => ctx.push_view(list_tree(&records, &self.1.sheet(self.0.kind()))),
             Err(error) => ctx.fail(error.to_string()),
         }
     }
@@ -453,8 +528,8 @@ fn argument_tree(record: &Record, template: &Template, action_id: &str) -> ViewT
     }
 }
 
-fn list_tree(records: &[Record], kind: Kind) -> ViewTree {
-    let (title, description) = match kind {
+fn list_tree(records: &[Record], sheet: &Sheet) -> ViewTree {
+    let (title, description) = match sheet.kind {
         Kind::Snippet => (
             "No snippets yet",
             "Create one to keep text you type again and again.",
@@ -479,8 +554,8 @@ fn list_tree(records: &[Record], kind: Kind) -> ViewTree {
                     id: record.id.clone(),
                     title: record.name.clone(),
                     subtitle: Some(one_line(&record.body)),
-                    icon: Some(format!("{NAMED_ICON}clipboard-type")),
-                    actions: item_actions(kind),
+                    icon: Some(sheet.of(record)),
+                    actions: item_actions(sheet.kind),
                 })
                 .collect(),
         }),
@@ -542,16 +617,35 @@ pub(crate) fn manifest(kind: Kind) -> Manifest {
                 alias: None,
             },
         ],
-        preferences: vec![],
+        preferences: match kind {
+            Kind::Quicklink => vec![PreferenceDecl {
+                command_id: None,
+                key: PREF_FAVICONS.into(),
+                kind: PreferenceKind::Boolean,
+                default: Some(true.into()),
+                required: false,
+            }],
+            Kind::Snippet => vec![],
+        },
         root_items: true,
-        services: false,
+        // Both kinds run one: keyword expansion for snippets, favicon fetching
+        // for quicklinks.
+        services: true,
     }
+}
+
+/// What the host needs to read this extension's preferences, without handing it
+/// the manifest.
+pub fn preference_declarations(kind: Kind) -> Vec<PreferenceDecl> {
+    manifest(kind).preferences
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use std::sync::Mutex;
+
+    use crate::extensions::snippets::favicons::{FaviconError, Image};
 
     #[derive(Default)]
     struct FakeTarget {
@@ -628,6 +722,30 @@ mod tests {
 
     fn fixture(kind: Kind) -> Fixture {
         fixture_with(kind, FakeTarget::working())
+    }
+
+    /// A quicklink extension whose favicon cache is already filled for `hosts`,
+    /// with no fetching behind it.
+    fn with_favicons(hosts: &[&str], enabled: bool) -> (Fixture, Arc<FaviconCache>) {
+        let cache = FaviconCache::in_temp();
+        for host in hosts {
+            cache.seed(host);
+        }
+        let mut fixture = fixture(Kind::Quicklink);
+        fixture.extension = fixture.extension.with_favicons(
+            cache.clone(),
+            Arc::new(NoSource),
+            Arc::new(move || enabled),
+        );
+        (fixture, cache)
+    }
+
+    struct NoSource;
+
+    impl FaviconSource for NoSource {
+        fn fetch(&self, _site: &tauri::Url) -> Result<Image, FaviconError> {
+            unreachable!("the icon is seeded, so nothing is fetched")
+        }
     }
 
     fn fixture_with(kind: Kind, target: Arc<FakeTarget>) -> Fixture {
@@ -1102,5 +1220,177 @@ mod tests {
             .extension
             .perform_action("nope", ACTION_INSERT, &no_values());
         assert!(matches!(outcome, ActionOutcome::Failed(_)));
+    }
+
+    #[tokio::test]
+    async fn a_quicklink_shows_the_favicon_of_the_site_it_opens() {
+        let (fixture, cache) = with_favicons(&["example.com"], true);
+        fixture
+            .records
+            .create("Docs", "https://example.com/docs", None)
+            .unwrap();
+        let items = provider(&fixture.extension).items(String::new()).await;
+        assert_eq!(
+            items[0].icon.as_deref(),
+            cache.path("example.com").as_deref()
+        );
+    }
+
+    #[tokio::test]
+    async fn two_quicklinks_into_one_site_share_its_favicon() {
+        let (fixture, cache) = with_favicons(&["example.com"], true);
+        fixture
+            .records
+            .create("Docs", "https://example.com/docs", None)
+            .unwrap();
+        fixture
+            .records
+            .create("Search", "https://example.com/s?q={{query}}", None)
+            .unwrap();
+        let items = provider(&fixture.extension).items(String::new()).await;
+        let expected = cache.path("example.com");
+        assert_eq!(items[0].icon, expected);
+        assert_eq!(items[1].icon, expected);
+    }
+
+    #[tokio::test]
+    async fn a_quicklink_without_a_favicon_keeps_the_link_icon() {
+        let (fixture, _) = with_favicons(&["example.com"], true);
+        fixture
+            .records
+            .create("Other", "https://other.example/", None)
+            .unwrap();
+        let items = provider(&fixture.extension).items(String::new()).await;
+        assert_eq!(items[0].icon, Some(format!("{NAMED_ICON}link")));
+    }
+
+    #[tokio::test]
+    async fn favicons_turned_off_leave_every_quicklink_with_the_link_icon() {
+        let (fixture, _) = with_favicons(&["example.com"], false);
+        fixture
+            .records
+            .create("Docs", "https://example.com/docs", None)
+            .unwrap();
+        let items = provider(&fixture.extension).items(String::new()).await;
+        assert_eq!(items[0].icon, Some(format!("{NAMED_ICON}link")));
+    }
+
+    #[test]
+    fn the_quicklinks_list_shows_the_same_icons_as_root_search() {
+        let (fixture, cache) = with_favicons(&["example.com"], true);
+        fixture
+            .records
+            .create("Docs", "https://example.com/docs", None)
+            .unwrap();
+        fixture
+            .records
+            .create("Other", "https://other.example/", None)
+            .unwrap();
+        let items = items(&fixture.extension.list_tree());
+        assert_eq!(items[0].icon, cache.path("example.com"));
+        assert_eq!(items[1].icon, Some(format!("{NAMED_ICON}link")));
+    }
+
+    #[test]
+    fn a_quicklink_is_never_shown_with_the_snippet_icon() {
+        let fixture = fixture(Kind::Quicklink);
+        fixture
+            .records
+            .create("Docs", "https://example.com/docs", None)
+            .unwrap();
+        let items = items(&fixture.extension.list_tree());
+        assert_eq!(items[0].icon, Some(format!("{NAMED_ICON}link")));
+    }
+
+    #[test]
+    fn a_snippet_list_keeps_the_snippet_icon() {
+        let fixture = fixture(Kind::Snippet);
+        fixture.records.create("Sig", "Kind regards", None).unwrap();
+        let items = items(&fixture.extension.list_tree());
+        assert_eq!(items[0].icon, Some(format!("{NAMED_ICON}clipboard-type")));
+    }
+
+    fn provider(extension: &SnippetsExtension) -> Arc<dyn crate::search::RootProvider> {
+        extension.root_provider().expect("quicklinks provide items")
+    }
+
+    #[test]
+    fn only_quicklinks_declare_the_favicon_preference() {
+        let quicklinks = manifest(Kind::Quicklink);
+        let keys: Vec<_> = quicklinks
+            .preferences
+            .iter()
+            .map(|preference| preference.key.as_str())
+            .collect();
+        assert_eq!(keys, [PREF_FAVICONS]);
+        assert_eq!(
+            quicklinks.preferences[0].default,
+            Some(serde_json::Value::Bool(true)),
+            "favicons are on unless the user turns them off"
+        );
+        assert!(manifest(Kind::Snippet).preferences.is_empty());
+        assert!(quicklinks.validate().is_ok());
+    }
+
+    #[test]
+    fn a_quicklink_extension_without_a_cache_still_works() {
+        let fixture = fixture(Kind::Quicklink);
+        assert!(
+            fixture.extension.services().is_empty(),
+            "the favicon service arrives with the cache, not before it"
+        );
+    }
+
+    #[test]
+    fn wiring_favicons_adds_the_service_to_quicklinks_only() {
+        let (fixture, _) = with_favicons(&[], true);
+        assert_eq!(fixture.extension.services().len(), 1);
+
+        let snippets = fixture_with(Kind::Snippet, FakeTarget::working())
+            .extension
+            .with_favicons(FaviconCache::in_temp(), Arc::new(NoSource), Arc::new(|| true));
+        assert_eq!(
+            snippets.services().len(),
+            1,
+            "a snippet keeps its keyword expansion and gains nothing"
+        );
+    }
+
+    #[tokio::test]
+    async fn the_provider_stays_in_budget_with_five_hundred_quicklinks_and_their_icons() {
+        let (fixture, _) = with_favicons(&[], true);
+        for i in 0..500 {
+            fixture
+                .records
+                .create(&format!("link {i}"), &format!("https://host{i}.example/"), None)
+                .unwrap();
+        }
+        // Every one resolves to a cached icon, which is the slowest case: each
+        // record is parsed, rendered and looked up.
+        for i in 0..500 {
+            fixture.extension.icons.favicons.as_ref().unwrap().seed(&format!("host{i}.example"));
+        }
+
+        let provider = provider(&fixture.extension);
+        let start = std::time::Instant::now();
+        let candidates = provider.items(String::new()).await;
+        let elapsed = start.elapsed();
+
+        assert_eq!(candidates.len(), 500);
+        assert!(
+            candidates.iter().all(|candidate| !is_named(candidate)),
+            "every one should have found its icon"
+        );
+        assert!(
+            elapsed < std::time::Duration::from_millis(50),
+            "answering took {elapsed:?}, the provider budget is 50ms"
+        );
+    }
+
+    fn is_named(candidate: &Candidate) -> bool {
+        candidate
+            .icon
+            .as_deref()
+            .is_some_and(|icon| icon.starts_with(NAMED_ICON))
     }
 }

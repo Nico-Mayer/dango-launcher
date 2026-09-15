@@ -36,6 +36,14 @@
       }
     },
 
+    "dango.quicklinks": {
+      "preferences": {
+        // Show each quicklink with its site's icon. Turning this off stops Dango
+        // fetching anything from the sites your quicklinks point at. Default true.
+        "favicons": false
+      }
+    },
+
     "dango.applications": {
       // Open an application, or bring it to the front, from a global hotkey. The
       // key is the name Dango shows for the app in root search, matched ignoring
