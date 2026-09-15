@@ -254,6 +254,15 @@ impl Records {
         Ok(records)
     }
 
+    /// The records as the file has them now, for a caller that follows the file
+    /// itself and must not read a set the watcher has not reloaded yet.
+    pub fn on_disk(&self) -> Result<Vec<Record>, RecordError> {
+        Ok(load(&self.path)?
+            .iter()
+            .filter_map(|record| self.project(record))
+            .collect())
+    }
+
     pub fn get(&self, id: &str) -> Result<Record, RecordError> {
         let cache = self.cache.read().unwrap();
         cache

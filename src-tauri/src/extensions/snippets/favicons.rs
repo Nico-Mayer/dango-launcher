@@ -357,7 +357,10 @@ impl FaviconService {
     }
 
     fn sweep(&self) {
-        let Ok(records) = self.records.all() else {
+        // From the file rather than from the live set, because the sweep wakes
+        // on the file's mtime while the watcher refreshes that set a moment
+        // later, so the live set can still be the one from before the edit.
+        let Ok(records) = self.records.on_disk() else {
             return;
         };
         let mut seen = Vec::new();
@@ -399,8 +402,11 @@ impl FaviconService {
         std::fs::metadata(self.records.path()).ok()?.modified().ok()
     }
 
-    fn wait_for_refresh(&self) {
-        let baseline = self.fingerprint();
+    /// Waits for the records to change, for the preference to come back on, or
+    /// for the refresh interval. `baseline` is taken before the sweep reads the
+    /// records, so an edit made while a sweep was running is still noticed
+    /// rather than swallowed by a wait that started after it.
+    fn wait_for_refresh(&self, baseline: Option<SystemTime>) {
         // Turning the preference back on has to resume fetching, and it lives in
         // the config file rather than in the records, so the wait watches it too
         // instead of sleeping until the next edit or the next interval.
@@ -432,8 +438,9 @@ impl Service for FaviconService {
                 running: running.clone(),
             };
             while running.load(Ordering::SeqCst) {
+                let baseline = service.fingerprint();
                 service.sweep();
-                service.wait_for_refresh();
+                service.wait_for_refresh(baseline);
             }
         });
         Ok(())
@@ -781,10 +788,16 @@ mod tests {
         let added = wait_until(|| !source.asked().is_empty());
         assert!(added, "the first sweep should have run");
 
+        // Written to the file without a reload, the way a hand edit arrives:
+        // the watcher refreshes the live set a moment after the file changes, so
+        // a sweep reading that set would work from what was there before.
         let before = service.fingerprint();
-        records
-            .create("Other", "https://other.example/", None)
-            .unwrap();
+        std::fs::write(
+            records.path(),
+            r#"[{"id": "1", "name": "Docs", "url": "https://example.com/"},
+                {"id": "2", "name": "Other", "url": "https://other.example/"}]"#,
+        )
+        .unwrap();
         assert_ne!(service.fingerprint(), before, "the file changed");
         let followed = wait_until(|| source.asked().len() == 2);
         service.stop();
