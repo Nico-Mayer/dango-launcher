@@ -16,6 +16,8 @@ use crate::search::{Candidate, Ranker};
 /// by feel; isolated here so it can change without touching the pipeline.
 const FRECENCY_WEIGHT: f64 = 6.0;
 
+const SUGGESTION_LIMIT: usize = 6;
+
 /// A keyword or alias match is worth slightly less than the same match in the
 /// title, so a title hit wins an otherwise equal race.
 const NON_TITLE_PENALTY: i32 = 4;
@@ -97,7 +99,15 @@ fn rank_empty_query(
     // Highest frecency first; on a first run every score is zero and this falls
     // back to title order, which is a sensible default list rather than empty.
     scored.sort_by(|a, b| b.1.total_cmp(&a.1).then_with(|| a.0.title.cmp(&b.0.title)));
-    scored.into_iter().map(|(c, _)| c).take(limit).collect()
+    scored
+        .into_iter()
+        .enumerate()
+        .map(|(index, (mut c, score))| {
+            c.suggested = index < SUGGESTION_LIMIT && score > 0.0;
+            c
+        })
+        .take(limit)
+        .collect()
 }
 
 #[derive(PartialEq, Eq, PartialOrd, Ord)]
@@ -163,6 +173,7 @@ mod tests {
             source: Source::Command,
             actions: vec![],
             match_positions: vec![],
+            suggested: false,
         }
     }
 
@@ -266,24 +277,96 @@ mod tests {
     }
 
     #[test]
-    fn ranking_two_thousand_candidates_meets_the_budget() {
+    fn empty_query_marks_launched_items_as_suggestions() {
+        let frecency = Arc::new(FrecencyTable::in_memory());
+        frecency.record_launch("used", frecency::now_millis());
+        let ranker = DangoRanker::new(frecency);
+        let ranked = ranker.rank(
+            "",
+            vec![candidate("cold", "Cold"), candidate("used", "Used")],
+            10,
+        );
+        assert!(ranked[0].suggested);
+        assert!(!ranked[1].suggested);
+    }
+
+    #[test]
+    fn suggestions_are_capped_and_the_rest_keep_frecency_order() {
+        let frecency = Arc::new(FrecencyTable::in_memory());
+        let now = frecency::now_millis();
+        let mut candidates: Vec<Candidate> = (0..8)
+            .map(|i| candidate(&format!("used{i}"), &format!("Used {i}")))
+            .collect();
+        for (i, c) in candidates.iter().enumerate() {
+            for _ in 0..(8 - i) {
+                frecency.record_launch(&c.id, now);
+            }
+        }
+        candidates.push(candidate("aaa", "Aaa Never Launched"));
+        let ranker = DangoRanker::new(frecency);
+
+        let ranked = ranker.rank("", candidates, 10);
+        let suggested: Vec<&str> = ranked
+            .iter()
+            .filter(|c| c.suggested)
+            .map(|c| c.id.as_str())
+            .collect();
+        assert_eq!(
+            suggested,
+            ["used0", "used1", "used2", "used3", "used4", "used5"]
+        );
+        assert_eq!(ranked[6].id, "used6");
+        assert_eq!(ranked[7].id, "used7");
+        assert!(!ranked[6].suggested && !ranked[7].suggested);
+        assert_eq!(ranked[8].id, "aaa");
+    }
+
+    #[test]
+    fn empty_query_on_first_run_marks_nothing() {
         let ranker = ranker();
+        let ranked = ranker.rank(
+            "",
+            vec![candidate("b", "Beta"), candidate("a", "Alpha")],
+            10,
+        );
+        assert!(ranked.iter().all(|c| !c.suggested));
+    }
+
+    #[test]
+    fn a_query_marks_nothing_as_suggested() {
+        let frecency = Arc::new(FrecencyTable::in_memory());
+        frecency.record_launch("used", frecency::now_millis());
+        let ranker = DangoRanker::new(frecency);
+        let ranked = ranker.rank("use", vec![candidate("used", "Used")], 10);
+        assert!(!ranked[0].suggested);
+    }
+
+    #[test]
+    fn ranking_two_thousand_candidates_meets_the_budget() {
+        let frecency = Arc::new(FrecencyTable::in_memory());
+        let now = frecency::now_millis();
+        for i in 0..12 {
+            frecency.record_launch(&format!("id{i}"), now);
+        }
+        let ranker = DangoRanker::new(frecency);
         let candidates: Vec<Candidate> = (0..2000)
             .map(|i| candidate(&format!("id{i}"), &format!("Application Number {i}")))
             .collect();
 
         // Best of several runs, so a single scheduling hiccup on CI does not
         // fail a test about steady-state cost.
-        let mut best = std::time::Duration::from_secs(1);
-        for _ in 0..5 {
-            let input = candidates.clone();
-            let start = std::time::Instant::now();
-            let _ = ranker.rank("appnum", input, 50);
-            best = best.min(start.elapsed());
+        for query in ["appnum", ""] {
+            let mut best = std::time::Duration::from_secs(1);
+            for _ in 0..5 {
+                let input = candidates.clone();
+                let start = std::time::Instant::now();
+                let _ = ranker.rank(query, input, 50);
+                best = best.min(start.elapsed());
+            }
+            assert!(
+                best < std::time::Duration::from_millis(30),
+                "ranking 2000 candidates for {query:?} took {best:?}, over the 30ms budget"
+            );
         }
-        assert!(
-            best < std::time::Duration::from_millis(30),
-            "ranking 2000 candidates took {best:?}, over the 30ms budget"
-        );
     }
 }

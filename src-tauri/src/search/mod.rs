@@ -37,6 +37,9 @@ pub struct Candidate {
     /// Character offsets in the title that matched the query, filled by the
     /// ranker so the frontend can highlight them. Empty until ranked.
     pub match_positions: Vec<usize>,
+    /// Set by the ranker on an empty query for the few most frecent items, so
+    /// the frontend can head them as suggestions without knowing frecency.
+    pub suggested: bool,
 }
 
 /// A fixed set of commands snapshotted from the registry. Rebuilt when
@@ -232,6 +235,7 @@ mod tests {
             source,
             actions: vec![],
             match_positions: vec![],
+            suggested: false,
         }
     }
 

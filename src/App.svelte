@@ -66,11 +66,14 @@
     results.some((r) => r.id === pickedId) ? pickedId : (results[0]?.id ?? ""),
   );
   const selectedItem = $derived(results.find((r) => r.id === selectedId));
+  const suggestions = $derived(results.filter((r) => r.suggested));
+  const everythingElse = $derived(results.filter((r) => !r.suggested));
 
-  /// The primitive scrolls the selection into view for every row but the first:
-  /// for that one it scrolls the enclosing group's heading instead, and a list
-  /// without groups has none, so it returns having scrolled nothing. Arrowing
-  /// back to the top then leaves the first row selected just above the fold.
+  /// The primitive scrolls the selected row into view but no further, so
+  /// arrowing back to the top leaves the first row selected just under the
+  /// list's edge, and with the list grouped, the "Suggestions" heading above it
+  /// out of sight. Its own first-row branch, which would scroll the heading in,
+  /// compares the wrong element and never fires.
   $effect(() => {
     if (selectedId && selectedId === results[0]?.id && listEl) listEl.scrollTop = 0;
   });
@@ -308,6 +311,39 @@
 
 <svelte:window onkeydown={onKeydown} onblur={() => invoke("dismiss")} />
 
+<!-- The row is not focusable, so a click would otherwise move focus off the
+     prompt and leave the launcher unable to type. The scroll margin keeps a
+     group's heading in view when arrowing up lands on its first row. -->
+{#snippet row(item: ResultItem)}
+  <Command.Item
+    value={item.id}
+    onSelect={() => confirm(item)}
+    onmousedown={(event) => event.preventDefault()}
+    class="data-[selected]:bg-muted [[data-pointer]_&:hover:not([data-selected])]:bg-muted/50 flex h-14 items-center gap-3 rounded-lg px-3 first:scroll-mt-7"
+  >
+    <ResultRow
+      title={item.title}
+      subtitle={item.subtitle}
+      icon={item.icon}
+      matchPositions={item.matchPositions}
+      tint={item.tint}
+    />
+  </Command.Item>
+{/snippet}
+
+{#snippet group(heading: string, items: ResultItem[])}
+  <Command.Group>
+    <Command.GroupHeading class="text-muted-foreground px-3 pt-2 pb-1 text-xs font-medium">
+      {heading}
+    </Command.GroupHeading>
+    <Command.GroupItems>
+      {#each items as item (item.id)}
+        {@render row(item)}
+      {/each}
+    </Command.GroupItems>
+  </Command.Group>
+{/snippet}
+
 {#snippet footer(primaryLabel: string, confirmKey: string = "↵")}
   <div
     class="border-border-card text-muted-foreground flex h-10 shrink-0 items-center justify-between border-t px-4 text-xs"
@@ -378,24 +414,14 @@
         class="min-h-0 flex-1 overflow-y-auto"
       >
         <Command.Viewport class="px-2">
-          {#each results as item (item.id)}
-            <!-- The row is not focusable, so a click would otherwise move focus
-                 off the prompt and leave the launcher unable to type. -->
-            <Command.Item
-              value={item.id}
-              onSelect={() => confirm(item)}
-              onmousedown={(event) => event.preventDefault()}
-              class="data-[selected]:bg-muted [[data-pointer]_&:hover:not([data-selected])]:bg-muted/50 flex h-14 items-center gap-3 rounded-lg px-3"
-            >
-              <ResultRow
-                title={item.title}
-                subtitle={item.subtitle}
-                icon={item.icon}
-                matchPositions={item.matchPositions}
-                tint={item.tint}
-              />
-            </Command.Item>
-          {/each}
+          {#if suggestions.length > 0}
+            {@render group("Suggestions", suggestions)}
+            {@render group("Everything else", everythingElse)}
+          {:else}
+            {#each results as item (item.id)}
+              {@render row(item)}
+            {/each}
+          {/if}
           {#if results.length === 0 && query.length > 0}
             <div class="text-muted-foreground truncate px-3 py-4 text-sm">
               No results for “{query}”

@@ -59,6 +59,7 @@ struct ResultItem {
     tint: Option<String>,
     actions: Vec<protocol::Action>,
     match_positions: Vec<usize>,
+    suggested: bool,
 }
 
 impl ResultItem {
@@ -72,6 +73,7 @@ impl ResultItem {
             icon: c.icon,
             actions: c.actions,
             match_positions: c.match_positions,
+            suggested: c.suggested,
         }
     }
 }
@@ -390,6 +392,7 @@ mod tint_tests {
             source: crate::search::Source::Command,
             actions: vec![],
             match_positions: vec![],
+            suggested: false,
         }
     }
 

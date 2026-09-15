@@ -396,6 +396,7 @@ impl RootProvider for SnippetProvider {
                 source: Source::RootItem,
                 actions: item_actions(self.kind),
                 match_positions: vec![],
+                suggested: false,
             })
             .collect()
     }

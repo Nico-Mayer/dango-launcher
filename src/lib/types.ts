@@ -19,6 +19,8 @@ export interface ResultItem {
   tint?: string | null;
   actions: ActionDto[];
   matchPositions: number[];
+  /// Marked by the backend on an empty query for the few most launched items.
+  suggested: boolean;
 }
 
 export interface ResultsPayload {

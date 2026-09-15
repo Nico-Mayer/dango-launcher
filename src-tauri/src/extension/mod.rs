@@ -204,6 +204,7 @@ impl ExtensionHost {
                 source: crate::search::Source::Command,
                 actions: Vec::new(),
                 match_positions: Vec::new(),
+                suggested: false,
             })
             .collect()
     }

@@ -152,6 +152,7 @@ impl RootProvider for AppProvider {
                     source: Source::RootItem,
                     actions: app_actions(has_path),
                     match_positions: vec![],
+                    suggested: false,
                 }
             })
             .collect()
