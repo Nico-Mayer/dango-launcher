@@ -51,9 +51,35 @@
 
 ## 4. Install and verify hooks on macOS
 
-- [ ] 4.1 Run `mise install` and `hk install --mise` on the macOS machine and verify the hooks are registered (config entries on Git 2.54+, shim in `.git/hooks/` otherwise)
-- [ ] 4.2 Repeat the partially staged Rust commit from 3.2 and verify the same outcome
-- [ ] 4.3 Repeat the aborted push from 3.4 and verify the same outcome
+- [x] 4.1 Run `mise install` and `hk install --mise` on the macOS machine and verify the hooks are registered (config entries on Git 2.54+, shim in `.git/hooks/` otherwise)
+  - Apple Git 2.50.1, below the 2.54 config-hook cutoff, so hk took the shim
+    path and wrote `.git/hooks/pre-commit` and `.git/hooks/pre-push`. Both are
+    `/bin/sh` one-liners: `test "${HK:-1}" = "0" || exec mise x -- hk run
+    <hook> --from-hook "$@"`. No `hook.*` entries in `.git/config`, which is
+    the documented fallback. `mise exec -- hk --version` prints 2.0.0.
+- [x] 4.2 Repeat the partially staged Rust commit from 3.2 and verify the same outcome
+  - Same outcome as Windows. In a scratch worktree on `scratch/hk-macos-verify`,
+    `src-tauri/src/main.rs` got a misformatted staged function and a second
+    misformatted unstaged one. hk stashed the unstaged hunk, ran
+    `cargo fmt --manifest-path src-tauri/Cargo.toml`, re-staged the file, and
+    restored the stash. The commit holds rustfmt output and passes
+    `cargo fmt --check`; the unstaged function is still in the working tree,
+    unformatted and uncommitted. No stash entry left behind.
+  - The worktree shares `.git/hooks` with the main checkout, so one
+    `hk install --mise` covers every worktree.
+  - Commit took 1.4 s wall clock against a warm rustfmt.
+- [x] 4.3 Repeat the aborted push from 3.4 and verify the same outcome
+  - Same outcome as Windows, and driven the same way: `git push` is blocked by
+    the session's permission policy, so the hook was invoked as git invokes it,
+    `mise x -- hk run pre-push --from-hook <remote> <url>` with the ref line on
+    stdin, against a local bare repository. With a needless `return` committed
+    it exited 101 after 5 s and printed the `-D clippy::needless-return` help
+    exactly as CI does. `-D warnings` also caught a `dead_code` warning from the
+    4.2 probe in the same run.
+  - After reverting the probes it exited 0 in 1.5 s, clippy and svelte-check
+    both green and running in parallel.
+  - A real `git push` is still unverified on both platforms. It is covered by
+    task 6.1, which needs one anyway.
 
 ## 5. Document
 
@@ -61,5 +87,26 @@
 
 ## 6. Close out
 
-- [ ] 6.1 Push the change and verify CI is green on both matrix jobs with `ci.yml` untouched
-- [ ] 6.2 Record the Windows and macOS verification results from sections 3 and 4 in this change before archiving
+- [x] 6.1 Push the change and verify CI is green on both matrix jobs with `ci.yml` untouched
+  - `913c6bb chore: git hooks` is on `origin/main`. CI run 34941330925 is green
+    on both jobs: macOS in 5m45s, Windows in 13m21s. `.github/workflows/ci.yml`
+    was not touched by this change; its last edits predate it.
+  - That push does not close the open question from 3.4 and 4.3. The commit was
+    made at 09:21 and `hk install --mise` ran on this macOS clone at 09:23, so
+    the pre-push hook was not active for it. Whether git invokes the hook on a
+    real push is still unobserved; the next push from either machine settles it.
+- [x] 6.2 Record the Windows and macOS verification results from sections 3 and 4 in this change before archiving
+  - Results are recorded as notes under each task in sections 3 and 4 above.
+  - Summary: the hook behaves the same on both machines. Windows took the
+    config-hook path (Git 2.55, `hook.hk-*` entries in `.git/config`); macOS
+    took the shim path (Apple Git 2.50.1, `.git/hooks/pre-commit` and
+    `pre-push`). Both wrap the hook in `mise x`, so commits from PowerShell,
+    lazygit, or an editor resolve `cargo` without an activated shell.
+    Partially staged Rust commits format the staged hunk and leave the unstaged
+    one untouched on both. A clippy warning aborts pre-push on both, with CI's
+    message. Markdown-only commits cost about 380 ms of hook overhead.
+  - Two caveats carried forward: the pre-push hook was never observed firing on
+    a real `git push` (the session permission policy blocked the command on
+    both machines, so it was driven directly instead), and a fresh clone needs
+    `npm ci` before the first push or svelte-check fails and hk's fail-fast
+    aborts clippy with it.
