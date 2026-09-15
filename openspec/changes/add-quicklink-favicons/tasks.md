@@ -78,11 +78,25 @@
       root search and in Search Quicklinks; a brand new quicklink picking up its
       icon without a restart; the icons still there after a restart with no
       refetch.
-- [ ] 5.2 Verify on Windows: the same list, with attention to ICO rendering in
+- [x] 5.2 Verify on Windows: the same list, with attention to ICO rendering in
       WebView2 and to the cache directory resolving under the app cache path.
+      Done: release build, seven quicklinks over github.com (svg),
+      www.google.com (ico), en.wikipedia.org (ico), developer.mozilla.org (ico),
+      news.ycombinator.com (svg), www.rust-lang.org (png) and a placeholder
+      template on Wikipedia. WebView2 drew every ICO, and root search and Search
+      Quicklinks showed the same icons, with no snippet glyph anywhere. The
+      cache resolved to `%LOCALAPPDATA%\com.nimayer.dango\favicons\`, and the
+      four new hosts were written within two seconds of start without the
+      already cached github.com and www.google.com being touched.
 - [ ] 5.3 Verify on both platforms that the launcher stays inside its budget
       with 500 quicklinks stored, using `env DANGO_MEASURE=1` and a generated
       quicklinks file, and that no request goes out while typing.
+      Windows done: release build with `DANGO_MEASURE=1` and a generated file of
+      500 quicklinks over eight hosts. 26 activations by the global hotkey: min
+      17.7ms, median 23.9ms, p90 29.2ms, max 37.0ms, none over 80ms. Twenty
+      queries typed against the 500 records left the process with zero TCP
+      connections at every sample, the cache directory unchanged, and no new log
+      line. macOS still to run.
 - [x] 5.4 Verify on both platforms with the machine offline and with a quicklink
       pointing at a host that does not exist: no message on screen, every
       quicklink still opens, the failure in `dango.log`, and no repeated attempt
@@ -91,7 +105,10 @@
       marker and `no favicon for this-host-does-not-exist.invalid: error sending
       request ...` in the log, with nothing on screen. A live host that refuses
       every request (chatgpt.com, 403 on both the page and /favicon.ico) behaves
-      the same. Windows still to run.
+      the same.
+      Windows done: the same quicklink left the miss marker and the log line,
+      nothing on screen, and Enter on it still opened the browser. A restart ten
+      seconds later left the cache directory and the log byte for byte unchanged.
 - [x] 5.5 Verify on both platforms that setting `"favicons": false` stops the
       fetching within a tick and returns every quicklink to the generic icon,
       and that turning it back on restores them without a restart.
@@ -100,6 +117,10 @@
       of those. The wait now watches the preference too, and a sweep already
       running stops as soon as it goes off. Re-verified live: a quicklink added
       while off was not fetched, and was fetched about two seconds after turning
-      it on. Windows still to run.
+      it on.
+      Windows done: turning the preference off while running returned every
+      quicklink in Search Quicklinks to the link glyph, and a quicklink added
+      while off was not fetched in five seconds. Turning it back on fetched that
+      host half a second later and the icons came back without a restart.
 - [x] 5.6 Run `cargo clippy -- -D warnings`, `cargo test`, and `npm run check`,
       and verify all three pass.
