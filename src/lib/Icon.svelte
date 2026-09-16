@@ -1,5 +1,6 @@
 <script lang="ts" module>
   import AppWindow from "@lucide/svelte/icons/app-window";
+  import Check from "@lucide/svelte/icons/check";
   import CircleAlert from "@lucide/svelte/icons/circle-alert";
   import CirclePower from "@lucide/svelte/icons/circle-power";
   import ClipboardList from "@lucide/svelte/icons/clipboard-list";
@@ -29,6 +30,7 @@
   /// somewhere in Rust.
   const REGISTRY = {
     "app-window": AppWindow,
+    check: Check,
     "circle-alert": CircleAlert,
     "circle-power": CirclePower,
     "clipboard-list": ClipboardList,
@@ -62,7 +64,7 @@
   export function namedIcon(value: string | null | undefined): IconName | null {
     if (!value?.startsWith(NAMED_PREFIX)) return null;
     const name = value.slice(NAMED_PREFIX.length);
-    return name in REGISTRY ? (name as IconName) : null;
+    return Object.hasOwn(REGISTRY, name) ? (name as IconName) : null;
   }
 
   export function isNamedIcon(value: string | null | undefined): boolean {

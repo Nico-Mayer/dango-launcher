@@ -1,12 +1,14 @@
 <script lang="ts">
     import { invoke } from "@tauri-apps/api/core";
     import { listen } from "@tauri-apps/api/event";
-    import { Command } from "bits-ui";
+    import * as Command from "./lib/ui/command";
     import { onMount } from "svelte";
     import ActionPanel from "./lib/ActionPanel.svelte";
-    import Icon from "./lib/Icon.svelte";
+    import LauncherFrame from "./lib/launcher/LauncherFrame.svelte";
+    import LauncherFooter from "./lib/launcher/LauncherFooter.svelte";
+    import EmptyMessage from "./lib/ui/EmptyMessage.svelte";
+    import StatusBanner from "./lib/ui/StatusBanner.svelte";
     import { inUserGesture, pointerActive } from "./lib/input.svelte";
-    import { modKey } from "./lib/platform";
     import ProtocolView from "./lib/ProtocolView.svelte";
     import ResultRow from "./lib/ResultRow.svelte";
     import {
@@ -28,6 +30,7 @@
     let pickedId = $state("");
     let stack = $state<ViewTree[]>([]);
     let panelOpen = $state(false);
+    let panelPresent = $state(false);
     let protocolError = $state(false);
     /// The extension whose command pushed what is on the stack, so an action
     /// chosen inside its view goes back to it.
@@ -41,7 +44,6 @@
     // shown a view yet.
     let workingTitle = $state<string | null>(null);
     let inputEl = $state<HTMLInputElement | null>(null);
-    let listEl = $state<HTMLElement | null>(null);
 
     // The query whose results we will display; a late event for an older query is
     // dropped so cancelled results never show.
@@ -70,16 +72,6 @@
     const selectedItem = $derived(results.find((r) => r.id === selectedId));
     const suggestions = $derived(results.filter((r) => r.suggested));
     const everythingElse = $derived(results.filter((r) => !r.suggested));
-
-    /// The primitive scrolls the selected row into view but no further, so
-    /// arrowing back to the top leaves the first row selected just under the
-    /// list's edge, and with the list grouped, the "Suggestions" heading above it
-    /// out of sight. Its own first-row branch, which would scroll the heading in,
-    /// compares the wrong element and never fires.
-    $effect(() => {
-        if (selectedId && selectedId === results[0]?.id && listEl)
-            listEl.scrollTop = 0;
-    });
 
     function runSearch(q: string) {
         liveQuery = q;
@@ -194,6 +186,7 @@
     // action panel, and per-action shortcuts. Arrow and Enter navigation and
     // scroll-into-view are handled by Command itself.
     function onKeydown(event: KeyboardEvent) {
+        if (event.defaultPrevented) return;
         if (protocolError) {
             if (event.key === "Escape") {
                 event.preventDefault();
@@ -201,7 +194,7 @@
             }
             return;
         }
-        if (panelOpen) return;
+        if (panelOpen || panelPresent) return;
 
         if (event.key === "Escape") {
             event.preventDefault();
@@ -243,6 +236,11 @@
     }
 
     onMount(() => {
+        const updateVisibility = () => {
+            document.documentElement.toggleAttribute("data-dango-hidden", document.hidden);
+        };
+        updateVisibility();
+        document.addEventListener("visibilitychange", updateVisibility);
         // Runs while the window is still parked offscreen, so the first activation
         // already has the frecent items and their icons painted. Leaving it until
         // the first activation cost 40ms of icon loading and showed an empty list.
@@ -288,7 +286,11 @@
                 shownInvocation = event.payload.invocation;
             }),
         ];
-        return () => unlisten.forEach((p) => p.then((un) => un()));
+        return () => {
+            document.removeEventListener("visibilitychange", updateVisibility);
+            document.documentElement.removeAttribute("data-dango-hidden");
+            unlisten.forEach((p) => p.then((un) => un()));
+        };
     });
 
     /// Who owns the cursor, in one place.
@@ -299,7 +301,7 @@
     /// hand the cursor back, or the launcher is left unable to type, which is how
     /// popping a view used to strand it on the body.
     $effect(() => {
-        if (stack.length > 0 || panelOpen || protocolError) return;
+        if (stack.length > 0 || panelOpen || panelPresent || protocolError) return;
         inputEl?.focus();
     });
 
@@ -308,28 +310,6 @@
         const q = query;
         runSearch(q);
     });
-    /// The footer should say what Enter does here rather than always "Select".
-    /// A detail or form view declares its own actions; a list's live on its
-    /// items, and every list so far gives all its items the same set.
-    function stackPrimaryLabel(): string {
-        const view = stack[stack.length - 1]?.view;
-        if (!view) return "Select";
-        const actions =
-            view.kind === "list"
-                ? (view.items[0]?.actions ?? [])
-                : view.actions;
-        return actions[0]?.title ?? "Select";
-    }
-
-    /// A template field needs plain Enter for a newline, so the footer has to
-    /// advertise the chord that actually submits.
-    function stackConfirmKey(): string {
-        const view = stack[stack.length - 1]?.view;
-        const hasTemplate =
-            view?.kind === "form" &&
-            view.fields.some((field) => field.kind === "template");
-        return hasTemplate ? `${modKey}↵` : "↵";
-    }
 </script>
 
 <svelte:window onkeydown={onKeydown} onblur={() => invoke("dismiss")} />
@@ -340,9 +320,9 @@
 {#snippet row(item: ResultItem)}
     <Command.Item
         value={item.id}
-        onSelect={() => confirm(item)}
+        onSelect={() => !panelOpen && !panelPresent && confirm(item)}
         onmousedown={(event) => event.preventDefault()}
-        class="data-[selected]:bg-muted [[data-pointer]_&:hover:not([data-selected])]:bg-muted/50 flex h-14 items-center gap-3 rounded-lg px-3 first:scroll-mt-7"
+        class="first:scroll-mt-7"
     >
         <ResultRow
             title={item.title}
@@ -357,7 +337,7 @@
 {#snippet group(heading: string, items: ResultItem[])}
     <Command.Group>
         <Command.GroupHeading
-            class="text-muted-foreground px-3 pt-2 pb-1 text-xs font-medium"
+
         >
             {heading}
         </Command.GroupHeading>
@@ -369,71 +349,41 @@
     </Command.Group>
 {/snippet}
 
-{#snippet footer(primaryLabel: string, confirmKey: string = "↵")}
-    <div
-        class="border-border-card text-muted-foreground flex h-10 shrink-0 items-center justify-between border-t px-4 text-xs"
-    >
-        <span class="text-foreground-alt font-medium">Dango</span>
-        <div class="flex items-center gap-4">
-            <span class="flex items-center gap-1.5">
-                {primaryLabel}
-                <kbd class="bg-muted rounded px-1.5 py-0.5 font-sans"
-                    >{confirmKey}</kbd
-                >
-            </span>
-            <span class="flex items-center gap-1.5">
-                Actions
-                <kbd class="bg-muted rounded px-1.5 py-0.5 font-sans"
-                    >{modKey} K</kbd
-                >
-            </span>
-        </div>
-    </div>
-{/snippet}
-
 {#if protocolError}
-    <main
-        class="border-border-card bg-background flex h-screen w-screen flex-col justify-center gap-2 overflow-hidden rounded-[14px] border px-6"
-    >
+    <LauncherFrame class="justify-center gap-2 px-6">
         <span class="text-foreground text-sm"
             >This view needs a newer version of Dango.</span
         >
         <span class="text-muted-foreground text-xs"
             >Press Escape to go back.</span
         >
-    </main>
+    </LauncherFrame>
 {:else if stack.length > 0}
-    <main
-        class="border-border-card bg-background flex h-screen w-screen flex-col overflow-hidden rounded-[14px] border"
-    >
+    <LauncherFrame>
         <!-- Fills the space so the footer sits on the bottom edge rather than
          directly under a short form. -->
         <div class="flex min-h-0 flex-1 flex-col">
             <ProtocolView
                 tree={stack[stack.length - 1]}
                 onaction={runViewAction}
-            />
-        </div>
-        {#if failure}
-            <div
-                class="text-destructive border-border-card flex shrink-0 items-center gap-2 border-t px-5 py-2 text-sm"
             >
-                <Icon name="circle-alert" size={16} />
-                {failure}
-            </div>
-        {/if}
-        {@render footer(stackPrimaryLabel(), stackConfirmKey())}
-    </main>
+                {#snippet beforeFooter()}
+                    {#if failure}
+                        <StatusBanner message={failure} />
+                    {/if}
+                {/snippet}
+            </ProtocolView>
+        </div>
+    </LauncherFrame>
 {:else}
     <Command.Root
-        shouldFilter={false}
-        disablePointerSelection
-        vimBindings={false}
         bind:value={
-            () => selectedId, (id) => inUserGesture() && (pickedId = id)
+            () => selectedId, () => {}
         }
-        class="border-border-card bg-background flex h-screen w-screen flex-col overflow-hidden rounded-[14px] border"
+        onValueChange={(id) => { if (inUserGesture()) pickedId = id; }}
     >
+        {#snippet child({ props })}
+        <LauncherFrame {...props}>
         <Command.Input
             bind:ref={inputEl}
             bind:value={
@@ -441,22 +391,20 @@
                 (q) => ((query = q), (pickedId = ""), (failure = null))
             }
             placeholder="Search apps and commands"
-            spellcheck={false}
-            autocomplete="off"
-            class="text-foreground placeholder:text-muted-foreground h-16 w-full shrink-0 bg-transparent px-5 text-2xl focus:outline-none"
+
         />
         <!-- The inset lives outside the scroller, so the gap above the first row
          and below the last one is there at every scroll position instead of
          appearing only at the two ends. -->
         <div
-            class="border-border-card flex min-h-0 flex-1 flex-col border-t py-2"
+            aria-busy={workingTitle !== null}
+            class="border-border-card flex min-h-0 flex-1 flex-col border-t-edge py-2"
         >
             <Command.List
-                bind:ref={listEl}
                 data-pointer={pointerActive() ? "" : undefined}
-                class="min-h-0 flex-1 overflow-y-auto"
+
             >
-                <Command.Viewport class="px-2">
+                <Command.Viewport >
                     {#if suggestions.length > 0}
                         {@render group("Suggestions", suggestions)}
                         {@render group("Everything else", everythingElse)}
@@ -466,41 +414,28 @@
                         {/each}
                     {/if}
                     {#if results.length === 0 && query.length > 0}
-                        <div
-                            class="text-muted-foreground truncate px-3 py-4 text-sm"
-                        >
-                            No results for “{query}”
-                        </div>
+                        <EmptyMessage class="truncate">No results for “{query}”</EmptyMessage>
                     {/if}
                 </Command.Viewport>
             </Command.List>
         </div>
 
-        {#if workingTitle}
-            <div
-                class="text-muted-foreground border-border-card flex shrink-0 items-center gap-2 border-t px-5 py-2 text-sm"
-            >
-                <Icon name="loader-circle" size={16} class="animate-spin" />
-                <span class="truncate">Running {workingTitle}…</span>
-            </div>
-        {/if}
         {#if failure}
-            <div
-                class="text-destructive border-border-card flex shrink-0 items-center gap-2 border-t px-5 py-2 text-sm"
-            >
-                <Icon name="circle-alert" size={16} />
-                {failure}
-            </div>
+            <StatusBanner message={failure} />
         {/if}
 
-        {@render footer("Open")}
-
-        {#if panelOpen && selectedItem}
-            <ActionPanel
-                actions={selectedItem.actions}
-                onrun={(id) => runAction(selectedItem, id)}
-                onclose={() => (panelOpen = false)}
-            />
-        {/if}
+        <LauncherFooter primaryLabel="Open" status={workingTitle ? `Running ${workingTitle}…` : ""}>
+            {#snippet actions()}
+                <ActionPanel
+                    actions={selectedItem?.actions ?? []}
+                    bind:open={panelOpen}
+                    bind:present={panelPresent}
+                    returnFocus={() => inputEl}
+                    onrun={(id) => selectedItem && runAction(selectedItem, id)}
+                />
+            {/snippet}
+        </LauncherFooter>
+        </LauncherFrame>
+        {/snippet}
     </Command.Root>
 {/if}

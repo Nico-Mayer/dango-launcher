@@ -1,92 +1,12 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
+@import "./lib/theme/foundations.css";
+@import "./lib/theme/themes.css";
+@import "./lib/theme/tokens.css";
+@import "./lib/theme/motion.css";
+
 @custom-variant dark (&:is(.dark *));
-
-:root {
-  --background: hsl(0 0% 100%);
-  --background-alt: hsl(0 0% 100%);
-  --foreground: hsl(0 0% 9%);
-  --foreground-alt: hsl(0 0% 32%);
-  --muted: hsl(240 5% 96%);
-  --muted-foreground: hsla(0 0% 9% / 0.4);
-  --border: hsl(240 6% 10%);
-  --border-input: hsla(240 6% 10% / 0.17);
-  --border-card: hsla(240 6% 10% / 0.1);
-  --accent: hsl(204 94% 94%);
-  --accent-foreground: hsl(204 80% 16%);
-  --destructive: hsl(347 77% 50%);
-
-  --tint-red: hsl(0 94% 94%);
-  --tint-red-foreground: hsl(0 80% 16%);
-  --tint-amber: hsl(45 94% 94%);
-  --tint-amber-foreground: hsl(45 80% 16%);
-  --tint-green: hsl(142 94% 94%);
-  --tint-green-foreground: hsl(142 80% 16%);
-  --tint-blue: hsl(204 94% 94%);
-  --tint-blue-foreground: hsl(204 80% 16%);
-  --tint-purple: hsl(270 94% 94%);
-  --tint-purple-foreground: hsl(270 80% 16%);
-  --tint-pink: hsl(330 94% 94%);
-  --tint-pink-foreground: hsl(330 80% 16%);
-}
-
-.dark {
-  --background: hsl(0 0% 5%);
-  --background-alt: hsl(0 0% 7%);
-  --foreground: hsl(0 0% 95%);
-  --foreground-alt: hsl(0 0% 70%);
-  --muted: hsl(240 4% 16%);
-  --muted-foreground: hsla(0 0% 100% / 0.4);
-  --border: hsl(240 6% 90%);
-  --border-input: hsla(0 0% 100% / 0.17);
-  --border-card: hsla(0 0% 100% / 0.1);
-  --accent: hsl(204 80% 16%);
-  --accent-foreground: hsl(204 94% 94%);
-  --destructive: hsl(347 77% 50%);
-
-  --tint-red: hsl(0 80% 16%);
-  --tint-red-foreground: hsl(0 94% 94%);
-  --tint-amber: hsl(45 80% 16%);
-  --tint-amber-foreground: hsl(45 94% 94%);
-  --tint-green: hsl(142 80% 16%);
-  --tint-green-foreground: hsl(142 94% 94%);
-  --tint-blue: hsl(204 80% 16%);
-  --tint-blue-foreground: hsl(204 94% 94%);
-  --tint-purple: hsl(270 80% 16%);
-  --tint-purple-foreground: hsl(270 94% 94%);
-  --tint-pink: hsl(330 80% 16%);
-  --tint-pink-foreground: hsl(330 94% 94%);
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-background-alt: var(--background-alt);
-  --color-foreground: var(--foreground);
-  --color-foreground-alt: var(--foreground-alt);
-  --color-muted: var(--muted);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-border: var(--border);
-  --color-border-input: var(--border-input);
-  --color-border-card: var(--border-card);
-  --color-accent: var(--accent);
-  --color-accent-foreground: var(--accent-foreground);
-  --color-destructive: var(--destructive);
-  --color-tint-red: var(--tint-red);
-  --color-tint-red-foreground: var(--tint-red-foreground);
-  --color-tint-amber: var(--tint-amber);
-  --color-tint-amber-foreground: var(--tint-amber-foreground);
-  --color-tint-green: var(--tint-green);
-  --color-tint-green-foreground: var(--tint-green-foreground);
-  --color-tint-blue: var(--tint-blue);
-  --color-tint-blue-foreground: var(--tint-blue-foreground);
-  --color-tint-purple: var(--tint-purple);
-  --color-tint-purple-foreground: var(--tint-purple-foreground);
-  --color-tint-pink: var(--tint-pink);
-  --color-tint-pink-foreground: var(--tint-pink-foreground);
-  --radius-card: 0.875rem;
-  --radius-button: 0.5rem;
-}
 
 /* The launcher is a floating panel, so the page itself must not paint a
    background or the window's rounded corners show a square behind them. */
@@ -97,18 +17,25 @@ body {
   background: transparent;
 }
 
+body {
+  font-family: var(--dango-font-sans);
+  font-weight: var(--dango-weight-normal);
+  line-height: var(--dango-leading-default);
+  letter-spacing: var(--dango-tracking-normal);
+}
+
 /* A thin, inset scrollbar so it sits inside the rounded surface instead of
    hugging the edge with the webview's default chrome. */
 ::-webkit-scrollbar {
-  width: 12px;
+  width: calc(3 * var(--dango-space-unit));
 }
 ::-webkit-scrollbar-track {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
   background-color: var(--muted-foreground);
-  border-radius: 9999px;
-  border: 4px solid transparent;
+  border-radius: var(--dango-radius-round);
+  border: var(--dango-space-unit) solid transparent;
   background-clip: padding-box;
 }
 ::-webkit-scrollbar-thumb:hover {

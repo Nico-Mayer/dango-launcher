@@ -13,16 +13,10 @@
 let active = $state(false);
 let lastX = Number.NaN;
 let lastY = Number.NaN;
-let gesture = false;
+let gesture: Event | null = null;
 
-function markGesture() {
-  gesture = true;
-  // Cleared on the next task rather than the next microtask: Svelte delivers a
-  // component binding's write through its effect flush, which is a microtask,
-  // so a microtask reset lands before the write it is meant to cover.
-  setTimeout(() => {
-    gesture = false;
-  }, 0);
+function markGesture(event: Event) {
+  gesture = event;
 }
 
 if (typeof window !== "undefined") {
@@ -39,9 +33,9 @@ if (typeof window !== "undefined") {
 
   window.addEventListener(
     "keydown",
-    () => {
+    (event) => {
       active = false;
-      markGesture();
+      markGesture(event);
     },
     true,
   );
@@ -54,13 +48,8 @@ export function pointerActive(): boolean {
   return active;
 }
 
-/// Whether a key press or a click is being handled at this moment.
-///
-/// The Command primitive re-selects the first row whenever it re-sorts its
-/// items, and it re-sorts every time results are replaced, which would drag the
-/// selection back to the top while results stream in for the same query. Its
-/// writes are only trusted while the user is actually pressing something; the
-/// re-sort runs on its own in a later task, with no gesture in flight.
+// Bits calls onValueChange synchronously for input, but re-sorts after a tick.
+// Binding writes flush later too, so only the synchronous callback may pick.
 export function inUserGesture(): boolean {
-  return gesture;
+  return gesture !== null && gesture.eventPhase !== Event.NONE;
 }

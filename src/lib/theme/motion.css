@@ -1,0 +1,41 @@
+[data-pointer] [data-command-item]:not([data-selected]) {
+  transition: background-color var(--dango-duration-fast) var(--dango-ease-out);
+}
+
+.dango-button {
+  transition: background-color var(--dango-duration-fast) var(--dango-ease-out), color var(--dango-duration-fast) var(--dango-ease-out);
+}
+.dango-button:hover:not(:disabled) { background-color: var(--dango-hover-bg); }
+.dango-button:active:not(:disabled) { background-color: var(--dango-selection-bg); }
+
+.action-panel {
+  transform-origin: var(--bits-popover-content-transform-origin);
+}
+.action-panel[data-state="open"] {
+  animation: dango-panel-in var(--dango-duration-panel-in) var(--dango-ease-out);
+}
+.action-panel[data-state="closed"] {
+  animation: dango-panel-out var(--dango-duration-panel-out) var(--dango-ease-out);
+}
+@keyframes dango-panel-in {
+  from { opacity: var(--dango-motion-hidden-opacity); transform: scale(var(--dango-motion-panel-scale)); }
+  to { opacity: var(--dango-motion-visible-opacity); transform: scale(1); }
+}
+@keyframes dango-panel-out {
+  from { opacity: var(--dango-motion-visible-opacity); }
+  to { opacity: var(--dango-motion-hidden-opacity); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .action-panel[data-state] { animation: none; }
+  .dango-button, [data-command-item] { transition: none !important; }
+  .dango-busy-edge::after { animation: none !important; }
+  .dango-busy-edge { background: var(--dango-busy-indicator) !important; }
+}
+
+:root[data-dango-hidden] :is(.action-panel, .dango-button, [data-command-item]),
+:root[data-dango-hidden] .dango-busy-edge::after {
+  animation: none !important;
+  transition: none !important;
+}
+:root[data-dango-hidden] .dango-busy-edge { background: var(--dango-busy-indicator) !important; }

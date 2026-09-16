@@ -1,6 +1,9 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
-  import Icon from "./Icon.svelte";
+  import { createAttachmentKey } from "svelte/attachments";
+  import Field from "./ui/Field.svelte";
+  import TextField from "./ui/TextField.svelte";
+  import Checkbox from "./ui/Checkbox.svelte";
   import type { FormView } from "../protocol/FormView";
 
   interface Props {
@@ -38,15 +41,17 @@
   /// The launcher is summoned to be typed into, so a form that arrives without
   /// focus costs a click every time. The caret goes to the end rather than
   /// selecting, because an edit form is usually being adjusted, not replaced.
-  function takeFocus(node: HTMLInputElement | HTMLTextAreaElement) {
+  function takeFocus(node: HTMLInputElement | HTMLTextAreaElement | HTMLButtonElement) {
     node.focus();
-    node.setSelectionRange(node.value.length, node.value.length);
+    if (node instanceof HTMLInputElement || node instanceof HTMLTextAreaElement)
+      node.setSelectionRange(node.value.length, node.value.length);
   }
 
   /// Stable identities. An attachment re-runs whenever its expression changes,
   /// and an inline arrow is a new function every render, which would refocus
   /// the field and jump the caret to the end on every keystroke.
   const nothing = () => {};
+  const focusAttachment = createAttachmentKey();
 
   function submit() {
     onsubmit(values);
@@ -74,46 +79,33 @@
   }}
 >
   {#each view.fields as field, index (field.id)}
-    <label class="flex flex-col gap-1.5">
-      <span class="text-foreground-alt text-xs font-medium">{field.label}</span>
-      {#if field.kind === "toggle"}
-        <input
-          type="checkbox"
-          class="accent-foreground h-4 w-4 self-start"
-          checked={values[field.id] === "true"}
-          onchange={(e) => (values[field.id] = e.currentTarget.checked ? "true" : "false")}
-        />
-      {:else if field.kind === "template"}
-        <textarea
-          rows="5"
-          spellcheck="false"
-          class="border-border-input bg-background/60 text-foreground focus:border-foreground-alt resize-none rounded-md border px-2.5 py-2 font-mono text-sm outline-none"
-          value={values[field.id] ?? ""}
-          oninput={(e) => (values[field.id] = e.currentTarget.value)}
-          {@attach index === 0 ? takeFocus : nothing}
-        ></textarea>
-        {#if inspections[field.id]?.error}
-          <span class="text-destructive flex items-center gap-1.5 text-xs">
-            <Icon name="circle-alert" size={12} />
-            {inspections[field.id].error}
-          </span>
-        {:else if (inspections[field.id]?.arguments.length ?? 0) > 0}
-          <span class="text-foreground-alt text-xs">
-            Will ask for: {inspections[field.id].arguments.join(", ")}
-          </span>
+    <Field
+      label={field.label}
+      error={field.kind === "template" ? inspections[field.id]?.error : undefined}
+      helpEmphasized={(inspections[field.id]?.arguments.length ?? 0) > 0}
+      help={field.kind !== "template" ? undefined : (inspections[field.id]?.arguments.length ?? 0) > 0
+        ? `Will ask for: ${inspections[field.id].arguments.join(", ")}`
+        : "Nothing to fill in"}
+    >
+      {#snippet children(props)}
+        {#if field.kind === "toggle"}
+          <Checkbox
+            {...props}
+            {...{ [focusAttachment]: index === 0 ? takeFocus : nothing }}
+            checked={values[field.id] === "true"}
+            onCheckedChange={(checked) => (values[field.id] = checked ? "true" : "false")}
+          />
         {:else}
-          <span class="text-muted-foreground text-xs">Nothing to fill in</span>
+          <TextField
+            {...props}
+            {...{ [focusAttachment]: index === 0 ? takeFocus : nothing }}
+            multiline={field.kind === "template"}
+            rows={field.kind === "template" ? 5 : undefined}
+            type={field.kind === "password" ? "password" : "text"}
+            bind:value={values[field.id]}
+          />
         {/if}
-      {:else}
-        <input
-          type={field.kind === "password" ? "password" : "text"}
-          spellcheck="false"
-          class="border-border-input bg-background/60 text-foreground focus:border-foreground-alt rounded-md border px-2.5 py-2 text-sm outline-none"
-          value={values[field.id] ?? ""}
-          oninput={(e) => (values[field.id] = e.currentTarget.value)}
-          {@attach index === 0 ? takeFocus : nothing}
-        />
-      {/if}
-    </label>
+      {/snippet}
+    </Field>
   {/each}
 </form>

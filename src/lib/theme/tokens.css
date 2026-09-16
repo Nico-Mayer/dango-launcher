@@ -1,0 +1,178 @@
+:root {
+  --dango-surface-canvas: var(--dango-palette-background);
+  --dango-surface-raised: var(--dango-palette-background-alt);
+  --dango-surface-muted: var(--dango-palette-muted);
+  --dango-text-primary: var(--dango-palette-foreground);
+  --dango-text-secondary: var(--dango-palette-foreground-alt);
+  --dango-text-tertiary: var(--dango-palette-muted-foreground);
+  --dango-text-disabled: var(--dango-palette-disabled);
+  --dango-border-subtle: var(--dango-palette-border-card);
+  --dango-border-emphasis: var(--dango-palette-border);
+  --dango-control-border: var(--dango-palette-border-input);
+  --dango-control-text: var(--dango-palette-foreground);
+  --dango-control-accent: var(--dango-palette-foreground);
+  --dango-selection-bg: var(--dango-palette-selection);
+  --dango-selection-text: var(--dango-palette-foreground);
+  --dango-focus-width: calc(2 * var(--dango-edge-width));
+  --dango-focus-ring: var(--dango-palette-focus);
+  --dango-keycap-bg: var(--dango-palette-muted);
+  --dango-keycap-text: var(--dango-palette-muted-foreground);
+  --dango-error-text: var(--dango-palette-destructive);
+  --dango-busy-text: var(--dango-palette-muted-foreground);
+  --dango-busy-edge-height: calc(2 * var(--dango-edge-width));
+  --dango-busy-track: color-mix(in srgb, var(--dango-busy-indicator) 25%, transparent);
+  --dango-busy-indicator: var(--dango-palette-focus);
+  --dango-accent-bg: var(--dango-palette-accent);
+  --dango-accent-text: var(--dango-palette-accent-foreground);
+  --dango-tint-red: var(--dango-palette-tint-red);
+  --dango-tint-red-foreground: var(--dango-palette-tint-red-foreground);
+  --dango-tint-amber: var(--dango-palette-tint-amber);
+  --dango-tint-amber-foreground: var(--dango-palette-tint-amber-foreground);
+  --dango-tint-green: var(--dango-palette-tint-green);
+  --dango-tint-green-foreground: var(--dango-palette-tint-green-foreground);
+  --dango-tint-blue: var(--dango-palette-tint-blue);
+  --dango-tint-blue-foreground: var(--dango-palette-tint-blue-foreground);
+  --dango-tint-purple: var(--dango-palette-tint-purple);
+  --dango-tint-purple-foreground: var(--dango-palette-tint-purple-foreground);
+  --dango-tint-pink: var(--dango-palette-tint-pink);
+  --dango-tint-pink-foreground: var(--dango-palette-tint-pink-foreground);
+  --dango-hover-bg: color-mix(in oklab, var(--dango-palette-muted) 50%, transparent);
+  --dango-control-bg: var(--dango-palette-inset);
+  --dango-selection-edge: var(--dango-palette-selection-edge);
+
+  --background: var(--dango-surface-canvas);
+  --background-alt: var(--dango-surface-raised);
+  --foreground: var(--dango-text-primary);
+  --foreground-alt: var(--dango-text-secondary);
+  --muted: var(--dango-surface-muted);
+  --muted-foreground: var(--dango-text-tertiary);
+  --border: var(--dango-border-emphasis);
+  --border-input: var(--dango-control-border);
+  --border-card: var(--dango-border-subtle);
+  --accent: var(--dango-accent-bg);
+  --accent-foreground: var(--dango-accent-text);
+  --destructive: var(--dango-error-text);
+  --tint-red: var(--dango-tint-red);
+  --tint-red-foreground: var(--dango-tint-red-foreground);
+  --tint-amber: var(--dango-tint-amber);
+  --tint-amber-foreground: var(--dango-tint-amber-foreground);
+  --tint-green: var(--dango-tint-green);
+  --tint-green-foreground: var(--dango-tint-green-foreground);
+  --tint-blue: var(--dango-tint-blue);
+  --tint-blue-foreground: var(--dango-tint-blue-foreground);
+  --tint-purple: var(--dango-tint-purple);
+  --tint-purple-foreground: var(--dango-tint-purple-foreground);
+  --tint-pink: var(--dango-tint-pink);
+  --tint-pink-foreground: var(--dango-tint-pink-foreground);
+
+  --dango-search-height: 4rem;
+  --dango-result-height: 3.5rem;
+  --dango-footer-height: 2.5rem;
+  --dango-row-inset: calc(3 * var(--dango-space-unit));
+  --dango-field-inset: calc(2.5 * var(--dango-space-unit));
+  --dango-overlay-width: 18rem;
+  --dango-overlay-margin: calc(2 * var(--dango-space-unit));
+  --dango-overlay-bottom: 3rem;
+  --dango-radius-row: var(--dango-radius-8);
+  --dango-radius-field: var(--dango-radius-6);
+  --dango-radius-keycap: var(--dango-radius-4);
+  --dango-radius-overlay: var(--dango-radius-10);
+  --dango-elevation-overlay: var(--dango-shadow-floating);
+  --dango-radius-shell: var(--dango-radius-14);
+  --dango-radius-control: var(--dango-radius-8);
+}
+
+@theme inline {
+  --spacing: var(--dango-space-unit);
+  --spacing-row-inset: var(--dango-row-inset);
+  --spacing-field-inset: var(--dango-field-inset);
+  --spacing-overlay: var(--dango-overlay-width);
+  --spacing-overlay-margin: var(--dango-overlay-margin);
+  --spacing-overlay-bottom: var(--dango-overlay-bottom);
+  --spacing-icon-small: var(--dango-icon-small);
+  --spacing-icon-status: var(--dango-icon-status);
+  --spacing-icon-result: var(--dango-icon-result);
+  --spacing-icon-tile: var(--dango-icon-tile);
+  --font-sans: var(--dango-font-sans);
+  --font-mono: var(--dango-font-mono);
+  --text-xs: var(--dango-text-meta);
+  --text-xs--line-height: var(--dango-leading-meta);
+  --text-sm: var(--dango-text-body);
+  --text-sm--line-height: var(--dango-leading-body);
+  --text-2xl: var(--dango-text-search);
+  --text-2xl--line-height: var(--dango-leading-search);
+  --font-weight-normal: var(--dango-weight-normal);
+  --font-weight-medium: var(--dango-weight-medium);
+  --font-weight-semibold: var(--dango-weight-semibold);
+  --radius-sm: var(--dango-radius-4);
+  --radius-md: var(--dango-radius-6);
+  --radius-lg: var(--dango-radius-row);
+  --radius-field: var(--dango-radius-field);
+  --radius-keycap: var(--dango-radius-keycap);
+  --radius-overlay: var(--dango-radius-overlay);
+  --shadow-xl: var(--dango-elevation-overlay);
+  --ease-out: var(--dango-ease-out);
+  --inset-shadow-selection: inset 0 0 0 var(--dango-edge-width) var(--dango-selection-edge);
+  --color-selection-bg: var(--dango-selection-bg);
+  --color-selection-text: var(--dango-selection-text);
+  --color-selection-edge: var(--dango-selection-edge);
+  --color-hover-bg: var(--dango-hover-bg);
+  --color-focus-ring: var(--dango-focus-ring);
+  --color-control-bg: var(--dango-control-bg);
+  --color-control-text: var(--dango-control-text);
+  --color-control-accent: var(--dango-control-accent);
+  --color-keycap-bg: var(--dango-keycap-bg);
+  --color-keycap-text: var(--dango-keycap-text);
+  --color-busy-text: var(--dango-busy-text);
+  --color-busy-indicator: var(--dango-busy-indicator);
+  --color-text-disabled: var(--dango-text-disabled);
+
+  --spacing-search: var(--dango-search-height);
+  --spacing-result: var(--dango-result-height);
+  --spacing-footer: var(--dango-footer-height);
+  --color-background: var(--background);
+  --color-background-alt: var(--background-alt);
+  --color-foreground: var(--foreground);
+  --color-foreground-alt: var(--foreground-alt);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-border-input: var(--border-input);
+  --color-border-card: var(--border-card);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-tint-red: var(--tint-red);
+  --color-tint-red-foreground: var(--tint-red-foreground);
+  --color-tint-amber: var(--tint-amber);
+  --color-tint-amber-foreground: var(--tint-amber-foreground);
+  --color-tint-green: var(--tint-green);
+  --color-tint-green-foreground: var(--tint-green-foreground);
+  --color-tint-blue: var(--tint-blue);
+  --color-tint-blue-foreground: var(--tint-blue-foreground);
+  --color-tint-purple: var(--tint-purple);
+  --color-tint-purple-foreground: var(--tint-purple-foreground);
+  --color-tint-pink: var(--tint-pink);
+  --color-tint-pink-foreground: var(--tint-pink-foreground);
+  --radius-card: var(--dango-radius-shell);
+  --radius-button: var(--dango-radius-control);
+}
+
+@utility border-edge {
+  border-style: var(--tw-border-style);
+  border-width: var(--dango-edge-width);
+}
+
+@utility border-t-edge {
+  border-top-style: var(--tw-border-style);
+  border-top-width: var(--dango-edge-width);
+}
+
+@utility z-overlay {
+  z-index: var(--dango-layer-overlay);
+}
+
+@utility outline-control-focus {
+  outline: var(--dango-focus-width) solid var(--dango-focus-ring);
+  outline-offset: var(--dango-focus-width);
+}

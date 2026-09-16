@@ -1,6 +1,6 @@
 <script lang="ts">
   import { convertFileSrc } from "@tauri-apps/api/core";
-  import Icon, { namedIcon } from "./Icon.svelte";
+  import Icon, { isNamedIcon, namedIcon } from "./Icon.svelte";
   import { highlight } from "./highlight";
   import { tintClasses } from "./tint";
 
@@ -31,31 +31,31 @@
   }: Props = $props();
 
   const named = $derived(namedIcon(icon));
-  const file = $derived(!named && icon ? convertFileSrc(icon) : null);
+  const file = $derived(icon && !isNamedIcon(icon) ? convertFileSrc(icon) : null);
   const tinted = $derived(tintClasses(tint));
 </script>
 
 {#if named}
   <div
-    class="flex size-8 shrink-0 items-center justify-center rounded-md {tinted ||
+    class="flex size-icon-tile shrink-0 items-center justify-center rounded-md {tinted ||
       'text-foreground-alt'}"
   >
-    <Icon name={named} size={20} />
+    <Icon name={named} size={20} class="size-icon-result" />
   </div>
 {:else if file}
   <img
     src={file}
     alt=""
-    class="size-8 shrink-0 {iconIsContent
-      ? 'border-border-card rounded border object-cover'
+    class="size-icon-tile shrink-0 {iconIsContent
+      ? 'border-border-card rounded-sm border-edge object-cover'
       : 'object-contain'}"
   />
 {:else}
-  <div class="bg-muted size-8 shrink-0 rounded"></div>
+  <div class="bg-muted size-icon-tile shrink-0 rounded-sm"></div>
 {/if}
 
 <div class="flex min-w-0 items-baseline gap-2">
-  <span class="text-foreground truncate text-sm">
+  <span class="text-foreground [[data-selected]_&]:text-selection-text truncate text-sm">
     {#each highlight(title, matchPositions) as segment, index (index)}
       <span class={segment.matched ? "font-semibold" : ""}>{segment.text}</span>
     {/each}

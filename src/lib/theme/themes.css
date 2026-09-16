@@ -1,0 +1,67 @@
+:root {
+  --dango-palette-background: #fafafa;
+  --dango-palette-background-alt: #ffffff;
+  --dango-palette-foreground: #202124;
+  --dango-palette-foreground-alt: #444a55;
+  --dango-palette-muted: hsl(240 5% 96%);
+  --dango-palette-muted-foreground: #525966;
+  --dango-palette-border: hsl(240 6% 10%);
+  --dango-palette-border-input: hsla(240 6% 10% / 0.17);
+  --dango-palette-border-card: hsla(240 6% 10% / 0.1);
+  --dango-palette-accent: hsl(204 94% 94%);
+  --dango-palette-accent-foreground: hsl(204 80% 16%);
+  --dango-palette-destructive: #b21b40;
+
+  --dango-palette-selection: #dce9fc;
+  --dango-palette-selection-edge: #b4c9e7;
+  --dango-palette-focus: #245ab0;
+  --dango-palette-inset: #f0f1f3;
+  --dango-palette-disabled: #777c85;
+
+  --dango-palette-tint-red: hsl(0 94% 94%);
+  --dango-palette-tint-red-foreground: hsl(0 80% 16%);
+  --dango-palette-tint-amber: hsl(45 94% 94%);
+  --dango-palette-tint-amber-foreground: hsl(45 80% 16%);
+  --dango-palette-tint-green: hsl(142 94% 94%);
+  --dango-palette-tint-green-foreground: hsl(142 80% 16%);
+  --dango-palette-tint-blue: hsl(204 94% 94%);
+  --dango-palette-tint-blue-foreground: hsl(204 80% 16%);
+  --dango-palette-tint-purple: hsl(270 94% 94%);
+  --dango-palette-tint-purple-foreground: hsl(270 80% 16%);
+  --dango-palette-tint-pink: hsl(330 94% 94%);
+  --dango-palette-tint-pink-foreground: hsl(330 80% 16%);
+}
+
+:root.dark {
+  --dango-palette-background: #202124;
+  --dango-palette-background-alt: #292a2d;
+  --dango-palette-foreground: #f2f3f5;
+  --dango-palette-foreground-alt: #c8cbd2;
+  --dango-palette-muted: #303236;
+  --dango-palette-muted-foreground: #b0b4bd;
+  --dango-palette-border: hsl(240 6% 90%);
+  --dango-palette-border-input: hsla(0 0% 100% / 0.17);
+  --dango-palette-border-card: hsla(0 0% 100% / 0.1);
+  --dango-palette-accent: hsl(204 80% 16%);
+  --dango-palette-accent-foreground: hsl(204 94% 94%);
+  --dango-palette-destructive: #ff91a3;
+  --dango-palette-selection: #293d59;
+  --dango-palette-selection-edge: #405777;
+  --dango-palette-focus: #8cb9ff;
+  --dango-palette-inset: #191a1c;
+  --dango-palette-disabled: #777c85;
+
+  --dango-palette-tint-red: hsl(0 80% 16%);
+  --dango-palette-tint-red-foreground: hsl(0 94% 94%);
+  --dango-palette-tint-amber: hsl(45 80% 16%);
+  --dango-palette-tint-amber-foreground: hsl(45 94% 94%);
+  --dango-palette-tint-green: hsl(142 80% 16%);
+  --dango-palette-tint-green-foreground: hsl(142 94% 94%);
+  --dango-palette-tint-blue: hsl(204 80% 16%);
+  --dango-palette-tint-blue-foreground: hsl(204 94% 94%);
+  --dango-palette-tint-purple: hsl(270 80% 16%);
+  --dango-palette-tint-purple-foreground: hsl(270 94% 94%);
+  --dango-palette-tint-pink: hsl(330 80% 16%);
+  --dango-palette-tint-pink-foreground: hsl(330 94% 94%);
+}
+
