@@ -1,0 +1,164 @@
+=== src/App.svelte
+{
+  issues: [],
+  suggestions: [
+    'The stateful variable "listEl" is assigned inside an $effect which is generally consider a malpractice. Consider using $derived if possible.',
+    "You are calling a function inside an $effect. Please check if the function is reassigning a stateful variable because that's considered malpractice and check if it could use  `$derived` instead. Ignore this suggestion if you are sure this function is not assigning any stateful variable or if you can't check if it does.",
+    "You are calling the function `runSearch` inside an $effect. Please check if the function is reassigning a stateful variable because that's considered malpractice and check if it could use  `$derived` instead. Ignore this suggestion if you are sure this function is not assigning any stateful variable or if you can't check if it does."
+  ],
+  require_another_tool_call_after_fixing: true
+}
+=== src/lib/ActionPanel.svelte
+{
+  issues: [],
+  suggestions: [],
+  require_another_tool_call_after_fixing: false
+}
+=== src/lib/FormFields.svelte
+{
+  issues: [],
+  suggestions: [
+    "You are calling a function inside an $effect. Please check if the function is reassigning a stateful variable because that's considered malpractice and check if it could use  `$derived` instead. Ignore this suggestion if you are sure this function is not assigning any stateful variable or if you can't check if it does.",
+    'The stateful variable "inspections" is assigned inside an $effect which is generally consider a malpractice. Consider using $derived if possible.',
+    "You are calling the function `invoke` inside an $effect. Please check if the function is reassigning a stateful variable because that's considered malpractice and check if it could use  `$derived` instead. Ignore this suggestion if you are sure this function is not assigning any stateful variable or if you can't check if it does."
+  ],
+  require_another_tool_call_after_fixing: true
+}
+=== src/lib/Icon.svelte
+{
+  issues: [],
+  suggestions: [],
+  require_another_tool_call_after_fixing: false
+}
+=== src/lib/ProtocolView.svelte
+{
+  issues: [],
+  suggestions: [
+    'The stateful variable "listEl" is assigned inside an $effect which is generally consider a malpractice. Consider using $derived if possible.',
+    "You are calling a function inside an $effect. Please check if the function is reassigning a stateful variable because that's considered malpractice and check if it could use  `$derived` instead. Ignore this suggestion if you are sure this function is not assigning any stateful variable or if you can't check if it does.",
+    'The usage of `bind:this` can often be replaced with an easier to read `action` or even better an `attachment`. Consider using the latter if possible.',
+    'The usage of `bind:this` can often be replaced with an easier to read `action` or even better an `attachment`. Consider using the latter if possible.'
+  ],
+  require_another_tool_call_after_fixing: true
+}
+=== src/lib/ResultRow.svelte
+{
+  issues: [],
+  suggestions: [],
+  require_another_tool_call_after_fixing: false
+}
+=== src/lib/input.svelte.ts
+{
+  issues: [],
+  suggestions: [],
+  require_another_tool_call_after_fixing: false
+}
+=== src/lib/launcher/LauncherFooter.svelte
+{
+  issues: [],
+  suggestions: [],
+  require_another_tool_call_after_fixing: false
+}
+=== src/lib/launcher/LauncherFrame.svelte
+{
+  issues: [],
+  suggestions: [],
+  require_another_tool_call_after_fixing: false
+}
+=== src/lib/ui/BusyStatus.svelte
+{
+  issues: [],
+  suggestions: [],
+  require_another_tool_call_after_fixing: false
+}
+=== src/lib/ui/Button.svelte
+{
+  issues: [],
+  suggestions: [
+    'The usage of `bind:this` can often be replaced with an easier to read `action` or even better an `attachment`. Consider using the latter if possible.'
+  ],
+  require_another_tool_call_after_fixing: true
+}
+=== src/lib/ui/Checkbox.svelte
+{
+  issues: [],
+  suggestions: [],
+  require_another_tool_call_after_fixing: false
+}
+=== src/lib/ui/CommandGroupHeading.svelte
+{
+  issues: [],
+  suggestions: [],
+  require_another_tool_call_after_fixing: false
+}
+=== src/lib/ui/CommandInput.svelte
+{
+  issues: [],
+  suggestions: [],
+  require_another_tool_call_after_fixing: false
+}
+=== src/lib/ui/CommandItem.svelte
+{
+  issues: [],
+  suggestions: [],
+  require_another_tool_call_after_fixing: false
+}
+=== src/lib/ui/CommandList.svelte
+{
+  issues: [],
+  suggestions: [],
+  require_another_tool_call_after_fixing: false
+}
+=== src/lib/ui/CommandRoot.svelte
+{
+  issues: [],
+  suggestions: [],
+  require_another_tool_call_after_fixing: false
+}
+=== src/lib/ui/CommandViewport.svelte
+{
+  issues: [],
+  suggestions: [],
+  require_another_tool_call_after_fixing: false
+}
+=== src/lib/ui/EmptyMessage.svelte
+{
+  issues: [],
+  suggestions: [],
+  require_another_tool_call_after_fixing: false
+}
+=== src/lib/ui/Field.svelte
+{
+  issues: [],
+  suggestions: [],
+  require_another_tool_call_after_fixing: false
+}
+=== src/lib/ui/Shortcut.svelte
+{
+  issues: [],
+  suggestions: [],
+  require_another_tool_call_after_fixing: false
+}
+=== src/lib/ui/StatusBanner.svelte
+{
+  issues: [],
+  suggestions: [],
+  require_another_tool_call_after_fixing: false
+}
+=== src/lib/ui/TextField.svelte
+{
+  issues: [],
+  suggestions: [],
+  require_another_tool_call_after_fixing: false
+}
+=== src/lib/ui/command.ts
+{
+  issues: [
+    'Unexpected token\n' +
+      'https://svelte.dev/e/js_parse_error at line undefined, column undefined'
+  ],
+  suggestions: [
+    "The code can't be compiled because a Javascript parse error. In case you are using runes like this `$state variable_name = 3;` or `$derived variable_name = 3 * count` that's not how runes are used. You need to use them as function calls without importing them: `const variable_name = $state(3)` and `const variable_name = $derived(3 * count)`."
+  ],
+  require_another_tool_call_after_fixing: true
+}

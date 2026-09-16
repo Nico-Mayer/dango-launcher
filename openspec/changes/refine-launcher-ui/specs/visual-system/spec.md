@@ -44,7 +44,7 @@ The default presentation SHALL retain the current search-and-results layout and 
 
 ### Requirement: Interaction states remain clear and accessible
 
-Enabled controls SHALL expose visible keyboard focus and distinguish their default, hover, active, and applicable disabled or invalid states. Keyboard selection SHALL remain distinct from both pointer hover and keyboard focus, following the existing list-navigation requirements.
+Enabled controls SHALL expose visible keyboard focus and distinguish their default, hover, active, and applicable disabled or invalid states. Keyboard selection SHALL remain distinct from both pointer hover and keyboard focus, following the existing list-navigation requirements. A command scope that keeps focus on its prompt or action list SHALL convey the focused option through its selected row, not through a ring around the whole surface.
 
 Required text SHALL remain readable rather than relying on faint opacity for hierarchy. Errors and busy states SHALL include text or accessible state information instead of relying on color or animation alone.
 

@@ -1,0 +1,42 @@
+[
+  {
+    "scene": "root",
+    "minimumText": 5.303864686271101,
+    "focus": 8.048459509862335
+  },
+  {
+    "scene": "refreshing-list",
+    "minimumText": 5.303864686271101,
+    "focus": 8.048459509862335
+  },
+  {
+    "scene": "actions",
+    "minimumText": 5.303864686271101,
+    "focus": 7.174355088325533
+  },
+  {
+    "scene": "detail",
+    "minimumText": 6.182389077836733,
+    "focus": null
+  },
+  {
+    "scene": "form",
+    "minimumText": 6.182389077836733,
+    "focus": 8.048459509862335
+  },
+  {
+    "scene": "failure",
+    "minimumText": 5.303864686271101,
+    "focus": 8.048459509862335
+  },
+  {
+    "scene": "loading-list",
+    "minimumText": 6.182389077836733,
+    "focus": 8.048459509862335
+  },
+  {
+    "scene": "empty-list",
+    "minimumText": 6.182389077836733,
+    "focus": 8.048459509862335
+  }
+]

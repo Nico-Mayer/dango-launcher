@@ -33,7 +33,7 @@ Starting values below are implementation defaults, not separately confirmed pale
 | Canvas / inset / raised dark surfaces | Neutral graphite with small lightness steps; inset fields slightly darker, overlays lighter |
 | Text | Primary, secondary, tertiary, disabled roles; enabled metadata must still meet contrast requirements |
 | Selection | Blue-tinted fill plus a quiet inset edge; stronger than hover without changing row geometry |
-| Focus | Separate high-contrast ring, not the same treatment as list selection |
+| Focus | Separate high-contrast ring on discrete controls (fields, checkbox, footer trigger), not the same treatment as list selection. Whole surfaces never carry a ring: the search prompt holds focus for the whole session under the list-navigation requirements and its caret marks focus, and the action panel's command scope conveys focus through its selected row via `aria-activedescendant`. A ring framing either surface collided with the rounded shell and overlay corners in native review |
 | Search / result / footer | Preserve 64px / 56px / 40px at default text scale |
 | Type | Tokenized local system sans stack for native legibility; 24px search, 14px result/body, 12px metadata; 400/500/600 weights |
 | Spacing | 4px base rhythm with explicit 2px micro-spacing where existing icon/keycap alignment requires it |
@@ -124,7 +124,21 @@ Remove the custom capture-phase Arrow/Enter implementation. Retain only launcher
 
 The current first-row scroll correction and user-gesture selection guard in root/pushed lists address observed primitive integration behavior. Preserve them during extraction; remove only if a targeted regression test proves the installed primitive handles the case without them. Do not expand them into replacement navigation.
 
+Native macOS review found the row after a group heading selected but clipped below the scroller. Bits 2.19.2 wraps every item in a `display: contents` node that repeats the item's `data-value`; its "first item of a group" branch compares against that wrapper, so it matches every row and scrolls only the group heading, or nothing in an ungrouped list. The per-view first-row `scrollTop` corrections are therefore replaced by one correction in the shared list wrapper: when `data-selected` moves, the selected row is scrolled `nearest` inside the list, and the list's first row resets the scroller to the top so its heading stays visible. Bits still owns navigation and its own heading scroll; this only completes the scroll it skips.
+
 Alternatives: keep the custom panel, or use a menu primitive by default. Keeping it retains duplicated selection and focus work. Menu behavior is not assumed interchangeable with Dango's explicit hover-independent selected-row contract; Command already exposes the required controls. The selected composition still needs a narrow integration test for focus and nested event isolation before migration proceeds.
+
+#### Installed primitive integration (stage 4)
+
+Bits UI 2.19.2 handles Escape at document bubble, prevents the original event, and supplies a cloned event to `onEscapeKeydown`. Content therefore allows Escape to bubble; launcher handlers honor `defaultPrevented`. Other panel keys stay inside the portaled Command scope. A small capture guard consumes input only during closed-but-present content and repeats of the closing key until its keyup. It does not select or invoke actions. `onOpenChangeComplete(false)` releases exit ownership, including zero-duration dismissal; disabled outgoing items cannot reactivate.
+
+Bits' outside-dismiss hook runs after pointerdown (10ms deferred), too late to consume a parent row's click reliably. The launcher records an outside press, prevents its mousedown focus transfer, and consumes its resulting click even after exit has completed. Pointerdown still reaches Bits unchanged: the primitive alone decides whether to dismiss. Content/trigger presses are excluded. This adapter preserves the launcher's stronger parent-selection contract without replacing outside-dismiss behavior.
+
+Keep the pointer-hover marker on the inner Command, not Popover.Content. In the installed primitive, changing Content props during pointer interaction can recycle its ref and dismissible-layer listeners, cancelling the deferred outside callback. The production outside-press regression covers that seam. Focus hooks capture the originating typing control and restore it immediately on close, falling back to the current view control if the original disconnected. Pushed footer presentation lives beside its ProtocolView action owner; App still supplies carried failures through a snippet and owns invocation state.
+
+#### Same-task replacement guard (stage 5)
+
+A same-task replacement after ArrowDown reproduced a selection reset in both root and pushed lists (6/6 failures). Bits calls `onValueChange` synchronously during input, but its deferred item re-sort also writes the first item. The previous timer-wide gesture flag admitted both writes, and Svelte binding propagation could not distinguish them. Selection now accepts the synchronous callback only while the captured input event is dispatching (`eventPhase !== NONE`); function bindings remain controlled by the derived identity and ignore deferred writes. The action Command uses the same guard because unchanged actions re-register when delayed parent results arrive. Missing IDs still fall back to the first available item. Closed action scopes expose an empty controlled value because all outgoing options are disabled; retaining a selected ID there made Bits repeatedly reconcile an unavailable value during reset. Bits still owns all navigation, confirmation and scrolling; no scheduling delay or replacement navigation was added.
 
 ### 6. Motion follows identity and lifecycle, not render frequency
 
