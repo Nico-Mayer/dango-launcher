@@ -1,7 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Dango",
-  "version": "0.1.0",
   "identifier": "com.nimayer.dango",
   "build": {
     "beforeDevCommand": "npm run dev",
