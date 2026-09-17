@@ -1,0 +1,283 @@
+## Context
+
+See proposal.md for motivation. What shapes the approach:
+
+- The version appears in three checked-in files today, all `0.1.0`:
+  `src-tauri/Cargo.toml`, `src-tauri/tauri.conf.json`, and `package.json`.
+  `src-tauri/Cargo.lock` is committed and carries the crate version too. The
+  Tauri v2 config reference states that when `version` is absent from
+  `tauri.conf.json`, "the version number from Cargo.toml is used".
+- The repository has no tags. History is conventional commits throughout,
+  including many `docs(openspec)` commits that should not appear in a changelog.
+- `ci.yml` already builds on `macos-latest` and `windows-latest` with
+  `dtolnay/rust-toolchain`, `swatinem/rust-cache`, and `actions/setup-node`.
+  `macos-latest` is an Apple Silicon runner. `bundle.targets` is `all`, which on
+  Windows yields both a WiX `.msi` and an NSIS `.exe`, and on macOS a `.dmg`
+  and `.app`.
+- Tooling is pinned in `mise.toml`; the hk change set the precedent for adding
+  a developer tool there and documenting one setup command. mise runs TOML
+  tasks through `cmd /c` on Windows and `sh -c` elsewhere, so a task body
+  cannot rely on POSIX syntax. mise renders Tera templates in task bodies, and
+  `exec(command=...)` returns a command's output.
+- The pre-push hook from `local-checks` runs clippy and `svelte-check` on every
+  push, including the one the release task makes.
+- Verified upstream state at the time of writing: git-cliff 2.14.1
+  (2026-09-01, `aqua:orhun/git-cliff` in the mise registry), cargo-release
+  (`github:crate-ci/cargo-release`), tauri-action 1.0.0 (drops Tauri v1, needs
+  runner 2.327.1 or newer, renames `includeUpdaterJson` to `uploadUpdaterJson`),
+  git-cliff-action v4.
+
+## Goals / Non-Goals
+
+**Goals:**
+
+- The whole local half is one mise task that works identically from PowerShell
+  and fish, with a dry run as the default safety net.
+- The CI half is one workflow file that a reader can follow top to bottom.
+- Every tool is off the shelf and pinned. Nothing in the repo parses commits,
+  edits manifests, or talks to the GitHub API by hand.
+
+**Non-Goals:**
+
+- Anything the proposal lists. In particular the release workflow does not
+  become a second CI: it builds, it does not lint or test.
+
+## Decisions
+
+### Cargo.toml is the single version source
+
+Alternatives:
+
+- **`tauri.conf.json` pointing at `../package.json`**, Tauri's documented
+  option. Rejected: it moves the truth to the frontend package for an app whose
+  logic and identity are Rust, and Cargo.toml would still need to agree for
+  `cargo` metadata. Two files again.
+- **Keep all three and let the release task rewrite them.** Rejected: three
+  hand-written edits, three chances to drift, and a bespoke script where a
+  documented fallback exists.
+
+Chosen: delete `version` from `tauri.conf.json` and let Tauri read Cargo.toml.
+`package.json` keeps `"version": "0.1.0"` as an inert placeholder; a comment is
+not possible in JSON, so the README states that the field is not the app
+version. Verification: `npx tauri build --no-bundle` after the deletion must
+still produce a binary that reports the crate version.
+
+### git-cliff computes the version and writes the changelog
+
+This is the svu role. Candidates checked: git-cliff, cocogitto, convco,
+release-plz, semantic-release, release-please.
+
+- **cocogitto** (`cog bump --auto`): does version, changelog, commit, and tag
+  in one command with hooks. It still needs a separate tool in a
+  `pre_bump_hook` to set the Cargo version, so it does not remove a dependency,
+  and its changelog templates are less flexible. Viable; rejected because the
+  git-cliff plus cargo-release split gives each tool one job.
+- **convco**: `convco version --bump` and `convco changelog`. Smaller
+  community, no `initial_tag`, and no GitHub Action to reuse in CI. Rejected.
+- **release-plz**: a release-PR bot built around crates.io publishing with
+  `cargo-semver-checks`. Far more machinery than a hobby desktop app wants, and
+  it does not do the "one command from my terminal" flow. Rejected.
+- **semantic-release / release-please**: Node bots, JavaScript plugin
+  configuration, and a PR-based flow. Rejected for the same reason plus a
+  second toolchain for release logic.
+
+Chosen: git-cliff. `git cliff --bumped-version` prints the next version from
+the commits since the last tag. `git cliff --bump --unreleased --prepend
+CHANGELOG.md` writes the new section. The same binary runs in CI through
+`orhun/git-cliff-action@v4` with `--latest --strip header` to produce the
+release body, so the release notes and `CHANGELOG.md` cannot disagree.
+
+`cliff.toml` settings that matter: `tag_pattern = "v[0-9].*"`; `[bump]
+initial_tag = "v0.1.0"` so the first run on an untagged repo produces the
+version Cargo.toml already has; `commit_parsers` that drop `chore(release)`
+and `docs(openspec)` and map the remaining types to group titles;
+`filter_unconventional = true`. Group titles in the changelog are project copy
+and are quoted below.
+
+### cargo-release performs the bump, commit, tag, and push
+
+This is the part goreleaser leaves to the developer. Candidates checked for
+setting the version in Cargo.toml and Cargo.lock: cargo-edit
+(`cargo set-version`), cargo-release, a `sed` line plus `cargo update
+--workspace`, cargo-bump.
+
+- **cargo-edit**: `cargo set-version X` is the obvious fit, but it is not in the
+  mise registry under any name, its documentation does not say whether it
+  updates `Cargo.lock`, and installing through the `cargo:` backend compiles it
+  from source on each machine. Rejected.
+- **`sed` plus `cargo update --workspace`**: two lines, but hand-rolled, and
+  `sed` behaves differently on macOS and is absent from `cmd`. Rejected under
+  the off-the-shelf rule.
+- **cargo-bump**: unmaintained and only edits the manifest. Rejected.
+- **cargo-release**: accepts an explicit version (`cargo release 0.3.0`), sets
+  the manifest and lockfile, runs a `pre-release-hook` with `{{version}}`
+  available, makes one commit, tags with a configurable `tag-name`, pushes, and
+  refuses to run on a dirty tree, a disallowed branch, or a branch behind its
+  remote. Dry run is the default and `--execute` is required to act, which is
+  the safety property the spec asks for. It is in the mise registry as
+  `github:crate-ci/cargo-release`. Chosen.
+
+cargo-release does not compute the version from commits. That is exactly what
+git-cliff supplies, so the task composes them:
+
+```toml
+[tools]
+"aqua:orhun/git-cliff" = "2.14.1"
+"github:crate-ci/cargo-release" = "<pin at implementation>"
+
+[tasks.release]
+description = "Cut a release: derive version, changelog, commit, tag, push"
+dir = "src-tauri"
+run = "cargo release {{exec(command='git cliff --bumped-version')}} {{arg(name='flags', default='')}}"
+```
+
+`{{exec(...)}}` is rendered by mise before the shell sees the line, so it works
+under `cmd /c` and `sh -c` alike. With no flags the task is a dry run that
+prints the derived version and every step. `mise run release -- --execute`
+performs it. An explicit level or version replaces the derived one by running
+`cargo release minor --execute` directly; that is the manual override and does
+not need a second task.
+
+`src-tauri/release.toml`, to be validated against the installed version during
+implementation:
+
+```toml
+publish = false
+tag-name = "v{{version}}"
+pre-release-commit-message = "chore(release): v{{version}}"
+pre-release-hook = ["git", "cliff", "--bump", "--unreleased", "--tag", "v{{version}}", "--prepend", "../CHANGELOG.md"]
+allow-branch = ["main"]
+```
+
+Note the hook runs with the crate directory as its working directory, hence
+the relative path to the changelog. The exact flag set and whether `--bump`
+and `--tag` may be combined must be confirmed in the dry run; if they conflict,
+`--tag v{{version}}` alone is sufficient because cargo-release already knows
+the version.
+
+Cargo.lock: cargo-release is expected to refresh the crate's own entry. The
+dry run and the first real release confirm it; if it does not, add
+`cargo update --workspace` as a second hook entry.
+
+### Ignore the "nothing to release" case rather than script it
+
+When no bumping commit exists, `git cliff --bumped-version` prints the current
+version. cargo-release then rejects it because the version "has to be greater
+than current version", exits non-zero, and changes nothing. That satisfies the
+spec's scenario without any logic in the task.
+
+### tauri-action builds and uploads; a separate job owns the release
+
+This is the goreleaser role. Candidates checked: tauri-action, cargo-dist,
+hand-written `tauri build` plus `softprops/action-gh-release`.
+
+- **cargo-dist**: runs `cargo build` and packages the binary. It never invokes
+  `tauri build`, so no `.dmg`, `.msi`, or NSIS installer. Wrong tool.
+- **Hand-written build plus upload action**: `npm run tauri build`, then glob
+  the bundle directory per platform and upload. Works, but duplicates path
+  knowledge tauri-action already has and needs per-OS glob patterns.
+- **tauri-action**: official, installs nothing extra, knows the bundle paths,
+  and uploads to a release by tag or by id. Chosen.
+
+Release creation is pulled out of the build matrix into its own job. The
+official example lets each matrix job call tauri-action with `tagName` and
+`releaseName`, which makes two jobs race to create the same release and leaves
+the release as a draft to publish by hand. Instead:
+
+```
+ on: push tags v*
+ +----------------+     +---------------------------+     +----------------+
+ | changelog      | --> | build (matrix)            | --> | publish        |
+ | git-cliff-     |     | macos-latest, windows-    |     | gh release     |
+ | action, then   |     | latest; tauri-action with |     | edit --draft=  |
+ | gh release     |     | releaseId, uploadUpdater- |     | false          |
+ | create --draft |     | Json false                |     |                |
+ +----------------+     +---------------------------+     +----------------+
+```
+
+- `changelog` checks out with full history (`fetch-depth: 0`, git-cliff needs
+  tags), runs `orhun/git-cliff-action@v4` with `--latest --strip header`,
+  creates a draft release with `gh release create "$TAG" --draft --title
+  "Dango $TAG" --notes-file`, and outputs the numeric release id from `gh
+  release view --json databaseId`.
+- `build` reuses the `ci.yml` setup steps (node, rust toolchain, rust cache,
+  `npm ci`) and calls `tauri-apps/tauri-action@v1` with `releaseId`,
+  `uploadUpdaterJson: false`, and no `args`, since `macos-latest` is already
+  Apple Silicon. `fail-fast: false` so one platform's failure does not cancel
+  the other's upload.
+- `publish` runs with `needs: build` and flips the draft to published. If any
+  build failed, `publish` is skipped and the draft stays visible with whatever
+  assets made it, which is the spec's "one platform fails" scenario.
+
+`permissions: contents: write` on the workflow. `gh` is preinstalled on GitHub
+runners and authenticates from `GITHUB_TOKEN`.
+
+### Release workflow does not repeat CI
+
+`ci.yml` runs on every push to `main`. The tag points at a commit on `main`, so
+the checks already ran, and the pre-push hook ran them again locally before
+the tag left the machine. Repeating clippy and tests would double the macOS
+minutes for no new information.
+
+### Changelog copy
+
+The changelog is text the user reads, so its group titles follow the
+interface-copy spec: sentence case, no internal identifiers. Titles by commit
+type:
+
+| type | title |
+|---|---|
+| `feat` | Features |
+| `fix` | Fixes |
+| `perf` | Performance |
+| `refactor` | Refactoring |
+| `docs` (not `docs(openspec)`) | Documentation |
+| `test`, `ci`, `build`, `chore`, `style` | Maintenance |
+
+Skipped entirely: `chore(release)`, `docs(openspec)`, unconventional subjects.
+The file header reads:
+
+> # Changelog
+>
+> All notable changes to Dango. Generated from commit history at release time.
+
+## Risks / Trade-offs
+
+- [`{{exec}}` in a mise task fails or quotes badly on Windows] → Fall back to
+  a file task `mise-tasks/release.mjs` with a `#!/usr/bin/env node` shebang;
+  mise starts the interpreter itself on Windows and Node is already pinned.
+  Same behaviour, twenty lines instead of one.
+- [cargo-release does not refresh `Cargo.lock`] → Confirmed in the dry run
+  before the first release; `cargo update --workspace` as a second hook is the
+  fix. A stale lock would otherwise dirty the tree on the next build.
+- [`git cliff --bump` and `--tag` conflict in the hook] → Drop `--bump`; the
+  version is already known.
+- [Two-job release creation is more YAML than the official example] → Accepted
+  for deterministic release creation and automatic publish. The extra job is
+  about fifteen lines.
+- [Unsigned macOS app blocked by Gatekeeper] → Documented one-time `xattr -cr
+  Dango.app` in the README. Signing stays deferred per M7.
+- [Release build fails only on the tag because `ci.yml` never bundles] →
+  `ci.yml` builds the frontend and the crate but not the installers, so WiX or
+  DMG packaging problems surface only at release time. Accepted; the fix is a
+  new tag after the fix commit, and no user is waiting.
+- [Pre-push hook slows the release push] → It is the same clippy and
+  `svelte-check` the developer just ran to land the last commit, so incremental
+  and fast. Accepted.
+
+## Migration Plan
+
+1. Land the tooling and workflow on `main` without a tag. CI stays green
+   because nothing in `ci.yml` changes.
+2. Run `mise run release` (dry run) on both machines and check the derived
+   version is `0.1.0` from `initial_tag`, and the hook output looks right.
+3. Cut `v0.1.0` with `--execute` from one machine. Watch the workflow, install
+   both bundles, confirm the version in the installer metadata.
+4. Rollback: delete the tag locally and on the remote and revert the release
+   commit. Nothing outside git and the GitHub release holds state.
+
+## Open Questions
+
+- Exact cargo-release version to pin, and whether its Windows binary name on
+  GitHub releases resolves through the `github:` backend without an `asset`
+  pattern. Resolved during implementation by `mise install`.
