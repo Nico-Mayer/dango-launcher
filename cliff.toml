@@ -41,3 +41,4 @@ commit_parsers = [
 
 [bump]
 initial_tag = "v0.1.0"
+no_increment_regex = "^(docs|chore|ci|build|test|style|refactor|perf|revert)"
