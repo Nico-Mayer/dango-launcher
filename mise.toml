@@ -2,3 +2,9 @@
 node = "24.21.0"
 hk = "2.0.0"
 "npm:@fission-ai/openspec" = "1.12.0"
+"aqua:orhun/git-cliff" = "2.14.1"
+"github:crate-ci/cargo-release" = "1.1.6"
+
+[tasks.release]
+description = "Cut a release: derive version, changelog, commit, tag, push"
+run = "node scripts/release.mjs"

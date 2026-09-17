@@ -1,0 +1,5 @@
+publish = false
+allow-branch = ["main"]
+tag-name = "v{{version}}"
+pre-release-commit-message = "chore(release): v{{version}}"
+pre-release-hook = ["node", "../scripts/changelog.mjs"]
