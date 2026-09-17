@@ -19,9 +19,8 @@ M3  plumbing    selection capture, paste + focus restore, template engine
 M4  windows     window-management extension
 M5  keys        hotkey binding UI, conflict detection, hyperkey
 M6  ai          BYOK providers, auth.json, streaming, user-defined AI commands
-M7  polish      preferences window, permission onboarding, autostart
+M7  polish      permission onboarding, autostart, release workflow
 M8  3rd party   script commands, then a sandboxed extension runtime
-M9  sync        file-based, deliberately small
 ```
 
 ### M0 - shell
@@ -155,9 +154,14 @@ thing to run once a key exists.
 
 ### M7 - polish
 
-Preferences window, permission onboarding (a genuine UX surface on macOS),
-autostart. Code signing and auto-update are deliberately deferred and may never
-happen, since there are no external users.
+Permission onboarding (a genuine UX surface on macOS), autostart, and the
+release workflow that produces installers for both platforms. Code signing and
+auto-update are deliberately deferred and may never happen, since there are no
+external users.
+
+The preferences window was cut from this milestone. M5 settled on JSON config
+files in the user's dotfiles as the settings surface, and a window that edits
+the same values is not part of this MVP.
 
 ### M8 - third party
 
@@ -168,13 +172,6 @@ Rust codebase.
 A real sandboxed runtime comes after, and the choice between WASM and an
 embedded JS engine stays open until then.
 
-### M9 - sync
-
-Deliberately minimal. An export file in a synced folder, or a git repository.
-Accounts, a server, and end-to-end encryption are not worth it for one person
-with two machines. The `updated_at` and `deleted_at` discipline from M1 keeps a
-real sync engine possible if that ever changes.
-
 ## Deferred, with reasons
 
 | Item                                    | Why not                                              |
@@ -182,6 +179,8 @@ real sync engine possible if that ever changes.
 | Calculator                              | Dropped from M2. The author does not use one.        |
 | Linux and Wayland                       | No Linux desktop. Wayland would break four features. |
 | Accounts and cloud sync                 | Weeks of work so two machines agree on snippets.     |
+| Preferences window                      | Config files in dotfiles won in M5. Not in this MVP. |
+| Sync between machines                   | Not in this MVP. Record discipline keeps it open.    |
 | Code signing, notarization, auto-update | No external users.                                   |
 | AI chat interface                       | A different product. Transforms first.               |
 | Grid views, menu-bar commands           | Add once a real command needs them.                  |
