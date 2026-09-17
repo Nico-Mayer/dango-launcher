@@ -62,6 +62,12 @@ not possible in JSON, so the README states that the field is not the app
 version. Verification: `npx tauri build --no-bundle` after the deletion must
 still produce a binary that reports the crate version.
 
+Before the first release the crate manifest says `0.0.0`, not `0.1.0`.
+cargo-release accepts a version equal to the current one, but then it has no
+manifest change to commit, so the hook's changelog would be left uncommitted
+and the tag would land on the previous commit. Starting from `0.0.0` makes
+`v0.1.0` a real bump with one commit like every later release.
+
 ### git-cliff computes the version and writes the changelog
 
 This is the svu role. Candidates checked: git-cliff, cocogitto, convco,
@@ -82,8 +88,14 @@ release-plz, semantic-release, release-please.
   second toolchain for release logic.
 
 Chosen: git-cliff. `git cliff --bumped-version` prints the next version from
-the commits since the last tag. `git cliff --bump --unreleased --prepend
-CHANGELOG.md` writes the new section. The same binary runs in CI through
+the commits since the last tag. `git cliff --tag vX.Y.Z --output CHANGELOG.md`
+regenerates the whole file from history with the unreleased commits under the
+new version. Regenerating replaced the planned `--prepend`: prepend fails when
+the file does not exist, and a regenerated file is byte-identical when the
+history is, which keeps a "nothing to release" run from dirtying the tree. A
+header-only `CHANGELOG.md` is committed with the tooling because cargo-release
+commits with `git commit -a`, which ignores untracked files. The same binary
+runs in CI through
 `orhun/git-cliff-action@v4` with `--latest --strip header` to produce the
 release body, so the release notes and `CHANGELOG.md` cannot disagree.
 
@@ -123,48 +135,57 @@ git-cliff supplies, so the task composes them:
 ```toml
 [tools]
 "aqua:orhun/git-cliff" = "2.14.1"
-"github:crate-ci/cargo-release" = "<pin at implementation>"
+"github:crate-ci/cargo-release" = "1.1.6"
 
 [tasks.release]
 description = "Cut a release: derive version, changelog, commit, tag, push"
-dir = "src-tauri"
-run = "cargo release {{exec(command='git cliff --bumped-version')}} {{arg(name='flags', default='')}}"
+run = "node scripts/release.mjs"
 ```
 
-`{{exec(...)}}` is rendered by mise before the shell sees the line, so it works
-under `cmd /c` and `sh -c` alike. With no flags the task is a dry run that
-prints the derived version and every step. `mise run release -- --execute`
-performs it. An explicit level or version replaces the derived one by running
-`cargo release minor --execute` directly; that is the manual override and does
-not need a second task.
+The planned one-liner with `{{exec(command='git cliff --bumped-version')}}`
+failed: mise renders the template before the task's tools are on `PATH`, so
+`git cliff` is not found. The fallback from the risks section is in place:
+`scripts/release.mjs` runs `git cliff --bumped-version` from the repo root,
+strips the `v`, and runs `cargo release <version>` in `src-tauri` with any
+extra arguments appended. mise appends everything after `--` to the command,
+so `mise run release -- --execute` needs no argument declaration. With no
+flags the task is a dry run that prints the derived version and every step.
+An explicit level or version replaces the derived one by running `cargo
+release minor --execute` directly; that is the manual override and does not
+need a second task.
 
-`src-tauri/release.toml`, to be validated against the installed version during
-implementation:
+`src-tauri/release.toml` as validated against cargo-release 1.1.6:
 
 ```toml
 publish = false
+allow-branch = ["main"]
 tag-name = "v{{version}}"
 pre-release-commit-message = "chore(release): v{{version}}"
-pre-release-hook = ["git", "cliff", "--bump", "--unreleased", "--tag", "v{{version}}", "--prepend", "../CHANGELOG.md"]
-allow-branch = ["main"]
+pre-release-hook = ["node", "../scripts/changelog.mjs"]
 ```
 
-Note the hook runs with the crate directory as its working directory, hence
-the relative path to the changelog. The exact flag set and whether `--bump`
-and `--tag` may be combined must be confirmed in the dry run; if they conflict,
-`--tag v{{version}}` alone is sufficient because cargo-release already knows
-the version.
+The hook is a script rather than the git-cliff command itself for two
+reasons found in the dry run. cargo-release runs the hook in dry-run mode too
+and only tells it through the `DRY_RUN` environment variable, so a plain
+`git cliff --output` would write the changelog during a rehearsal. And the
+hook's working directory is the crate directory, from which git-cliff limits
+itself to commits touching `src-tauri`. `scripts/changelog.mjs` runs git-cliff
+from the repo root with `--tag v$NEW_VERSION`, printing the unreleased section
+when `DRY_RUN` is `true` and writing `CHANGELOG.md` otherwise. Neither script
+parses commits or edits manifests; both only choose arguments for the tools.
 
-Cargo.lock: cargo-release is expected to refresh the crate's own entry. The
-dry run and the first real release confirm it; if it does not, add
-`cargo update --workspace` as a second hook entry.
+Cargo.lock: confirmed in the dry run and a local `--execute --no-push` run.
+cargo-release refreshes the crate's own entry, and the release commit touches
+exactly `CHANGELOG.md`, `Cargo.toml`, and `Cargo.lock`.
 
 ### Ignore the "nothing to release" case rather than script it
 
 When no bumping commit exists, `git cliff --bumped-version` prints the current
-version. cargo-release then rejects it because the version "has to be greater
-than current version", exits non-zero, and changes nothing. That satisfies the
-spec's scenario without any logic in the task.
+version. cargo-release accepts an equal version but refuses because the tag
+exists: "tag `v0.1.0` already exists (for `dango`)", exit code 101, nothing
+written, in dry-run and execute mode alike. That satisfies the spec's scenario
+without any logic in the task; the message names the existing tag rather than
+saying "nothing to release" literally, which is accepted.
 
 ### tauri-action builds and uploads; a separate job owns the release
 
@@ -243,15 +264,13 @@ The file header reads:
 
 ## Risks / Trade-offs
 
-- [`{{exec}}` in a mise task fails or quotes badly on Windows] → Fall back to
-  a file task `mise-tasks/release.mjs` with a `#!/usr/bin/env node` shebang;
-  mise starts the interpreter itself on Windows and Node is already pinned.
-  Same behaviour, twenty lines instead of one.
-- [cargo-release does not refresh `Cargo.lock`] → Confirmed in the dry run
-  before the first release; `cargo update --workspace` as a second hook is the
-  fix. A stale lock would otherwise dirty the tree on the next build.
-- [`git cliff --bump` and `--tag` conflict in the hook] → Drop `--bump`; the
-  version is already known.
+- [`{{exec}}` in a mise task fails] → Happened on macOS already: the template
+  renders before tools are on `PATH`. Resolved with `scripts/release.mjs`,
+  run through `node` from a TOML task so Windows needs no shebang handling.
+- [cargo-release does not refresh `Cargo.lock`] → Did not happen; confirmed
+  refreshed in a local execute run.
+- [`git cliff --bump` and `--tag` conflict in the hook] → Moot; the hook passes
+  only `--tag` with the version cargo-release supplies.
 - [Two-job release creation is more YAML than the official example] → Accepted
   for deterministic release creation and automatic publish. The extra job is
   about fifteen lines.
@@ -271,6 +290,7 @@ The file header reads:
    because nothing in `ci.yml` changes.
 2. Run `mise run release` (dry run) on both machines and check the derived
    version is `0.1.0` from `initial_tag`, and the hook output looks right.
+   Done on macOS from fish; the Windows run is still open.
 3. Cut `v0.1.0` with `--execute` from one machine. Watch the workflow, install
    both bundles, confirm the version in the installer metadata.
 4. Rollback: delete the tag locally and on the remote and revert the release
@@ -278,6 +298,7 @@ The file header reads:
 
 ## Open Questions
 
-- Exact cargo-release version to pin, and whether its Windows binary name on
-  GitHub releases resolves through the `github:` backend without an `asset`
-  pattern. Resolved during implementation by `mise install`.
+- Whether cargo-release 1.1.6's Windows asset
+  (`cargo-release-v1.1.6-x86_64-pc-windows-msvc.zip`) resolves through the
+  `github:` backend without an `asset` pattern. The macOS asset did; the
+  Windows `mise install` in task 2.6 settles it.

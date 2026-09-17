@@ -42,7 +42,7 @@ pre-push hook as any other push.
 ## Impact
 
 - New files: `.github/workflows/release.yml`, `cliff.toml`, `CHANGELOG.md`,
-  `src-tauri/release.toml`.
+  `src-tauri/release.toml`, `scripts/release.mjs`, `scripts/changelog.mjs`.
 - Edited files: `mise.toml` (tools and task), `src-tauri/tauri.conf.json`
   (drop `version`), `README.md` (release procedure). `src-tauri/Cargo.toml` and
   `Cargo.lock` change on every release, by the tool, never by hand.
