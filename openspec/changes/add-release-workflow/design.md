@@ -103,7 +103,11 @@ release body, so the release notes and `CHANGELOG.md` cannot disagree.
 initial_tag = "v0.1.0"` so the first run on an untagged repo produces the
 version Cargo.toml already has; `commit_parsers` that drop `chore(release)`
 and `docs(openspec)` and map the remaining types to group titles;
-`filter_unconventional = true`. Group titles in the changelog are project copy
+`filter_unconventional = true`; and `no_increment_regex` listing every
+conventional type other than `feat` and `fix`, because git-cliff otherwise
+bumps patch for any commit it lists in the changelog. Found on Windows in
+task 2.6: a lone `docs: update roadmap` commit after `v0.1.0` derived
+`v0.1.1`, which the spec forbids. Group titles in the changelog are project copy
 and are quoted below.
 
 ### cargo-release performs the bump, commit, tag, and push
@@ -290,7 +294,7 @@ The file header reads:
    because nothing in `ci.yml` changes.
 2. Run `mise run release` (dry run) on both machines and check the derived
    version is `0.1.0` from `initial_tag`, and the hook output looks right.
-   Done on macOS from fish; the Windows run is still open.
+   Done on macOS from fish and on Windows from PowerShell.
 3. Cut `v0.1.0` with `--execute` from one machine. Watch the workflow, install
    both bundles, confirm the version in the installer metadata.
 4. Rollback: delete the tag locally and on the remote and revert the release
@@ -298,7 +302,6 @@ The file header reads:
 
 ## Open Questions
 
-- Whether cargo-release 1.1.6's Windows asset
-  (`cargo-release-v1.1.6-x86_64-pc-windows-msvc.zip`) resolves through the
-  `github:` backend without an `asset` pattern. The macOS asset did; the
-  Windows `mise install` in task 2.6 settles it.
+None. cargo-release 1.1.6's Windows asset
+(`cargo-release-v1.1.6-x86_64-pc-windows-msvc.zip`) resolved through the
+`github:` backend without an `asset` pattern in task 2.6.

@@ -10,7 +10,7 @@
 - [x] 2.3 Add `src-tauri/release.toml` with `publish = false`, `tag-name`, `pre-release-commit-message`, `allow-branch`, and the git-cliff `pre-release-hook`; verify `cargo release 0.1.0` from `src-tauri` in dry-run mode lists the hook, the commit `chore(release): v0.1.0`, the tag `v0.1.0`, and the push, and leaves the tree clean
 - [x] 2.4 Add the `release` mise task from design.md; verify `mise run release` prints the same dry run as 2.3 with the version filled in by `{{exec}}`, and `mise run release -- --execute` is accepted as the flags argument (do not execute yet)
 - [x] 2.5 Verify the refusal paths in dry-run and execute mode without releasing: a dirty tree, a non-`main` branch, and a version equal to the current one each exit non-zero with nothing written
-- [ ] 2.6 Verify the release task on Windows from PowerShell: `mise install`, then `mise run release` dry run prints the derived version and steps without a POSIX shell involved
+- [x] 2.6 Verify the release task on Windows from PowerShell: `mise install`, then `mise run release` dry run prints the derived version and steps without a POSIX shell involved
 - [x] 2.7 Verify the release task on macOS from fish: `mise install`, then `mise run release` dry run prints the identical version and steps
 
 ## 3. Release workflow
