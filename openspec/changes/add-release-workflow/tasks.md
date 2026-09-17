@@ -23,9 +23,9 @@
 ## 4. First release and end-to-end verification
 
 - [x] 4.1 Commit everything above on `main` and let `ci.yml` pass; verify the run is green on both platforms with no change to `ci.yml`
-- [ ] 4.2 Cut `v0.1.0` with `mise run release -- --execute` from one machine; verify one commit touching only `CHANGELOG.md`, `Cargo.toml`, and `Cargo.lock` exists, is tagged `v0.1.0`, and both are on the remote, and that `CHANGELOG.md` contains the full pre-release history as one section
-- [ ] 4.3 Verify the release workflow run: `changelog` created a draft named `Dango v0.1.0` whose body equals the `v0.1.0` section without the file header, both builds succeeded, `publish` ran, and the release is no longer a draft
+- [x] 4.2 Cut `v0.1.0` with `mise run release -- --execute` from one machine; verify one commit touching only `CHANGELOG.md`, `Cargo.toml`, and `Cargo.lock` exists, is tagged `v0.1.0`, and both are on the remote, and that `CHANGELOG.md` contains the full pre-release history as one section
+- [x] 4.3 Verify the release workflow run: `changelog` created a draft named `Dango v0.1.0` whose body equals the `v0.1.0` section without the file header, both builds succeeded, `publish` ran, and the release is no longer a draft
 - [ ] 4.4 Verify the Windows assets: download the `.msi` and the NSIS `.exe`, install one, confirm the installed application reports `0.1.0` and launches with the tray icon and hotkey working
-- [ ] 4.5 Verify the macOS asset: download the `.dmg`, run `xattr -cr` on the app, confirm it launches and `Info.plist` reports `0.1.0`
-- [ ] 4.6 Verify the nothing-to-release path after 4.2: `mise run release` on the freshly tagged `main` exits non-zero without creating a commit or tag
-- [ ] 4.7 Review the final diff for comments that only restate the YAML or TOML, for any leftover `version` in `tauri.conf.json`, and for scope creep such as updater or signing settings; delete what is found
+- [x] 4.5 Verify the macOS asset: download the `.dmg`, run `xattr -cr` on the app, confirm it launches and `Info.plist` reports `0.1.0`
+- [x] 4.6 Verify the nothing-to-release path after 4.2: `mise run release` on the freshly tagged `main` exits non-zero without creating a commit or tag
+- [x] 4.7 Review the final diff for comments that only restate the YAML or TOML, for any leftover `version` in `tauri.conf.json`, and for scope creep such as updater or signing settings; delete what is found
