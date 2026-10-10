@@ -120,6 +120,10 @@ context: |
     files. Only that route sees UWP and MSIX apps alongside Win32 ones, and it
     gives AppUserModelIDs for launching plus icons via
     `IShellItemImageFactory::GetImage`.
+  - A `shell:AppsFolder` entry's target can be a shell namespace identifier
+    of the form `::{GUID}` rather than a file; File Explorer is one. Its
+    second character is a colon, so a naive drive-letter test takes it for a
+    path. Classify paths with `Path::components` and `Component::Prefix`.
   - Windows window management must correct geometry with
     `DWMWA_EXTENDED_FRAME_BOUNDS`, or invisible resize borders leave visible
     gaps. Per-monitor DPI awareness is required for multi-monitor tiling.
