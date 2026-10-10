@@ -101,15 +101,16 @@ impl AppIndex {
     /// installs and uninstalls without a restart.
     pub fn rebuild(&self) {
         let apps = self.indexer.index();
+        // An empty result from a machine that had applications is a failed
+        // enumeration, not an empty machine.
+        if apps.is_empty() && !self.apps.read().unwrap().is_empty() {
+            eprintln!(
+                "[dango] application enumeration returned nothing; keeping the current index"
+            );
+            return;
+        }
         self.persist(&apps);
         *self.apps.write().unwrap() = apps;
-    }
-
-    pub fn remove(&self, id: &str) {
-        self.apps.write().unwrap().retain(|a| a.id != id);
-        if let Some(store) = &self.store {
-            let _ = store.delete_app(id);
-        }
     }
 
     pub fn launch(&self, app: &IndexedApp) -> Result<(), LaunchError> {
@@ -230,12 +231,13 @@ pub mod tests {
     }
 
     #[test]
-    fn remove_takes_an_entry_out() {
+    fn rebuild_keeps_the_index_when_enumeration_returns_nothing() {
         let indexer = Arc::new(FakeIndexer::with_apps(&[("a", "Alpha", None)]));
-        let index = AppIndex::new(indexer, None);
+        let index = AppIndex::new(indexer.clone(), None);
         index.rebuild();
-        index.remove("a");
-        assert!(index.get("a").is_none());
+        indexer.set_apps(&[]);
+        index.rebuild();
+        assert_eq!(index.snapshot().len(), 1);
     }
 
     #[test]

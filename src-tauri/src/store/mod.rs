@@ -129,13 +129,6 @@ impl Store {
         })
     }
 
-    pub fn delete_app(&self, app_id: &str) -> rusqlite::Result<()> {
-        self.with(|c| {
-            c.execute("DELETE FROM local_app_index WHERE app_id = ?1", [app_id])?;
-            Ok(())
-        })
-    }
-
     pub fn load_frecency(&self) -> rusqlite::Result<Vec<(String, u32, i64)>> {
         self.with(|c| {
             let mut stmt = c.prepare(

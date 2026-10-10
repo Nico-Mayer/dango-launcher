@@ -42,12 +42,12 @@ impl AppIndexer for WindowsAppIndexer {
     }
 
     fn launch(&self, app: &IndexedApp) -> Result<(), LaunchError> {
-        // A filesystem target that has vanished is a stale entry, reported so
-        // the caller can drop it.
-        if let Some(target) = &app.target {
-            if is_file_path(target) && !Path::new(target).exists() {
-                return Err(LaunchError::NotFound);
-            }
+        if app
+            .target
+            .as_deref()
+            .is_some_and(|t| !Path::new(t).exists())
+        {
+            return Err(LaunchError::NotFound);
         }
         unsafe {
             init_com();
@@ -82,7 +82,7 @@ impl AppIndexer for WindowsAppIndexer {
     fn reveal(&self, app: &IndexedApp) -> std::io::Result<()> {
         use std::os::windows::process::CommandExt;
         match &app.target {
-            Some(target) if is_file_path(target) => std::process::Command::new("explorer.exe")
+            Some(target) => std::process::Command::new("explorer.exe")
                 .raw_arg(format!("/select,\"{target}\""))
                 .spawn()
                 .map(|_| ()),
@@ -158,7 +158,13 @@ unsafe fn enumerate() -> windows::core::Result<Vec<IndexedApp>> {
         if !is_launchable(&id, target.as_deref()) {
             continue;
         }
-        apps.push(IndexedApp { id, name, target });
+        // Only a file path is a target the result can show, reveal, or copy;
+        // a shell namespace identifier or a URL scheme launches by id alone.
+        apps.push(IndexedApp {
+            id,
+            name,
+            target: target.filter(|t| is_file_path(t)),
+        });
     }
     Ok(apps)
 }
@@ -351,8 +357,10 @@ fn apps_folder_path(app_id: &str) -> String {
 }
 
 fn is_file_path(s: &str) -> bool {
-    let bytes = s.as_bytes();
-    (bytes.len() > 2 && bytes[1] == b':') || s.starts_with("\\\\")
+    matches!(
+        Path::new(s).components().next(),
+        Some(std::path::Component::Prefix(_))
+    )
 }
 
 #[cfg(test)]
@@ -402,5 +410,6 @@ mod tests {
         assert!(is_file_path("\\\\server\\share"));
         assert!(!is_file_path("steam://rungameid/1"));
         assert!(!is_file_path("Some.AUMID_abc!App"));
+        assert!(!is_file_path("::{52205FD8-5DFB-447D-801A-D0B52F2E83E1}"));
     }
 }

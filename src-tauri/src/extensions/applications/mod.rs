@@ -65,21 +65,37 @@ impl ApplicationsExtension {
         self.index.find_by_name(name)
     }
 
-    /// Runs a chosen action, removing an entry that turns out to be gone.
+    /// A miss can be a result rendered before a refresh replaced the index,
+    /// so the index is rebuilt once before the entry is declared gone.
+    fn lookup(&self, app_id: &str) -> Option<IndexedApp> {
+        self.index.get(app_id).or_else(|| {
+            self.index.rebuild();
+            self.index.get(app_id)
+        })
+    }
+
+    /// Runs a chosen action. The platform's enumeration is the only authority
+    /// on whether an application is gone: a failed launch or a missing entry
+    /// rebuilds the index and the verdict follows from what the rebuild lists.
     fn perform(&self, app_id: &str, action: &str) -> ActionOutcome {
-        let Some(app) = self.index.get(app_id) else {
-            return ActionOutcome::Failed(
-                "That app is no longer installed. It's been removed from results.".into(),
-            );
+        let Some(app) = self.lookup(app_id) else {
+            return ActionOutcome::Failed(LaunchError::NotFound.to_string());
         };
         match action {
             ACTION_LAUNCH => match self.index.launch(&app) {
                 Ok(()) => ActionOutcome::Done,
-                Err(LaunchError::NotFound) => {
-                    self.index.remove(app_id);
-                    ActionOutcome::Failed(LaunchError::NotFound.to_string())
+                Err(error) => {
+                    self.index.rebuild();
+                    if self.index.get(app_id).is_none() {
+                        return ActionOutcome::Failed(LaunchError::NotFound.to_string());
+                    }
+                    ActionOutcome::Failed(match error {
+                        LaunchError::Failed(message) => message,
+                        LaunchError::NotFound => {
+                            format!("Couldn't open {}. Try again.", app.name)
+                        }
+                    })
                 }
-                Err(LaunchError::Failed(message)) => ActionOutcome::Failed(message),
             },
             ACTION_REVEAL => match self.index.reveal(&app) {
                 Ok(()) => ActionOutcome::Done,
@@ -320,12 +336,37 @@ mod tests {
     }
 
     #[test]
-    fn launching_a_vanished_app_removes_it() {
+    fn a_failed_launch_keeps_an_app_the_platform_still_lists() {
         let (ext, indexer) = extension();
         indexer.make_launch_fail_not_found();
-        let outcome = ext.perform("code", ACTION_LAUNCH);
-        assert!(matches!(outcome, ActionOutcome::Failed(_)));
+        assert_eq!(
+            ext.perform("code", ACTION_LAUNCH),
+            ActionOutcome::Failed("Couldn't open VS Code. Try again.".into())
+        );
+        assert!(ext.index.get("code").is_some());
+    }
+
+    #[test]
+    fn a_failed_launch_removes_an_app_the_platform_no_longer_lists() {
+        let (ext, indexer) = extension();
+        indexer.set_apps(&[("other", "Other", None)]);
+        indexer.make_launch_fail_not_found();
+        assert_eq!(
+            ext.perform("code", ACTION_LAUNCH),
+            ActionOutcome::Failed(LaunchError::NotFound.to_string())
+        );
         assert!(ext.index.get("code").is_none());
+    }
+
+    #[test]
+    fn a_result_missing_from_the_index_is_looked_up_again_after_a_rebuild() {
+        let (ext, indexer) = extension();
+        indexer.set_apps(&[("code", "VS Code", Some("/a/code")), ("new", "New", None)]);
+        assert_eq!(ext.perform("new", ACTION_LAUNCH), ActionOutcome::Done);
+        assert_eq!(
+            ext.perform("gone", ACTION_LAUNCH),
+            ActionOutcome::Failed(LaunchError::NotFound.to_string())
+        );
     }
 
     #[test]
