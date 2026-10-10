@@ -8,7 +8,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 /// Score halves every 30 days of disuse, so recency decays smoothly while a
 /// high launch count still keeps a stale item findable.
-const HALF_LIFE_MS: f64 = 30.0 * 24.0 * 60.0 * 60.0 * 1000.0;
+pub(super) const HALF_LIFE_MS: f64 = 30.0 * 24.0 * 60.0 * 60.0 * 1000.0;
 
 #[derive(Clone, Copy)]
 pub struct Record {

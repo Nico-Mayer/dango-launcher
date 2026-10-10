@@ -178,6 +178,47 @@ impl Store {
             Ok(())
         })
     }
+
+    pub fn load_input_history(&self) -> rusqlite::Result<Vec<(String, String, u32, i64)>> {
+        self.with(|c| {
+            let mut stmt = c.prepare(
+                "SELECT input, item_id, use_count, last_used_at                  FROM input_history WHERE deleted_at IS NULL",
+            )?;
+            let rows = stmt.query_map([], |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, i64>(2)? as u32,
+                    row.get::<_, i64>(3)?,
+                ))
+            })?;
+            rows.collect()
+        })
+    }
+
+    pub fn save_input_history(
+        &self,
+        input: &str,
+        item_id: &str,
+        use_count: u32,
+        last_used_at: i64,
+    ) -> rusqlite::Result<()> {
+        let now = now_millis();
+        self.with(|c| {
+            c.execute(
+                "INSERT INTO input_history                  (id, input, item_id, use_count, last_used_at, updated_at)                  VALUES (?1, ?2, ?3, ?4, ?5, ?6)                  ON CONFLICT(input, item_id) DO UPDATE SET                  use_count = ?4, last_used_at = ?5, updated_at = ?6, deleted_at = NULL",
+                params![
+                    uuid::Uuid::new_v4().to_string(),
+                    input,
+                    item_id,
+                    use_count as i64,
+                    last_used_at,
+                    now
+                ],
+            )?;
+            Ok(())
+        })
+    }
 }
 
 fn now_millis() -> i64 {
@@ -260,6 +301,26 @@ mod tests {
         );
         assert!(opened.store.schema_version().unwrap() > 0);
         cleanup(&path);
+    }
+
+    #[test]
+    fn input_history_pairs_round_trip_and_update_in_place() {
+        let store = Store::in_memory().unwrap();
+        store.save_input_history("cal", "calendar", 1, 10).unwrap();
+        store
+            .save_input_history("cal", "calculator", 1, 11)
+            .unwrap();
+        store.save_input_history("cal", "calendar", 2, 12).unwrap();
+
+        let mut loaded = store.load_input_history().unwrap();
+        loaded.sort();
+        assert_eq!(
+            loaded,
+            vec![
+                ("cal".into(), "calculator".into(), 1, 11),
+                ("cal".into(), "calendar".into(), 2, 12),
+            ]
+        );
     }
 
     #[test]

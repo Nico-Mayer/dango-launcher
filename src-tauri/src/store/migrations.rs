@@ -6,6 +6,7 @@ pub const MIGRATIONS: &[&str] = &[
     include_str!("migrations/0003_snippets.sql"),
     include_str!("migrations/0004_drop_config_tables.sql"),
     include_str!("migrations/0005_drop_records_tables.sql"),
+    include_str!("migrations/0006_input_history.sql"),
 ];
 
 #[derive(Debug, thiserror::Error)]
@@ -71,7 +72,12 @@ mod tests {
         let mut connection = Connection::open_in_memory().unwrap();
         run(&mut connection).unwrap();
         assert_eq!(version(&connection).unwrap(), MIGRATIONS.len() as u32);
-        for table in ["frecency", "local_app_index", "local_clipboard_history"] {
+        for table in [
+            "frecency",
+            "input_history",
+            "local_app_index",
+            "local_clipboard_history",
+        ] {
             assert!(table_exists(&connection, table), "{table} missing");
         }
         // The configuration tables were retired by migration 0004.

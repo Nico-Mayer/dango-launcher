@@ -111,6 +111,7 @@
             itemId: item.id,
             actionId,
             values: null,
+            query,
         })) as ActionResponse;
         if (response.kind === "copy") {
             await navigator.clipboard.writeText(response.text);
@@ -171,7 +172,7 @@
             workingTitle = item.title;
             // The view that follows carries its own owner, so nothing is read back
             // here; only a refusal to start the command needs handling.
-            await invoke("invoke_command", { commandId: item.id }).catch(
+            await invoke("invoke_command", { commandId: item.id, query }).catch(
                 (reason) => {
                     failure = String(reason);
                     workingTitle = null;

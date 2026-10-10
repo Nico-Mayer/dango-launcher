@@ -36,7 +36,7 @@ use extensions::window_management::WindowManagementExtension;
 use invocation::{InvocationContext, InvokeError, Invoker, Outcome, Output};
 use latency::LatencyProbe;
 use platform::LauncherWindow;
-use ranking::{now_millis, DangoRanker, FrecencyTable};
+use ranking::{now_millis, DangoRanker, FrecencyTable, InputHistory};
 use search::{Candidate, SearchPipeline, StaticCommandSource};
 use store::{Opened, Store};
 use text::TextExchange;
@@ -337,6 +337,7 @@ async fn run_action(
     item_id: String,
     action_id: String,
     values: Option<FormValues>,
+    query: Option<String>,
 ) -> ActionResponse {
     let Some(host) = app.try_state::<Arc<Mutex<ExtensionHost>>>() else {
         return ActionResponse::Failed {
@@ -353,9 +354,7 @@ async fn run_action(
         ActionOutcome::Done => {
             // Any successful action counts as use. Revealing an application is
             // reaching for it just as much as launching it is.
-            if let Some(frecency) = app.try_state::<Arc<FrecencyTable>>() {
-                frecency.record_launch(&item_id, now_millis());
-            }
+            record_use(&app, &item_id, query.as_deref());
             hide_after_launch(&app);
             ActionResponse::Done
         }
@@ -469,8 +468,29 @@ mod inspect_tests {
 /// extension that owns it, so an action chosen inside a view the command pushes
 /// can be sent back to the right place, or the reason it could not start.
 #[tauri::command]
-async fn invoke_command(app: tauri::AppHandle, command_id: String) -> Result<(), String> {
-    run_command(&app, &command_id).map_err(|error| error.to_string())
+async fn invoke_command(
+    app: tauri::AppHandle,
+    command_id: String,
+    query: Option<String>,
+) -> Result<(), String> {
+    run_command(&app, &command_id).map_err(|error| error.to_string())?;
+    record_use(&app, &command_id, query.as_deref());
+    Ok(())
+}
+
+/// Credits a use of a result and, when the launcher knows what was typed to
+/// reach it, learns that text for the item. Only the two root confirm paths
+/// call this: an action inside a pushed view passes no text, and a hotkey
+/// press never gets here, because a chord says nothing about what the user
+/// types to find an item.
+fn record_use(app: &tauri::AppHandle, item_id: &str, query: Option<&str>) {
+    let now = now_millis();
+    if let Some(frecency) = app.try_state::<Arc<FrecencyTable>>() {
+        frecency.record_launch(item_id, now);
+    }
+    if let (Some(query), Some(learned)) = (query, app.try_state::<Arc<InputHistory>>()) {
+        learned.record(query, item_id, now);
+    }
 }
 
 /// Runs a command through the invoker and streams its output the same way for a
@@ -488,10 +508,6 @@ fn run_command(app: &tauri::AppHandle, command_id: &str) -> Result<(), InvokeErr
         .try_state::<Arc<Invoker>>()
         .ok_or(InvokeError::HostUnavailable)?;
     let running = invoker.invoke(command_id)?;
-    if let Some(frecency) = app.try_state::<Arc<FrecencyTable>>() {
-        frecency.record_launch(command_id, now_millis());
-    }
-
     pump(app, owner, running);
     Ok(())
 }
@@ -576,7 +592,7 @@ fn remember_focused_window() {
 }
 
 /// Launches an application from its hotkey: the same launch action Enter runs
-/// on the result, with the same frecency credit. The name is resolved now
+/// on the result, without the frecency credit. The name is resolved now
 /// rather than when the chord was registered, so a binding shared from another
 /// machine starts working the moment the application is installed here.
 fn dispatch_application(app: &tauri::AppHandle, name: &str) {
@@ -615,12 +631,7 @@ fn dispatch_application(app: &tauri::AppHandle, name: &str) {
             &FormValues::new(),
         );
         match outcome {
-            ActionOutcome::Done => {
-                if let Some(frecency) = app.try_state::<Arc<FrecencyTable>>() {
-                    frecency.record_launch(&target.id, now_millis());
-                }
-                hide_after_launch(&app);
-            }
+            ActionOutcome::Done => hide_after_launch(&app),
             ActionOutcome::Failed(message) => {
                 report_hotkey_problem(&app, &format!("application \"{}\": {message}", target.name));
             }
@@ -1375,7 +1386,11 @@ pub fn run() {
                 Some(store) => FrecencyTable::load(Box::new(store.clone())),
                 None => FrecencyTable::in_memory(),
             });
-            let ranker = Arc::new(DangoRanker::new(frecency.clone()));
+            let learned = Arc::new(match &store {
+                Some(store) => InputHistory::load(Box::new(store.clone())),
+                None => InputHistory::in_memory(),
+            });
+            let ranker = Arc::new(DangoRanker::new(frecency.clone(), learned.clone()));
             let commands = StaticCommandSource(aliased_candidates(&host, &file_config));
             let pipeline = SearchPipeline::new(
                 Arc::new(commands),
@@ -1385,6 +1400,7 @@ pub fn run() {
             );
             app.manage(pipeline);
             app.manage(frecency);
+            app.manage(learned);
 
             app.manage(TintTable(host.tints()));
 
