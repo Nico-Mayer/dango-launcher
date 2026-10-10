@@ -167,12 +167,21 @@ Status: the release workflow shipped as `add-release-workflow` and cut
 `v0.1.0`. Autostart is implemented in `add-autostart` as one `launcher.autostart`
 boolean in the config file, reconciled with the OS at startup and on reload
 through the official Tauri autostart plugin, pinned at 2.5.0 because later
-releases require Tauri 2.12. A debug build never registers itself. On Windows
-the per-user `Run` entry was verified live from the local release build:
-created at startup and on a live edit, removed on a live edit, untouched by an
-unrelated edit, and absent with the setting absent. Still to run: the sign-out
-and sign-in checks on Windows against the installed build, and every macOS
-check. The config file now carries a generated JSON Schema, written beside it at startup for editor completion, and a generated settings reference in `docs/config.md`; both come from the config structs and the built-in manifests, and a test fails when the reference is stale (`add-config-schema`). Permission onboarding is the remaining item.
+releases require Tauri 2.12. A debug build never registers itself. Windows is
+verified against the installed build: the per-user `Run` entry is created at
+startup and on a live edit, removed on a live edit, untouched by an unrelated
+edit, absent with the setting absent, and Windows lists Dango as a startup
+command. The sign-out checks and the Settings startup toggle were run by the
+author and reported passing.
+
+Carried forward, unverified: every macOS check in `add-autostart` tasks 5.1 to
+5.6, because the change was built and verified on the Windows machine. They
+stay unticked in the archived change and are the first thing to run on the Mac:
+the plist under `~/Library/LaunchAgents`, the login run, removal on a live
+edit, the path repair after a launch from `/Applications`, the debug-build
+skip, and the tray notice on a write failure.
+
+The config file now carries a generated JSON Schema, written beside it at startup for editor completion, and a generated settings reference in `docs/config.md`; both come from the config structs and the built-in manifests, and a test fails when the reference is stale (`add-config-schema`). Permission onboarding is the remaining item.
 
 ### M8 - third party
 

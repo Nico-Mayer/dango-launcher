@@ -16,10 +16,10 @@
 
 ## 4. Windows verification
 
-- [ ] 4.1 Install a release build from the installer, set `launcher.autostart` to true, and verify `reg query HKCU\Software\Microsoft\Windows\CurrentVersion\Run /v Dango` shows the installed path, Settings > Apps > Startup lists Dango, and no value exists under the same key in `HKLM`
-- [ ] 4.2 Sign out and in; verify Dango is running with its tray icon, no launcher window is visible, and the launcher hotkey works
+- [x] 4.1 Install a release build from the installer, set `launcher.autostart` to true, and verify `reg query HKCU\Software\Microsoft\Windows\CurrentVersion\Run /v Dango` shows the installed path, Settings > Apps > Startup lists Dango, and no value exists under the same key in `HKLM`
+- [x] 4.2 Sign out and in; verify Dango is running with its tray icon, no launcher window is visible, and the launcher hotkey works (run by the author on the Windows machine and reported passing; the agent session that recorded it could not observe the sign-out)
 - [x] 4.3 Set the key to false and save; verify the `Run` value is gone without a restart (verified against the local release build in `target/release`, same binary the installers wrap)
-- [ ] 4.4 Turn Dango off in Settings > Apps > Startup with the config on, sign out and in, verify Dango did not start; start it by hand and verify the startup toggle is on again
+- [x] 4.4 Turn Dango off in Settings > Apps > Startup with the config on, sign out and in, verify Dango did not start; start it by hand and verify the startup toggle is on again (same: run and reported by the author; the final state, toggle on with the entry pointing at the installed app, was confirmed in the registry)
 - [x] 4.5 Run `tauri dev` with the setting on; verify no `Run` value is created and `dango.log` has the development-build line
 
 ## 5. macOS verification
@@ -34,4 +34,4 @@
 ## 6. Wrap up
 
 - [x] 6.1 Review the diff for comments that restate the code, for any frontend or capability change, and for scope beyond the proposal; delete what is found and verify `cargo clippy -- -D warnings` and `cargo test` pass
-- [ ] 6.2 Update the M7 section of `openspec/ROADMAP.md` to record autostart as shipped with what was verified on each platform; verify the text matches the ticked tasks above
+- [x] 6.2 Update the M7 section of `openspec/ROADMAP.md` to record autostart as shipped with what was verified on each platform; verify the text matches the ticked tasks above
