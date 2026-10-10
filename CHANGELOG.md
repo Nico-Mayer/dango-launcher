@@ -2,6 +2,11 @@
 
 All notable changes to Dango. Generated from commit history at release time.
 
+## [0.3.1] - 2026-10-10
+
+### Fixes
+
+- **config:** Name commands by id in schema
 ## [0.3.0] - 2026-10-10
 
 ### Features
