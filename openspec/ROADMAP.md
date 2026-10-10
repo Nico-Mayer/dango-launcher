@@ -172,7 +172,7 @@ the per-user `Run` entry was verified live from the local release build:
 created at startup and on a live edit, removed on a live edit, untouched by an
 unrelated edit, and absent with the setting absent. Still to run: the sign-out
 and sign-in checks on Windows against the installed build, and every macOS
-check. Permission onboarding is the remaining item.
+check. The config file now carries a generated JSON Schema, written beside it at startup for editor completion, and a generated settings reference in `docs/config.md`; both come from the config structs and the built-in manifests, and a test fails when the reference is stale (`add-config-schema`). Permission onboarding is the remaining item.
 
 ### M8 - third party
 
