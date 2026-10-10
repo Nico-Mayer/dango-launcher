@@ -116,7 +116,7 @@ fn adapter_kind(kind: &ProviderKind) -> Option<AdapterKind> {
         ProviderKind::Openai => Some(AdapterKind::OpenAI),
         ProviderKind::Ollama => Some(AdapterKind::Ollama),
         // Answered by the command client, which never asks this.
-        ProviderKind::Cli | ProviderKind::Unknown(_) => None,
+        ProviderKind::Cli => None,
     }
 }
 
@@ -264,7 +264,6 @@ mod tests {
             adapter_kind(&ProviderKind::Ollama),
             Some(AdapterKind::Ollama)
         );
-        assert_eq!(adapter_kind(&ProviderKind::Unknown("mistral".into())), None);
     }
 
     #[test]

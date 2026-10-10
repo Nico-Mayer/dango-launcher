@@ -6,22 +6,27 @@
 //! does not shift the binding. When a chord must differ per platform, a hotkey
 //! may be an object with `macos` and `windows` strings instead of a string.
 
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use tauri_plugin_global_shortcut::{Code, Modifiers};
 
-/// A hotkey as written in the file: one portable string, or a per-platform
-/// object when the two platforms need different chords.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+/// A hotkey: one chord that works on both platforms, such as `mod+shift+k`
+/// where `mod` is Cmd on macOS and Ctrl on Windows, or a chord per platform.
+/// The key is a physical position, so a non-US layout does not move it.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(untagged)]
 pub enum Hotkey {
     Portable(String),
     PerPlatform(PerPlatform),
 }
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+/// One value per platform. A missing side means no value there.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, JsonSchema)]
 pub struct PerPlatform {
+    /// The value on macOS.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub macos: Option<String>,
+    /// The value on Windows.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub windows: Option<String>,
 }
@@ -118,10 +123,91 @@ pub fn parse_with_hyper(spec: &str, hyper: Modifiers) -> Result<ParsedHotkey, Ho
     Ok(ParsedHotkey { modifiers, code })
 }
 
+/// What a modifier token stands for. `Primary` is Cmd on macOS and Ctrl on
+/// Windows; `Hyper` is whatever set the configured hyperkey emits.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ModifierToken {
+    Primary,
+    Control,
+    Alt,
+    Shift,
+    Super,
+    Hyper,
+}
+
+/// Every modifier token the grammar accepts. Several spell one modifier so a
+/// chord reads naturally on either platform. The schema's hotkey pattern is
+/// built from this same table.
+pub const MODIFIER_TOKENS: &[(&str, ModifierToken)] = &[
+    ("mod", ModifierToken::Primary),
+    ("ctrl", ModifierToken::Control),
+    ("control", ModifierToken::Control),
+    ("alt", ModifierToken::Alt),
+    ("opt", ModifierToken::Alt),
+    ("option", ModifierToken::Alt),
+    ("shift", ModifierToken::Shift),
+    ("meta", ModifierToken::Super),
+    ("cmd", ModifierToken::Super),
+    ("command", ModifierToken::Super),
+    ("super", ModifierToken::Super),
+    ("win", ModifierToken::Super),
+    ("windows", ModifierToken::Super),
+    ("hyper", ModifierToken::Hyper),
+];
+
+/// Every named key token the grammar accepts. A single lowercase letter or
+/// digit is a key too and is not listed here.
+pub const KEY_TOKENS: &[(&str, Code)] = &[
+    ("space", Code::Space),
+    ("enter", Code::Enter),
+    ("return", Code::Enter),
+    ("tab", Code::Tab),
+    ("escape", Code::Escape),
+    ("esc", Code::Escape),
+    ("backspace", Code::Backspace),
+    ("delete", Code::Delete),
+    ("del", Code::Delete),
+    ("up", Code::ArrowUp),
+    ("down", Code::ArrowDown),
+    ("left", Code::ArrowLeft),
+    ("right", Code::ArrowRight),
+    ("home", Code::Home),
+    ("end", Code::End),
+    ("pageup", Code::PageUp),
+    ("pagedown", Code::PageDown),
+    ("comma", Code::Comma),
+    ("period", Code::Period),
+    ("dot", Code::Period),
+    ("slash", Code::Slash),
+    ("backslash", Code::Backslash),
+    ("semicolon", Code::Semicolon),
+    ("quote", Code::Quote),
+    ("backquote", Code::Backquote),
+    ("grave", Code::Backquote),
+    ("minus", Code::Minus),
+    ("equal", Code::Equal),
+    ("leftbracket", Code::BracketLeft),
+    ("rightbracket", Code::BracketRight),
+    ("f1", Code::F1),
+    ("f2", Code::F2),
+    ("f3", Code::F3),
+    ("f4", Code::F4),
+    ("f5", Code::F5),
+    ("f6", Code::F6),
+    ("f7", Code::F7),
+    ("f8", Code::F8),
+    ("f9", Code::F9),
+    ("f10", Code::F10),
+    ("f11", Code::F11),
+    ("f12", Code::F12),
+];
+
 fn modifier(token: &str, hyper: Modifiers) -> Result<Modifiers, HotkeyError> {
-    Ok(match token {
-        // The primary accelerator: Cmd on macOS, Ctrl on Windows.
-        "mod" => {
+    let Some((_, kind)) = MODIFIER_TOKENS.iter().find(|(name, _)| *name == token) else {
+        return Err(HotkeyError::UnknownModifier(token.to_string()));
+    };
+    Ok(match kind {
+        ModifierToken::Primary => {
             #[cfg(target_os = "macos")]
             {
                 Modifiers::SUPER
@@ -131,15 +217,11 @@ fn modifier(token: &str, hyper: Modifiers) -> Result<Modifiers, HotkeyError> {
                 Modifiers::CONTROL
             }
         }
-        "ctrl" | "control" => Modifiers::CONTROL,
-        "alt" | "opt" | "option" => Modifiers::ALT,
-        "shift" => Modifiers::SHIFT,
-        "meta" | "cmd" | "command" | "super" | "win" | "windows" => Modifiers::SUPER,
-        // The hyperkey chord: the set the configured hyperkey emits (the full
-        // four by default). Passing the same set the key produces is what makes
-        // a `hyper` chord actually fire from the remap.
-        "hyper" => hyper,
-        other => return Err(HotkeyError::UnknownModifier(other.to_string())),
+        ModifierToken::Control => Modifiers::CONTROL,
+        ModifierToken::Alt => Modifiers::ALT,
+        ModifierToken::Shift => Modifiers::SHIFT,
+        ModifierToken::Super => Modifiers::SUPER,
+        ModifierToken::Hyper => hyper,
     })
 }
 
@@ -154,47 +236,13 @@ fn key_code(token: &str) -> Result<Code, HotkeyError> {
             return Ok(digit_code(ch));
         }
     }
-    Ok(match token {
-        "space" => Code::Space,
-        "enter" | "return" => Code::Enter,
-        "tab" => Code::Tab,
-        "escape" | "esc" => Code::Escape,
-        "backspace" => Code::Backspace,
-        "delete" | "del" => Code::Delete,
-        "up" => Code::ArrowUp,
-        "down" => Code::ArrowDown,
-        "left" => Code::ArrowLeft,
-        "right" => Code::ArrowRight,
-        "home" => Code::Home,
-        "end" => Code::End,
-        "pageup" => Code::PageUp,
-        "pagedown" => Code::PageDown,
-        "comma" => Code::Comma,
-        "period" | "dot" => Code::Period,
-        "slash" => Code::Slash,
-        "backslash" => Code::Backslash,
-        "semicolon" => Code::Semicolon,
-        "quote" => Code::Quote,
-        "backquote" | "grave" => Code::Backquote,
-        "minus" => Code::Minus,
-        "equal" => Code::Equal,
-        "leftbracket" => Code::BracketLeft,
-        "rightbracket" => Code::BracketRight,
-        "f1" => Code::F1,
-        "f2" => Code::F2,
-        "f3" => Code::F3,
-        "f4" => Code::F4,
-        "f5" => Code::F5,
-        "f6" => Code::F6,
-        "f7" => Code::F7,
-        "f8" => Code::F8,
-        "f9" => Code::F9,
-        "f10" => Code::F10,
-        "f11" => Code::F11,
-        "f12" => Code::F12,
-        _ if is_modifier(token) => return Err(HotkeyError::NoKey),
-        other => return Err(HotkeyError::UnknownKey(other.to_string())),
-    })
+    if let Some((_, code)) = KEY_TOKENS.iter().find(|(name, _)| *name == token) {
+        return Ok(*code);
+    }
+    if is_modifier(token) {
+        return Err(HotkeyError::NoKey);
+    }
+    Err(HotkeyError::UnknownKey(token.to_string()))
 }
 
 fn is_modifier(token: &str) -> bool {
@@ -250,6 +298,20 @@ fn digit_code(ch: char) -> Code {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn every_token_in_the_tables_parses() {
+        for (name, _) in MODIFIER_TOKENS {
+            assert!(parse(&format!("{name}+a")).is_ok(), "{name}");
+        }
+        for (name, code) in KEY_TOKENS {
+            assert_eq!(
+                parse(&format!("ctrl+{name}")).unwrap().code,
+                *code,
+                "{name}"
+            );
+        }
+    }
 
     #[test]
     fn single_modifier_and_letter() {

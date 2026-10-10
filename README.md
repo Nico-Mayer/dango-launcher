@@ -24,9 +24,14 @@ same steps on demand. Use `git push --no-verify` to skip the push checks once.
 ## Configuration
 
 Dango reads `~/.config/dango/config.json` (or `$DANGO_CONFIG_DIR`). Every
-setting is optional and documented in `docs/config.example.jsonc`. Run the
-Open Config File command from the launcher to open it in the app your system
-uses for `.json` files. It creates the file if there is none yet.
+setting is optional and listed in `docs/config.md`. Run the Open Config File
+command from the launcher to open it in the app your system uses for `.json`
+files. It creates the file if there is none yet.
+
+Dango writes `config.schema.json` beside the config file on every start. Put
+`"$schema": "./config.schema.json"` at the top of yours and your editor will
+complete and check it. The schema file is generated, so keep it out of the git
+repository that holds your dotfiles.
 
 API keys for the AI commands live beside it in `auth.json`, in plain text, one
 entry per provider. See `docs/auth.example.json`. **Keep `auth.json` out of
@@ -89,7 +94,7 @@ On Windows, SmartScreen warns on first run of the `.msi` or `.exe` installer;
 choose "More info" and then "Run anyway".
 
 To start Dango at login, set `launcher.autostart` to `true` in the config file
-(see `docs/config.example.jsonc`). The login entry records the path Dango was
+(see `docs/config.md`). The login entry records the path Dango was
 started from, so on macOS move the app to `/Applications` before turning the
 setting on, or start it from there once afterwards. macOS shows a one-time
 notification that Dango added an item that can run in the background.

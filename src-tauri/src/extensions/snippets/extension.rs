@@ -622,6 +622,10 @@ pub(crate) fn manifest(kind: Kind) -> Manifest {
                 kind: PreferenceKind::Boolean,
                 default: Some(true.into()),
                 required: false,
+                description:
+                    "Show each quicklink with its site's icon. Off stops Dango fetching from those sites."
+                        .into(),
+                values: vec![],
             }],
             Kind::Snippet => vec![],
         },

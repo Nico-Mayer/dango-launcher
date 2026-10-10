@@ -77,6 +77,13 @@ pub struct PreferenceDecl {
     pub default: Option<serde_json::Value>,
     #[serde(default)]
     pub required: bool,
+    /// One sentence for the user, shown wherever the preference is described.
+    #[serde(default)]
+    pub description: String,
+    /// For a string preference that takes one of a fixed set, that set. Empty
+    /// means any string.
+    #[serde(default)]
+    pub values: Vec<String>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -95,6 +102,8 @@ pub enum ManifestError {
     NoContributions { id: String },
     #[error("extension '{id}' declares two commands with id '{command_id}'")]
     DuplicateCommand { id: String, command_id: String },
+    #[error("extension '{id}' declares preference '{key}' without a description")]
+    UndescribedPreference { id: String, key: String },
 }
 
 impl Manifest {
@@ -120,6 +129,16 @@ impl Manifest {
                     command_id: command.id.clone(),
                 });
             }
+        }
+        if let Some(preference) = self
+            .preferences
+            .iter()
+            .find(|p| p.description.trim().is_empty())
+        {
+            return Err(ManifestError::UndescribedPreference {
+                id: self.id.clone(),
+                key: preference.key.clone(),
+            });
         }
         Ok(())
     }
@@ -152,6 +171,14 @@ impl PreferenceDecl {
     /// command with one of these must prompt instead of running.
     pub fn is_unsatisfied(&self, stored: Option<&serde_json::Value>) -> bool {
         self.required && self.effective(stored).is_none()
+    }
+
+    /// Whether a raw stored value is one this preference allows. Only a string
+    /// preference with a declared set can refuse one.
+    pub fn accepts(&self, raw: &str) -> bool {
+        self.kind != PreferenceKind::String
+            || self.values.is_empty()
+            || self.values.iter().any(|value| value == raw)
     }
 }
 
@@ -236,7 +263,35 @@ mod tests {
             kind: PreferenceKind::String,
             default,
             required,
+            description: "A token.".into(),
+            values: vec![],
         }
+    }
+
+    #[test]
+    fn a_preference_without_a_description_is_rejected() {
+        let mut m = manifest(1, vec![command("a")]);
+        let mut pref = preference(None, false);
+        pref.description = " ".into();
+        m.preferences.push(pref);
+        assert_eq!(
+            m.validate(),
+            Err(ManifestError::UndescribedPreference {
+                id: "test".into(),
+                key: "token".into()
+            })
+        );
+    }
+
+    #[test]
+    fn a_declared_set_decides_what_is_accepted() {
+        let mut pref = preference(None, false);
+        assert!(pref.accepts("anything"));
+        pref.values = vec!["paste".into(), "copy".into()];
+        assert!(pref.accepts("copy"));
+        assert!(!pref.accepts("speak"));
+        pref.kind = PreferenceKind::Number;
+        assert!(pref.accepts("speak"), "only strings have a set");
     }
 
     #[test]

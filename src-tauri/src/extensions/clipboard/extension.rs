@@ -152,15 +152,26 @@ pub(crate) fn manifest() -> Manifest {
             alias: None,
         }],
         preferences: vec![
-            number(PREF_ENTRIES, 500.0),
-            number(PREF_ENTRY_MEGABYTES, 16.0),
-            number(PREF_TOTAL_MEGABYTES, 256.0),
+            number(PREF_ENTRIES, 500.0, "How many entries the history keeps."),
+            number(
+                PREF_ENTRY_MEGABYTES,
+                16.0,
+                "The largest single entry kept, in megabytes.",
+            ),
+            number(
+                PREF_TOTAL_MEGABYTES,
+                256.0,
+                "The most the whole history may use, in megabytes.",
+            ),
             PreferenceDecl {
                 command_id: None,
                 key: PREF_EXCLUDED.into(),
                 kind: PreferenceKind::String,
                 default: Some(DEFAULT_EXCLUDED_APPLICATIONS.join(", ").into()),
                 required: false,
+                description: "Applications whose copies are never recorded, comma separated."
+                    .into(),
+                values: vec![],
             },
             PreferenceDecl {
                 command_id: None,
@@ -168,6 +179,10 @@ pub(crate) fn manifest() -> Manifest {
                 kind: PreferenceKind::String,
                 default: Some("paste".into()),
                 required: false,
+                description:
+                    "What Enter does to an entry: paste it into the previous app, or only copy it."
+                        .into(),
+                values: vec!["paste".into(), "copy".into()],
             },
         ],
         root_items: false,
@@ -175,13 +190,15 @@ pub(crate) fn manifest() -> Manifest {
     }
 }
 
-fn number(key: &str, default: f64) -> PreferenceDecl {
+fn number(key: &str, default: f64, description: &str) -> PreferenceDecl {
     PreferenceDecl {
         command_id: None,
         key: key.into(),
         kind: PreferenceKind::Number,
         default: Some(default.into()),
         required: false,
+        description: description.into(),
+        values: vec![],
     }
 }
 

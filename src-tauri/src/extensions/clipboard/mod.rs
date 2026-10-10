@@ -5,7 +5,6 @@ mod history;
 mod source;
 mod watcher;
 
-#[cfg(test)]
 pub(crate) use extension::manifest;
 pub use extension::{preference_declarations, ClipboardExtension, PreferencePolicy, EXTENSION_ID};
 pub use history::{Bounds, Content, Entry, History, HistoryError, Kind};

@@ -14,7 +14,8 @@
 use std::sync::{Arc, Mutex};
 
 use crate::extension::{
-    ActionOutcome, CommandDecl, Extension, FormValues, InvocationMode, Manifest, NAMED_ICON,
+    ActionOutcome, CommandDecl, Extension, FormValues, InvocationMode, Manifest, PreferenceDecl,
+    PreferenceKind, NAMED_ICON,
 };
 use crate::extensions::clipboard::ClipboardSource;
 use crate::invocation::{Command, InvocationContext};
@@ -24,8 +25,10 @@ use crate::protocol::{
 use crate::templates::{Template, Values};
 use crate::text::TextTarget;
 
-use super::commands::{build, AiCommand, Output, Providers, EXTENSION_ID};
-use super::provider::{Completions, Request};
+use super::commands::{
+    build, AiCommand, Output, Providers, EXTENSION_ID, PREF_PROVIDER, PREF_THINKING,
+};
+use super::provider::{Completions, Request, Thinking};
 use super::stream::{drive, Ended, FIRST_FRAGMENT_TIMEOUT};
 use super::Keys;
 
@@ -404,7 +407,29 @@ pub(crate) fn manifest(commands: &[AiCommand]) -> Manifest {
                 alias: None,
             })
             .collect(),
-        preferences: vec![],
+        preferences: vec![
+            PreferenceDecl {
+                command_id: None,
+                key: PREF_PROVIDER.into(),
+                kind: PreferenceKind::String,
+                default: None,
+                required: false,
+                description: "The provider a command uses when it names none.".into(),
+                values: vec![],
+            },
+            PreferenceDecl {
+                command_id: None,
+                key: PREF_THINKING.into(),
+                kind: PreferenceKind::String,
+                default: Some("off".into()),
+                required: false,
+                description: "How hard the model thinks when a command does not say.".into(),
+                values: Thinking::NAMES
+                    .iter()
+                    .map(|name| (*name).to_string())
+                    .collect(),
+            },
+        ],
         root_items: false,
         services: false,
     }

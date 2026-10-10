@@ -89,6 +89,7 @@ impl Preferences {
         let stored = self
             .store
             .get(&self.extension_id, command_id, key)
+            .filter(|raw| declaration.accepts(raw))
             .and_then(|raw| parse(&raw));
         stored.or_else(|| {
             declaration
@@ -157,7 +158,21 @@ mod tests {
             kind,
             default,
             required: false,
+            description: "A preference.".into(),
+            values: vec![],
         }
+    }
+
+    #[test]
+    fn a_string_outside_the_declared_set_reads_as_the_default() {
+        let store = Arc::new(MemoryStore::default());
+        store.set("x", None, "action", "speak");
+        let mut declaration = decl(None, "action", PreferenceKind::String, Some("paste".into()));
+        declaration.values = vec!["paste".into(), "copy".into()];
+        let preferences = Preferences::new("x", vec![declaration], store.clone());
+        assert_eq!(preferences.string("action").as_deref(), Some("paste"));
+        store.set("x", None, "action", "copy");
+        assert_eq!(preferences.string("action").as_deref(), Some("copy"));
     }
 
     fn preferences(store: Arc<dyn PreferenceStore>) -> Preferences {

@@ -12,17 +12,19 @@
 
 use std::collections::BTreeMap;
 
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use tauri_plugin_global_shortcut::Modifiers;
 
 pub mod hotkey;
 mod location;
+pub mod schema;
 mod store;
 pub mod watch;
 
 pub use hotkey::{Hotkey, HotkeyError, ParsedHotkey, PerPlatform};
-pub use location::{auth_path, config_dir, config_path};
+pub use location::{auth_path, config_dir, config_path, SCHEMA_REF};
 pub use store::FileConfig;
 
 #[derive(Debug, thiserror::Error)]
@@ -35,35 +37,47 @@ pub enum ConfigError {
 
 /// The whole configuration. Every level keeps an `extra` catch-all so a key the
 /// running version does not understand survives a load and a write.
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, JsonSchema)]
 pub struct Config {
+    /// Where your editor finds this schema. Dango writes it beside the config
+    /// file, so `./config.schema.json` is the value to use.
+    #[serde(rename = "$schema", default, skip_serializing_if = "Option::is_none")]
+    pub schema: Option<String>,
+    /// The config schema version. Leave it at 1.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub version: Option<u32>,
+    /// Settings of the launcher itself.
     #[serde(default, skip_serializing_if = "Launcher::is_empty")]
     pub launcher: Launcher,
+    /// Per-extension settings, keyed by extension id.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub extensions: BTreeMap<String, Extension>,
-    /// The system-wide hyperkey. Present means on; absent means off.
+    /// A physical key remapped to act as the hyper modifier system-wide.
+    /// Present means on; leave it out to turn it off.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub hyperkey: Option<Hyperkey>,
+    /// How Dango reads the text you have selected.
     #[serde(default, skip_serializing_if = "Selection::is_empty")]
     pub selection: Selection,
     #[serde(flatten)]
     pub extra: Map<String, Value>,
 }
 
-/// One physical key remapped to act as the hyper modifier system-wide.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+/// One physical key remapped to act as the hyper modifier system-wide. While
+/// it is held, Ctrl+Alt+Shift+Super are in effect, so a chord like
+/// `hyper+left` fires from this one key.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct Hyperkey {
-    /// The physical key to remap, from a small allowlist. Defaults to CapsLock.
+    /// The physical key to remap. Defaults to capslock.
     #[serde(default = "default_hyperkey_key")]
     pub key: String,
-    /// Whether Shift is part of the combination. On by default; off emits
+    /// Whether Shift is part of the combination. Default true; false emits
     /// Ctrl+Alt+Super, which leaves typed characters unshifted.
     #[serde(default = "default_true", skip_serializing_if = "is_true")]
     pub shift: bool,
-    /// A key to send on a quick, solitary tap of the hyperkey, in the launcher
-    /// grammar (for example `escape`). Absent means a tap does nothing.
+    /// A key to send on a quick, solitary tap of the hyperkey, such as
+    /// `escape`. A hold, or a press with another key, still acts as the
+    /// modifier. Leave it out for no tap action.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tap: Option<String>,
     #[serde(flatten)]
@@ -95,12 +109,13 @@ fn is_true(value: &bool) -> bool {
 
 /// How Dango reads what the user has selected. Beside `hyperkey` rather than
 /// under an extension, because the text plumbing belongs to the application.
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "kebab-case")]
 pub struct Selection {
-    /// Applications where the copy chord must never be sent, because they bind
-    /// it to something of their own. Comma separated, matched ignoring case,
-    /// the way the clipboard history names its exclusions.
+    /// Applications where Dango must never send the copy chord to read a
+    /// selection, comma separated and matched ignoring case. For editors that
+    /// bind Ctrl+C to something of their own. Dango says it cannot read the
+    /// selection there instead.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub excluded_applications: Option<String>,
     #[serde(flatten)]
@@ -135,10 +150,14 @@ impl Selection {
     }
 }
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, JsonSchema)]
 pub struct Launcher {
+    /// The chord that summons the launcher. Default alt+space, which is
+    /// Option+Space on macOS.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub hotkey: Option<Hotkey>,
+    /// Start Dango when you log in, on the machine that reads this file.
+    /// Default false. A development build ignores it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub autostart: Option<bool>,
     #[serde(flatten)]
@@ -151,20 +170,23 @@ impl Launcher {
     }
 }
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, JsonSchema)]
 pub struct Extension {
+    /// Whether the extension runs. Absent means enabled.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub enabled: Option<bool>,
+    /// The extension's preference values, overriding its defaults.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub preferences: BTreeMap<String, Value>,
+    /// Per-command settings, keyed by command id.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub commands: BTreeMap<String, CommandSettings>,
-    /// Applications bound to hotkeys, keyed by the name root search shows.
-    /// Only the applications extension reads this branch.
+    /// Applications bound to global hotkeys, keyed by the name Dango shows for
+    /// the application in root search.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub apps: BTreeMap<String, AppSettings>,
-    /// Model services, keyed by the name commands refer to them by. Only the AI
-    /// extension reads this branch.
+    /// Model services, keyed by the name commands refer to them by. That name
+    /// is also the key its API key is filed under in auth.json.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub providers: BTreeMap<String, ProviderSettings>,
     #[serde(flatten)]
@@ -173,10 +195,9 @@ pub struct Extension {
 
 /// One model service. The key it is stored under is the name a command uses to
 /// refer to it, and the name its key in `auth.json` is filed under.
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ProviderSettings {
-    #[serde(default)]
     pub kind: ProviderKind,
     /// Where the service lives. Anthropic needs none; an OpenAI-compatible
     /// endpoint always does; Ollama defaults to the local one.
@@ -196,56 +217,64 @@ pub struct ProviderSettings {
     pub extra: Map<String, Value>,
 }
 
-/// The protocol a provider speaks. An unrecognised kind is carried as written
-/// rather than rejected, so a provider from a newer Dango neither fails the file
-/// nor loses its name when the file is written back.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(from = "String", into = "String")]
+/// The protocol a provider speaks. `openai` covers any OpenAI-compatible
+/// endpoint, such as OpenRouter, LM Studio, or vLLM. `cli` runs a program on
+/// this machine that takes a prompt and prints an answer.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "lowercase")]
 pub enum ProviderKind {
     Anthropic,
     Openai,
     Ollama,
-    /// A program on this machine that takes a prompt and prints an answer.
     Cli,
-    Unknown(String),
 }
 
-impl Default for ProviderKind {
-    fn default() -> Self {
-        ProviderKind::Unknown(String::new())
-    }
+/// How hard the model should think before answering. A model that cannot think
+/// ignores it.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "lowercase")]
+pub enum Thinking {
+    #[default]
+    Off,
+    Low,
+    Medium,
+    High,
 }
 
-impl From<String> for ProviderKind {
-    fn from(text: String) -> Self {
-        match text.as_str() {
-            "anthropic" => ProviderKind::Anthropic,
-            "openai" => ProviderKind::Openai,
-            "ollama" => ProviderKind::Ollama,
-            "cli" => ProviderKind::Cli,
-            _ => ProviderKind::Unknown(text),
+impl Thinking {
+    /// The levels as they are written in the config file, lowest first.
+    pub const NAMES: [&'static str; 4] = ["off", "low", "medium", "high"];
+
+    pub fn parse(text: &str) -> Option<Self> {
+        match text {
+            "off" => Some(Thinking::Off),
+            "low" => Some(Thinking::Low),
+            "medium" => Some(Thinking::Medium),
+            "high" => Some(Thinking::High),
+            _ => None,
         }
     }
 }
 
-impl From<ProviderKind> for String {
-    fn from(kind: ProviderKind) -> Self {
-        match kind {
-            ProviderKind::Anthropic => "anthropic".into(),
-            ProviderKind::Openai => "openai".into(),
-            ProviderKind::Ollama => "ollama".into(),
-            ProviderKind::Cli => "cli".into(),
-            ProviderKind::Unknown(text) => text,
-        }
-    }
+/// What becomes of an AI command's answer once it is complete.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "lowercase")]
+pub enum Output {
+    /// Left on screen with actions to paste or copy it.
+    #[default]
+    View,
+    Paste,
+    Copy,
 }
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, JsonSchema)]
 pub struct AppSettings {
-    /// The shown name when it differs from the entry's key, or differs per
-    /// platform. Absent means the key is the name on both platforms.
+    /// The application's shown name when it differs from the key, either one
+    /// string or one per platform. A side with no value means the entry is
+    /// skipped on that platform.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub name: Option<AppName>,
+    /// The chord that opens the application, or brings it to the front.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub hotkey: Option<Hotkey>,
     #[serde(flatten)]
@@ -254,7 +283,7 @@ pub struct AppSettings {
 
 /// An application's shown name: one string for both platforms, or one per
 /// platform, the same two shapes a hotkey may take.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(untagged)]
 pub enum AppName {
     Portable(String),
@@ -273,34 +302,45 @@ impl AppSettings {
     }
 }
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, JsonSchema)]
 pub struct CommandSettings {
-    /// The command's global hotkey, registered by `hotkeys::command_bindings`.
+    /// A global hotkey that runs this command from anywhere. A no-view command
+    /// runs without showing the launcher; a view command shows its view.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub hotkey: Option<Hotkey>,
+    /// A short alias that matches this command in root search.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub alias: Option<String>,
+    /// Preference values scoped to this command.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub preferences: BTreeMap<String, Value>,
-    /// Off for a command the extension ships but the user does not want.
+    /// Whether the command is offered. Absent means yes; false removes a
+    /// command the extension ships.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub enabled: Option<bool>,
-    /// The title root search shows. Required for a command the file defines
-    /// from nothing, absent for one that only overrides a shipped command.
+    /// The title root search shows. Needed for a command the file defines
+    /// from nothing.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub title: Option<String>,
-    /// The fields below belong to commands an extension builds from
-    /// configuration. Only the AI extension reads them.
+    /// What the model is asked, as a template. Placeholders: {{ selection }},
+    /// {{ clipboard }}, and any other name, which the launcher asks for.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub prompt: Option<String>,
+    /// The provider this command uses, by its name under providers. Absent
+    /// falls back to the extension's default provider.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub provider: Option<String>,
+    /// The model this command uses. Absent falls back to the provider's model.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub model: Option<String>,
+    /// How hard the model thinks before answering. Absent falls back to the
+    /// extension's default level.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub thinking: Option<String>,
+    pub thinking: Option<Thinking>,
+    /// What becomes of the answer: shown in the launcher, pasted into the
+    /// previous app, or copied. Default view.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub output: Option<String>,
+    pub output: Option<Output>,
     #[serde(flatten)]
     pub extra: Map<String, Value>,
 }
@@ -582,67 +622,6 @@ mod tests {
     }
 
     #[test]
-    fn the_example_config_validates_and_parses() {
-        let docs = concat!(env!("CARGO_MANIFEST_DIR"), "/../docs");
-        let schema_text =
-            std::fs::read_to_string(format!("{docs}/config.schema.json")).expect("schema file");
-        let example_jsonc =
-            std::fs::read_to_string(format!("{docs}/config.example.jsonc")).expect("example file");
-        // The example is JSONC for documentation; strip its full-line comments
-        // to get the JSON the live file would hold.
-        let example_json: String = example_jsonc
-            .lines()
-            .filter(|line| !line.trim_start().starts_with("//"))
-            .collect::<Vec<_>>()
-            .join("\n");
-
-        // It is valid Dango configuration.
-        assert!(
-            Config::parse(&example_json).is_ok(),
-            "the example config does not parse"
-        );
-
-        // And it matches the shipped JSON Schema.
-        let schema: Value = serde_json::from_str(&schema_text).expect("schema is valid JSON");
-        let instance: Value =
-            serde_json::from_str(&example_json).expect("example is valid JSON once decommented");
-        if let Err(error) = jsonschema::validate(&schema, &instance) {
-            panic!("the example config does not match the schema: {error}");
-        }
-    }
-
-    #[test]
-    fn the_schema_rejects_a_value_the_ai_extension_could_not_use() {
-        let docs = concat!(env!("CARGO_MANIFEST_DIR"), "/../docs");
-        let schema: Value = serde_json::from_str(
-            &std::fs::read_to_string(format!("{docs}/config.schema.json")).unwrap(),
-        )
-        .unwrap();
-
-        let bad = [
-            r#"{ "extensions": { "dango.ai": { "providers": { "x": { "kind": "mistral" } } } } }"#,
-            r#"{ "extensions": { "dango.ai": { "commands": { "x": { "thinking": "deep" } } } } }"#,
-            r#"{ "extensions": { "dango.ai": { "commands": { "x": { "output": "speak" } } } } }"#,
-        ];
-        for text in bad {
-            let instance: Value = serde_json::from_str(text).unwrap();
-            assert!(
-                jsonschema::validate(&schema, &instance).is_err(),
-                "the schema accepted {text}"
-            );
-        }
-
-        let good: Value = serde_json::from_str(
-            r#"{ "extensions": { "dango.ai": {
-                "providers": { "x": { "kind": "openai", "baseUrl": "https://example.test/v1" } },
-                "commands": { "y": { "title": "Y", "prompt": "p", "thinking": "high", "output": "paste" } }
-            } } }"#,
-        )
-        .unwrap();
-        assert!(jsonschema::validate(&schema, &good).is_ok());
-    }
-
-    #[test]
     fn a_launcher_autostart_flag_parses_and_round_trips() {
         assert_eq!(Config::parse("{}").unwrap().launcher.autostart, None);
         let config = Config::parse(r#"{ "launcher": { "autostart": true } }"#).unwrap();
@@ -740,18 +719,22 @@ mod tests {
     }
 
     #[test]
-    fn an_unrecognised_provider_kind_survives_rather_than_failing() {
-        let config = Config::parse(
+    fn an_unrecognised_provider_kind_is_a_config_error() {
+        let error = Config::parse(
             r#"{ "extensions": { "dango.ai": { "providers": { "future": { "kind": "mistral" } } } } }"#,
         )
-        .unwrap();
+        .unwrap_err();
+        assert!(error.to_string().contains("mistral"), "{error}");
+    }
+
+    #[test]
+    fn the_schema_key_round_trips_first() {
+        let config =
+            Config::parse(r#"{ "version": 1, "$schema": "./config.schema.json" }"#).unwrap();
+        assert_eq!(config.schema.as_deref(), Some("./config.schema.json"));
         assert_eq!(
-            config.extensions["dango.ai"].providers["future"].kind,
-            ProviderKind::Unknown("mistral".into())
-        );
-        assert!(
-            config.to_json().contains("mistral"),
-            "kind rewritten on write-back"
+            config.to_json(),
+            "{\n  \"$schema\": \"./config.schema.json\",\n  \"version\": 1\n}"
         );
     }
 
@@ -779,13 +762,13 @@ mod tests {
             commands["improve-writing"].provider.as_deref(),
             Some("local")
         );
-        assert_eq!(commands["improve-writing"].thinking.as_deref(), Some("low"));
+        assert_eq!(commands["improve-writing"].thinking, Some(Thinking::Low));
         assert_eq!(commands["make-longer"].enabled, Some(false));
         assert_eq!(
             commands["review-rust"].title.as_deref(),
             Some("Review Rust")
         );
-        assert_eq!(commands["review-rust"].output.as_deref(), Some("view"));
+        assert_eq!(commands["review-rust"].output, Some(Output::View));
         assert_eq!(
             config.alias("dango.ai", "improve-writing"),
             Some("iw".to_string())

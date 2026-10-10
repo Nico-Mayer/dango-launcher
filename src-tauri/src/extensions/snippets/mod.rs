@@ -6,7 +6,6 @@ mod matcher;
 mod service;
 mod store;
 
-#[cfg(test)]
 pub(crate) use extension::manifest;
 pub use extension::{
     extension_id, preference_declarations, OpenUrl, SnippetsExtension, PREF_FAVICONS,

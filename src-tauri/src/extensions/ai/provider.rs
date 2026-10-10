@@ -8,28 +8,7 @@ use std::time::Duration;
 
 pub use crate::config::ProviderKind;
 
-/// How hard the model should think before answering. A model that cannot think
-/// ignores it.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-pub enum Thinking {
-    #[default]
-    Off,
-    Low,
-    Medium,
-    High,
-}
-
-impl Thinking {
-    pub fn parse(text: &str) -> Option<Self> {
-        match text {
-            "off" => Some(Thinking::Off),
-            "low" => Some(Thinking::Low),
-            "medium" => Some(Thinking::Medium),
-            "high" => Some(Thinking::High),
-            _ => None,
-        }
-    }
-}
+pub use crate::config::Thinking;
 
 /// The program behind a provider of the `cli` kind.
 #[derive(Debug, Clone, PartialEq, Eq)]

@@ -12,27 +12,10 @@ use crate::config::{CommandSettings, Config, ProviderKind, ProviderSettings};
 use super::provider::{CliSpec, Request, Thinking};
 
 pub const EXTENSION_ID: &str = "dango.ai";
+pub const PREF_PROVIDER: &str = "provider";
+pub const PREF_THINKING: &str = "thinking";
 
-/// What becomes of the answer once it is complete.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-pub enum Output {
-    /// Left on screen with actions to paste or copy it.
-    #[default]
-    View,
-    Paste,
-    Copy,
-}
-
-impl Output {
-    fn parse(text: &str) -> Option<Self> {
-        match text {
-            "view" => Some(Output::View),
-            "paste" => Some(Output::Paste),
-            "copy" => Some(Output::Copy),
-            _ => None,
-        }
-    }
-}
+pub use crate::config::Output;
 
 /// One command as the user will meet it, after the shipped set and the file
 /// have been merged.
@@ -182,18 +165,8 @@ fn merge(
         return Err(format!("{EXTENSION_ID}: the command '{id}' has no prompt"));
     }
 
-    let thinking = match &overrides.thinking {
-        None => None,
-        Some(text) => Some(Thinking::parse(text).ok_or_else(|| {
-            format!("{EXTENSION_ID}: the command '{id}' has an unknown thinking level '{text}'")
-        })?),
-    };
-    let output = match &overrides.output {
-        None => shipped.map(|_| Output::default()).unwrap_or_default(),
-        Some(text) => Output::parse(text).ok_or_else(|| {
-            format!("{EXTENSION_ID}: the command '{id}' has an unknown output '{text}'")
-        })?,
-    };
+    let thinking = overrides.thinking;
+    let output = overrides.output.unwrap_or_default();
 
     Ok(AiCommand {
         id: id.into(),
@@ -234,12 +207,12 @@ impl Providers {
             return Self::default();
         };
         let default_thinking = config
-            .preference(EXTENSION_ID, None, "thinking")
+            .preference(EXTENSION_ID, None, PREF_THINKING)
             .and_then(|text| Thinking::parse(&text))
             .unwrap_or_default();
         Self {
             entries: extension.providers.clone(),
-            default_provider: config.preference(EXTENSION_ID, None, "provider"),
+            default_provider: config.preference(EXTENSION_ID, None, PREF_PROVIDER),
             default_thinking,
         }
     }
@@ -258,12 +231,9 @@ impl Providers {
             None => return Err(NotReady::NoDefault),
         };
         let entry = self.entries.get(name).ok_or(NotReady::UnknownProvider)?;
-        // A kind this build does not know, and a command provider with no
-        // command, are the same thing from the user's side: an entry that
-        // cannot be used.
-        let unusable = matches!(entry.kind, ProviderKind::Unknown(_))
-            || (entry.kind == ProviderKind::Cli && entry.command.is_none());
-        if unusable {
+        // A command provider with no command cannot be used, so from the
+        // user's side it is not set up.
+        if entry.kind == ProviderKind::Cli && entry.command.is_none() {
             return Err(NotReady::UnknownProvider);
         }
         let (name, entry) = self.entries.get_key_value(name).unwrap();
@@ -287,7 +257,7 @@ impl Providers {
         };
         Ok(Request {
             provider: name.to_string(),
-            kind: entry.kind.clone(),
+            kind: entry.kind,
             base_url: entry.base_url.clone(),
             model,
             thinking: command.thinking.unwrap_or(self.default_thinking),
@@ -433,16 +403,13 @@ mod tests {
     }
 
     #[test]
-    fn an_unknown_thinking_level_or_output_is_reported_and_skipped() {
-        let built = build(&config(
-            r#"{ "extensions": { "dango.ai": { "commands": {
-                "summarize": { "thinking": "deep" },
-                "explain": { "output": "speak" }
-            } } } }"#,
-        ));
-        assert!(find(&built, "summarize").is_none());
-        assert!(find(&built, "explain").is_none());
-        assert_eq!(built.problems.len(), 2);
+    fn an_unknown_thinking_level_or_output_is_a_config_error() {
+        for text in [
+            r#"{ "extensions": { "dango.ai": { "commands": { "summarize": { "thinking": "deep" } } } } }"#,
+            r#"{ "extensions": { "dango.ai": { "commands": { "explain": { "output": "speak" } } } } }"#,
+        ] {
+            assert!(Config::parse(text).is_err(), "accepted {text}");
+        }
     }
 
     #[test]
@@ -485,6 +452,14 @@ mod tests {
         assert_eq!(request.provider, "anthropic");
         assert_eq!(request.model, "claude-sonnet-5");
         assert_eq!(request.thinking, Thinking::Medium);
+    }
+
+    #[test]
+    fn a_thinking_level_dango_does_not_have_reads_as_the_default() {
+        let text = TWO_PROVIDERS.replace("\"thinking\": \"medium\"", "\"thinking\": \"deep\"");
+        let providers = Providers::from_config(&config(&text));
+        let request = providers.resolve(&command(None, None, None)).unwrap();
+        assert_eq!(request.thinking, Thinking::Off);
     }
 
     #[test]
@@ -586,17 +561,12 @@ mod tests {
     }
 
     #[test]
-    fn a_provider_kind_dango_does_not_know_is_not_usable() {
-        let providers = Providers::from_config(&config(
-            r#"{ "extensions": { "dango.ai": { "providers": {
-                "future": { "kind": "mistral", "model": "m" }
-            } } } }"#,
-        ));
-        let error = providers.resolve(&command(None, None, None)).unwrap_err();
-        assert_eq!(
-            error.to_string(),
-            "This command uses a provider that isn't set up. Check your config file."
-        );
+    fn a_provider_kind_dango_does_not_know_fails_the_config() {
+        let error = Config::parse(
+            r#"{ "extensions": { "dango.ai": { "providers": { "future": { "kind": "mistral" } } } } }"#,
+        )
+        .unwrap_err();
+        assert!(error.to_string().contains("mistral"), "{error}");
     }
 
     #[test]

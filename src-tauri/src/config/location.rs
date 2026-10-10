@@ -19,6 +19,10 @@ pub fn config_path() -> PathBuf {
     config_dir().join("config.json")
 }
 
+/// How the config file refers to the schema Dango writes beside it, relative
+/// so the pair can move together.
+pub const SCHEMA_REF: &str = "./config.schema.json";
+
 /// The provider keys, beside the config file but deliberately not in it: the
 /// config is meant to be committed and this file is not.
 pub fn auth_path() -> PathBuf {

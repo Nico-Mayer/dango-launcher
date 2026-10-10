@@ -5,25 +5,33 @@ pub mod snippets;
 pub mod system;
 pub mod window_management;
 
+use crate::extension::Manifest;
+
+/// Every built-in extension's manifest as shipped, before the config file has
+/// its say: what the config schema and the settings reference describe.
+pub fn builtin_manifests() -> Vec<Manifest> {
+    use snippets::Kind;
+    let shipped_ai = ai::commands::build(&crate::config::Config::default()).commands;
+    vec![
+        applications::manifest(),
+        clipboard::manifest(),
+        system::manifest(),
+        window_management::manifest(),
+        ai::manifest(&shipped_ai),
+        snippets::manifest(Kind::Snippet),
+        snippets::manifest(Kind::Quicklink),
+    ]
+}
+
 #[cfg(test)]
 mod tests {
     use crate::extension::manifest::TINTS;
-    use crate::extensions::snippets::Kind;
 
     /// A tint the palette does not hold renders as no tint at all, silently, so
     /// the built-ins are checked against it here rather than at load time.
     #[test]
     fn every_built_in_tint_is_one_the_palette_holds() {
-        let manifests = [
-            super::applications::manifest(),
-            super::clipboard::manifest(),
-            super::system::manifest(),
-            super::window_management::manifest(),
-            super::ai::manifest(&[]),
-            super::snippets::manifest(Kind::Snippet),
-            super::snippets::manifest(Kind::Quicklink),
-        ];
-        for manifest in manifests {
+        for manifest in super::builtin_manifests() {
             let Some(tint) = &manifest.tint else { continue };
             assert!(
                 TINTS.contains(&tint.as_str()),

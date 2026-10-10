@@ -1326,6 +1326,15 @@ pub fn run() {
                 Err(error) => eprintln!("[dango] window-management failed to load: {error}"),
             }
 
+            if let Err(error) =
+                config::schema::write(&config::config_dir(), &extensions::builtin_manifests())
+            {
+                log_config(&format!(
+                    "config: could not write {}: {error}",
+                    config::schema::FILE_NAME
+                ));
+            }
+
             {
                 let parts = AiParts {
                     keys: Arc::new(AuthFile::new(config::auth_path())),

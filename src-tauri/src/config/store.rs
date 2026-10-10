@@ -10,6 +10,7 @@ use std::sync::{Arc, Mutex, RwLock};
 
 use serde_json::Value;
 
+use super::location::SCHEMA_REF;
 use super::Config;
 use crate::extension::{EnabledStore, PreferenceStore};
 
@@ -53,7 +54,11 @@ impl FileConfig {
     /// that exists is left alone, whatever it contains.
     pub fn ensure_file(&self) -> Result<PathBuf, String> {
         if !self.path.exists() {
-            self.config.write().unwrap().version.get_or_insert(1);
+            {
+                let mut config = self.config.write().unwrap();
+                config.schema.get_or_insert_with(|| SCHEMA_REF.into());
+                config.version.get_or_insert(1);
+            }
             let text = self.config.read().unwrap().to_json();
             self.write(&text)
                 .map_err(|error| format!("{}: {error}", self.path.display()))?;
@@ -198,7 +203,10 @@ mod tests {
         let store = FileConfig::new(path.clone(), Config::default());
         assert_eq!(store.ensure_file().unwrap(), path);
         let on_disk = std::fs::read_to_string(&path).unwrap();
-        assert_eq!(on_disk, "{\n  \"version\": 1\n}");
+        assert_eq!(
+            on_disk,
+            "{\n  \"$schema\": \"./config.schema.json\",\n  \"version\": 1\n}"
+        );
         assert_eq!(
             store.own_write.lock().unwrap().as_deref(),
             Some(on_disk.as_str())
