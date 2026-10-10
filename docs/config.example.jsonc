@@ -15,10 +15,14 @@
     // The chord that summons the launcher. Portable tokens work on both
     // machines: "mod" is Cmd on macOS and Ctrl on Windows. The default is
     // Option+Space on macOS and Alt+Space on Windows.
-    "hotkey": "alt+space"
+    "hotkey": "alt+space",
 
     // A chord can also differ per platform:
     // "hotkey": { "macos": "cmd+space", "windows": "ctrl+space" }
+
+    // Start Dango when you log in. Applies to the machine that reads this file.
+    // Default false. A development build ignores it.
+    "autostart": true
   },
 
   "extensions": {

@@ -1,3 +1,4 @@
+mod autostart;
 pub mod config;
 pub mod extension;
 pub mod extensions;
@@ -855,6 +856,12 @@ fn apply_config_reload(
     };
 
     let new_shortcut = launcher_shortcut(&config);
+    let autostart = config.launcher.autostart.unwrap_or(false);
+    let autostart_changed = {
+        let shared = file_config.shared();
+        let previous = shared.read().unwrap();
+        previous.launcher.autostart.unwrap_or(false) != autostart
+    };
     file_config.replace(config);
 
     {
@@ -904,6 +911,11 @@ fn apply_config_reload(
         let mut conflicts = apply_command_hotkeys(app, &config, new_shortcut, bindings);
         if let Some(message) = apply_hyperkey(&config, hyperkey) {
             conflicts.push(message);
+        }
+        if autostart_changed {
+            if let Err(message) = autostart::apply(app, autostart) {
+                conflicts.push(message);
+            }
         }
         conflicts
     };
@@ -1011,6 +1023,7 @@ pub fn run() {
 
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_autostart::Builder::new().build())
         .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
             show(app, None);
         }))
@@ -1394,6 +1407,12 @@ pub fn run() {
                 if let Some(message) = apply_hyperkey(&config, &hyperkey) {
                     log_config(&message);
                     notices.push("Hyperkey didn't start, see dango.log".to_string());
+                }
+                if let Err(message) =
+                    autostart::apply(app.handle(), config.launcher.autostart.unwrap_or(false))
+                {
+                    log_config(&message);
+                    notices.push("Autostart couldn't be applied, see dango.log".to_string());
                 }
             }
             app.manage(HyperkeyState(hyperkey.clone()));

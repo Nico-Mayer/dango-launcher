@@ -163,6 +163,17 @@ The preferences window was cut from this milestone. M5 settled on JSON config
 files in the user's dotfiles as the settings surface, and a window that edits
 the same values is not part of this MVP.
 
+Status: the release workflow shipped as `add-release-workflow` and cut
+`v0.1.0`. Autostart is implemented in `add-autostart` as one `launcher.autostart`
+boolean in the config file, reconciled with the OS at startup and on reload
+through the official Tauri autostart plugin, pinned at 2.5.0 because later
+releases require Tauri 2.12. A debug build never registers itself. On Windows
+the per-user `Run` entry was verified live from the local release build:
+created at startup and on a live edit, removed on a live edit, untouched by an
+unrelated edit, and absent with the setting absent. Still to run: the sign-out
+and sign-in checks on Windows against the installed build, and every macOS
+check. Permission onboarding is the remaining item.
+
 ### M8 - third party
 
 Script commands first: a shell script with a metadata header, run through the

@@ -139,13 +139,15 @@ impl Selection {
 pub struct Launcher {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub hotkey: Option<Hotkey>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub autostart: Option<bool>,
     #[serde(flatten)]
     pub extra: Map<String, Value>,
 }
 
 impl Launcher {
     fn is_empty(&self) -> bool {
-        self.hotkey.is_none() && self.extra.is_empty()
+        self.hotkey.is_none() && self.autostart.is_none() && self.extra.is_empty()
     }
 }
 
@@ -638,6 +640,17 @@ mod tests {
         )
         .unwrap();
         assert!(jsonschema::validate(&schema, &good).is_ok());
+    }
+
+    #[test]
+    fn a_launcher_autostart_flag_parses_and_round_trips() {
+        assert_eq!(Config::parse("{}").unwrap().launcher.autostart, None);
+        let config = Config::parse(r#"{ "launcher": { "autostart": true } }"#).unwrap();
+        assert_eq!(config.launcher.autostart, Some(true));
+
+        let json = config.to_json();
+        assert!(json.contains("autostart"), "key dropped: {json}");
+        assert_eq!(Config::parse(&json).unwrap().launcher.autostart, Some(true));
     }
 
     #[test]

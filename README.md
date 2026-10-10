@@ -85,3 +85,9 @@ xattr -cr /Applications/Dango.app
 
 On Windows, SmartScreen warns on first run of the `.msi` or `.exe` installer;
 choose "More info" and then "Run anyway".
+
+To start Dango at login, set `launcher.autostart` to `true` in the config file
+(see `docs/config.example.jsonc`). The login entry records the path Dango was
+started from, so on macOS move the app to `/Applications` before turning the
+setting on, or start it from there once afterwards. macOS shows a one-time
+notification that Dango added an item that can run in the background.
