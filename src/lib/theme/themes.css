@@ -17,6 +17,7 @@
   --dango-palette-focus: #245ab0;
   --dango-palette-inset: #f0f1f3;
   --dango-palette-disabled: #777c85;
+  --dango-palette-dev-edge: hsl(40 90% 50%);
 
   --dango-palette-tint-red: hsl(0 94% 94%);
   --dango-palette-tint-red-foreground: hsl(0 80% 16%);
@@ -50,6 +51,7 @@
   --dango-palette-focus: #8cb9ff;
   --dango-palette-inset: #191a1c;
   --dango-palette-disabled: #777c85;
+  --dango-palette-dev-edge: hsl(40 90% 55%);
 
   --dango-palette-tint-red: hsl(0 80% 16%);
   --dango-palette-tint-red-foreground: hsl(0 94% 94%);

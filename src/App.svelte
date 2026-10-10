@@ -44,6 +44,7 @@
     // shown a view yet.
     let workingTitle = $state<string | null>(null);
     let inputEl = $state<HTMLInputElement | null>(null);
+    let development = $state(false);
 
     // The query whose results we will display; a late event for an older query is
     // dropped so cancelled results never show.
@@ -247,6 +248,7 @@
         // the first activation cost 40ms of icon loading and showed an empty list.
         runSearch("");
         invoke("warmup_done");
+        invoke<boolean>("is_development_build").then((answer) => (development = answer));
         const unlisten = [
             listen<number | null>("dango://activate", (event) => {
                 inputEl?.focus();
@@ -351,7 +353,7 @@
 {/snippet}
 
 {#if protocolError}
-    <LauncherFrame class="justify-center gap-2 px-6">
+    <LauncherFrame {development} class="justify-center gap-2 px-6">
         <span class="text-foreground text-sm"
             >This view needs a newer version of Dango.</span
         >
@@ -360,7 +362,7 @@
         >
     </LauncherFrame>
 {:else if stack.length > 0}
-    <LauncherFrame>
+    <LauncherFrame {development}>
         <!-- Fills the space so the footer sits on the bottom edge rather than
          directly under a short form. -->
         <div class="flex min-h-0 flex-1 flex-col">
@@ -384,7 +386,7 @@
         onValueChange={(id) => { if (inUserGesture()) pickedId = id; }}
     >
         {#snippet child({ props })}
-        <LauncherFrame {...props}>
+        <LauncherFrame {...props} {development}>
         <Command.Input
             bind:ref={inputEl}
             bind:value={

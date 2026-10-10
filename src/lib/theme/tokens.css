@@ -39,6 +39,7 @@
   --dango-hover-bg: color-mix(in oklab, var(--dango-palette-muted) 50%, transparent);
   --dango-control-bg: var(--dango-palette-inset);
   --dango-selection-edge: var(--dango-palette-selection-edge);
+  --dango-dev-edge: var(--dango-palette-dev-edge);
 
   --background: var(--dango-surface-canvas);
   --background-alt: var(--dango-surface-raised);
@@ -113,6 +114,8 @@
   --shadow-xl: var(--dango-elevation-overlay);
   --ease-out: var(--dango-ease-out);
   --inset-shadow-selection: inset 0 0 0 var(--dango-edge-width) var(--dango-selection-edge);
+  --inset-shadow-dev-edge: inset 0 0 0 var(--dango-edge-width) var(--dango-dev-edge);
+  --color-dev-edge: var(--dango-dev-edge);
   --color-selection-bg: var(--dango-selection-bg);
   --color-selection-text: var(--dango-selection-text);
   --color-selection-edge: var(--dango-selection-edge);

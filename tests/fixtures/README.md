@@ -24,6 +24,10 @@ dangoFixture.calls;
 complete)` delivers root results, including deliberately stale/delayed results. Streaming
 stops on cancellation, dismissal, scene changes, completion, or page exit.
 
+Append `&dev=1` to a scene URL to mount the launcher as a development build: the
+frame edge turns amber and the footer shows a `dev` badge. Without it the fixture
+answers as a release build.
+
 ## Token preview
 
 Append `&tokens=1` to a scene URL to mount a development-only Bits Portal probe.

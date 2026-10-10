@@ -738,6 +738,11 @@ fn hide_for_work(app: &tauri::AppHandle) {
     });
 }
 
+#[tauri::command]
+fn is_development_build() -> bool {
+    cfg!(debug_assertions)
+}
+
 /// The webview does not allocate its drawing surface until the window is shown
 /// once, and paying that cost on the user's first hotkey pushed cold activation
 /// to the edge of the budget. Showing far offscreen at startup pays it early
@@ -1075,6 +1080,7 @@ pub fn run() {
             report_paint,
             dismiss,
             warmup_done,
+            is_development_build,
             search,
             run_action,
             invoke_command,
@@ -1516,6 +1522,11 @@ pub fn run() {
 
             TrayIconBuilder::new()
                 .icon(app.default_window_icon().expect("bundled icon").clone())
+                .tooltip(if cfg!(debug_assertions) {
+                    "Dango (development build)"
+                } else {
+                    "Dango"
+                })
                 .menu(&menu)
                 .show_menu_on_left_click(true)
                 .on_menu_event(|app, event| match event.id().as_ref() {

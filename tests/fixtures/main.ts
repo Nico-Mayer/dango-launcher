@@ -55,6 +55,8 @@ mockIPC((command, args) => {
     case "cancel_invocation":
       stopStream();
       return;
+    case "is_development_build":
+      return new URLSearchParams(location.search).get("dev") === "1";
     case "warmup_done":
     case "report_paint":
     case "invoke_command":
