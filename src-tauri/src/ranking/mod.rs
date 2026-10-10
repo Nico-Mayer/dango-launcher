@@ -10,25 +10,25 @@ mod input_history;
 use std::sync::Arc;
 
 pub use frecency::{now_millis, FrecencyPersistence, FrecencyTable};
-pub use fuzzy::{fuzzy_match, Match};
+pub use fuzzy::{Match, Query};
 pub use input_history::{InputHistory, InputHistoryPersistence};
 
 use crate::search::{Candidate, Ranker};
 
 /// How much a candidate's frecency counts relative to raw match quality. Tuned
 /// by feel; isolated here so it can change without touching the pipeline.
-const FRECENCY_WEIGHT: f64 = 6.0;
+const FRECENCY_WEIGHT: f64 = 12.0;
 
 /// How much one past confirm for a longer text that starts with the query
 /// counts. A single `cal` for Calendar should lift it over a slightly better
 /// textual match on `c`, but not pin it above an item used far more often.
-const LEARNED_WEIGHT: f64 = 10.0;
+const LEARNED_WEIGHT: f64 = 20.0;
 
 const SUGGESTION_LIMIT: usize = 6;
 
 /// A keyword or alias match is worth slightly less than the same match in the
 /// title, so a title hit wins an otherwise equal race.
-const NON_TITLE_PENALTY: i32 = 4;
+const NON_TITLE_PENALTY: i32 = 8;
 
 pub struct DangoRanker {
     frecency: Arc<FrecencyTable>,
@@ -49,6 +49,7 @@ impl Ranker for DangoRanker {
         }
 
         let learned = self.learned.lookup(query, now);
+        let mut matcher = Query::new(query);
         let mut scored: Vec<Scored> = Vec::new();
         for mut candidate in candidates {
             // An exact alias match is a deliberate, unambiguous request, so it
@@ -70,7 +71,7 @@ impl Ranker for DangoRanker {
             // A text the user already resolved to this item needs no textual
             // argument: it ranks on how established that choice is.
             if let Some(weight) = learned.exact.get(&candidate.id) {
-                candidate.match_positions = best_field_match(query, &candidate)
+                candidate.match_positions = best_field_match(&mut matcher, &candidate)
                     .map(|best| best.title_positions)
                     .unwrap_or_default();
                 scored.push(Scored {
@@ -81,7 +82,7 @@ impl Ranker for DangoRanker {
                 continue;
             }
 
-            let Some(best) = best_field_match(query, &candidate) else {
+            let Some(best) = best_field_match(&mut matcher, &candidate) else {
                 continue;
             };
             candidate.match_positions = best.title_positions;
@@ -155,7 +156,7 @@ struct FieldMatch {
     title_positions: Vec<usize>,
 }
 
-fn best_field_match(query: &str, candidate: &Candidate) -> Option<FieldMatch> {
+fn best_field_match(query: &mut Query, candidate: &Candidate) -> Option<FieldMatch> {
     let mut best: Option<FieldMatch> = None;
     let mut consider = |score: i32, title_positions: Vec<usize>| {
         if best.as_ref().is_none_or(|b| score > b.score) {
@@ -166,16 +167,16 @@ fn best_field_match(query: &str, candidate: &Candidate) -> Option<FieldMatch> {
         }
     };
 
-    if let Some(m) = fuzzy_match(query, &candidate.title) {
+    if let Some(m) = query.score(&candidate.title) {
         consider(m.score, m.positions);
     }
     for keyword in &candidate.keywords {
-        if let Some(m) = fuzzy_match(query, keyword) {
+        if let Some(m) = query.score(keyword) {
             consider(m.score - NON_TITLE_PENALTY, Vec::new());
         }
     }
     if let Some(alias) = &candidate.alias {
-        if let Some(m) = fuzzy_match(query, alias) {
+        if let Some(m) = query.score(alias) {
             consider(m.score - NON_TITLE_PENALTY, Vec::new());
         }
     }
@@ -270,6 +271,31 @@ mod tests {
             !ranked[0].match_positions.is_empty(),
             "matched positions should be reported for highlighting"
         );
+    }
+
+    #[test]
+    fn a_word_start_beats_a_mid_word_hit_at_equal_frecency() {
+        let ranker = ranker();
+        let ranked = ranker.rank(
+            "ze",
+            vec![candidate("max", "Maximize"), candidate("zed", "Zed")],
+            10,
+        );
+        assert_eq!(ranked[0].id, "zed");
+    }
+
+    #[test]
+    fn a_contiguous_match_beats_a_scattered_one_at_equal_frecency() {
+        let ranker = ranker();
+        let ranked = ranker.rank(
+            "fire",
+            vec![
+                candidate("far", "Far Infrared Emitter"),
+                candidate("fox", "Firefox"),
+            ],
+            10,
+        );
+        assert_eq!(ranked[0].id, "fox");
     }
 
     #[test]
