@@ -2,6 +2,16 @@
 
 All notable changes to Dango. Generated from commit history at release time.
 
+## [0.3.0] - 2026-10-10
+
+### Features
+
+- **system:** Add Open Config File command
+- **config:** Generate schema and settings reference
+
+### Maintenance
+
+- Deps bump
 ## [0.2.0] - 2026-10-10
 
 ### Features
