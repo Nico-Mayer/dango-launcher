@@ -268,6 +268,8 @@ fn kind_name(kind: PreferenceKind) -> &'static str {
     }
 }
 
+/// Commands are named by id, not title: a title can differ per platform, and
+/// the reference generated from this must not.
 fn commands(manifest: &Manifest, description: Value) -> Value {
     let item = if manifest.id == AI_ID {
         "#/$defs/AiCommandSettings"
@@ -278,7 +280,10 @@ fn commands(manifest: &Manifest, description: Value) -> Value {
     for command in &manifest.commands {
         properties.insert(
             command.id.clone(),
-            json!({ "$ref": item, "description": format!("Settings for {}.", command.title) }),
+            json!({
+                "$ref": item,
+                "description": format!("Settings for the {} command.", command.id)
+            }),
         );
     }
     let open = manifest.id == AI_ID;

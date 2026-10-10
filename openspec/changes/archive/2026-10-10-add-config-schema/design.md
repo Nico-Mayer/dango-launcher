@@ -220,6 +220,9 @@ file:
   but still reads them from the config directly, through the typed parse.
 - A tidy pass flattens doc-comment line breaks into one line and turns
   whole-number float defaults into integers, for the hover and the table.
+- Shipped commands are described by id, not title, in the schema and the
+  reference. The system extension titles one command per platform, and a
+  reference generated on Windows failed the currency test on macOS CI.
 - The reference omits an object with nothing to set, such as `preferences`
   of an extension that declares none, instead of printing an empty table.
 

@@ -44,15 +44,15 @@ Per-command settings, keyed by command id.
 
 | Setting | Type | Default | Values | Description |
 | --- | --- | --- | --- | --- |
-| `explain` | [AI command settings](#ai-command-settings) |  |  | Settings for Explain This. |
-| `fix-spelling` | [AI command settings](#ai-command-settings) |  |  | Settings for Fix Spelling and Grammar. |
-| `improve-writing` | [AI command settings](#ai-command-settings) |  |  | Settings for Improve Writing. |
-| `make-longer` | [AI command settings](#ai-command-settings) |  |  | Settings for Make Longer. |
-| `make-professional` | [AI command settings](#ai-command-settings) |  |  | Settings for Make Professional. |
-| `make-shorter` | [AI command settings](#ai-command-settings) |  |  | Settings for Make Shorter. |
-| `make-simpler` | [AI command settings](#ai-command-settings) |  |  | Settings for Make Simpler. |
-| `summarize` | [AI command settings](#ai-command-settings) |  |  | Settings for Summarize. |
-| `translate` | [AI command settings](#ai-command-settings) |  |  | Settings for Translate. |
+| `explain` | [AI command settings](#ai-command-settings) |  |  | Settings for the explain command. |
+| `fix-spelling` | [AI command settings](#ai-command-settings) |  |  | Settings for the fix-spelling command. |
+| `improve-writing` | [AI command settings](#ai-command-settings) |  |  | Settings for the improve-writing command. |
+| `make-longer` | [AI command settings](#ai-command-settings) |  |  | Settings for the make-longer command. |
+| `make-professional` | [AI command settings](#ai-command-settings) |  |  | Settings for the make-professional command. |
+| `make-shorter` | [AI command settings](#ai-command-settings) |  |  | Settings for the make-shorter command. |
+| `make-simpler` | [AI command settings](#ai-command-settings) |  |  | Settings for the make-simpler command. |
+| `summarize` | [AI command settings](#ai-command-settings) |  |  | Settings for the summarize command. |
+| `translate` | [AI command settings](#ai-command-settings) |  |  | Settings for the translate command. |
 
 ## `extensions.dango.ai.preferences`
 
@@ -88,7 +88,7 @@ Per-command settings, keyed by command id.
 
 | Setting | Type | Default | Values | Description |
 | --- | --- | --- | --- | --- |
-| `history` | [Command settings](#command-settings) |  |  | Settings for Clipboard History. |
+| `history` | [Command settings](#command-settings) |  |  | Settings for the history command. |
 
 ## `extensions.dango.clipboard.preferences`
 
@@ -118,8 +118,8 @@ Per-command settings, keyed by command id.
 
 | Setting | Type | Default | Values | Description |
 | --- | --- | --- | --- | --- |
-| `create` | [Command settings](#command-settings) |  |  | Settings for Create Quicklink. |
-| `search` | [Command settings](#command-settings) |  |  | Settings for Search Quicklinks. |
+| `create` | [Command settings](#command-settings) |  |  | Settings for the create command. |
+| `search` | [Command settings](#command-settings) |  |  | Settings for the search command. |
 
 ## `extensions.dango.quicklinks.preferences`
 
@@ -144,8 +144,8 @@ Per-command settings, keyed by command id.
 
 | Setting | Type | Default | Values | Description |
 | --- | --- | --- | --- | --- |
-| `create` | [Command settings](#command-settings) |  |  | Settings for Create Snippet. |
-| `search` | [Command settings](#command-settings) |  |  | Settings for Search Snippets. |
+| `create` | [Command settings](#command-settings) |  |  | Settings for the create command. |
+| `search` | [Command settings](#command-settings) |  |  | Settings for the search command. |
 
 ## `extensions.dango.system`
 
@@ -162,11 +162,11 @@ Per-command settings, keyed by command id.
 
 | Setting | Type | Default | Values | Description |
 | --- | --- | --- | --- | --- |
-| `empty-trash` | [Command settings](#command-settings) |  |  | Settings for Empty Recycle Bin. |
-| `lock` | [Command settings](#command-settings) |  |  | Settings for Lock Screen. |
-| `open-config` | [Command settings](#command-settings) |  |  | Settings for Open Config File. |
-| `quit-application` | [Command settings](#command-settings) |  |  | Settings for Quit Application. |
-| `sleep` | [Command settings](#command-settings) |  |  | Settings for Sleep. |
+| `empty-trash` | [Command settings](#command-settings) |  |  | Settings for the empty-trash command. |
+| `lock` | [Command settings](#command-settings) |  |  | Settings for the lock command. |
+| `open-config` | [Command settings](#command-settings) |  |  | Settings for the open-config command. |
+| `quit-application` | [Command settings](#command-settings) |  |  | Settings for the quit-application command. |
+| `sleep` | [Command settings](#command-settings) |  |  | Settings for the sleep command. |
 
 ## `extensions.dango.window-management`
 
@@ -183,25 +183,25 @@ Per-command settings, keyed by command id.
 
 | Setting | Type | Default | Values | Description |
 | --- | --- | --- | --- | --- |
-| `almost-maximize` | [Command settings](#command-settings) |  |  | Settings for Almost Maximize. |
-| `bottom-half` | [Command settings](#command-settings) |  |  | Settings for Bottom Half. |
-| `bottom-left-quarter` | [Command settings](#command-settings) |  |  | Settings for Bottom Left Quarter. |
-| `bottom-right-quarter` | [Command settings](#command-settings) |  |  | Settings for Bottom Right Quarter. |
-| `center` | [Command settings](#command-settings) |  |  | Settings for Center. |
-| `center-half` | [Command settings](#command-settings) |  |  | Settings for Center Half. |
-| `center-third` | [Command settings](#command-settings) |  |  | Settings for Center Third. |
-| `left-half` | [Command settings](#command-settings) |  |  | Settings for Left Half. |
-| `left-third` | [Command settings](#command-settings) |  |  | Settings for Left Third. |
-| `make-larger` | [Command settings](#command-settings) |  |  | Settings for Make Larger. |
-| `make-smaller` | [Command settings](#command-settings) |  |  | Settings for Make Smaller. |
-| `maximize` | [Command settings](#command-settings) |  |  | Settings for Maximize. |
-| `next-display` | [Command settings](#command-settings) |  |  | Settings for Move to Next Display. |
-| `reasonable-size` | [Command settings](#command-settings) |  |  | Settings for Reasonable Size. |
-| `right-half` | [Command settings](#command-settings) |  |  | Settings for Right Half. |
-| `right-third` | [Command settings](#command-settings) |  |  | Settings for Right Third. |
-| `top-half` | [Command settings](#command-settings) |  |  | Settings for Top Half. |
-| `top-left-quarter` | [Command settings](#command-settings) |  |  | Settings for Top Left Quarter. |
-| `top-right-quarter` | [Command settings](#command-settings) |  |  | Settings for Top Right Quarter. |
+| `almost-maximize` | [Command settings](#command-settings) |  |  | Settings for the almost-maximize command. |
+| `bottom-half` | [Command settings](#command-settings) |  |  | Settings for the bottom-half command. |
+| `bottom-left-quarter` | [Command settings](#command-settings) |  |  | Settings for the bottom-left-quarter command. |
+| `bottom-right-quarter` | [Command settings](#command-settings) |  |  | Settings for the bottom-right-quarter command. |
+| `center` | [Command settings](#command-settings) |  |  | Settings for the center command. |
+| `center-half` | [Command settings](#command-settings) |  |  | Settings for the center-half command. |
+| `center-third` | [Command settings](#command-settings) |  |  | Settings for the center-third command. |
+| `left-half` | [Command settings](#command-settings) |  |  | Settings for the left-half command. |
+| `left-third` | [Command settings](#command-settings) |  |  | Settings for the left-third command. |
+| `make-larger` | [Command settings](#command-settings) |  |  | Settings for the make-larger command. |
+| `make-smaller` | [Command settings](#command-settings) |  |  | Settings for the make-smaller command. |
+| `maximize` | [Command settings](#command-settings) |  |  | Settings for the maximize command. |
+| `next-display` | [Command settings](#command-settings) |  |  | Settings for the next-display command. |
+| `reasonable-size` | [Command settings](#command-settings) |  |  | Settings for the reasonable-size command. |
+| `right-half` | [Command settings](#command-settings) |  |  | Settings for the right-half command. |
+| `right-third` | [Command settings](#command-settings) |  |  | Settings for the right-third command. |
+| `top-half` | [Command settings](#command-settings) |  |  | Settings for the top-half command. |
+| `top-left-quarter` | [Command settings](#command-settings) |  |  | Settings for the top-left-quarter command. |
+| `top-right-quarter` | [Command settings](#command-settings) |  |  | Settings for the top-right-quarter command. |
 
 ## Hyperkey
 
