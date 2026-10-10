@@ -158,10 +158,10 @@ command SHALL be found by the words a user reaches for when looking for
 settings, including "config", "settings", "preferences", "keybinds", and
 "hotkeys".
 
-When no config file exists, the command SHALL create one containing only the
-schema version before opening it, and the creation SHALL NOT be treated as an
-external edit to react to. An existing file SHALL be opened as it is, with no
-change to its content.
+When no config file exists, the command SHALL create one containing the
+`$schema` key pointing at the schema beside it and the schema version, before
+opening it, and the creation SHALL NOT be treated as an external edit to react
+to. An existing file SHALL be opened as it is, with no change to its content.
 
 #### Scenario: Found by a settings word
 
@@ -189,7 +189,7 @@ change to its content.
 #### Scenario: No config file exists yet
 
 - **WHEN** open config file is invoked and there is no config file
-- **THEN** a config file containing only the schema version is created in the config directory
+- **THEN** a config file containing `"$schema": "./config.schema.json"` and the schema version is created in the config directory
 - **AND** that file is opened
 - **AND** the config status does not report a reload, because the write was Dango's own
 
