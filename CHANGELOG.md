@@ -2,6 +2,19 @@
 
 All notable changes to Dango. Generated from commit history at release time.
 
+## [0.2.0] - 2026-10-10
+
+### Features
+
+- **launcher:** Add autostart config setting
+
+### Fixes
+
+- **release:** Stop non-fix commits bumping version
+
+### Documentation
+
+- Update roadmap
 ## [0.1.0] - 2026-09-17
 
 ### Features
