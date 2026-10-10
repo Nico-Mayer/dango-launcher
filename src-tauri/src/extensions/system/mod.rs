@@ -2,8 +2,10 @@
 //! expected to have. The first extension whose whole contribution is commands,
 //! so it is what proves the invocation path.
 
+use std::path::Path;
 use std::sync::Arc;
 
+use crate::config::FileConfig;
 use crate::extension::{
     ActionOutcome, Extension, FormValues, InvocationMode, Manifest, NAMED_ICON,
 };
@@ -16,7 +18,7 @@ use crate::protocol::{
 
 mod commands;
 
-use commands::{EmptyTrash, Lock, QuitApplication, Sleep};
+use commands::{EmptyTrash, Lock, OpenConfigFile, QuitApplication, Sleep};
 
 pub const EXTENSION_ID: &str = "dango.system";
 
@@ -24,23 +26,40 @@ pub const COMMAND_LOCK: &str = "lock";
 pub const COMMAND_SLEEP: &str = "sleep";
 pub const COMMAND_EMPTY_TRASH: &str = "empty-trash";
 pub const COMMAND_QUIT: &str = "quit-application";
+pub const COMMAND_OPEN_CONFIG: &str = "open-config";
 
 pub const ACTION_CONFIRM: &str = "confirm";
 pub const ACTION_CANCEL: &str = "cancel";
 pub const ACTION_QUIT: &str = "quit";
 
+/// Hands a file to whatever the operating system associates with its type.
+/// Implemented on the app handle, where the opener plugin lives, so the
+/// extension never sees Tauri.
+pub trait OpenFile: Send + Sync {
+    fn open(&self, path: &Path) -> Result<(), String>;
+}
+
 pub struct SystemExtension {
     manifest: Manifest,
     control: Arc<dyn SystemControl>,
     icons: Arc<IconCache>,
+    config: Arc<FileConfig>,
+    opener: Arc<dyn OpenFile>,
 }
 
 impl SystemExtension {
-    pub fn new(control: Arc<dyn SystemControl>, icons: Arc<IconCache>) -> Self {
+    pub fn new(
+        control: Arc<dyn SystemControl>,
+        icons: Arc<IconCache>,
+        config: Arc<FileConfig>,
+        opener: Arc<dyn OpenFile>,
+    ) -> Self {
         Self {
             manifest: manifest(),
             control,
             icons,
+            config,
+            opener,
         }
     }
 }
@@ -57,6 +76,10 @@ impl Extension for SystemExtension {
             COMMAND_SLEEP => Some(Arc::new(Sleep(control))),
             COMMAND_EMPTY_TRASH => Some(Arc::new(EmptyTrash(control))),
             COMMAND_QUIT => Some(Arc::new(QuitApplication(control, self.icons.clone()))),
+            COMMAND_OPEN_CONFIG => Some(Arc::new(OpenConfigFile(
+                self.config.clone(),
+                self.opener.clone(),
+            ))),
             _ => None,
         }
     }
@@ -120,6 +143,23 @@ pub(crate) fn manifest() -> Manifest {
                 "circle-power",
                 InvocationMode::View,
                 &["quit", "close", "exit", "kill"],
+            ),
+            command(
+                COMMAND_OPEN_CONFIG,
+                "Open Config File",
+                "settings",
+                InvocationMode::NoView,
+                &[
+                    "config",
+                    "configuration",
+                    "settings",
+                    "preferences",
+                    "keybinds",
+                    "hotkeys",
+                    "keys",
+                    "edit",
+                    "json",
+                ],
             ),
         ],
         preferences: vec![],
@@ -231,6 +271,7 @@ pub mod tests {
     use super::*;
     use crate::extension::{ExtensionHost, Host};
     use crate::invocation::{CommandResolver, Invoker, Outcome, Output, Resolved};
+    use std::path::PathBuf;
     use std::sync::Mutex;
 
     /// A `SystemControl` that records what it was asked to do and answers
@@ -289,6 +330,42 @@ pub mod tests {
         }
     }
 
+    /// An `OpenFile` that records the paths it was handed.
+    #[derive(Default)]
+    pub struct FakeOpener {
+        pub opened: Mutex<Vec<PathBuf>>,
+        pub fail: Mutex<bool>,
+    }
+
+    impl OpenFile for FakeOpener {
+        fn open(&self, path: &Path) -> Result<(), String> {
+            self.opened.lock().unwrap().push(path.to_path_buf());
+            if *self.fail.lock().unwrap() {
+                Err("no handler".into())
+            } else {
+                Ok(())
+            }
+        }
+    }
+
+    /// A config file in a fresh temp directory, not yet on disk.
+    fn temp_config() -> Arc<FileConfig> {
+        let dir = std::env::temp_dir().join(format!("dango-system-{}", uuid::Uuid::new_v4()));
+        Arc::new(FileConfig::new(
+            dir.join("config.json"),
+            crate::config::Config::default(),
+        ))
+    }
+
+    fn extension(control: Arc<FakeControl>) -> SystemExtension {
+        SystemExtension::new(
+            control,
+            IconCache::in_temp(),
+            temp_config(),
+            Arc::new(FakeOpener::default()),
+        )
+    }
+
     struct Direct(Arc<SystemExtension>);
 
     impl CommandResolver for Direct {
@@ -302,7 +379,7 @@ pub mod tests {
     }
 
     fn setup(control: Arc<FakeControl>) -> (Arc<SystemExtension>, Invoker) {
-        let extension = Arc::new(SystemExtension::new(control, IconCache::in_temp()));
+        let extension = Arc::new(extension(control));
         let invoker = Invoker::new(Arc::new(Direct(extension.clone())));
         (extension, invoker)
     }
@@ -328,9 +405,9 @@ pub mod tests {
     }
 
     #[test]
-    fn the_manifest_declares_four_commands_and_validates() {
+    fn the_manifest_declares_five_commands_and_validates() {
         let manifest = manifest();
-        assert_eq!(manifest.commands.len(), 4);
+        assert_eq!(manifest.commands.len(), 5);
         assert!(manifest.validate().is_ok());
         assert!(manifest.preferences.is_empty());
     }
@@ -353,13 +430,14 @@ pub mod tests {
         let mode = |id: &str| manifest.commands.iter().find(|c| c.id == id).unwrap().mode;
         assert_eq!(mode(COMMAND_LOCK), InvocationMode::NoView);
         assert_eq!(mode(COMMAND_SLEEP), InvocationMode::NoView);
+        assert_eq!(mode(COMMAND_OPEN_CONFIG), InvocationMode::NoView);
         assert_eq!(mode(COMMAND_EMPTY_TRASH), InvocationMode::View);
         assert_eq!(mode(COMMAND_QUIT), InvocationMode::View);
     }
 
     #[test]
     fn every_command_declared_has_an_implementation() {
-        let extension = SystemExtension::new(FakeControl::new(), IconCache::in_temp());
+        let extension = extension(FakeControl::new());
         for declared in &manifest().commands {
             assert!(
                 extension.command(&declared.id).is_some(),
@@ -433,7 +511,7 @@ pub mod tests {
     #[test]
     fn confirming_empties_the_trash_and_declining_does_not() {
         let control = FakeControl::new();
-        let extension = SystemExtension::new(control.clone(), IconCache::in_temp());
+        let extension = extension(control.clone());
 
         assert_eq!(
             extension.perform_action("", ACTION_CANCEL, &FormValues::new()),
@@ -470,7 +548,7 @@ pub mod tests {
     #[test]
     fn choosing_an_application_asks_that_one_to_quit() {
         let control = FakeControl::new();
-        let extension = SystemExtension::new(control.clone(), IconCache::in_temp());
+        let extension = extension(control.clone());
         assert_eq!(
             extension.perform_action("42", ACTION_QUIT, &FormValues::new()),
             ActionOutcome::Done
@@ -482,7 +560,7 @@ pub mod tests {
     fn an_application_that_already_exited_is_reported() {
         let control = FakeControl::new();
         *control.quit_gone.lock().unwrap() = true;
-        let extension = SystemExtension::new(control, IconCache::in_temp());
+        let extension = extension(control);
         assert!(matches!(
             extension.perform_action("42", ACTION_QUIT, &FormValues::new()),
             ActionOutcome::Failed(_)
@@ -491,11 +569,100 @@ pub mod tests {
 
     #[test]
     fn an_unknown_action_fails_cleanly() {
-        let extension = SystemExtension::new(FakeControl::new(), IconCache::in_temp());
+        let extension = extension(FakeControl::new());
         assert!(matches!(
             extension.perform_action("", "nope", &FormValues::new()),
             ActionOutcome::Failed(_)
         ));
+    }
+
+    fn setup_open_config(
+        config: Arc<FileConfig>,
+        opener: Arc<FakeOpener>,
+    ) -> (Arc<FakeOpener>, Invoker) {
+        let extension = Arc::new(SystemExtension::new(
+            FakeControl::new(),
+            IconCache::in_temp(),
+            config,
+            opener.clone(),
+        ));
+        (opener, Invoker::new(Arc::new(Direct(extension))))
+    }
+
+    #[tokio::test]
+    async fn open_config_creates_a_missing_file_and_opens_it() {
+        let config = temp_config();
+        let (opener, invoker) = setup_open_config(config.clone(), Arc::new(FakeOpener::default()));
+        let output = run(&invoker, COMMAND_OPEN_CONFIG).await;
+
+        let path = config.ensure_file().unwrap();
+        assert_eq!(
+            std::fs::read_to_string(&path).unwrap(),
+            "{
+  \"version\": 1
+}"
+        );
+        assert_eq!(*opener.opened.lock().unwrap(), std::slice::from_ref(&path));
+        assert!(matches!(
+            output.as_slice(),
+            [Output::Finished(Outcome::Success)]
+        ));
+        let _ = std::fs::remove_dir_all(path.parent().unwrap());
+    }
+
+    #[tokio::test]
+    async fn open_config_opens_an_existing_file_untouched() {
+        let config = temp_config();
+        let path = config.ensure_file().unwrap();
+        std::fs::write(&path, "{ not even json").unwrap();
+        let (opener, invoker) = setup_open_config(config, Arc::new(FakeOpener::default()));
+        let output = run(&invoker, COMMAND_OPEN_CONFIG).await;
+
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), "{ not even json");
+        assert_eq!(*opener.opened.lock().unwrap(), std::slice::from_ref(&path));
+        assert!(matches!(
+            output.as_slice(),
+            [Output::Finished(Outcome::Success)]
+        ));
+        let _ = std::fs::remove_dir_all(path.parent().unwrap());
+    }
+
+    #[tokio::test]
+    async fn open_config_reports_a_handler_that_would_not_start() {
+        let config = temp_config();
+        let opener = Arc::new(FakeOpener::default());
+        *opener.fail.lock().unwrap() = true;
+        let (_, invoker) = setup_open_config(config.clone(), opener);
+        let output = run(&invoker, COMMAND_OPEN_CONFIG).await;
+
+        let [Output::Finished(Outcome::Failure(message))] = output.as_slice() else {
+            panic!("expected a failure, got {output:?}");
+        };
+        assert_eq!(message, commands::OPEN_FAILED);
+        let _ = std::fs::remove_dir_all(config.ensure_file().unwrap().parent().unwrap());
+    }
+
+    #[tokio::test]
+    async fn open_config_reports_a_file_it_cannot_create() {
+        // A regular file where the directory should be, so nothing can be
+        // created under it.
+        let dir = std::env::temp_dir().join(format!("dango-system-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let blocker = dir.join("blocker");
+        std::fs::write(&blocker, "").unwrap();
+        let config = Arc::new(FileConfig::new(
+            blocker.join("config.json"),
+            crate::config::Config::default(),
+        ));
+        let (opener, invoker) = setup_open_config(config, Arc::new(FakeOpener::default()));
+        let output = run(&invoker, COMMAND_OPEN_CONFIG).await;
+
+        let [Output::Finished(Outcome::Failure(message))] = output.as_slice() else {
+            panic!("expected a failure, got {output:?}");
+        };
+        assert_eq!(message, commands::CREATE_FAILED);
+        assert!(opener.opened.lock().unwrap().is_empty());
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]
@@ -508,11 +675,8 @@ pub mod tests {
             fn set_enabled(&self, _: &str, _: bool) {}
         }
         let mut host = ExtensionHost::new(Arc::new(AlwaysOn));
-        host.register(Arc::new(SystemExtension::new(
-            FakeControl::new(),
-            IconCache::in_temp(),
-        )))
-        .unwrap();
+        host.register(Arc::new(extension(FakeControl::new())))
+            .unwrap();
         let lock = format!("{EXTENSION_ID}.{COMMAND_LOCK}");
         assert!(host.registry().get(&lock).is_some());
 

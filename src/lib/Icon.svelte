@@ -19,6 +19,7 @@
   import PanelLeft from "@lucide/svelte/icons/panel-left";
   import PanelRight from "@lucide/svelte/icons/panel-right";
   import PanelTop from "@lucide/svelte/icons/panel-top";
+  import Settings from "@lucide/svelte/icons/settings";
   import Sparkles from "@lucide/svelte/icons/sparkles";
   import Square from "@lucide/svelte/icons/square";
   import Terminal from "@lucide/svelte/icons/terminal";
@@ -49,6 +50,7 @@
     "panel-left": PanelLeft,
     "panel-right": PanelRight,
     "panel-top": PanelTop,
+    settings: Settings,
     sparkles: Sparkles,
     square: Square,
     terminal: Terminal,

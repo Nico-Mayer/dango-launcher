@@ -24,7 +24,9 @@ same steps on demand. Use `git push --no-verify` to skip the push checks once.
 ## Configuration
 
 Dango reads `~/.config/dango/config.json` (or `$DANGO_CONFIG_DIR`). Every
-setting is optional and documented in `docs/config.example.jsonc`.
+setting is optional and documented in `docs/config.example.jsonc`. Run the
+Open Config File command from the launcher to open it in the app your system
+uses for `.json` files. It creates the file if there is none yet.
 
 API keys for the AI commands live beside it in `auth.json`, in plain text, one
 entry per provider. See `docs/auth.example.json`. **Keep `auth.json` out of

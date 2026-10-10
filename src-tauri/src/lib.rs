@@ -165,18 +165,24 @@ impl text::Launcher for HideLauncher {
     }
 }
 
-/// Opening a quicklink through the official plugin rather than by shelling out
-/// to `open` or `cmd /c start`, which is the project's standing preference and
-/// also the only route that behaves the same on both platforms.
-struct DefaultBrowser(tauri::AppHandle);
+/// Opening a quicklink or a file through the official plugin rather than by
+/// shelling out to `open` or `cmd /c start`, which is the project's standing
+/// preference and also the only route that behaves the same on both platforms.
+struct DefaultHandler(tauri::AppHandle);
 
-impl snippets::OpenUrl for DefaultBrowser {
+impl snippets::OpenUrl for DefaultHandler {
     fn open(&self, url: &str) -> Result<(), String> {
         use tauri_plugin_opener::OpenerExt;
         self.0
             .opener()
             .open_url(url, None::<&str>)
             .map_err(|error| error.to_string())
+    }
+}
+
+impl extensions::system::OpenFile for DefaultHandler {
+    fn open(&self, path: &std::path::Path) -> Result<(), String> {
+        tauri_plugin_opener::open_path(path, None::<&str>).map_err(|error| error.to_string())
     }
 }
 
@@ -1221,7 +1227,7 @@ pub fn run() {
                     .try_state::<Arc<TextExchange>>()
                     .map(|state| state.inner().clone() as Arc<dyn text::TextTarget>);
                 let opener: Arc<dyn snippets::OpenUrl> =
-                    Arc::new(DefaultBrowser(app.handle().clone()));
+                    Arc::new(DefaultHandler(app.handle().clone()));
                 // Keyword expansion skips the applications the clipboard history
                 // is told to skip: one list, read fresh each keystroke.
                 let excluded: snippets::ExcludedApps = {
@@ -1302,6 +1308,8 @@ pub fn run() {
             let system = Arc::new(SystemExtension::new(
                 platform::system_control(),
                 icons.clone(),
+                file_config.clone(),
+                Arc::new(DefaultHandler(app.handle().clone())),
             ));
             match host.register(system) {
                 Ok(report) if report.is_clean() => {}

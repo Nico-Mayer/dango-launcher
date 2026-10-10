@@ -49,15 +49,31 @@ impl FileConfig {
         *self.config.write().unwrap() = config;
     }
 
+    /// The file's path, creating the file first when there is none. A file
+    /// that exists is left alone, whatever it contains.
+    pub fn ensure_file(&self) -> Result<PathBuf, String> {
+        if !self.path.exists() {
+            self.config.write().unwrap().version.get_or_insert(1);
+            let text = self.config.read().unwrap().to_json();
+            self.write(&text)
+                .map_err(|error| format!("{}: {error}", self.path.display()))?;
+        }
+        Ok(self.path.clone())
+    }
+
     fn persist(&self) {
         let text = self.config.read().unwrap().to_json();
-        *self.own_write.lock().unwrap() = Some(text.clone());
-        if let Some(parent) = self.path.parent() {
-            let _ = std::fs::create_dir_all(parent);
-        }
-        if let Err(error) = std::fs::write(&self.path, text) {
+        if let Err(error) = self.write(&text) {
             eprintln!("[dango] could not write the config file: {error}");
         }
+    }
+
+    fn write(&self, text: &str) -> std::io::Result<()> {
+        *self.own_write.lock().unwrap() = Some(text.to_string());
+        if let Some(parent) = self.path.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
+        std::fs::write(&self.path, text)
     }
 }
 
@@ -163,5 +179,56 @@ mod tests {
             Some(on_disk.as_str())
         );
         let _ = std::fs::remove_file(&path);
+    }
+
+    fn temp_dir(name: &str) -> PathBuf {
+        let dir = std::env::temp_dir().join(format!(
+            "dango-cfg-test-{name}-{}-{}",
+            std::process::id(),
+            uuid::Uuid::new_v4()
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
+    #[test]
+    fn ensure_file_creates_a_missing_file_with_the_version_only() {
+        let dir = temp_dir("ensure-missing");
+        let path = dir.join("nested").join("config.json");
+        let store = FileConfig::new(path.clone(), Config::default());
+        assert_eq!(store.ensure_file().unwrap(), path);
+        let on_disk = std::fs::read_to_string(&path).unwrap();
+        assert_eq!(on_disk, "{\n  \"version\": 1\n}");
+        assert_eq!(
+            store.own_write.lock().unwrap().as_deref(),
+            Some(on_disk.as_str())
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn ensure_file_leaves_an_existing_file_alone() {
+        let dir = temp_dir("ensure-existing");
+        let path = dir.join("config.json");
+        std::fs::write(&path, "not json at all").unwrap();
+        let store = FileConfig::new(path.clone(), Config::default());
+        assert_eq!(store.ensure_file().unwrap(), path);
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), "not json at all");
+        assert!(store.own_write.lock().unwrap().is_none());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn ensure_file_names_the_path_when_it_cannot_write() {
+        let dir = temp_dir("ensure-unwritable");
+        // A regular file where the directory should be: nothing can be
+        // created under it on any platform.
+        let blocker = dir.join("blocker");
+        std::fs::write(&blocker, "").unwrap();
+        let path = blocker.join("config.json");
+        let store = FileConfig::new(path.clone(), Config::default());
+        let error = store.ensure_file().unwrap_err();
+        assert!(error.contains(&path.display().to_string()), "{error}");
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }
