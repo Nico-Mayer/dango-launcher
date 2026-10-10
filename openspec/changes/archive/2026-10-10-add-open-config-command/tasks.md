@@ -15,20 +15,20 @@
 
 ## 4. Windows verification
 
-- [ ] 4.1 With `config.json` present, run Open Config File from root search; verify the file opens in the application Windows associates with `.json`, the launcher hides, the editor is in the foreground rather than behind the previous app, and the file content is unchanged
-- [ ] 4.2 Move `config.json` aside and run the command; verify a file containing only `"version": 1` is created in the config directory and opened, and the tray status still reads `Config file loaded` with no reload line in `dango.log`
-- [ ] 4.3 Remove the `.json` association in Settings > Apps > Default apps, run the command; verify the Windows "How do you want to open this file?" chooser appears and the launcher has hidden, then restore the association
-- [ ] 4.4 Set `$DANGO_CONFIG_DIR` to an empty directory, start Dango, run the command; verify the file is created and opened there, not under `~/.config/dango`
-- [ ] 4.5 Make the config directory read-only with no file present, run the command; verify the banner reads `Couldn't create the config file. See dango.log for the reason.`, the log names the path, and no editor opens; restore permissions
-- [ ] 4.6 Bind the command under `extensions.dango.system.commands.open-config.hotkey`, press the chord from another application; verify the file opens without the launcher appearing
+- [x] 4.1 With `config.json` present, run Open Config File from root search; verify the file opens in the application Windows associates with `.json`, the launcher hides, the editor is in the foreground rather than behind the previous app, and the file content is unchanged
+- [x] 4.2 Move `config.json` aside and run the command; verify a file containing only `"version": 1` is created in the config directory and opened, and the tray status still reads `Config file loaded` with no reload line in `dango.log`
+- [x] 4.3 Remove the `.json` association in Settings > Apps > Default apps, run the command; verify the Windows "How do you want to open this file?" chooser appears and the launcher has hidden, then restore the association
+- [x] 4.4 Set `$DANGO_CONFIG_DIR` to an empty directory, start Dango, run the command; verify the file is created and opened there, not under `~/.config/dango`
+- [x] 4.5 Make the config directory read-only with no file present, run the command; verify the banner reads `Couldn't create the config file. See dango.log for the reason.`, the log names the path, and no editor opens; restore permissions
+- [x] 4.6 Bind the command under `extensions.dango.system.commands.open-config.hotkey`, press the chord from another application; verify the file opens without the launcher appearing
 
 ## 5. macOS verification
 
-- [ ] 5.1 With `config.json` present, run Open Config File from root search; verify the file opens in the application macOS associates with `.json`, the launcher hides, and the file content is unchanged
-- [ ] 5.2 Move `config.json` aside and run the command; verify a file containing only `"version": 1` is created in the config directory and opened, and the tray status still reads `Config file loaded` with no reload line in `dango.log`
-- [ ] 5.3 Set `$DANGO_CONFIG_DIR` to an empty directory, start Dango, run the command; verify the file is created and opened there, not under `~/.config/dango`
-- [ ] 5.4 Make the config directory read-only with no file present, run the command; verify the banner reads `Couldn't create the config file. See dango.log for the reason.`, the log names the path, and no editor opens; restore permissions
-- [ ] 5.5 Bind the command under `extensions.dango.system.commands.open-config.hotkey`, press the chord from another application; verify the file opens without the launcher appearing
+- [x] 5.1 With `config.json` present, run Open Config File from root search; verify the file opens in the application macOS associates with `.json`, the launcher hides, and the file content is unchanged
+- [x] 5.2 Move `config.json` aside and run the command; verify a file containing only `"version": 1` is created in the config directory and opened, and the tray status still reads `Config file loaded` with no reload line in `dango.log`
+- [x] 5.3 Set `$DANGO_CONFIG_DIR` to an empty directory, start Dango, run the command; verify the file is created and opened there, not under `~/.config/dango`
+- [x] 5.4 Make the config directory read-only with no file present, run the command; verify the banner reads `Couldn't create the config file. See dango.log for the reason.`, the log names the path, and no editor opens; restore permissions
+- [x] 5.5 Bind the command under `extensions.dango.system.commands.open-config.hotkey`, press the chord from another application; verify the file opens without the launcher appearing
 
 ## 6. Wrap up
 
