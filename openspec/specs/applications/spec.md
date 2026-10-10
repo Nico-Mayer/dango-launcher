@@ -162,8 +162,9 @@ both. When more than one indexed application carries the name, the first in
 the index's name order SHALL be used and the ambiguity SHALL be surfaced.
 
 Launching an application by hotkey SHALL have the same effect as selecting it
-in root search and confirming: the same launch, the same frecency credit, and
-the same handling of an entry that turns out to be gone.
+in root search and confirming, with one exception: the same launch and the
+same handling of an entry that turns out to be gone, but no frecency credit,
+because a chord says nothing about what the user types to find the item.
 
 #### Scenario: Matching the shown name on macOS
 
@@ -197,7 +198,8 @@ the same handling of an entry that turns out to be gone.
 #### Scenario: A launch from a hotkey counts as use
 
 - **WHEN** an application is launched from its hotkey
-- **THEN** its frecency is credited as if it had been launched from root search
+- **THEN** it opens
+- **AND** its frecency is unchanged, because use through a chord is not use of search
 
 #### Scenario: A bound application has been removed from disk
 
@@ -205,3 +207,4 @@ the same handling of an entry that turns out to be gone.
   user presses its chord
 - **THEN** the failure is surfaced
 - **AND** the entry is removed from the index
+

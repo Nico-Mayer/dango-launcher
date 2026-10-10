@@ -53,9 +53,10 @@ Confirming a root result SHALL record the event so that the item's future
 ranking improves, and SHALL record the text the user had typed when they
 confirmed it, so the same text ranks that item higher next time. Both records
 SHALL survive a restart. Any successful root action SHALL count, not only the
-primary one. A launch from a global hotkey and an action inside a pushed view
-SHALL update frecency as today but SHALL NOT record a typed text, because none
-was typed for that item.
+primary one. An action inside a pushed view SHALL update frecency but SHALL
+NOT record a typed text, because none was typed for that item. A launch from
+a global hotkey SHALL update neither: a chord says nothing about what the user
+types to find an item, so pressing it SHALL NOT change search ranking.
 
 #### Scenario: Ranking improves after use
 
@@ -75,8 +76,13 @@ was typed for that item.
 #### Scenario: A hotkey launch teaches nothing
 
 - **WHEN** the user opens an application through its global hotkey
-- **THEN** its frecency rises
+- **THEN** its frecency is unchanged
 - **AND** no typed text is recorded for it
+
+#### Scenario: A command chord leaves ranking alone
+
+- **WHEN** the user presses the chord bound to Maximize twenty times and then types `ze`
+- **THEN** Maximize ranks no higher for `ze` than it did before those presses
 
 ## ADDED Requirements
 

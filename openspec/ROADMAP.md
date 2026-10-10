@@ -48,6 +48,25 @@ proves the contract. Needs a real app indexer on both platforms, including the
 Exit criteria: a usable daily-driver app launcher, built entirely on the same
 contract third-party extensions will later use.
 
+Two follow-ups landed after daily use showed ranking ignoring what the user
+typed. `add-adaptive-ranking` learns pairs of typed text and chosen item on
+every root confirm: typing exactly a learned text ranks its item above every
+textual match, a longer learned text boosts the shorter queries that start it,
+and typing past it switches it off. Pairs decay with the frecency half life
+and live in a new `input_history` table, read from memory on the search path.
+The same change stopped hotkey launches from crediting frecency, because the
+chord-bound window commands had come to dominate the table and bury short
+queries; the applications spec was amended to match. `adopt-nucleo-matcher`
+retired the hand-rolled fuzzy scorer, which M1 had shipped without the
+candidate evaluation the project rule requires, for `nucleo-matcher`: fzf
+scoring, case and accent folding, character positions for highlighting, with
+the weights beside the score rescaled. Verified on Windows against the
+installed build: learned exact and prefix behaviour, release on a longer text,
+repeated correction, no record from a hotkey or a pushed view, and Zed above
+Maximize on `ze` after a frecency reset. Carried forward, unverified: the macOS
+checks in both changes (`add-adaptive-ranking` 4.4 and 4.5,
+`adopt-nucleo-matcher` 3.2, which includes the accented-title case).
+
 ### M2 - builtins
 
 Two built-in extensions: `system` commands (lock, sleep, empty trash, quit app)

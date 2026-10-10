@@ -21,6 +21,14 @@ is the personalisation gap in daily use.
   nothing.
 - Any successful root action teaches, the same rule frecency uses for counting
   use.
+- A launch from a global hotkey no longer credits frecency. A chord says
+  nothing about what the user types to find an item, and on the author's
+  machine the hotkey-bound window commands held the top of the frecency table
+  and buried every short textual query.
+- A launch from a global hotkey no longer credits frecency. A chord says
+  nothing about what the user types to find an item, and on the author's
+  machine the hotkey-bound window commands held the top of the frecency table
+  and buried every short textual query.
 
 Milestone: a follow-up to M1 core, where the ranking pipeline and frecency were
 built. Platforms: Windows and macOS, no platform-specific code.
@@ -48,9 +56,12 @@ None.
 
 - `root-search`: "Ranking combines match quality and frecency" gains the
   learned-input tier and boost; "Launching an item updates its frecency"
-  becomes recording both frecency and the query the item was chosen for. A new
-  requirement in the same capability covers what a learned input is, when it
-  fires, how it decays, and how a correction overrides it.
+  becomes recording both frecency and the query the item was chosen for, and
+  stops counting hotkey launches. A new requirement in the same capability
+  covers what a learned input is, when it fires, how it decays, and how a
+  correction overrides it.
+- `applications`: "An application is addressable by its shown name" drops the
+  frecency credit from a hotkey launch.
 
 ## Impact
 
@@ -59,6 +70,7 @@ None.
 - `src-tauri/src/ranking/`: a new in-memory table beside `FrecencyTable`, a new
   tier in `DangoRanker`, and the prefix boost.
 - `src-tauri/src/lib.rs`: `run_action` and `invoke_command` take an optional
-  query and record the pair on success.
+  query and record the pair on success; the two hotkey dispatch paths stop
+  recording a launch.
 - `src/App.svelte`: the two root confirm paths pass the query.
 - No change to the extension manifest, the view protocol, or the config file.

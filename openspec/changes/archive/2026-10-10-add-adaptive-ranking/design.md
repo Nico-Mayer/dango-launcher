@@ -104,6 +104,23 @@ could record it without a frontend change. It would also record for view
 actions and for a confirm that happens after the user cleared the field, and
 it couples two things that are independent today.
 
+### Hotkey launches leave ranking alone
+
+Both hotkey dispatch paths credited frecency as if the user had searched for
+the item. On the author's machine that put the window commands bound to
+`hyper+enter` and `hyper+k` at 30 launches each in the last day, so `ze` ranked
+Maximize above Zed by 130 points of frecency against a 25-point textual loss.
+The user never typed those; the chord did. Frecency now means "reached through
+the search box": `run_command` no longer records, `invoke_command` records
+after it, and `dispatch_application` drops its record. The applications spec
+is amended to match, since it promised the credit.
+
+Rejected: counting a hotkey launch at a reduced weight. Any weight above zero
+still accumulates from a chord pressed dozens of times a day, and nothing the
+user types can push back. Rejected: saturating the frecency count instead.
+Worth doing on its own merits, but it would leave the wrong signal in the table
+and only dampen it.
+
 ### Storage and memory
 
 Migration `0006_input_history.sql`:
