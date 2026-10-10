@@ -55,6 +55,15 @@ context: |
     code lives in `platform/windows` and `platform/macos` modules behind those
     traits, never inline behind `cfg` attributes scattered through feature code.
 
+  ## Project stage
+
+  Alpha with no users. Breaking changes to the config file, the extension
+  manifest, the view protocol, and stored data are free: no migrations, no
+  compatibility shims, no deprecation paths, no version bumps for their own
+  sake. Keep the version fields, but do not spend design on honouring old
+  values. Remove this section at the first real release; until then every
+  change is written on this assumption.
+
   ## Architectural spine
 
   Everything the user can invoke is a command, and every command belongs to an
