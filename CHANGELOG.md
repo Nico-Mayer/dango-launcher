@@ -2,6 +2,20 @@
 
 All notable changes to Dango. Generated from commit history at release time.
 
+## [0.4.0] - 2026-10-10
+
+### Features
+
+- **ranking:** Learn typed input per chosen item
+- **shell:** Mark development builds in window and tray
+
+### Fixes
+
+- **applications:** Stop dropping Explorer on launch
+
+### Refactoring
+
+- **ranking:** Adopt nucleo-matcher scorer
 ## [0.3.1] - 2026-10-10
 
 ### Fixes
