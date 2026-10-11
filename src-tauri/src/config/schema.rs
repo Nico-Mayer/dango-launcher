@@ -549,7 +549,7 @@ mod tests {
     const FULL: &str = r#"{
         "$schema": "./config.schema.json",
         "version": 1,
-        "launcher": { "hotkey": { "macos": "cmd+space", "windows": "ctrl+space" }, "autostart": true },
+        "launcher": { "hotkey": { "macos": "cmd+space", "windows": "ctrl+space" }, "autostart": true, "reset-after": 90 },
         "hyperkey": { "key": "capslock", "shift": false, "tap": "escape" },
         "selection": { "excluded-applications": "Zed" },
         "extensions": {
@@ -604,6 +604,14 @@ mod tests {
             .collect();
         assert!(errors.is_empty(), "{errors:#?}");
         Config::parse(FULL).expect("the full sample parses");
+    }
+
+    #[test]
+    fn reset_after_is_a_whole_number_of_seconds() {
+        assert!(accepts(r#"{ "launcher": { "reset-after": 0 } }"#));
+        assert!(accepts(r#"{ "launcher": { "reset-after": 300 } }"#));
+        assert!(!accepts(r#"{ "launcher": { "reset-after": -5 } }"#));
+        assert!(!accepts(r#"{ "launcher": { "reset-after": 1.5 } }"#));
     }
 
     #[test]

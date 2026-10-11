@@ -151,6 +151,7 @@ impl Selection {
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
 pub struct Launcher {
     /// The chord that summons the launcher. Default alt+space, which is
     /// Option+Space on macOS.
@@ -160,13 +161,22 @@ pub struct Launcher {
     /// Default false. A development build ignores it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub autostart: Option<bool>,
+    /// Seconds the launcher keeps what you were doing after it is hidden by
+    /// the hotkey or by losing focus. Pressing the hotkey again within this
+    /// time continues where you left off. Default 60. 0 resets to root search
+    /// at once.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reset_after: Option<u32>,
     #[serde(flatten)]
     pub extra: Map<String, Value>,
 }
 
 impl Launcher {
     fn is_empty(&self) -> bool {
-        self.hotkey.is_none() && self.autostart.is_none() && self.extra.is_empty()
+        self.hotkey.is_none()
+            && self.autostart.is_none()
+            && self.reset_after.is_none()
+            && self.extra.is_empty()
     }
 }
 
@@ -619,6 +629,20 @@ mod tests {
             apps["terminal"].name,
             Some(AppName::PerPlatform(_))
         ));
+    }
+
+    #[test]
+    fn a_launcher_reset_after_value_parses_and_round_trips() {
+        assert_eq!(Config::parse("{}").unwrap().launcher.reset_after, None);
+        let config = Config::parse(r#"{ "launcher": { "reset-after": 300 } }"#).unwrap();
+        assert_eq!(config.launcher.reset_after, Some(300));
+
+        let json = config.to_json();
+        assert!(json.contains("reset-after"), "key dropped: {json}");
+        assert_eq!(
+            Config::parse(&json).unwrap().launcher.reset_after,
+            Some(300)
+        );
     }
 
     #[test]
