@@ -14,8 +14,10 @@ pub mod store;
 pub mod templates;
 pub mod text;
 
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::sync::Mutex;
+use std::time::Duration;
 
 use tauri::{
     menu::{IsMenuItem, Menu, MenuItem},
@@ -193,6 +195,105 @@ const SHORTCUT_LABEL: &str = "Alt+Space";
 
 struct AppState {
     launcher: Mutex<Box<dyn LauncherWindow>>,
+    hold: Mutex<Option<Hold>>,
+    hold_generation: AtomicU64,
+}
+
+/// An interrupting hide whose state the launcher is still keeping. The task
+/// resets the launcher when the grace period runs out; showing aborts it.
+struct Hold {
+    generation: u64,
+    expiry: tauri::async_runtime::JoinHandle<()>,
+}
+
+/// Why the launcher is going away, which decides what becomes of its state
+/// and of a command still running.
+enum HideReason {
+    /// The user is done: an action finished, or Escape on an empty root.
+    Done,
+    /// The user was interrupted: the shortcut toggled, or focus went elsewhere.
+    Interrupted,
+    /// A command hid the launcher to paste or read a selection and is still wanted.
+    ForWork,
+}
+
+const DEFAULT_RESET_AFTER_SECS: u32 = 60;
+
+#[derive(Clone, serde::Serialize)]
+struct ActivatePayload {
+    probe: Option<u64>,
+    held: bool,
+}
+
+fn reset_after(app: &tauri::AppHandle) -> Duration {
+    let seconds = app
+        .try_state::<Arc<config::FileConfig>>()
+        .and_then(|file| {
+            let shared = file.shared();
+            let config = shared.read().ok()?;
+            config.launcher.reset_after
+        })
+        .unwrap_or(DEFAULT_RESET_AFTER_SECS);
+    Duration::from_secs(seconds.into())
+}
+
+fn holding(app: &tauri::AppHandle) -> bool {
+    app.state::<AppState>().hold.lock().unwrap().is_some()
+}
+
+fn clear_hold(app: &tauri::AppHandle) -> bool {
+    let Some(hold) = app.state::<AppState>().hold.lock().unwrap().take() else {
+        return false;
+    };
+    hold.expiry.abort();
+    true
+}
+
+fn start_hold(app: &tauri::AppHandle, period: Duration) {
+    let state = app.state::<AppState>();
+    let mut hold = state.hold.lock().unwrap();
+    if let Some(previous) = hold.take() {
+        previous.expiry.abort();
+    }
+    let generation = state.hold_generation.fetch_add(1, Ordering::SeqCst);
+    let handle = app.clone();
+    let expiry = tauri::async_runtime::spawn(async move {
+        tokio::time::sleep(period).await;
+        {
+            let state = handle.state::<AppState>();
+            let mut hold = state.hold.lock().unwrap();
+            // A show between waking and taking the lock has already ended this hold.
+            if !matches!(hold.as_ref(), Some(current) if current.generation == generation) {
+                return;
+            }
+            hold.take();
+        }
+        abandon_running_command(&handle);
+        let _ = handle.emit_to("main", "dango://reset", ());
+    });
+    *hold = Some(Hold { generation, expiry });
+}
+
+fn settle_hide(app: &tauri::AppHandle, reason: HideReason) {
+    match reason {
+        HideReason::Interrupted => {
+            let period = reset_after(app);
+            if !period.is_zero() {
+                start_hold(app, period);
+                return;
+            }
+            clear_hold(app);
+            abandon_running_command(app);
+        }
+        HideReason::Done => {
+            clear_hold(app);
+            abandon_running_command(app);
+        }
+        HideReason::ForWork => {
+            clear_hold(app);
+        }
+    }
+    let _ = app.emit_to("main", "dango://reset", ());
 }
 
 /// Runs window work on the main thread, inline when already there.
@@ -219,11 +320,16 @@ fn show(app: &tauri::AppHandle, probe_id: Option<u64>) {
         let Some(window) = app.get_webview_window("main") else {
             return;
         };
+        let held = clear_hold(app);
         let state = app.state::<AppState>();
         let mut launcher = state.launcher.lock().unwrap();
         launcher.position_on_active_display(&window);
         launcher.show(&window);
-        let _ = app.emit_to("main", "dango://activate", probe_id);
+        let payload = ActivatePayload {
+            probe: probe_id,
+            held,
+        };
+        let _ = app.emit_to("main", "dango://activate", payload);
     });
 }
 
@@ -242,8 +348,8 @@ fn hide(app: &tauri::AppHandle) -> bool {
     let mut launcher = state.launcher.lock().unwrap();
     launcher.hide(&window);
     launcher.restore_previous_focus();
-    abandon_running_command(app);
-    let _ = app.emit_to("main", "dango://reset", ());
+    drop(launcher);
+    settle_hide(app, HideReason::Interrupted);
     true
 }
 
@@ -527,7 +633,9 @@ fn pump(app: &tauri::AppHandle, owner: String, running: invocation::Running) {
                     // A command that read the selection hid the launcher to do
                     // it. It has something to show now, so the launcher comes
                     // back rather than streaming into a window nobody can see.
-                    if !visible(&app) {
+                    // A held launcher is different: the user closed it and will
+                    // find the output when they come back.
+                    if !visible(&app) && !holding(&app) {
                         show(&app, None);
                     }
                     let payload = RenderPayload {
@@ -705,20 +813,30 @@ fn report_hotkey_problem(app: &tauri::AppHandle, message: &str) {
 /// Hides the launcher without restoring the previous foreground, because the
 /// just-launched application should keep focus rather than the window that was
 /// in front before.
-///
-/// Abandoning is tied to the window actually going away here, not to the call:
-/// this is also the window's focus-loss handler, which fires when a command
-/// hides the launcher to do its own work. Abandoning there would cancel the
-/// command that asked for the hide.
 fn hide_after_launch(app: &tauri::AppHandle) {
     on_main_thread(app, |app| {
         if let Some(window) = app.get_webview_window("main") {
             if window.is_visible().unwrap_or(false) {
                 let _ = window.hide();
-                abandon_running_command(app);
             }
         }
-        let _ = app.emit_to("main", "dango://reset", ());
+        settle_hide(app, HideReason::Done);
+    });
+}
+
+/// The window's focus-loss handler. A window that is already hidden is left
+/// alone: a command's own hide drops focus too, and that hide has already
+/// settled what becomes of the launcher's state.
+fn hide_on_focus_loss(app: &tauri::AppHandle) {
+    on_main_thread(app, |app| {
+        let Some(window) = app.get_webview_window("main") else {
+            return;
+        };
+        if !window.is_visible().unwrap_or(false) {
+            return;
+        }
+        let _ = window.hide();
+        settle_hide(app, HideReason::Interrupted);
     });
 }
 
@@ -734,7 +852,7 @@ fn hide_for_work(app: &tauri::AppHandle) {
         if let Some(window) = app.get_webview_window("main") {
             let _ = window.hide();
         }
-        let _ = app.emit_to("main", "dango://reset", ());
+        settle_hide(app, HideReason::ForWork);
     });
 }
 
@@ -1095,6 +1213,8 @@ pub fn run() {
             let launcher = platform::launcher_window(&window);
             app.manage(AppState {
                 launcher: Mutex::new(launcher),
+                hold: Mutex::new(None),
+                hold_generation: AtomicU64::new(0),
             });
 
             // Clicking away from a non-activating panel does not reliably blur
@@ -1105,7 +1225,7 @@ pub fn run() {
                 let handle = app.handle().clone();
                 window.on_window_event(move |event| {
                     if let tauri::WindowEvent::Focused(false) = event {
-                        hide_after_launch(&handle);
+                        hide_on_focus_loss(&handle);
                     }
                 });
             }

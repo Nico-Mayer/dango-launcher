@@ -75,7 +75,12 @@ async function show(name: FixtureName) {
   const tree = treeFor(name);
   if (tree) await replace(tree);
   if (name === "failure") await emit("dango://failed", "Couldn't paste. Try again.");
-  await emit("dango://activate", null);
+  await emit("dango://activate", { probe: null, held: false });
+  await tick();
+}
+
+async function reactivate() {
+  await emit("dango://activate", { probe: null, held: true });
   await tick();
 }
 
@@ -104,7 +109,7 @@ async function destroy() {
   await unmount(app);
 }
 
-export const fixture = { destroy, calls, show, results, replace, stream, stopStream, emit, setTemplateInspection };
+export const fixture = { destroy, calls, show, reactivate, results, replace, stream, stopStream, emit, setTemplateInspection };
 declare global {
   interface Window { dangoFixture: typeof fixture }
 }

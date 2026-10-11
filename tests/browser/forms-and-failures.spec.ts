@@ -44,7 +44,7 @@ for (const order of ["before-reset", "after-reset"]) {
         if (order === "before-reset") await window.dangoFixture.emit("dango://failed", "Couldn't paste. Try again.");
         await window.dangoFixture.emit("dango://reset");
         if (order === "after-reset") await window.dangoFixture.emit("dango://failed", "Couldn't paste. Try again.");
-        await window.dangoFixture.emit("dango://activate", null);
+        await window.dangoFixture.emit("dango://activate", { probe: null, held: false });
       }, order);
       const failure = page.getByText("Couldn't paste. Try again.");
       await expect(failure).toBeVisible();

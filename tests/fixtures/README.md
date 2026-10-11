@@ -17,6 +17,7 @@ dangoFixture.stream(); // 30 full-tree replacements, then loading ends
 await dangoFixture.show("long-actions"); // Ctrl+K or Cmd+K opens actions
 await dangoFixture.emit("dango://failed", "Couldn't paste. Try again.");
 await dangoFixture.emit("dango://reset");
+await dangoFixture.reactivate(); // activate again with held state, no reset
 dangoFixture.calls;
 ```
 

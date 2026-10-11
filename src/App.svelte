@@ -14,6 +14,7 @@
     import {
         matchesShortcut,
         type ActionResponse,
+        type ActivatePayload,
         type RenderPayload,
         type ResultItem,
         type ResultsPayload,
@@ -250,13 +251,16 @@
         invoke("warmup_done");
         invoke<boolean>("is_development_build").then((answer) => (development = answer));
         const unlisten = [
-            listen<number | null>("dango://activate", (event) => {
-                inputEl?.focus();
-                inputEl?.select();
+            listen<ActivatePayload>("dango://activate", (event) => {
+                if (event.payload.held) runSearch(query);
+                if (!(stack.length > 0 || panelOpen || panelPresent || protocolError)) {
+                    inputEl?.focus();
+                    inputEl?.select();
+                }
                 requestAnimationFrame(() =>
                     requestAnimationFrame(() => {
-                        if (event.payload !== null)
-                            invoke("report_paint", { id: event.payload });
+                        if (event.payload.probe !== null)
+                            invoke("report_paint", { id: event.payload.probe });
                     }),
                 );
             }),

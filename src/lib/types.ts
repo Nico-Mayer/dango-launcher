@@ -32,6 +32,14 @@ export interface ResultsPayload {
 /// A pushed view with the extension whose command produced it. A command can be
 /// started from its own hotkey, without the frontend ever asking for it, so the
 /// owner arrives with the tree rather than from the invocation.
+export interface ActivatePayload {
+  /// The latency probe to report the first paint to, when one is running.
+  probe: number | null;
+  /// An interrupting hide kept the state, so the renderer refreshes what it
+  /// shows instead of starting over.
+  held: boolean;
+}
+
 export interface RenderPayload {
   owner: string;
   /// Which run produced the tree. A streaming command sends many, and the ones
