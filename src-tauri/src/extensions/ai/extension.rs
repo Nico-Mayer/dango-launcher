@@ -263,7 +263,7 @@ impl Inner {
     /// because on Windows it costs a clipboard round trip.
     fn selection(&self) -> Result<Option<String>, String> {
         let Some(text) = &self.text else {
-            return Err(crate::text::TextError::PermissionMissing.to_string());
+            return Err(crate::text::TextError::Unavailable.to_string());
         };
         match text.selection() {
             Ok(Some(selection)) if !selection.trim().is_empty() => Ok(Some(selection)),
@@ -308,7 +308,7 @@ impl Inner {
 
     fn insert(&self, answer: &str) -> Result<(), String> {
         let Some(text) = &self.text else {
-            return Err(crate::text::TextError::PermissionMissing.to_string());
+            return Err(crate::text::TextError::Unavailable.to_string());
         };
         text.insert(answer, None).map_err(|error| error.to_string())
     }

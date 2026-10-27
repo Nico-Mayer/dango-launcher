@@ -187,7 +187,7 @@ impl SnippetsExtension {
             Err(outcome) => return outcome,
         };
         let Some(text) = &self.text else {
-            return ActionOutcome::Failed(TextError::PermissionMissing.to_string());
+            return ActionOutcome::Failed(TextError::Unavailable.to_string());
         };
         match text.insert(&rendered.text, rendered.caret) {
             Ok(()) => ActionOutcome::Done,

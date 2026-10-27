@@ -99,7 +99,7 @@ impl Extension for ClipboardExtension {
     ) -> ActionOutcome {
         match action_id {
             ACTION_INSERT => match (&self.text, self.history.content(item_id)) {
-                (None, _) => ActionOutcome::Failed(TextError::PermissionMissing.to_string()),
+                (None, _) => ActionOutcome::Failed(TextError::Unavailable.to_string()),
                 (Some(text), Ok(content)) => match text.paste_content(&content) {
                     Ok(()) => ActionOutcome::Done,
                     Err(error) => ActionOutcome::Failed(error.to_string()),
@@ -730,14 +730,14 @@ mod tests {
     }
 
     #[test]
-    fn pasting_without_key_injection_fails_the_same_way() {
+    fn pasting_without_key_injection_says_the_text_path_is_unavailable() {
         let f = build(None);
         let id = record_text(&f.history, "hello");
 
         assert_eq!(
             f.extension
                 .perform_action(&id, ACTION_INSERT, &FormValues::new()),
-            ActionOutcome::Failed(TextError::PermissionMissing.to_string())
+            ActionOutcome::Failed(TextError::Unavailable.to_string())
         );
     }
 

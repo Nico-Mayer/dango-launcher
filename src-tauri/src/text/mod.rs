@@ -42,6 +42,8 @@ pub enum TextError {
     Clipboard,
     #[error("Dango can't read the selection in {0}. Copy the text first, then run this command.")]
     SelectionRefused(String),
+    #[error("Dango can't reach other apps right now. See dango.log for the reason.")]
+    Unavailable,
 }
 
 /// The keystrokes, per platform: `Cmd` on macOS, `Ctrl` on Windows, and the
@@ -1361,6 +1363,7 @@ mod display_tests {
             TextError::NoTarget,
             TextError::TargetUnavailable(KEYSTROKE_FAILED.into()),
             TextError::Clipboard,
+            TextError::Unavailable,
         ];
         for error in errors {
             let text = error.to_string();
