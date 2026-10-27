@@ -44,32 +44,18 @@ const HIDE_SETTLE: Duration = Duration::from_millis(60);
 const MAIN_THREAD_TIMEOUT: Duration = Duration::from_secs(2);
 
 pub struct MacKeys {
-    enigo: Arc<Mutex<Enigo>>,
+    /// Empty until the first keystroke. enigo refuses to start without the
+    /// Accessibility permission, so connecting at startup would leave a Dango
+    /// launched before the grant unable to type until it restarts.
+    enigo: Arc<Mutex<Option<Enigo>>>,
     main: Arc<dyn MainThread>,
 }
 
 impl MacKeys {
-    pub fn new(main: Arc<dyn MainThread>) -> Option<Self> {
-        let settings = Settings {
-            // The user got here by pressing a hotkey and may still be holding
-            // its modifiers. Without this, those modifiers ride along with the
-            // injected paste.
-            independent_of_keyboard_state: true,
-            // Dango asks for the permission deliberately, through an action the
-            // user chose. A dialog appearing by itself the first time they
-            // paste, from a process they cannot see, is worse.
-            open_prompt_to_get_permissions: false,
-            ..Default::default()
-        };
-        match Enigo::new(&settings) {
-            Ok(enigo) => Some(Self {
-                enigo: Arc::new(Mutex::new(enigo)),
-                main,
-            }),
-            Err(error) => {
-                eprintln!("[dango] no key injection available: {error}");
-                None
-            }
+    pub fn new(main: Arc<dyn MainThread>) -> Self {
+        Self {
+            enigo: Arc::new(Mutex::new(None)),
+            main,
         }
     }
 
@@ -91,25 +77,56 @@ impl MacKeys {
         let enigo = self.enigo.clone();
         let (done, wait) = std::sync::mpsc::channel();
         self.main.run(Box::new(move || {
-            let mut enigo = enigo.lock().unwrap();
-            let _ = done.send(work(&mut enigo).map_err(|error| error.to_string()));
+            let mut slot = enigo.lock().unwrap();
+            if slot.is_none() {
+                match connect() {
+                    Ok(connected) => *slot = Some(connected),
+                    Err(error) => {
+                        let _ = done.send(Err(error));
+                        return;
+                    }
+                }
+            }
+            if let Some(enigo) = slot.as_mut() {
+                let _ = done.send(work(enigo).map_err(|error| {
+                    eprintln!("[dango] keystroke failed: {error}");
+                    keystroke_failed()
+                }));
+            }
         }));
         match wait.recv_timeout(MAIN_THREAD_TIMEOUT) {
-            Ok(Ok(())) => Ok(()),
-            Ok(Err(error)) => {
-                eprintln!("[dango] keystroke failed: {error}");
-                Err(TextError::TargetUnavailable(
-                    crate::text::KEYSTROKE_FAILED.into(),
-                ))
-            }
+            Ok(result) => result,
             Err(_) => {
                 eprintln!("[dango] the main thread did not run the keystroke");
-                Err(TextError::TargetUnavailable(
-                    crate::text::KEYSTROKE_FAILED.into(),
-                ))
+                Err(keystroke_failed())
             }
         }
     }
+}
+
+fn connect() -> Result<Enigo, TextError> {
+    let settings = Settings {
+        // The user got here by pressing a hotkey and may still be holding
+        // its modifiers. Without this, those modifiers ride along with the
+        // injected paste.
+        independent_of_keyboard_state: true,
+        // Dango asks for the permission deliberately, through an action the
+        // user chose. A dialog appearing by itself the first time they
+        // paste, from a process they cannot see, is worse.
+        open_prompt_to_get_permissions: false,
+        ..Default::default()
+    };
+    Enigo::new(&settings).map_err(|error| match error {
+        enigo::NewConError::NoPermission => TextError::PermissionMissing,
+        error => {
+            eprintln!("[dango] no key injection available: {error}");
+            keystroke_failed()
+        }
+    })
+}
+
+fn keystroke_failed() -> TextError {
+    TextError::TargetUnavailable(crate::text::KEYSTROKE_FAILED.into())
 }
 
 impl Keys for MacKeys {

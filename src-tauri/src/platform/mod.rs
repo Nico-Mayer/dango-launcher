@@ -226,7 +226,7 @@ pub fn text_exchange(
 ) -> Option<crate::text::TextExchange> {
     #[cfg(target_os = "macos")]
     {
-        let keys = std::sync::Arc::new(macos::MacKeys::new(main)?);
+        let keys = std::sync::Arc::new(macos::MacKeys::new(main));
         Some(crate::text::TextExchange::new(
             clipboard,
             keys,

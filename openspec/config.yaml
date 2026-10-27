@@ -136,6 +136,8 @@ context: |
   - macOS gates window management, paste, snippet expansion, and reading the
     selection behind the Accessibility permission. Treat permission onboarding
     as a real feature.
+  - enigo's `Enigo::new` on macOS fails with `NoPermission` when Accessibility
+    is not granted. Create it on first use, never at startup.
   - Showing the launcher over fullscreen apps on macOS needs an NSPanel rather
     than a standard window.
   - Reading the current selection is direct on macOS via `AXSelectedText`, but on
