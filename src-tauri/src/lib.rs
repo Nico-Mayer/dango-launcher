@@ -1166,73 +1166,92 @@ pub fn run() {
             // Registering for application activations needs the main thread,
             // which this is; the watcher itself runs on its own.
             let attribution = platform::attribution();
-            if let Some(store) = &store {
-                let images = app
-                    .path()
-                    .app_cache_dir()
-                    .unwrap_or_else(|_| std::env::temp_dir())
-                    .join("clipboard");
-                // The webview loads image thumbnails through the asset protocol.
-                let _ = app.asset_protocol_scope().allow_directory(&images, true);
+            let clipboard = extensions::clipboard::CrateClipboard::new();
+            match &clipboard {
+                // Shared, so the AI extension can put an answer on the
+                // clipboard without opening a second connection to it.
+                Some(clipboard) => {
+                    app.manage(clipboard.clone());
+                }
+                None => eprintln!("[dango] no clipboard available, so history and pasting are off"),
+            }
 
-                let history = Arc::new(History::new(store.clone(), images));
-                let policy = Arc::new(PreferencePolicy(extension::Preferences::new(
+            let history = match (&store, &clipboard) {
+                (Some(store), Some(clipboard)) => {
+                    let images = app
+                        .path()
+                        .app_cache_dir()
+                        .unwrap_or_else(|_| std::env::temp_dir())
+                        .join("clipboard");
+                    // The webview loads image thumbnails through the asset protocol.
+                    let _ = app.asset_protocol_scope().allow_directory(&images, true);
+
+                    let history = Arc::new(History::new(store.clone(), images));
+                    let policy = Arc::new(PreferencePolicy(extension::Preferences::new(
+                        extensions::clipboard::EXTENSION_ID,
+                        extensions::clipboard::preference_declarations(),
+                        file_config.clone(),
+                    )));
+                    let watcher = Arc::new(Watcher::new(
+                        clipboard.clone(),
+                        attribution,
+                        history.clone(),
+                        policy,
+                    ));
+                    Some((history, watcher))
+                }
+                (None, _) => {
+                    eprintln!("[dango] no database, so clipboard history is off");
+                    None
+                }
+                (Some(_), None) => None,
+            };
+
+            let exchange = clipboard.as_ref().and_then(|clipboard| {
+                // The watcher is what keeps a paste out of the history, so the
+                // exchange is built against it whenever there is one.
+                let own_writes: Arc<dyn text::OwnWrites> = match &history {
+                    Some((_, watcher)) => watcher.clone(),
+                    None => Arc::new(text::Unwatched),
+                };
+                let dismisser: Arc<dyn text::Launcher> =
+                    Arc::new(HideLauncher(app.handle().clone()));
+                platform::text_exchange(
+                    clipboard.clone(),
+                    own_writes,
+                    dismisser,
+                    Arc::new(OnMainThread(app.handle().clone())),
+                    Some(refuses_fallback(file_config.clone())),
+                )
+                .map(Arc::new)
+            });
+            match &exchange {
+                Some(exchange) => {
+                    app.manage(exchange.clone());
+                }
+                None => {
+                    eprintln!("[dango] no key injection or clipboard, so pasting is off");
+                    notices.push("Pasting is off, see dango.log".to_string());
+                }
+            }
+
+            if let Some((history, watcher)) = history {
+                let preferences = extension::Preferences::new(
                     extensions::clipboard::EXTENSION_ID,
                     extensions::clipboard::preference_declarations(),
                     file_config.clone(),
-                )));
-                match extensions::clipboard::CrateClipboard::new() {
-                    Some(clipboard) => {
-                        // Shared, so the AI extension can put an answer on the
-                        // clipboard without opening a second connection to it.
-                        app.manage(clipboard.clone());
-                        let watcher = Arc::new(Watcher::new(
-                            clipboard.clone(),
-                            attribution,
-                            history.clone(),
-                            policy,
-                        ));
-                        // The watcher is what keeps a paste out of the history,
-                        // so the exchange is built against this one.
-                        let dismisser: Arc<dyn text::Launcher> =
-                            Arc::new(HideLauncher(app.handle().clone()));
-                        let exchange = platform::text_exchange(
-                            clipboard,
-                            watcher.clone(),
-                            dismisser,
-                            Arc::new(OnMainThread(app.handle().clone())),
-                            Some(refuses_fallback(file_config.clone())),
-                        )
-                        .map(Arc::new);
-                        match &exchange {
-                            Some(exchange) => {
-                                app.manage(exchange.clone());
-                            }
-                            None => eprintln!("[dango] no key injection, so pasting is off"),
-                        }
-                        let preferences = extension::Preferences::new(
-                            extensions::clipboard::EXTENSION_ID,
-                            extensions::clipboard::preference_declarations(),
-                            file_config.clone(),
-                        );
-                        let extension = Arc::new(ClipboardExtension::new(
-                            history,
-                            watcher,
-                            preferences,
-                            exchange.map(|exchange| exchange as Arc<dyn text::TextTarget>),
-                        ));
-                        match host.register(extension) {
-                            Ok(report) if report.is_clean() => {}
-                            Ok(report) => {
-                                eprintln!("[dango] clipboard loaded with issues: {report:?}")
-                            }
-                            Err(error) => eprintln!("[dango] clipboard failed to load: {error}"),
-                        }
-                    }
-                    None => eprintln!("[dango] no clipboard available, so history is off"),
+                );
+                let extension = Arc::new(ClipboardExtension::new(
+                    history,
+                    watcher,
+                    preferences,
+                    exchange.map(|exchange| exchange as Arc<dyn text::TextTarget>),
+                ));
+                match host.register(extension) {
+                    Ok(report) if report.is_clean() => {}
+                    Ok(report) => eprintln!("[dango] clipboard loaded with issues: {report:?}"),
+                    Err(error) => eprintln!("[dango] clipboard failed to load: {error}"),
                 }
-            } else {
-                eprintln!("[dango] no database, so clipboard history is off");
             }
 
             {
