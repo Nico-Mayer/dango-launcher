@@ -2,6 +2,52 @@
 
 All notable changes to Dango. Generated from commit history at release time.
 
+## [0.5.0] - 2026-10-30
+
+### Features
+
+- **config:** Add launcher.reset-after setting
+- **shell:** Hold launcher state after interrupting hide
+- **search:** Pin results above an empty query
+- **platform:** Check macOS privacy permissions
+- **permissions:** Warn about missing permissions
+- **updates:** Add self-update extension
+
+### Fixes
+
+- **text:** Stop blaming a missing text path on AX
+- **text:** Build the exchange without history
+- **macos:** Start key injection on first use
+- **search:** Merge providers in registration order
+
+### Refactoring
+
+- Move Runner into invocation
+
+### Documentation
+
+- **roadmap:** Record permission warnings in M7
+- Remove roadmap
+- Add AGENTS.md as agent source of truth
+- **specs:** Replace timing budgets with qualitative rules
+- Note local bundling needs the updater key
+- Note local macOS builds sign ad-hoc
+
+### Maintenance
+
+- Remove pi agent files
+- Drop timing-budget assertions
+- Remove tests that prove nothing
+- Drop tests of library behaviour and static data
+- Cut ActionPanel browser test combinations
+- Stop pinning pixels and unread screenshots
+- Match AI error variants, not their copy
+- Run search tests on paused tokio time
+- Cover snippet keyword expansion
+- Cover the Windows invisible-border correction
+- Generate IPC payload types with ts-rs
+- Cover frecency and app index persistence
+- **release:** Sign updater and macOS bundles
 ## [0.4.0] - 2026-10-10
 
 ### Features
