@@ -156,6 +156,11 @@ load and are not reliable.
 - Showing the launcher over fullscreen apps on macOS needs an NSPanel.
 - Reading the selection is direct on macOS via `AXSelectedText`. On Windows the
   realistic path is copy, read clipboard, restore clipboard.
+- Dango started from the tray, autostart, or Finder inherits the saved system
+  PATH, not the one a shell profile builds, so tools from version managers such
+  as mise are missing. `std::process::Command` on Windows also finds only
+  `.exe` for a bare name, not npm's `.cmd` wrappers. Resolve programs with the
+  `which` crate over an explicit search path.
 - An ad-hoc signed macOS build has a designated requirement of its own
   `cdhash`, which changes every build, so macOS can treat each update as a new
   app and drop its Accessibility and Input Monitoring grants. Release builds
