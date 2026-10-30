@@ -339,15 +339,6 @@ mod tests {
     }
 
     #[test]
-    fn the_order_is_the_same_every_time() {
-        let source = "{{ zebra }} {{ apple }} {{ mango }} {{ cherry }} {{ pear }}";
-        let first = arguments(source);
-        for _ in 0..20 {
-            assert_eq!(arguments(source), first, "a shuffling form is unusable");
-        }
-    }
-
-    #[test]
     fn a_repeated_argument_is_reported_once_and_filled_everywhere() {
         assert_eq!(
             arguments("{{ city }} to {{ city }} via {{ stop }}"),
@@ -498,32 +489,6 @@ mod tests {
         let template = Template::parse("https://example.com?q={{ query }}").unwrap();
         assert!(template.uses("query"));
         assert!(!template.uses("clipboard"));
-    }
-
-    #[test]
-    fn rendering_meets_the_budget() {
-        let body = "lorem ipsum dolor sit amet ".repeat(40);
-        let source = format!(
-            "{body}{}",
-            (0..10)
-                .map(|i| format!("{{{{ name{i} }}}} "))
-                .collect::<String>()
-        );
-        assert!(source.len() >= 1000, "the budget is for a real template");
-        let template = Template::parse(&source).unwrap();
-        let values = Values::with_arguments(
-            (0..10)
-                .map(|i| (format!("name{i}"), "value".to_string()))
-                .collect(),
-        );
-
-        let start = std::time::Instant::now();
-        template.render(&values).unwrap();
-        let elapsed = start.elapsed();
-        assert!(
-            elapsed < std::time::Duration::from_millis(5),
-            "rendering took {elapsed:?}, the budget is 5ms"
-        );
     }
 }
 

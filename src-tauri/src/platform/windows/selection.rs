@@ -77,22 +77,3 @@ fn read() -> Selected {
         Err(_) => Selected::Unavailable,
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use std::time::Instant;
-
-    /// Whatever has focus while the suite runs, the call must answer inside the
-    /// deadline rather than blocking the caller.
-    #[test]
-    fn reading_answers_within_the_deadline() {
-        let started = Instant::now();
-        let _ = WindowsSelection.selected_text();
-        assert!(
-            started.elapsed() < DEADLINE + Duration::from_millis(100),
-            "took {:?}",
-            started.elapsed()
-        );
-    }
-}

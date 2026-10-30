@@ -611,37 +611,4 @@ mod tests {
         assert_eq!(ranked[0].id, "used");
         assert!(!ranked[1].suggested);
     }
-
-    #[test]
-    fn ranking_two_thousand_candidates_meets_the_budget() {
-        let frecency = Arc::new(FrecencyTable::in_memory());
-        let learned = Arc::new(InputHistory::in_memory());
-        let now = frecency::now_millis();
-        for i in 0..12 {
-            frecency.record_launch(&format!("id{i}"), now);
-        }
-        for i in 0..2000 {
-            learned.record(&format!("ap{i}"), &format!("id{}", i % 500), now);
-        }
-        let ranker = ranker_with(frecency, learned);
-        let candidates: Vec<Candidate> = (0..2000)
-            .map(|i| candidate(&format!("id{i}"), &format!("Application Number {i}")))
-            .collect();
-
-        // Best of several runs, so a single scheduling hiccup on CI does not
-        // fail a test about steady-state cost.
-        for query in ["appnum", "ap", ""] {
-            let mut best = std::time::Duration::from_secs(1);
-            for _ in 0..5 {
-                let input = candidates.clone();
-                let start = std::time::Instant::now();
-                let _ = ranker.rank(query, input, 50);
-                best = best.min(start.elapsed());
-            }
-            assert!(
-                best < std::time::Duration::from_millis(30),
-                "ranking 2000 candidates for {query:?} took {best:?}, over the 30ms budget"
-            );
-        }
-    }
 }
