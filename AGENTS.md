@@ -199,3 +199,6 @@ load and are not reliable.
   `TAURI_SIGNING_PRIVATE_KEY`, after the app bundle is already signed. Pass
   `--config '{"bundle":{"createUpdaterArtifacts":false}}'` to skip the updater
   artifacts.
+- A local macOS bundle without `APPLE_SIGNING_IDENTITY` in the environment is
+  ad-hoc signed and carries no entitlements. Set it to the identity from
+  `security find-identity -v -p codesigning` to test a signed build.
