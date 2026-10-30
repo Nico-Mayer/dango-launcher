@@ -27,6 +27,30 @@ pub fn launcher_window(window: &WebviewWindow) -> Box<dyn LauncherWindow> {
     return Box::new(windows::WindowsLauncherWindow::new(window));
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Permission {
+    Accessibility,
+    InputMonitoring,
+}
+
+/// The operating-system permissions Dango's features depend on. Windows has
+/// none, so its answer is always empty.
+pub trait Permissions: Send + Sync {
+    /// Never prompts, so it is safe to ask per query and on a timer.
+    fn missing(&self) -> Vec<Permission>;
+    /// Asks the system for the permission, which also lists Dango in the
+    /// matching settings pane. Only ever called from an action the user chose.
+    fn request(&self, permission: Permission);
+    fn settings_url(&self, permission: Permission) -> Option<&'static str>;
+}
+
+pub fn permissions() -> std::sync::Arc<dyn Permissions> {
+    #[cfg(target_os = "macos")]
+    return std::sync::Arc::new(macos::MacPermissions);
+    #[cfg(target_os = "windows")]
+    return std::sync::Arc::new(windows::WindowsPermissions);
+}
+
 /// One running application, as the quit command needs to see it. `id` is
 /// whatever the platform addresses it by, opaque above this line.
 #[derive(Clone, Debug, PartialEq)]

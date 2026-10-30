@@ -2,6 +2,7 @@ mod apps;
 mod clipboard;
 mod hyperkey;
 mod keymonitor;
+mod permissions;
 #[cfg(test)]
 mod probe;
 mod selection;
@@ -13,6 +14,7 @@ pub use apps::{icon_for, WindowsAppIndexer};
 pub use clipboard::WindowsAttribution;
 pub use hyperkey::WindowsHyperkey;
 pub use keymonitor::WindowsKeyMonitor;
+pub use permissions::WindowsPermissions;
 pub use selection::WindowsSelection;
 pub use system::WindowsSystemControl;
 pub use text::{own_integrity_level, remember_previous_foreground, WindowsHandoff, WindowsKeys};
