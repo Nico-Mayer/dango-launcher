@@ -47,7 +47,7 @@ impl MacKeyMonitor {
         match tap {
             Some(tap) => Some(Self { _tap: tap }),
             None => {
-                eprintln!("[dango] keyword expansion needs the Accessibility permission");
+                eprintln!("[dango] keyword expansion needs the Input Monitoring permission");
                 None
             }
         }

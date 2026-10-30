@@ -22,6 +22,7 @@ Per-extension settings, keyed by extension id.
 | `dango.ai` | object |  |  | Settings for the AI extension. |
 | `dango.applications` | object |  |  | Settings for the Applications extension. |
 | `dango.clipboard` | object |  |  | Settings for the Clipboard History extension. |
+| `dango.permissions` | object |  |  | Settings for the Permissions extension. |
 | `dango.quicklinks` | object |  |  | Settings for the Quicklinks extension. |
 | `dango.snippets` | object |  |  | Settings for the Snippets extension. |
 | `dango.system` | object |  |  | Settings for the System extension. |
@@ -101,6 +102,14 @@ The extension's preference values, overriding its defaults.
 | `excluded-applications` | string | `1Password, Bitwarden, Dashlane, Enpass, KeePassXC, Keeper, LastPass, NordPass, Proton Pass, Secrets, Strongbox` |  | Applications whose copies are never recorded, comma separated. |
 | `primary-action` | string | `paste` | `paste`, `copy` | What Enter does to an entry: paste it into the previous app, or only copy it. |
 | `total-megabytes` | number | `256` |  | The most the whole history may use, in megabytes. |
+
+## `extensions.dango.permissions`
+
+Settings for the Permissions extension.
+
+| Setting | Type | Default | Values | Description |
+| --- | --- | --- | --- | --- |
+| `enabled` | boolean |  |  | Whether the extension runs. Absent means enabled. |
 
 ## `extensions.dango.quicklinks`
 

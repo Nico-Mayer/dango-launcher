@@ -32,6 +32,7 @@ use extensions::applications::{AppIndex, ApplicationsExtension, IconCache};
 use extensions::clipboard::{
     ClipboardExtension, ClipboardSource, History, PreferencePolicy, Watcher,
 };
+use extensions::permissions::PermissionsExtension;
 use extensions::snippets::{self, SnippetsExtension};
 use extensions::system::SystemExtension;
 use extensions::window_management::WindowManagementExtension;
@@ -954,6 +955,69 @@ fn set_config_status(app: &tauri::AppHandle, error: bool) {
     }
 }
 
+const PERMISSION_POLL: std::time::Duration = std::time::Duration::from_secs(2);
+
+struct PermissionTray {
+    menu: Menu<tauri::Wry>,
+    items: Vec<(platform::Permission, MenuItem<tauri::Wry>)>,
+}
+
+fn permission_menu_id(permission: platform::Permission) -> &'static str {
+    match permission {
+        platform::Permission::Accessibility => "grant-accessibility",
+        platform::Permission::InputMonitoring => "grant-input-monitoring",
+    }
+}
+
+fn sync_permission_tray(tray: &PermissionTray, missing: &[platform::Permission]) {
+    for (_, item) in &tray.items {
+        let _ = tray.menu.remove(item);
+    }
+    let shown = tray
+        .items
+        .iter()
+        .filter(|(permission, _)| missing.contains(permission));
+    for (position, (_, item)) in shown.enumerate() {
+        let _ = tray.menu.insert(item, position);
+    }
+}
+
+fn grant_from_tray(app: &tauri::AppHandle, permission: platform::Permission) {
+    let outcome = extensions::permissions::grant(
+        platform::permissions().as_ref(),
+        &DefaultHandler(app.clone()),
+        permission,
+    );
+    if let ActionOutcome::Failed(message) = outcome {
+        log_config(&message);
+    }
+}
+
+/// Keeps the tray in step with the permissions. A grant or revoke happens in
+/// System Settings, where Dango cannot see it, so polling is the only signal.
+fn watch_permissions(app: tauri::AppHandle, permissions: Arc<dyn platform::Permissions>) {
+    let mut last = permissions.missing();
+    let spawned = std::thread::Builder::new()
+        .name("dango-permissions".into())
+        .spawn(move || loop {
+            std::thread::sleep(PERMISSION_POLL);
+            let missing = permissions.missing();
+            if missing == last {
+                continue;
+            }
+            last = missing.clone();
+            let handle = app.clone();
+            let _ = app.run_on_main_thread(move || {
+                if let Some(tray) = handle.try_state::<PermissionTray>() {
+                    sync_permission_tray(&tray, &missing);
+                }
+            });
+        });
+    if let Err(error) = spawned {
+        eprintln!("[dango] permission watching is off: {error}");
+    }
+}
+
 /// Appends a config problem to a log file beside the config. A release build has
 /// `windows_subsystem = "windows"`, so stderr is not visible; the log is.
 fn log_config(message: &str) {
@@ -1134,6 +1198,12 @@ fn apply_hyperkey(config: &config::Config, handle: &HyperkeyHandle) -> Option<St
         Some(running) => {
             *current = Some(running);
             None
+        }
+        None if platform::permissions()
+            .missing()
+            .contains(&platform::Permission::InputMonitoring) =>
+        {
+            Some("hyperkey: needs the Input Monitoring permission".to_string())
         }
         None => Some(
             "hyperkey: could not start; unavailable on this platform or refused by the OS"
@@ -1476,6 +1546,16 @@ pub fn run() {
                 Err(error) => eprintln!("[dango] system failed to load: {error}"),
             }
 
+            let permissions = Arc::new(PermissionsExtension::new(
+                platform::permissions(),
+                Arc::new(DefaultHandler(app.handle().clone())),
+            ));
+            match host.register(permissions) {
+                Ok(report) if report.is_clean() => {}
+                Ok(report) => eprintln!("[dango] permissions loaded with issues: {report:?}"),
+                Err(error) => eprintln!("[dango] permissions failed to load: {error}"),
+            }
+
             let window_management = Arc::new(WindowManagementExtension::new(
                 platform::window_manager(Arc::new(OnMainThread(app.handle().clone()))),
             ));
@@ -1613,6 +1693,25 @@ pub fn run() {
                 false,
                 None::<&str>,
             )?;
+            let permission_items = [
+                (platform::Permission::Accessibility, "Grant Accessibility"),
+                (
+                    platform::Permission::InputMonitoring,
+                    "Grant Input Monitoring",
+                ),
+            ]
+            .into_iter()
+            .map(|(permission, text)| {
+                MenuItem::with_id(
+                    app,
+                    permission_menu_id(permission),
+                    text,
+                    true,
+                    None::<&str>,
+                )
+                .map(|item| (permission, item))
+            })
+            .collect::<Result<Vec<_>, _>>()?;
             let toggle_item =
                 MenuItem::with_id(app, "toggle", "Show or hide Dango", true, None::<&str>)?;
             let quit_item = MenuItem::with_id(app, "quit", "Quit Dango", true, None::<&str>)?;
@@ -1625,6 +1724,14 @@ pub fn run() {
             items.push(&quit_item);
             let menu = Menu::with_items(app, &items)?;
             app.manage(ConfigStatusItem(config_status.clone()));
+            let permissions = platform::permissions();
+            let tray = PermissionTray {
+                menu: menu.clone(),
+                items: permission_items,
+            };
+            sync_permission_tray(&tray, &permissions.missing());
+            app.manage(tray);
+            watch_permissions(app.handle().clone(), permissions);
             if config_error.is_some() {
                 log_config("config file did not parse at startup, using defaults");
             }
@@ -1673,6 +1780,12 @@ pub fn run() {
                 .show_menu_on_left_click(true)
                 .on_menu_event(|app, event| match event.id().as_ref() {
                     "toggle" => toggle(app),
+                    "grant-accessibility" => {
+                        grant_from_tray(app, platform::Permission::Accessibility)
+                    }
+                    "grant-input-monitoring" => {
+                        grant_from_tray(app, platform::Permission::InputMonitoring)
+                    }
                     "quit" => {
                         // Hand the combination back before going away, or it
                         // stays claimed until the session ends.

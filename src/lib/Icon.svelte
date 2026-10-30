@@ -24,6 +24,7 @@
   import Square from "@lucide/svelte/icons/square";
   import Terminal from "@lucide/svelte/icons/terminal";
   import Trash2 from "@lucide/svelte/icons/trash-2";
+  import TriangleAlert from "@lucide/svelte/icons/triangle-alert";
 
   /// Every named icon the product can ask for. Icons are imported one by one
   /// rather than as a barrel so the bundle carries only what is used, and
@@ -55,6 +56,7 @@
     square: Square,
     terminal: Terminal,
     "trash-2": Trash2,
+    "triangle-alert": TriangleAlert,
   } as const;
 
   export type IconName = keyof typeof REGISTRY;

@@ -138,6 +138,10 @@ context: |
     as a real feature.
   - enigo's `Enigo::new` on macOS fails with `NoPermission` when Accessibility
     is not granted. Create it on first use, never at startup.
+  - Keyboard `CGEventTap`s on macOS, listen-only and active alike, need Input
+    Monitoring, not Accessibility. The hyperkey's active tap starts with Input
+    Monitoring alone. macOS applies an Input Monitoring grant only after the
+    app restarts; an Accessibility grant applies at once.
   - Showing the launcher over fullscreen apps on macOS needs an NSPanel rather
     than a standard window.
   - Reading the current selection is direct on macOS via `AXSelectedText`, but on

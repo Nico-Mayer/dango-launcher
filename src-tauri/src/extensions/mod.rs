@@ -1,6 +1,7 @@
 pub mod ai;
 pub mod applications;
 pub mod clipboard;
+pub mod permissions;
 pub mod snippets;
 pub mod system;
 pub mod window_management;
@@ -15,6 +16,7 @@ pub fn builtin_manifests() -> Vec<Manifest> {
     vec![
         applications::manifest(),
         clipboard::manifest(),
+        permissions::manifest(),
         system::manifest(),
         window_management::manifest(),
         ai::manifest(&shipped_ai),
