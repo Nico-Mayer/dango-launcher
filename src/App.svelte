@@ -72,8 +72,10 @@
             : (results[0]?.id ?? ""),
     );
     const selectedItem = $derived(results.find((r) => r.id === selectedId));
-    const suggestions = $derived(results.filter((r) => r.suggested));
-    const everythingElse = $derived(results.filter((r) => !r.suggested));
+    const pinned = $derived(results.filter((r) => r.pinned));
+    const unpinned = $derived(results.filter((r) => !r.pinned));
+    const suggestions = $derived(unpinned.filter((r) => r.suggested));
+    const everythingElse = $derived(unpinned.filter((r) => !r.suggested));
 
     function runSearch(q: string) {
         liveQuery = q;
@@ -412,9 +414,14 @@
 
             >
                 <Command.Viewport >
+                    {#if pinned.length > 0}
+                        {@render group("Needs attention", pinned)}
+                    {/if}
                     {#if suggestions.length > 0}
                         {@render group("Suggestions", suggestions)}
                         {@render group("Everything else", everythingElse)}
+                    {:else if pinned.length > 0}
+                        {@render group("Everything else", unpinned)}
                     {:else}
                         {#each results as item (item.id)}
                             {@render row(item)}

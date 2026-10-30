@@ -22,6 +22,7 @@ export const rootItems: ResultItem[] = Array.from({ length: 18 }, (_, index) => 
   actions,
   matchPositions: index === 0 ? [0, 1, 2, 3] : [],
   suggested: index < 3,
+  pinned: false,
 }));
 
 export const listTree: ViewTree = {

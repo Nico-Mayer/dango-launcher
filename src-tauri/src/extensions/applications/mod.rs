@@ -169,6 +169,7 @@ impl RootProvider for AppProvider {
                     actions: app_actions(has_path),
                     match_positions: vec![],
                     suggested: false,
+                    pinned: false,
                 }
             })
             .collect()

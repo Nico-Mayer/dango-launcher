@@ -40,6 +40,9 @@ pub struct Candidate {
     /// Set by the ranker on an empty query for the few most frecent items, so
     /// the frontend can head them as suggestions without knowing frecency.
     pub suggested: bool,
+    /// Listed above everything else on an empty query, for the few results the
+    /// user should not have to search for, such as a missing permission.
+    pub pinned: bool,
 }
 
 /// A fixed set of commands snapshotted from the registry. Rebuilt when
@@ -236,6 +239,7 @@ mod tests {
             actions: vec![],
             match_positions: vec![],
             suggested: false,
+            pinned: false,
         }
     }
 

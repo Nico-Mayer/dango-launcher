@@ -21,6 +21,8 @@ export interface ResultItem {
   matchPositions: number[];
   /// Marked by the backend on an empty query for the few most launched items.
   suggested: boolean;
+  /// Listed first on an empty query, under its own heading.
+  pinned: boolean;
 }
 
 export interface ResultsPayload {

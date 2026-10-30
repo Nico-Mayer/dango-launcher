@@ -65,6 +65,7 @@ struct ResultItem {
     actions: Vec<protocol::Action>,
     match_positions: Vec<usize>,
     suggested: bool,
+    pinned: bool,
 }
 
 impl ResultItem {
@@ -79,6 +80,7 @@ impl ResultItem {
             actions: c.actions,
             match_positions: c.match_positions,
             suggested: c.suggested,
+            pinned: c.pinned,
         }
     }
 }
@@ -515,6 +517,7 @@ mod tint_tests {
             actions: vec![],
             match_positions: vec![],
             suggested: false,
+            pinned: false,
         }
     }
 

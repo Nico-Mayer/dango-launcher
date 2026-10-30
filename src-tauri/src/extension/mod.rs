@@ -205,6 +205,7 @@ impl ExtensionHost {
                 actions: Vec::new(),
                 match_positions: Vec::new(),
                 suggested: false,
+                pinned: false,
             })
             .collect()
     }

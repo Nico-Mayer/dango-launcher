@@ -394,6 +394,7 @@ impl RootProvider for SnippetProvider {
                 actions: item_actions(self.kind),
                 match_positions: vec![],
                 suggested: false,
+                pinned: false,
             })
             .collect()
     }

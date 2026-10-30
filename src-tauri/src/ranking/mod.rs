@@ -115,7 +115,9 @@ fn rank_empty_query(
     now: i64,
     limit: usize,
 ) -> Vec<Candidate> {
-    let mut scored: Vec<(Candidate, f64)> = candidates
+    let (pinned, rest): (Vec<Candidate>, Vec<Candidate>) =
+        candidates.into_iter().partition(|c| c.pinned);
+    let mut scored: Vec<(Candidate, f64)> = rest
         .into_iter()
         .map(|c| {
             let score = frecency.score(&c.id, now);
@@ -125,15 +127,14 @@ fn rank_empty_query(
     // Highest frecency first; on a first run every score is zero and this falls
     // back to title order, which is a sensible default list rather than empty.
     scored.sort_by(|a, b| b.1.total_cmp(&a.1).then_with(|| a.0.title.cmp(&b.0.title)));
-    scored
+    let ranked = scored
         .into_iter()
         .enumerate()
         .map(|(index, (mut c, score))| {
             c.suggested = index < SUGGESTION_LIMIT && score > 0.0;
             c
-        })
-        .take(limit)
-        .collect()
+        });
+    pinned.into_iter().chain(ranked).take(limit).collect()
 }
 
 #[derive(PartialEq, Eq, PartialOrd, Ord)]
@@ -201,6 +202,7 @@ mod tests {
             actions: vec![],
             match_positions: vec![],
             suggested: false,
+            pinned: false,
         }
     }
 
@@ -382,6 +384,36 @@ mod tests {
         assert_eq!(ranked[7].id, "used7");
         assert!(!ranked[6].suggested && !ranked[7].suggested);
         assert_eq!(ranked[8].id, "aaa");
+    }
+
+    #[test]
+    fn pinned_items_lead_an_empty_query_in_provider_order() {
+        let frecency = Arc::new(FrecencyTable::in_memory());
+        frecency.record_launch("used", frecency::now_millis());
+        let ranker = ranker_with(frecency, Arc::new(InputHistory::in_memory()));
+        let mut second = candidate("pin-b", "Zeta");
+        second.pinned = true;
+        let mut first = candidate("pin-a", "Omega");
+        first.pinned = true;
+
+        let ranked = ranker.rank("", vec![candidate("used", "Used"), first, second], 10);
+
+        let ids: Vec<&str> = ranked.iter().map(|c| c.id.as_str()).collect();
+        assert_eq!(ids, ["pin-a", "pin-b", "used"]);
+        assert!(!ranked[0].suggested && !ranked[1].suggested);
+        assert!(ranked[2].suggested);
+    }
+
+    #[test]
+    fn pinned_has_no_effect_on_a_typed_query() {
+        let ranker = ranker();
+        let mut pinned = candidate("pin", "Accessibility is off");
+        pinned.pinned = true;
+
+        let ranked = ranker.rank("alpha", vec![pinned, candidate("a", "Alpha")], 10);
+
+        let ids: Vec<&str> = ranked.iter().map(|c| c.id.as_str()).collect();
+        assert_eq!(ids, ["a"]);
     }
 
     #[test]
