@@ -33,4 +33,5 @@ rules:
   tasks:
     - Group tasks so that each group leaves the app in a runnable state.
     - Platform-specific work gets separate tasks per platform, never one task covering both.
-    - Include a task for verifying the change on both Windows and macOS before the change is done.
+    - Verify with automated tests by default. A task's verify clause names the test that proves it (`cargo test`, `npm run test:browser`), not a manual step in `tauri dev`.
+    - Add manual verification tasks only for behaviour a test cannot observe on the real OS (focus, window placement, panels, hotkeys, permissions, native APIs), and only for the platforms whose code or behaviour the change touches. A platform-neutral change has no manual tasks.
