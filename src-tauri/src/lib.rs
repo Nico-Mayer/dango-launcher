@@ -35,6 +35,7 @@ use extensions::clipboard::{
 use extensions::permissions::PermissionsExtension;
 use extensions::snippets::{self, SnippetsExtension};
 use extensions::system::SystemExtension;
+use extensions::updates::{self, UpdatesExtension};
 use extensions::window_management::WindowManagementExtension;
 use invocation::{InvocationContext, InvokeError, Invoker, Outcome, Output};
 use latency::LatencyProbe;
@@ -969,6 +970,31 @@ fn grant_from_tray(app: &tauri::AppHandle, permission: platform::Permission) {
     }
 }
 
+const UPDATE_MENU_ID: &str = "install-update";
+
+struct UpdateTray {
+    menu: Menu<tauri::Wry>,
+    item: MenuItem<tauri::Wry>,
+}
+
+fn sync_update_tray(tray: &UpdateTray, version: Option<&str>) {
+    let _ = tray.menu.remove(&tray.item);
+    if let Some(version) = version {
+        let _ = tray.item.set_text(format!("Install Dango {version}"));
+        let _ = tray.menu.insert(&tray.item, 0);
+    }
+}
+
+fn install_from_tray(app: &tauri::AppHandle) {
+    let Some(updates) = app.try_state::<Arc<UpdatesExtension>>() else {
+        return;
+    };
+    show(app, None);
+    if let ActionOutcome::Failed(message) = updates.install() {
+        log_config(&format!("updates: {message}"));
+    }
+}
+
 /// Keeps the tray in step with the permissions. A grant or revoke happens in
 /// System Settings, where Dango cannot see it, so polling is the only signal.
 fn watch_permissions(app: tauri::AppHandle, permissions: Arc<dyn platform::Permissions>) {
@@ -1213,6 +1239,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_autostart::Builder::new().build())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
             show(app, None);
         }))
@@ -1532,6 +1559,24 @@ pub fn run() {
                 Err(error) => eprintln!("[dango] permissions failed to load: {error}"),
             }
 
+            // Registered after permissions, so a permission warning leads the
+            // update item.
+            let updates = Arc::new(UpdatesExtension::new(
+                Arc::new(updates::PluginSource::new(app.handle().clone())),
+                app.package_info().version.to_string(),
+                !cfg!(debug_assertions),
+                tauri::async_runtime::handle().inner().clone(),
+                Some(Arc::new(ViewRunner {
+                    app: app.handle().clone(),
+                    owner: updates::EXTENSION_ID,
+                })),
+            ));
+            match host.register(updates.clone()) {
+                Ok(report) if report.is_clean() => {}
+                Ok(report) => eprintln!("[dango] updates loaded with issues: {report:?}"),
+                Err(error) => eprintln!("[dango] updates failed to load: {error}"),
+            }
+
             let window_management = Arc::new(WindowManagementExtension::new(
                 platform::window_manager(Arc::new(OnMainThread(app.handle().clone()))),
             ));
@@ -1711,6 +1756,25 @@ pub fn run() {
             sync_permission_tray(&tray, &permissions.missing());
             app.manage(tray);
             watch_permissions(app.handle().clone(), permissions);
+
+            app.manage(UpdateTray {
+                menu: menu.clone(),
+                item: MenuItem::with_id(app, UPDATE_MENU_ID, "", true, None::<&str>)?,
+            });
+            {
+                let handle = app.handle().clone();
+                updates.set_listener(Arc::new(move |version| {
+                    let version = version.map(str::to_string);
+                    let app = handle.clone();
+                    let _ = handle.run_on_main_thread(move || {
+                        if let Some(tray) = app.try_state::<UpdateTray>() {
+                            sync_update_tray(&tray, version.as_deref());
+                        }
+                    });
+                }));
+            }
+            updates.schedule();
+            app.manage(updates);
             if config_error.is_some() {
                 log_config("config file did not parse at startup, using defaults");
             }
@@ -1759,6 +1823,7 @@ pub fn run() {
                 .show_menu_on_left_click(true)
                 .on_menu_event(|app, event| match event.id().as_ref() {
                     "toggle" => toggle(app),
+                    UPDATE_MENU_ID => install_from_tray(app),
                     "grant-accessibility" => {
                         grant_from_tray(app, platform::Permission::Accessibility)
                     }

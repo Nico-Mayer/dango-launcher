@@ -2,6 +2,7 @@
   import AppWindow from "@lucide/svelte/icons/app-window";
   import Check from "@lucide/svelte/icons/check";
   import CircleAlert from "@lucide/svelte/icons/circle-alert";
+  import CircleArrowDown from "@lucide/svelte/icons/circle-arrow-down";
   import CirclePower from "@lucide/svelte/icons/circle-power";
   import ClipboardList from "@lucide/svelte/icons/clipboard-list";
   import ClipboardType from "@lucide/svelte/icons/clipboard-type";
@@ -19,6 +20,7 @@
   import PanelLeft from "@lucide/svelte/icons/panel-left";
   import PanelRight from "@lucide/svelte/icons/panel-right";
   import PanelTop from "@lucide/svelte/icons/panel-top";
+  import RefreshCw from "@lucide/svelte/icons/refresh-cw";
   import Settings from "@lucide/svelte/icons/settings";
   import Sparkles from "@lucide/svelte/icons/sparkles";
   import Square from "@lucide/svelte/icons/square";
@@ -34,6 +36,7 @@
     "app-window": AppWindow,
     check: Check,
     "circle-alert": CircleAlert,
+    "circle-arrow-down": CircleArrowDown,
     "circle-power": CirclePower,
     "clipboard-list": ClipboardList,
     "clipboard-type": ClipboardType,
@@ -51,6 +54,7 @@
     "panel-left": PanelLeft,
     "panel-right": PanelRight,
     "panel-top": PanelTop,
+    "refresh-cw": RefreshCw,
     settings: Settings,
     sparkles: Sparkles,
     square: Square,

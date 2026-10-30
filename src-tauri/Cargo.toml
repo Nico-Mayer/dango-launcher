@@ -24,6 +24,8 @@ tauri-plugin-opener = "2"
 # Pinned exactly: 2.6.0 and later require Tauri 2.12, which moves tao, wry and
 # webview2-com with it. Bump together with Tauri, not on its own.
 tauri-plugin-autostart = "=2.5.0"
+# Pinned exactly for the same reason: 2.13.0 and later require Tauri 2.12.
+tauri-plugin-updater = "=2.12.0"
 schemars = "1.2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
@@ -52,6 +54,7 @@ process-wrap = { version = "10", features = ["std"] }
 favicon-picker = { version = "1.1.0", features = ["blocking"] }
 reqwest = { version = "0.13", default-features = false, features = ["blocking", "rustls"] }
 nucleo-matcher = "0.3.1"
+bytesize = "2.7.0"
 
 [dev-dependencies]
 jsonschema = { version = "0.26", default-features = false }

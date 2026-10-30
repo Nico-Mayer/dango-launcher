@@ -181,3 +181,6 @@ load and are not reliable.
   `asset:` and `http://asset.localhost`, and a runtime
   `asset_protocol_scope().allow_directory(...)`. The frontend loads them with
   `convertFileSrc`.
+- The updater plugin fails at startup without `plugins.updater.pubkey` in
+  `tauri.conf.json`, development builds included. Its 2.13 and later releases
+  need Tauri 2.12, so it is pinned with autostart.

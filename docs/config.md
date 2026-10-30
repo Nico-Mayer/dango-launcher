@@ -26,6 +26,7 @@ Per-extension settings, keyed by extension id.
 | `dango.quicklinks` | object |  |  | Settings for the Quicklinks extension. |
 | `dango.snippets` | object |  |  | Settings for the Snippets extension. |
 | `dango.system` | object |  |  | Settings for the System extension. |
+| `dango.updates` | object |  |  | Settings for the Updates extension. |
 | `dango.window-management` | object |  |  | Settings for the Window Management extension. |
 
 ## `extensions.dango.ai`
@@ -176,6 +177,23 @@ Per-command settings, keyed by command id.
 | `open-config` | [Command settings](#command-settings) |  |  | Settings for the open-config command. |
 | `quit-application` | [Command settings](#command-settings) |  |  | Settings for the quit-application command. |
 | `sleep` | [Command settings](#command-settings) |  |  | Settings for the sleep command. |
+
+## `extensions.dango.updates`
+
+Settings for the Updates extension.
+
+| Setting | Type | Default | Values | Description |
+| --- | --- | --- | --- | --- |
+| `commands` | object |  |  | Per-command settings, keyed by command id. |
+| `enabled` | boolean |  |  | Whether the extension runs. Absent means enabled. |
+
+## `extensions.dango.updates.commands`
+
+Per-command settings, keyed by command id.
+
+| Setting | Type | Default | Values | Description |
+| --- | --- | --- | --- | --- |
+| `check` | [Command settings](#command-settings) |  |  | Settings for the check command. |
 
 ## `extensions.dango.window-management`
 

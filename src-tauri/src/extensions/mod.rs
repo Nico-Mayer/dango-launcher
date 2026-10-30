@@ -4,6 +4,7 @@ pub mod clipboard;
 pub mod permissions;
 pub mod snippets;
 pub mod system;
+pub mod updates;
 pub mod window_management;
 
 use crate::extension::Manifest;
@@ -18,6 +19,7 @@ pub fn builtin_manifests() -> Vec<Manifest> {
         clipboard::manifest(),
         permissions::manifest(),
         system::manifest(),
+        updates::manifest(),
         window_management::manifest(),
         ai::manifest(&shipped_ai),
         snippets::manifest(Kind::Snippet),
