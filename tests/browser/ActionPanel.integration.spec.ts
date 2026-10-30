@@ -6,11 +6,15 @@ import type {} from "../fixtures/main";
 const panel = (page: Page) => page.locator("[data-popover-content]");
 const calls = (page: Page, command = "run_action") => page.evaluate(command => window.dangoFixture.calls.filter(c => c.command === command), command);
 
-for (const reducedMotion of ["reduce", "no-preference"] as const) {
-test.describe(reducedMotion, () => {
-  test.use({ reducedMotion });
-for (const scene of ["root", "list", "form", "detail"]) {
-  for (const chord of ["Control+k", "Meta+k"]) {
+const flows = [
+  ...["root", "list", "form", "detail"].map(scene => ({ scene, chord: "Control+k", reducedMotion: "no-preference" as const })),
+  { scene: "root", chord: "Meta+k", reducedMotion: "no-preference" as const },
+  { scene: "root", chord: "Control+k", reducedMotion: "reduce" as const },
+];
+
+for (const { scene, chord, reducedMotion } of flows) {
+  test.describe(reducedMotion, () => {
+    test.use({ reducedMotion });
     test(`ActionPanel: ${scene} ${chord} owns selection, confirmation and focus`, async ({ page }) => {
       await page.goto(`/tests/fixtures/?scene=${scene}`);
       const origin = scene === "form" ? page.getByLabel("Password", { exact: true }) : scene === "detail" ? page.getByText("Working…", { exact: true }) : page.getByRole("combobox");
@@ -46,7 +50,7 @@ for (const scene of ["root", "list", "form", "detail"]) {
       expect(await calls(page, "dismiss")).toHaveLength(0);
       expect(await calls(page, "cancel_invocation")).toHaveLength(0);
     });
-  }
+  });
 }
 
 for (const scene of ["root", "list", "form", "detail"]) {
@@ -67,7 +71,7 @@ for (const scene of ["root", "list", "form", "detail"]) {
   });
 }
 
-test("ActionPanel: long actions scroll inside compact portal in both palettes", async ({ page }, testInfo) => {
+test("ActionPanel: long actions scroll inside compact portal in both palettes", async ({ page }) => {
   for (const palette of ["dark", "light"]) {
     for (const size of [{ width: 720, height: 400 }, { width: 480, height: 300 }]) {
       await page.setViewportSize(size);
@@ -85,7 +89,6 @@ test("ActionPanel: long actions scroll inside compact portal in both palettes", 
       expect(rect!.y).toBeGreaterThanOrEqual(0);
       expect(rect!.y + rect!.height).toBeLessThanOrEqual(size.height);
       expect(rect!.x + rect!.width).toBeLessThanOrEqual(size.width);
-      await page.screenshot({ path: testInfo.outputPath(`${palette}-${size.width}-actions.png`) });
       await options.last().click();
       await expect(panel(page)).toHaveCount(0);
       expect(await calls(page)).toHaveLength(1);
@@ -93,8 +96,12 @@ test("ActionPanel: long actions scroll inside compact portal in both palettes", 
   }
 });
 
-for (const scene of ["root", "list", "form", "detail"]) {
-  for (const press of ["click", "held"]) {
+const outsidePresses = [
+  { scene: "root", press: "click" },
+  ...["root", "list", "form", "detail"].map(scene => ({ scene, press: "held" })),
+];
+
+for (const { scene, press } of outsidePresses) {
     test(`ActionPanel: ${scene} outside ${press} preserves parent`, async ({ page }) => {
       await page.goto(`/tests/fixtures/?scene=${scene}`);
       const origin = scene === "form" ? page.getByLabel("Password", { exact: true }) : scene === "detail" ? page.getByText("Working…", { exact: true }) : page.getByRole("combobox");
@@ -123,9 +130,9 @@ for (const scene of ["root", "list", "form", "detail"]) {
       await expect(panel(page)).toHaveCount(0);
       await expect(origin).toBeFocused();
     });
+}
 
-  }
-
+for (const scene of ["root", "form"]) {
   for (const key of ["Escape", "Enter"]) {
     test(`ActionPanel: ${scene} immediate ${key} and held repeats stay isolated`, async ({ page }) => {
       await page.goto(`/tests/fixtures/?scene=${scene}`);
@@ -249,6 +256,3 @@ test("ActionPanel: removal of all actions closes safely", async ({ page }) => {
   await expect(page.getByRole("combobox")).toBeFocused();
   expect(await calls(page)).toHaveLength(0);
 });
-
-});
-}

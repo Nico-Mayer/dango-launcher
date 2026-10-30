@@ -69,10 +69,9 @@ this is browser rendering coverage, not native Windows evidence. Both-palette ic
 screenshots and extraction checks live in
 `openspec/changes/refine-launcher-ui/evidence/extraction/`.
 
-`tests/browser/ActionPanel.spec.ts` proves the isolated composition through
-`/tests/fixtures/actions.html`. `ActionPanel.integration.spec.ts` exercises the real
-root/list/form/detail panels, focus and dismissal boundaries, both chords, long
-lists, and live portal token overrides. Stage-4 screenshots and outcomes live in
+`ActionPanel.integration.spec.ts` exercises the real root/list/form/detail
+panels, focus and dismissal boundaries, both chords, long lists, and live portal
+token overrides. Stage-4 screenshots and outcomes live in
 `openspec/changes/refine-launcher-ui/evidence/actions/`. Production panel motion is
 still off at that checkpoint; test-only held exit presence is not a shipped effect.
 
