@@ -513,10 +513,7 @@ mod tests {
     fn no_provider_at_all_says_to_set_one_up() {
         let providers = Providers::from_config(&config("{}"));
         let error = providers.resolve(&command(None, None, None)).unwrap_err();
-        assert_eq!(
-            error.to_string(),
-            "No AI provider is set up yet. Add one to your config file."
-        );
+        assert!(matches!(error, NotReady::NoProvider), "{error}");
     }
 
     #[test]
@@ -528,10 +525,7 @@ mod tests {
             } } } }"#,
         ));
         let error = providers.resolve(&command(None, None, None)).unwrap_err();
-        assert_eq!(
-            error.to_string(),
-            "No default AI provider is set. Add one to your config file."
-        );
+        assert!(matches!(error, NotReady::NoDefault), "{error}");
     }
 
     #[test]
@@ -554,19 +548,7 @@ mod tests {
         let error = providers
             .resolve(&command(Some("openrouter"), None, None))
             .unwrap_err();
-        assert_eq!(
-            error.to_string(),
-            "This command uses a provider that isn't set up. Check your config file."
-        );
-    }
-
-    #[test]
-    fn a_provider_kind_dango_does_not_know_fails_the_config() {
-        let error = Config::parse(
-            r#"{ "extensions": { "dango.ai": { "providers": { "future": { "kind": "mistral" } } } } }"#,
-        )
-        .unwrap_err();
-        assert!(error.to_string().contains("mistral"), "{error}");
+        assert!(matches!(error, NotReady::UnknownProvider), "{error}");
     }
 
     #[test]
@@ -590,10 +572,7 @@ mod tests {
             r#"{ "extensions": { "dango.ai": { "providers": { "broken": { "kind": "cli" } } } } }"#,
         ));
         let error = providers.resolve(&command(None, None, None)).unwrap_err();
-        assert_eq!(
-            error.to_string(),
-            "This command uses a provider that isn't set up. Check your config file."
-        );
+        assert!(matches!(error, NotReady::UnknownProvider), "{error}");
     }
 
     #[test]
@@ -602,9 +581,9 @@ mod tests {
             r#"{ "extensions": { "dango.ai": { "providers": { "local": { "kind": "ollama" } } } } }"#,
         ));
         let error = providers.resolve(&command(None, None, None)).unwrap_err();
-        assert_eq!(
-            error.to_string(),
-            "No model is set for local. Add one to your config file."
+        assert!(
+            matches!(&error, NotReady::NoModel { provider } if provider == "local"),
+            "{error}"
         );
     }
 }

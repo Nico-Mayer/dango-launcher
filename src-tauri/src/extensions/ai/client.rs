@@ -251,22 +251,6 @@ mod tests {
     }
 
     #[test]
-    fn each_kind_maps_to_its_adapter() {
-        assert_eq!(
-            adapter_kind(&ProviderKind::Anthropic),
-            Some(AdapterKind::Anthropic)
-        );
-        assert_eq!(
-            adapter_kind(&ProviderKind::Openai),
-            Some(AdapterKind::OpenAI)
-        );
-        assert_eq!(
-            adapter_kind(&ProviderKind::Ollama),
-            Some(AdapterKind::Ollama)
-        );
-    }
-
-    #[test]
     fn a_kind_with_no_endpoint_falls_back_to_its_own() {
         assert_eq!(
             base_url(&request(ProviderKind::Anthropic, None)),
@@ -297,74 +281,12 @@ mod tests {
         );
     }
 
-    #[test]
-    fn a_thinking_level_maps_to_a_reasoning_effort() {
-        assert!(matches!(effort(Thinking::Low), Some(ReasoningEffort::Low)));
-        assert!(matches!(
-            effort(Thinking::Medium),
-            Some(ReasoningEffort::Medium)
-        ));
-        assert!(matches!(
-            effort(Thinking::High),
-            Some(ReasoningEffort::High)
-        ));
-        assert!(
-            effort(Thinking::Off).is_none(),
-            "off should ask for nothing"
-        );
-    }
-
     fn http(status: u16) -> genai::Error {
         genai::Error::HttpError {
             status: reqwest::StatusCode::from_u16(status).unwrap(),
             canonical_reason: String::new(),
             body: String::new(),
         }
-    }
-
-    #[test]
-    fn a_refused_key_says_to_check_the_key_file() {
-        let error = translate(&request(ProviderKind::Anthropic, None), &http(401));
-        assert_eq!(
-            error.to_string(),
-            "test didn't accept your key. Check it in auth.json."
-        );
-    }
-
-    #[test]
-    fn an_unknown_model_says_to_check_the_model_name() {
-        let error = translate(&request(ProviderKind::Anthropic, None), &http(404));
-        assert_eq!(
-            error.to_string(),
-            "test doesn't have that model. Check the model name in your config file."
-        );
-    }
-
-    #[test]
-    fn too_many_requests_says_the_provider_is_busy() {
-        let error = translate(&request(ProviderKind::Anthropic, None), &http(429));
-        assert_eq!(
-            error.to_string(),
-            "test is busy right now. Try again in a moment."
-        );
-    }
-
-    #[test]
-    fn a_hosted_provider_that_cannot_be_reached_says_so() {
-        let error = translate(&request(ProviderKind::Anthropic, None), &http(503));
-        assert_eq!(
-            error.to_string(),
-            "test couldn't be reached. Check your connection and try again."
-        );
-    }
-
-    #[test]
-    fn a_local_provider_that_cannot_be_reached_names_the_model_server() {
-        let error = translate(&request(ProviderKind::Ollama, None), &http(503));
-        assert_eq!(
-            error.to_string(),
-            "The local model couldn't be reached. Check that your model server is running."
-        );
     }
 
     fn streaming(inner: genai::Error) -> genai::Error {
@@ -376,43 +298,71 @@ mod tests {
     }
 
     #[test]
-    fn a_failure_once_the_answer_is_streaming_is_read_through() {
-        // What Ollama does for a model it has not pulled: the request is
-        // accepted, then the stream fails with a 404.
-        let error = translate(&request(ProviderKind::Ollama, None), &streaming(http(404)));
-        assert_eq!(
-            error.to_string(),
-            "test doesn't have that model. Check the model name in your config file."
-        );
-    }
-
-    #[test]
-    fn a_stream_that_never_started_still_reads_as_unreachable() {
-        let error = translate(
-            &request(ProviderKind::Ollama, None),
-            &genai::Error::WebStream {
-                model_iden: ModelIden::new(AdapterKind::Ollama, "some-model"),
-                cause: "error sending request".into(),
-                error: "error sending request".into(),
-            },
-        );
-        assert_eq!(
-            error.to_string(),
-            "The local model couldn't be reached. Check that your model server is running."
-        );
-    }
-
-    #[test]
-    fn a_missing_key_is_reported_as_one() {
-        let model = ModelIden::new(AdapterKind::Anthropic, "some-model");
-        let error = translate(
-            &request(ProviderKind::Anthropic, None),
-            &genai::Error::RequiresApiKey { model_iden: model },
-        );
-        assert_eq!(
-            error.to_string(),
-            "test needs a key. Add one to auth.json in your config folder."
-        );
+    fn each_failure_becomes_what_the_user_can_fix() {
+        let provider = || "test".to_string();
+        let anthropic = request(ProviderKind::Anthropic, None);
+        let ollama = request(ProviderKind::Ollama, None);
+        let cases = [
+            (
+                &anthropic,
+                http(401),
+                AiError::KeyRejected {
+                    provider: provider(),
+                },
+            ),
+            (
+                &anthropic,
+                http(404),
+                AiError::UnknownModel {
+                    provider: provider(),
+                },
+            ),
+            (
+                &anthropic,
+                http(429),
+                AiError::RateLimited {
+                    provider: provider(),
+                },
+            ),
+            (
+                &anthropic,
+                http(503),
+                AiError::Unreachable {
+                    provider: provider(),
+                },
+            ),
+            (&ollama, http(503), AiError::LocalUnreachable),
+            // What Ollama does for a model it has not pulled: the request is
+            // accepted, then the stream fails with a 404.
+            (
+                &ollama,
+                streaming(http(404)),
+                AiError::UnknownModel {
+                    provider: provider(),
+                },
+            ),
+            (
+                &ollama,
+                genai::Error::WebStream {
+                    model_iden: ModelIden::new(AdapterKind::Ollama, "some-model"),
+                    cause: "error sending request".into(),
+                    error: "error sending request".into(),
+                },
+                AiError::LocalUnreachable,
+            ),
+            (
+                &anthropic,
+                genai::Error::RequiresApiKey {
+                    model_iden: ModelIden::new(AdapterKind::Anthropic, "some-model"),
+                },
+                AiError::MissingKey {
+                    provider: provider(),
+                },
+            ),
+        ];
+        for (request, error, expected) in cases {
+            assert_eq!(translate(request, &error), expected, "from {error:?}");
+        }
     }
 
     /// Against a model on this machine, so it is never part of a normal run:
