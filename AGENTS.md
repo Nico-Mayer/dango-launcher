@@ -156,6 +156,15 @@ load and are not reliable.
 - Showing the launcher over fullscreen apps on macOS needs an NSPanel.
 - Reading the selection is direct on macOS via `AXSelectedText`. On Windows the
   realistic path is copy, read clipboard, restore clipboard.
+- An ad-hoc signed macOS build has a designated requirement of its own
+  `cdhash`, which changes every build, so macOS can treat each update as a new
+  app and drop its Accessibility and Input Monitoring grants. Release builds
+  are signed with one certificate from CI secrets to keep the requirement
+  stable.
+- A real signature turns on the hardened runtime. Under it, `osascript` talking
+  to Finder (Empty Trash) needs the `com.apple.security.automation.apple-events`
+  entitlement in `Entitlements.plist` and an `NSAppleEventsUsageDescription`
+  in `Info.plist`, or tccd denies it.
 
 ## Build and verification facts
 
@@ -184,3 +193,5 @@ load and are not reliable.
 - The updater plugin fails at startup without `plugins.updater.pubkey` in
   `tauri.conf.json`, development builds included. Its 2.13 and later releases
   need Tauri 2.12, so it is pinned with autostart.
+- tauri-action writes the `.msi` into `latest.json` unless
+  `updaterJsonPreferNsis: true` is set. Updates must go through NSIS.
