@@ -54,6 +54,8 @@ const EVENT_RESULTS: &str = "dango://results";
 /// event: the launcher simply gets out of the way.
 const EVENT_FAILED: &str = "dango://failed";
 
+#[cfg_attr(test, derive(ts_rs::TS))]
+#[cfg_attr(test, ts(export, export_to = "../../src/protocol/"))]
 #[derive(Clone, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 struct ResultItem {
@@ -91,6 +93,8 @@ impl ResultItem {
 /// path that streams results.
 struct TintTable(std::collections::HashMap<String, String>);
 
+#[cfg_attr(test, derive(ts_rs::TS))]
+#[cfg_attr(test, ts(export, export_to = "../../src/protocol/"))]
 #[derive(Clone, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 struct ResultsPayload {
@@ -107,14 +111,19 @@ struct ResultsPayload {
 /// many, and they replace one another rather than stacking up, which is what
 /// tells the launcher the difference between the next frame of this answer and
 /// a new view.
+#[cfg_attr(test, derive(ts_rs::TS))]
+#[cfg_attr(test, ts(export, export_to = "../../src/protocol/"))]
 #[derive(Clone, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 struct RenderPayload {
     owner: String,
+    #[cfg_attr(test, ts(type = "number"))]
     invocation: u64,
     tree: protocol::ViewTree,
 }
 
+#[cfg_attr(test, derive(ts_rs::TS))]
+#[cfg_attr(test, ts(export, export_to = "../../src/protocol/"))]
 #[derive(serde::Serialize)]
 #[serde(tag = "kind", rename_all = "camelCase")]
 enum ActionResponse {
@@ -222,8 +231,11 @@ enum HideReason {
 
 const DEFAULT_RESET_AFTER_SECS: u32 = 60;
 
+#[cfg_attr(test, derive(ts_rs::TS))]
+#[cfg_attr(test, ts(export, export_to = "../../src/protocol/"))]
 #[derive(Clone, serde::Serialize)]
 struct ActivatePayload {
+    #[cfg_attr(test, ts(type = "number | null"))]
     probe: Option<u64>,
     held: bool,
 }
@@ -477,6 +489,8 @@ async fn run_action(
 
 /// What a template field's text will ask for. Pure: nothing is stored and
 /// nothing is rendered, so the form can call it on every keystroke.
+#[cfg_attr(test, derive(ts_rs::TS))]
+#[cfg_attr(test, ts(export, export_to = "../../src/protocol/"))]
 #[derive(Debug, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 struct TemplateInspection {

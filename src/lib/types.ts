@@ -1,66 +1,12 @@
+import type { Action } from "../protocol/Action";
 import type { Shortcut } from "../protocol/Shortcut";
-import type { ViewTree } from "../protocol/ViewTree";
 
-export interface ActionDto {
-  id: string;
-  title: string;
-  shortcut?: Shortcut | null;
-}
-
-export interface ResultItem {
-  /// The extension that contributed the result; acting on it is dispatched
-  /// back to that owner.
-  extensionId: string;
-  id: string;
-  title: string;
-  subtitle?: string | null;
-  icon?: string | null;
-  /// The colour its extension named, or nothing for one that named none.
-  tint?: string | null;
-  actions: ActionDto[];
-  matchPositions: number[];
-  /// Marked by the backend on an empty query for the few most launched items.
-  suggested: boolean;
-  /// Listed first on an empty query, under its own heading.
-  pinned: boolean;
-}
-
-export interface ResultsPayload {
-  query: string;
-  items: ResultItem[];
-  complete: boolean;
-}
-
-/// A pushed view with the extension whose command produced it. A command can be
-/// started from its own hotkey, without the frontend ever asking for it, so the
-/// owner arrives with the tree rather than from the invocation.
-export interface ActivatePayload {
-  /// The latency probe to report the first paint to, when one is running.
-  probe: number | null;
-  /// An interrupting hide kept the state, so the renderer refreshes what it
-  /// shows instead of starting over.
-  held: boolean;
-}
-
-export interface RenderPayload {
-  owner: string;
-  /// Which run produced the tree. A streaming command sends many, and the ones
-  /// that share a number replace each other rather than stacking up.
-  invocation: number;
-  tree: ViewTree;
-}
-
-export type ActionResponse =
-  | { kind: "done" }
-  /// The action started work that reports through the render channel. Nothing
-  /// to show yet, so the view stays as it is until the first tree arrives.
-  | { kind: "started" }
-  | { kind: "copy"; text: string }
-  /// The action changed what the view was showing, so it is replaced and the
-  /// user stays where they are.
-  | { kind: "replaced"; tree: ViewTree }
-  | { kind: "removed"; tree: ViewTree }
-  | { kind: "failed"; message: string };
+export type { ActionResponse } from "../protocol/ActionResponse";
+export type { ActivatePayload } from "../protocol/ActivatePayload";
+export type { RenderPayload } from "../protocol/RenderPayload";
+export type { ResultItem } from "../protocol/ResultItem";
+export type { ResultsPayload } from "../protocol/ResultsPayload";
+export type ActionDto = Action;
 
 /// True when the pressed key event matches a declared shortcut.
 export function matchesShortcut(event: KeyboardEvent, shortcut: Shortcut): boolean {

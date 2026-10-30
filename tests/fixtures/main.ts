@@ -5,6 +5,7 @@ import type { InvokeArgs } from "@tauri-apps/api/core";
 import App from "../../src/App.svelte";
 import "../../src/app.css";
 import type { ResultItem } from "../../src/lib/types";
+import type { TemplateInspection } from "../../src/protocol/TemplateInspection";
 import type { ViewTree } from "../../src/protocol/ViewTree";
 import { fixtureNames, longActions, rootItems, treeFor, type FixtureName } from "./data";
 
@@ -16,7 +17,7 @@ const calls: { command: string; args?: InvokeArgs }[] = [];
 let current: FixtureName = "root";
 let invocation = 0;
 let streamTimer: ReturnType<typeof setInterval> | undefined;
-let templateInspection: { arguments: string[]; error: string | null } = { arguments: ["name"], error: null };
+let templateInspection: TemplateInspection = { arguments: ["name"], error: null };
 
 function stopStream() {
   clearInterval(streamTimer);

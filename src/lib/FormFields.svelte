@@ -5,6 +5,7 @@
   import TextField from "./ui/TextField.svelte";
   import Checkbox from "./ui/Checkbox.svelte";
   import type { FormView } from "../protocol/FormView";
+  import type { TemplateInspection } from "../protocol/TemplateInspection";
 
   interface Props {
     view: FormView;
@@ -12,8 +13,6 @@
   }
 
   let { view, onsubmit }: Props = $props();
-
-  type Inspection = { arguments: string[]; error: string | null };
 
   /// Seeded from each field's own value, so a field the user never touches
   /// still submits what it was showing. Capturing only the initial value is the
@@ -23,7 +22,7 @@
   let values = $state<Record<string, string>>(
     Object.fromEntries(view.fields.map((field) => [field.id, field.value ?? ""])),
   );
-  let inspections = $state<Record<string, Inspection>>({});
+  let inspections = $state<Record<string, TemplateInspection>>({});
 
   const templateFields = $derived(view.fields.filter((field) => field.kind === "template"));
 
@@ -33,7 +32,7 @@
     for (const field of templateFields) {
       const source = values[field.id] ?? "";
       invoke("inspect_template", { source }).then((result) => {
-        inspections[field.id] = result as Inspection;
+        inspections[field.id] = result as TemplateInspection;
       });
     }
   });
