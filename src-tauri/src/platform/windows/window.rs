@@ -75,20 +75,16 @@ impl WindowManager for WindowsWindowManager {
 
         // Undo the invisible border: SetWindowPos moves the outer window rect,
         // but `frame` is where the visible edges should land.
-        let inset = border_inset(hwnd).unwrap_or(Inset::ZERO);
-        let x = frame.x - inset.left;
-        let y = frame.y - inset.top;
-        let width = frame.width + inset.left + inset.right;
-        let height = frame.height + inset.top + inset.bottom;
+        let outer = border_inset(hwnd).unwrap_or(Inset::ZERO).around(frame);
 
         let ok = unsafe {
             SetWindowPos(
                 hwnd,
                 std::ptr::null_mut(),
-                x,
-                y,
-                width,
-                height,
+                outer.x,
+                outer.y,
+                outer.width,
+                outer.height,
                 SWP_NOZORDER | SWP_NOACTIVATE,
             )
         };
@@ -151,6 +147,25 @@ impl Inset {
         right: 0,
         bottom: 0,
     };
+
+    fn between(outer: RECT, visible: RECT) -> Inset {
+        Inset {
+            left: visible.left - outer.left,
+            top: visible.top - outer.top,
+            right: outer.right - visible.right,
+            bottom: outer.bottom - visible.bottom,
+        }
+    }
+
+    /// The outer window rect whose visible frame is `frame`.
+    fn around(&self, frame: Rect) -> Rect {
+        Rect {
+            x: frame.x - self.left,
+            y: frame.y - self.top,
+            width: frame.width + self.left + self.right,
+            height: frame.height + self.top + self.bottom,
+        }
+    }
 }
 
 /// How much larger the outer window rect is than the visible frame on each edge.
@@ -164,13 +179,7 @@ fn border_inset(hwnd: HWND) -> Option<Inset> {
     if unsafe { GetWindowRect(hwnd, &mut outer) } == 0 {
         return None;
     }
-    let visible = dwm_frame(hwnd)?;
-    Some(Inset {
-        left: visible.left - outer.left,
-        top: visible.top - outer.top,
-        right: outer.right - visible.right,
-        bottom: outer.bottom - visible.bottom,
-    })
+    Some(Inset::between(outer, dwm_frame(hwnd)?))
 }
 
 fn work_area(hwnd: HWND) -> Option<Rect> {
@@ -215,4 +224,54 @@ unsafe extern "system" fn collect_work_area(
         areas.push(area);
     }
     TRUE
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn rect(left: i32, top: i32, right: i32, bottom: i32) -> RECT {
+        RECT {
+            left,
+            top,
+            right,
+            bottom,
+        }
+    }
+
+    #[test]
+    fn placing_a_frame_undoes_the_invisible_border() {
+        // A typical Windows 11 window: a 7px resize border on the left, right
+        // and bottom, none on top.
+        let inset = Inset::between(rect(93, 100, 907, 707), rect(100, 100, 900, 700));
+        let area = Rect {
+            x: 0,
+            y: 0,
+            width: 960,
+            height: 1040,
+        };
+
+        let outer = inset.around(area);
+
+        assert_eq!(
+            outer,
+            Rect {
+                x: -7,
+                y: 0,
+                width: 974,
+                height: 1047,
+            }
+        );
+    }
+
+    #[test]
+    fn a_borderless_window_is_placed_as_is() {
+        let frame = Rect {
+            x: 10,
+            y: 20,
+            width: 300,
+            height: 200,
+        };
+        assert_eq!(Inset::ZERO.around(frame), frame);
+    }
 }
