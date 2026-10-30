@@ -317,6 +317,37 @@ mod tests {
     }
 
     #[test]
+    fn frecency_round_trips_and_updates_in_place() {
+        let store = Store::in_memory().unwrap();
+        store.save_frecency("calendar", 1, 10).unwrap();
+        store.save_frecency("safari", 4, 11).unwrap();
+        store.save_frecency("calendar", 2, 12).unwrap();
+
+        let mut loaded = store.load_frecency().unwrap();
+        loaded.sort();
+        assert_eq!(
+            loaded,
+            vec![("calendar".into(), 2, 12), ("safari".into(), 4, 11)]
+        );
+    }
+
+    #[test]
+    fn a_reindex_replaces_every_app() {
+        let store = Store::in_memory().unwrap();
+        let app = |id: &str| (id.to_string(), id.to_uppercase(), None);
+        store.replace_apps(&[app("old"), app("kept")]).unwrap();
+        store.replace_apps(&[app("kept"), app("new")]).unwrap();
+
+        let ids: Vec<String> = store
+            .load_apps()
+            .unwrap()
+            .into_iter()
+            .map(|a| a.0)
+            .collect();
+        assert_eq!(ids, ["kept", "new"]);
+    }
+
+    #[test]
     fn in_memory_store_is_migrated() {
         let store = Store::in_memory().unwrap();
         assert_eq!(
