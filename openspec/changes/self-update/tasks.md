@@ -7,7 +7,7 @@
 
 - [x] 2.1 In `src-tauri/tauri.conf.json`, set `bundle.createUpdaterArtifacts`, the updater `pubkey`, the `latest.json` endpoint, and `windows.installMode: passive`; verify a local `npx tauri build --no-bundle` still succeeds
 - [x] 2.2 Add `src-tauri/Entitlements.plist` with `com.apple.security.automation.apple-events`, an `NSAppleEventsUsageDescription` in the macOS Info.plist, and `bundle.macOS.entitlements`; verify a local signed bundle shows the entitlement in `codesign -d --entitlements -`
-- [ ] 2.3 In `.github/workflows/release.yml`, pass the updater and Apple secrets to tauri-action, set `uploadUpdaterJson: true`, and prefer NSIS in the manifest; verify with `actionlint` or a successful CI run on a test tag
+- [x] 2.3 In `.github/workflows/release.yml`, pass the updater and Apple secrets to tauri-action, set `uploadUpdaterJson: true`, and prefer NSIS in the manifest; verify with `actionlint` or a successful CI run on a test tag
 - [ ] 2.4 Cut a release and verify its assets: `latest.json` names the version with a Windows NSIS and a macOS `.app.tar.gz` entry, `releases/latest/download/latest.json` serves it, and `codesign -d -r-` on the macOS bundle shows `identifier "com.nimayer.dango"` and the certificate, not a `cdhash`
 
 ## 3. Update source
