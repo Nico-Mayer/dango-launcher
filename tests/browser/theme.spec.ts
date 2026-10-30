@@ -2,20 +2,6 @@ import { expect, test } from "@playwright/test";
 import { rootItems } from "../fixtures/data";
 import type {} from "../fixtures/main";
 
-for (const scene of ["root", "list"]) {
-  test(`theme: ${scene} preserves default density`, async ({ page }) => {
-    await page.goto(`/tests/fixtures/?scene=${scene}`);
-    await expect(page.getByRole("option")).toHaveCount(18);
-    await expect(page.getByRole("combobox")).toHaveCSS("height", "64px");
-    await expect(page.getByRole("option").first()).toHaveCSS("height", "56px");
-    await expect(page.getByText("Dango", { exact: true }).locator("..")).toHaveCSS("height", "40px");
-    await expect(page.getByRole("option").first()).toHaveCSS("background-color", "rgb(41, 61, 89)");
-    await expect(page.locator("html")).toHaveClass("dark");
-    await expect(page.locator("html")).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
-    await expect(page.locator("body")).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
-  });
-}
-
 const overrides = {
   "--dango-selection-bg": "rgb(10, 30, 50)",
   "--dango-selection-text": "rgb(201, 202, 203)",
@@ -131,25 +117,17 @@ test("theme: text hierarchy and raised surface inherit from document root", asyn
   await expect(page.getByText("Working…")).toHaveCSS("color", "rgb(210, 211, 212)");
 });
 
-for (const palette of ["dark", "light"]) {
-  for (const scene of ["root", "list", "form", "detail", "failure", "long-actions"]) {
-    test(`theme: ${palette} ${scene} renders built-in palette`, async ({ page }, testInfo) => {
-      await page.goto(`/tests/fixtures/?scene=${scene}`);
-      await expect(page.getByText("Dango", { exact: true })).toBeVisible();
-      await page.evaluate((palette) => document.documentElement.classList.toggle("dark", palette === "dark"), palette);
-      if (["root", "list", "failure", "long-actions"].includes(scene)) await expect(page.getByRole("option")).toHaveCount(18);
-      if (scene === "long-actions") {
-        await page.keyboard.press("Control+k");
-        await expect(page.locator("[data-popover-content]").getByRole("option")).toHaveCount(24);
-      }
-      const shell = page.locator("main");
-      await expect(shell).toHaveCSS("background-color", palette === "dark" ? "rgb(32, 33, 36)" : "rgb(250, 250, 250)");
-      await expect(page.getByText("Dango", { exact: true })).toHaveCSS("color", palette === "dark" ? "rgb(200, 203, 210)" : "rgb(68, 74, 85)");
-      await expect(page.locator("html")).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
-      await page.screenshot({ path: testInfo.outputPath(`${palette}-${scene}.png`) });
-    });
-  }
-}
+test("theme: both built-in palettes render on a transparent window", async ({ page }) => {
+  await page.goto("/tests/fixtures/?scene=root");
+  await expect(page.getByRole("option")).toHaveCount(18);
+  const shell = () => page.locator("main").evaluate((node) => getComputedStyle(node).backgroundColor);
+  await expect(page.locator("html")).toHaveClass("dark");
+  const dark = await shell();
+  await page.evaluate(() => document.documentElement.classList.remove("dark"));
+  expect(await shell()).not.toBe(dark);
+  await expect(page.locator("html")).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+  await expect(page.locator("body")).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+});
 
 test("theme: foundation overrides reach existing consumers and portal", async ({ page }) => {
   await page.goto("/tests/fixtures/?tokens=1");

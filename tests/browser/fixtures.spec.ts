@@ -3,7 +3,7 @@ import { fixtureNames } from "../fixtures/data";
 import type {} from "../fixtures/main";
 
 for (const name of fixtureNames) {
-  test(`fixture ${name} loads without native IPC`, async ({ page }, testInfo) => {
+  test(`fixture ${name} loads without native IPC`, async ({ page }) => {
     const errors: string[] = [];
     const externalRequests: string[] = [];
     page.on("pageerror", (error) => errors.push(error.message));
@@ -24,7 +24,6 @@ for (const name of fixtureNames) {
       await page.keyboard.press("Control+k");
       await expect(page.locator("[data-popover-content]").getByRole("option")).toHaveCount(24);
     }
-    await page.screenshot({ path: testInfo.outputPath(`${name}.png`) });
     if (name === "detail") {
       await page.evaluate(() => window.dangoFixture.stream(3, 20));
       await expect(page.getByText(/Streaming text 3/)).toBeVisible();

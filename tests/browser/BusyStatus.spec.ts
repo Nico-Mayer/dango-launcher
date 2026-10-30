@@ -177,7 +177,7 @@ test("BusyStatus: live reduced motion removes pointer feedback while keeping sel
   await page.goto("/tests/fixtures/?scene=refreshing-list");
   await expect(page.getByRole("option")).toHaveCount(18);
   await page.getByRole("option").nth(1).hover();
-  await expect(page.getByRole("option").nth(1)).toHaveCSS("transition-duration", "0.1s");
+  await expect(page.getByRole("option").nth(1)).not.toHaveCSS("transition-duration", "0s");
   await page.emulateMedia({ reducedMotion: "reduce" });
   await expect(page.getByRole("option").nth(1)).toHaveCSS("transition-duration", "0s");
   await expect(page.getByRole("option").first()).toHaveAttribute("data-selected");

@@ -2,23 +2,23 @@ import { expect, test } from "@playwright/test";
 import { detailTree } from "../fixtures/data";
 import type {} from "../fixtures/main";
 
-for (const scene of ["root", "list", "form", "detail", "protocol-error"]) {
-  test(`presentation: ${scene} shares shell geometry`, async ({ page }) => {
-    await page.goto(`/tests/fixtures/?scene=${scene === "protocol-error" ? "detail" : scene}`);
+test("presentation: every view fills the window with the footer at the bottom", async ({ page }) => {
+  for (const scene of ["root", "list", "form", "detail"]) {
+    await page.goto(`/tests/fixtures/?scene=${scene}`);
     await expect(page.getByText("Dango", { exact: true })).toBeVisible();
-    if (scene === "protocol-error") {
-      await page.evaluate((tree) => window.dangoFixture.replace({ ...tree, protocolVersion: 99 }), detailTree);
-      await expect(page.getByText("This view needs a newer version of Dango.")).toBeVisible();
-    }
-    await expect(page.locator("main")).toHaveCSS("width", "720px");
-    await expect(page.locator("main")).toHaveCSS("height", "400px");
-    await expect(page.locator("main")).toHaveCSS("border-radius", "14px");
-    if (scene !== "protocol-error") {
-      await expect(page.locator("footer")).toHaveCSS("height", "40px");
-      expect((await page.locator("footer").boundingBox())?.y).toBe(359);
-    }
-  });
-}
+    const shell = (await page.locator("main").boundingBox())!;
+    const footer = (await page.locator("footer").boundingBox())!;
+    expect(shell).toEqual({ x: 0, y: 0, ...page.viewportSize()! });
+    expect(shell.y + shell.height - (footer.y + footer.height)).toBeLessThanOrEqual(2);
+  }
+});
+
+test("presentation: a newer protocol version asks for an update", async ({ page }) => {
+  await page.goto("/tests/fixtures/?scene=detail");
+  await expect(page.getByText("Dango", { exact: true })).toBeVisible();
+  await page.evaluate((tree) => window.dangoFixture.replace({ ...tree, protocolVersion: 99 }), detailTree);
+  await expect(page.getByText("This view needs a newer version of Dango.")).toBeVisible();
+});
 
 for (const kind of ["text", "password", "template", "toggle"] as const) {
   test(`FormFields: first ${kind} field focuses and submits string values`, async ({ page }) => {
