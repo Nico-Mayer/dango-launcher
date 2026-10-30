@@ -202,6 +202,8 @@ skip, and the tray notice on a write failure.
 
 The config file now carries a generated JSON Schema, written beside it at startup for editor completion, and a generated settings reference in `docs/config.md`; both come from the config structs and the built-in manifests, and a test fails when the reference is stale (`add-config-schema`). Permission onboarding is the remaining item.
 
+Permission onboarding shipped as warnings only, in `add-permission-warnings`, after `fix-text-exchange-availability` made the text path report its real failure and stop depending on the history database. On macOS each missing permission, Accessibility or Input Monitoring, is a pinned item at the top of root search and a tray item; both ask for the permission and open its System Settings pane, and a 2-second poll keeps the tray current. Windows shows nothing, having no equivalent permission. There is no first-run flow. An Accessibility grant takes effect at once; an Input Monitoring grant needs the restart macOS offers, so nothing is restarted live. Verified by hand on macOS: both warnings and tray items, the grant panes, and the hyperkey and keyword expansion after the grant. Not verified: a revoke while running, activation timing, and the Windows build and run.
+
 ### M8 - third party
 
 Script commands first: a shell script with a metadata header, run through the
