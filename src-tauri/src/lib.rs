@@ -736,7 +736,7 @@ struct AiParts {
     client: Arc<dyn extensions::ai::Completions>,
     text: Option<Arc<dyn text::TextTarget>>,
     clipboard: Option<Arc<dyn ClipboardSource>>,
-    runner: Arc<dyn extensions::ai::Runner>,
+    runner: Arc<dyn invocation::Runner>,
 }
 
 impl AiParts {
@@ -756,13 +756,16 @@ impl AiParts {
 /// Starts an invocation for work an extension begins itself. A submitted
 /// argument form has an answer to stream but no command running behind it, so
 /// it asks for one and its output reaches the launcher the usual way.
-struct ViewRunner(tauri::AppHandle);
+struct ViewRunner {
+    app: tauri::AppHandle,
+    owner: &'static str,
+}
 
-impl extensions::ai::Runner for ViewRunner {
+impl invocation::Runner for ViewRunner {
     fn start(&self) -> Option<Arc<InvocationContext>> {
-        let invoker = self.0.try_state::<Arc<Invoker>>()?;
-        let (ctx, running) = invoker.detached(extensions::ai::EXTENSION_ID);
-        pump(&self.0, extensions::ai::EXTENSION_ID.to_string(), running);
+        let invoker = self.app.try_state::<Arc<Invoker>>()?;
+        let (ctx, running) = invoker.detached(self.owner);
+        pump(&self.app, self.owner.to_string(), running);
         Some(Arc::new(ctx))
     }
 }
@@ -1562,7 +1565,10 @@ pub fn run() {
                     clipboard: app
                         .try_state::<Arc<extensions::clipboard::CrateClipboard>>()
                         .map(|state| state.inner().clone() as Arc<dyn ClipboardSource>),
-                    runner: Arc::new(ViewRunner(app.handle().clone())),
+                    runner: Arc::new(ViewRunner {
+                        app: app.handle().clone(),
+                        owner: extensions::ai::EXTENSION_ID,
+                    }),
                 };
                 let (extension, problems) = {
                     let config = file_config.shared();

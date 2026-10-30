@@ -18,7 +18,7 @@ use crate::extension::{
     PreferenceKind, NAMED_ICON,
 };
 use crate::extensions::clipboard::ClipboardSource;
-use crate::invocation::{Command, InvocationContext};
+use crate::invocation::{Command, InvocationContext, Runner};
 use crate::protocol::{
     Action, DetailView, FieldKind, FormField, FormView, View, ViewTree, PROTOCOL_VERSION,
 };
@@ -41,12 +41,6 @@ pub const ACTION_COPY: &str = "copy";
 const ARGUMENT_PREFIX: &str = "arg:";
 
 const ICON: &str = "sparkles";
-
-/// Somewhere to start work that is not an invocation: a submitted form has an
-/// answer to stream but no command running behind it.
-pub trait Runner: Send + Sync {
-    fn start(&self) -> Option<Arc<InvocationContext>>;
-}
 
 pub struct AiExtension {
     manifest: Manifest,

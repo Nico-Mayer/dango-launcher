@@ -84,6 +84,12 @@ pub trait Command: Send + Sync {
     fn invoke(&self, ctx: &InvocationContext);
 }
 
+/// Somewhere to start work that is not an invocation: a submitted form has an
+/// answer to stream but no command running behind it.
+pub trait Runner: Send + Sync {
+    fn start(&self) -> Option<Arc<InvocationContext>>;
+}
+
 pub struct Resolved {
     pub command: Arc<dyn Command>,
     pub host: Host,

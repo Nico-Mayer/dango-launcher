@@ -14,7 +14,7 @@ pub use cli::CliClient;
 pub use client::GenAiClient;
 pub use commands::EXTENSION_ID;
 pub(crate) use extension::manifest;
-pub use extension::{AiExtension, Runner};
+pub use extension::AiExtension;
 pub use provider::{AiError, Chunks, Completions, Next, ProviderKind, Request, Thinking};
 
 use std::sync::Arc;
