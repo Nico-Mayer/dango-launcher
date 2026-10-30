@@ -468,20 +468,17 @@ mod tests {
           "version": 1,
           "somethingFuturistic": { "on": true },
           "extensions": {
-            "dango.future": { "enabled": true, "somethingNew": 42 }
+            "dango.future": { "enabled": true, "somethingNew": 42 },
+            "dango.ai": {
+              "providers": { "local": { "kind": "ollama", "keepAlive": "10m" } },
+              "commands": { "make-longer": { "enabled": false, "later": [1, 2] } }
+            }
           }
         }"#;
-        let config = Config::parse(text).unwrap();
-        let json = config.to_json();
-        assert!(
-            json.contains("somethingFuturistic"),
-            "top-level unknown key dropped: {json}"
-        );
-        assert!(
-            json.contains("somethingNew"),
-            "per-extension unknown key dropped: {json}"
-        );
-        assert!(json.contains("42"));
+        let written = Config::parse(text).unwrap().to_json();
+        let original: Value = serde_json::from_str(text).unwrap();
+        let again: Value = serde_json::from_str(&written).unwrap();
+        assert_eq!(again, original);
     }
 
     #[test]
@@ -494,21 +491,6 @@ mod tests {
             config.hyper_modifiers(),
             Modifiers::CONTROL | Modifiers::ALT | Modifiers::SHIFT | Modifiers::SUPER
         );
-    }
-
-    #[test]
-    fn a_hyperkey_tap_key_parses_and_round_trips() {
-        let config =
-            Config::parse(r#"{ "hyperkey": { "key": "capslock", "tap": "escape" } }"#).unwrap();
-        assert_eq!(
-            config.hyperkey.as_ref().unwrap().tap.as_deref(),
-            Some("escape")
-        );
-        let again = Config::parse(&config.to_json()).unwrap();
-        assert_eq!(again.hyperkey.unwrap().tap.as_deref(), Some("escape"));
-        // Absent means no tap.
-        let plain = Config::parse(r#"{ "hyperkey": { "key": "capslock" } }"#).unwrap();
-        assert_eq!(plain.hyperkey.unwrap().tap, None);
     }
 
     #[test]
@@ -632,31 +614,6 @@ mod tests {
     }
 
     #[test]
-    fn a_launcher_reset_after_value_parses_and_round_trips() {
-        assert_eq!(Config::parse("{}").unwrap().launcher.reset_after, None);
-        let config = Config::parse(r#"{ "launcher": { "reset-after": 300 } }"#).unwrap();
-        assert_eq!(config.launcher.reset_after, Some(300));
-
-        let json = config.to_json();
-        assert!(json.contains("reset-after"), "key dropped: {json}");
-        assert_eq!(
-            Config::parse(&json).unwrap().launcher.reset_after,
-            Some(300)
-        );
-    }
-
-    #[test]
-    fn a_launcher_autostart_flag_parses_and_round_trips() {
-        assert_eq!(Config::parse("{}").unwrap().launcher.autostart, None);
-        let config = Config::parse(r#"{ "launcher": { "autostart": true } }"#).unwrap();
-        assert_eq!(config.launcher.autostart, Some(true));
-
-        let json = config.to_json();
-        assert!(json.contains("autostart"), "key dropped: {json}");
-        assert_eq!(Config::parse(&json).unwrap().launcher.autostart, Some(true));
-    }
-
-    #[test]
     fn a_selection_block_parses_and_round_trips() {
         let config =
             Config::parse(r#"{ "selection": { "excluded-applications": "Zed, Neovim" } }"#)
@@ -685,64 +642,6 @@ mod tests {
     }
 
     #[test]
-    fn a_provider_branch_parses_and_round_trips() {
-        let text = r#"{
-          "extensions": {
-            "dango.ai": {
-              "providers": {
-                "anthropic": { "kind": "anthropic", "model": "claude-sonnet-5" },
-                "local": { "kind": "ollama", "baseUrl": "http://localhost:11434", "keepAlive": "10m" }
-              }
-            }
-          }
-        }"#;
-        let config = Config::parse(text).unwrap();
-        let providers = &config.extensions["dango.ai"].providers;
-        assert_eq!(providers["anthropic"].kind, ProviderKind::Anthropic);
-        assert_eq!(
-            providers["anthropic"].model.as_deref(),
-            Some("claude-sonnet-5")
-        );
-        assert_eq!(providers["local"].kind, ProviderKind::Ollama);
-        assert_eq!(
-            providers["local"].base_url.as_deref(),
-            Some("http://localhost:11434")
-        );
-
-        let json = config.to_json();
-        assert!(json.contains("baseUrl"), "camelCase key lost: {json}");
-        assert!(
-            json.contains("keepAlive"),
-            "unknown provider key dropped: {json}"
-        );
-        let again = Config::parse(&json).unwrap();
-        assert_eq!(
-            again.extensions["dango.ai"].providers["local"].kind,
-            ProviderKind::Ollama
-        );
-    }
-
-    #[test]
-    fn a_command_provider_carries_its_command_and_arguments() {
-        let config = Config::parse(
-            r#"{ "extensions": { "dango.ai": { "providers": {
-                "claude": { "kind": "cli", "command": "claude", "args": ["-p", "{prompt}"] }
-            } } } }"#,
-        )
-        .unwrap();
-        let entry = &config.extensions["dango.ai"].providers["claude"];
-        assert_eq!(entry.kind, ProviderKind::Cli);
-        assert_eq!(entry.command.as_deref(), Some("claude"));
-        assert_eq!(entry.args, ["-p", "{prompt}"]);
-
-        let again = Config::parse(&config.to_json()).unwrap();
-        assert_eq!(
-            again.extensions["dango.ai"].providers["claude"].args,
-            ["-p", "{prompt}"]
-        );
-    }
-
-    #[test]
     fn an_unrecognised_provider_kind_is_a_config_error() {
         let error = Config::parse(
             r#"{ "extensions": { "dango.ai": { "providers": { "future": { "kind": "mistral" } } } } }"#,
@@ -759,51 +658,6 @@ mod tests {
         assert_eq!(
             config.to_json(),
             "{\n  \"$schema\": \"./config.schema.json\",\n  \"version\": 1\n}"
-        );
-    }
-
-    #[test]
-    fn ai_command_fields_parse_beside_the_hotkey_and_alias() {
-        let text = r#"{
-          "extensions": {
-            "dango.ai": {
-              "commands": {
-                "improve-writing": { "hotkey": "hyper+i", "alias": "iw", "provider": "local", "thinking": "low" },
-                "make-longer": { "enabled": false },
-                "review-rust": {
-                  "title": "Review Rust",
-                  "prompt": "Review this.\n\n{{ selection }}",
-                  "model": "claude-opus-5",
-                  "output": "view"
-                }
-              }
-            }
-          }
-        }"#;
-        let config = Config::parse(text).unwrap();
-        let commands = &config.extensions["dango.ai"].commands;
-        assert_eq!(
-            commands["improve-writing"].provider.as_deref(),
-            Some("local")
-        );
-        assert_eq!(commands["improve-writing"].thinking, Some(Thinking::Low));
-        assert_eq!(commands["make-longer"].enabled, Some(false));
-        assert_eq!(
-            commands["review-rust"].title.as_deref(),
-            Some("Review Rust")
-        );
-        assert_eq!(commands["review-rust"].output, Some(Output::View));
-        assert_eq!(
-            config.alias("dango.ai", "improve-writing"),
-            Some("iw".to_string())
-        );
-
-        let again = Config::parse(&config.to_json()).unwrap();
-        let commands = &again.extensions["dango.ai"].commands;
-        assert!(commands["improve-writing"].hotkey.is_some(), "hotkey lost");
-        assert_eq!(
-            commands["review-rust"].prompt.as_deref(),
-            Some("Review this.\n\n{{ selection }}")
         );
     }
 }

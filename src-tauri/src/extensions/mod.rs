@@ -29,6 +29,15 @@ pub fn builtin_manifests() -> Vec<Manifest> {
 mod tests {
     use crate::extension::manifest::TINTS;
 
+    #[test]
+    fn every_built_in_manifest_validates() {
+        for manifest in super::builtin_manifests() {
+            if let Err(error) = manifest.validate() {
+                panic!("{} does not validate: {error:?}", manifest.id);
+            }
+        }
+    }
+
     /// A tint the palette does not hold renders as no tint at all, silently, so
     /// the built-ins are checked against it here rather than at load time.
     #[test]

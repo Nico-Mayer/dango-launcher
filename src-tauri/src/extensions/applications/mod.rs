@@ -293,14 +293,6 @@ mod tests {
         (ApplicationsExtension::new(index, icons), indexer)
     }
 
-    #[test]
-    fn manifest_contributes_root_items_and_services() {
-        let (ext, _) = extension();
-        assert!(ext.manifest().root_items);
-        assert!(ext.manifest().services);
-        assert!(ext.manifest().validate().is_ok());
-    }
-
     #[tokio::test]
     async fn the_provider_returns_indexed_apps() {
         let (ext, _) = extension();

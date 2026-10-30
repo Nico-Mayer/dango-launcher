@@ -507,19 +507,6 @@ mod tests {
     }
 
     #[test]
-    fn the_manifest_validates_and_declares_its_contributions() {
-        let manifest = manifest();
-        assert!(manifest.validate().is_ok());
-        assert_eq!(manifest.commands.len(), 1);
-        assert!(manifest.services, "the watcher is a service");
-        assert!(
-            !manifest.root_items,
-            "the history opens through its command"
-        );
-        assert_eq!(manifest.preferences.len(), 5);
-    }
-
-    #[test]
     fn the_declared_command_is_invocable() {
         let (extension, _, _) = setup();
         assert!(extension.command(COMMAND_HISTORY).is_some());

@@ -421,12 +421,6 @@ mod tests {
     };
 
     #[test]
-    fn manifest_validates() {
-        let extension = WindowManagementExtension::new(FakeManager::holding(FRAME, AREA));
-        assert!(extension.manifest().validate().is_ok());
-    }
-
-    #[test]
     fn every_declared_command_is_invocable() {
         let extension = WindowManagementExtension::new(FakeManager::holding(FRAME, AREA));
         for decl in &extension.manifest().commands {
@@ -668,23 +662,5 @@ mod tests {
         }
         let frame = *sim.frame.lock().unwrap();
         assert_eq!((frame.width, frame.height), (400, 300));
-    }
-
-    #[test]
-    fn the_new_commands_are_declared_and_invocable() {
-        let extension = WindowManagementExtension::new(FakeManager::holding(FRAME, AREA));
-        for id in [
-            COMMAND_ALMOST_MAXIMIZE,
-            COMMAND_REASONABLE_SIZE,
-            COMMAND_MAKE_LARGER,
-            COMMAND_MAKE_SMALLER,
-            COMMAND_CENTER_HALF,
-        ] {
-            assert!(
-                extension.manifest().commands.iter().any(|c| c.id == id),
-                "{id} not declared"
-            );
-            assert!(extension.command(id).is_some(), "{id} not invocable");
-        }
     }
 }

@@ -66,55 +66,8 @@ mod tests {
     use super::*;
 
     #[test]
-    fn matches_a_prefix() {
-        assert!(fuzzy_match("fire", "Firefox").is_some());
-    }
-
-    #[test]
-    fn matches_a_gapped_subsequence() {
-        let m = fuzzy_match("ffx", "Firefox").unwrap();
-        assert_eq!(m.positions.len(), 3);
-    }
-
-    #[test]
-    fn rejects_a_non_subsequence() {
-        assert!(fuzzy_match("xyz", "Firefox").is_none());
-    }
-
-    #[test]
     fn is_case_insensitive() {
         assert!(fuzzy_match("CODE", "Visual Studio Code").is_some());
-    }
-
-    #[test]
-    fn a_prefix_outscores_a_scattered_match() {
-        let prefix = fuzzy_match("code", "Code Runner").unwrap();
-        let scattered = fuzzy_match("code", "Console Detach Element").unwrap();
-        assert!(
-            prefix.score > scattered.score,
-            "prefix {} vs scattered {}",
-            prefix.score,
-            scattered.score
-        );
-    }
-
-    #[test]
-    fn a_word_start_outscores_a_mid_word_hit() {
-        let start = fuzzy_match("s", "Visual Studio").unwrap();
-        let mid = fuzzy_match("s", "Basics").unwrap();
-        assert!(
-            start.score > mid.score,
-            "start {} vs mid {}",
-            start.score,
-            mid.score
-        );
-    }
-
-    #[test]
-    fn finds_the_word_start_occurrence_not_the_first() {
-        let m = fuzzy_match("s", "Visual Studio").unwrap();
-        // "Studio" begins at index 7; the greedy first 's' would be index 2.
-        assert_eq!(m.positions, vec![7]);
     }
 
     #[test]

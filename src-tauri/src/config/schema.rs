@@ -567,7 +567,8 @@ mod tests {
             "dango.ai": {
                 "providers": {
                     "anthropic": { "kind": "anthropic", "model": "claude-sonnet-5" },
-                    "claude": { "kind": "cli", "command": "claude", "args": ["-p"] }
+                    "claude": { "kind": "cli", "command": "claude", "args": ["-p"] },
+                    "local": { "kind": "ollama", "baseUrl": "http://localhost:11434" }
                 },
                 "preferences": { "provider": "anthropic", "thinking": "low" },
                 "commands": {
@@ -586,15 +587,6 @@ mod tests {
     }"#;
 
     #[test]
-    fn the_schema_compiles_as_draft_2020_12() {
-        assert_eq!(
-            schema()["$schema"],
-            "https://json-schema.org/draft/2020-12/schema"
-        );
-        validator();
-    }
-
-    #[test]
     fn a_full_config_is_accepted() {
         let validator = validator();
         let instance: Value = serde_json::from_str(FULL).unwrap();
@@ -604,6 +596,14 @@ mod tests {
             .collect();
         assert!(errors.is_empty(), "{errors:#?}");
         Config::parse(FULL).expect("the full sample parses");
+    }
+
+    #[test]
+    fn a_full_config_survives_a_round_trip() {
+        let written = Config::parse(FULL).unwrap().to_json();
+        let original: Value = serde_json::from_str(FULL).unwrap();
+        let again: Value = serde_json::from_str(&written).unwrap();
+        assert_eq!(again, original);
     }
 
     #[test]

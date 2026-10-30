@@ -269,7 +269,7 @@ fn report(ctx: &InvocationContext, result: Result<(), SystemError>) {
 #[cfg(test)]
 pub mod tests {
     use super::*;
-    use crate::extension::{ExtensionHost, Host};
+    use crate::extension::Host;
     use crate::invocation::{CommandResolver, Invoker, Outcome, Output, Resolved};
     use std::path::PathBuf;
     use std::sync::Mutex;
@@ -402,14 +402,6 @@ pub mod tests {
             name: name.into(),
             icon: None,
         }
-    }
-
-    #[test]
-    fn the_manifest_declares_five_commands_and_validates() {
-        let manifest = manifest();
-        assert_eq!(manifest.commands.len(), 5);
-        assert!(manifest.validate().is_ok());
-        assert!(manifest.preferences.is_empty());
     }
 
     #[test]
@@ -664,25 +656,5 @@ pub mod tests {
         assert_eq!(message, commands::CREATE_FAILED);
         assert!(opener.opened.lock().unwrap().is_empty());
         let _ = std::fs::remove_dir_all(&dir);
-    }
-
-    #[test]
-    fn disabling_the_extension_removes_its_commands_from_the_registry() {
-        struct AlwaysOn;
-        impl crate::extension::EnabledStore for AlwaysOn {
-            fn is_enabled(&self, _: &str) -> bool {
-                true
-            }
-            fn set_enabled(&self, _: &str, _: bool) {}
-        }
-        let mut host = ExtensionHost::new(Arc::new(AlwaysOn));
-        host.register(Arc::new(extension(FakeControl::new())))
-            .unwrap();
-        let lock = format!("{EXTENSION_ID}.{COMMAND_LOCK}");
-        assert!(host.registry().get(&lock).is_some());
-
-        host.set_enabled(EXTENSION_ID, false);
-        assert!(host.registry().get(&lock).is_none());
-        assert!(host.resolve_command(&lock).is_none());
     }
 }

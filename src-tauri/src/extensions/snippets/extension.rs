@@ -794,23 +794,6 @@ mod tests {
         }
     }
 
-    #[test]
-    fn the_two_kinds_do_not_share_an_identity() {
-        assert_ne!(extension_id(Kind::Snippet), extension_id(Kind::Quicklink));
-        assert_eq!(fixture(Kind::Snippet).extension.manifest().id, SNIPPETS_ID);
-        assert_eq!(
-            fixture(Kind::Quicklink).extension.manifest().id,
-            QUICKLINKS_ID
-        );
-    }
-
-    #[test]
-    fn both_manifests_validate() {
-        for kind in [Kind::Snippet, Kind::Quicklink] {
-            assert!(fixture(kind).extension.manifest().validate().is_ok());
-        }
-    }
-
     #[tokio::test]
     async fn snippets_are_offered_in_root_search() {
         let f = fixture(Kind::Snippet);

@@ -339,6 +339,7 @@ mod tests {
             10,
         );
         assert_eq!(ranked[0].id, "a");
+        assert!(ranked.iter().all(|c| !c.suggested));
     }
 
     #[test]
@@ -414,17 +415,6 @@ mod tests {
 
         let ids: Vec<&str> = ranked.iter().map(|c| c.id.as_str()).collect();
         assert_eq!(ids, ["a"]);
-    }
-
-    #[test]
-    fn empty_query_on_first_run_marks_nothing() {
-        let ranker = ranker();
-        let ranked = ranker.rank(
-            "",
-            vec![candidate("b", "Beta"), candidate("a", "Alpha")],
-            10,
-        );
-        assert!(ranked.iter().all(|c| !c.suggested));
     }
 
     #[test]
