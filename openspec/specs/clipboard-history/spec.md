@@ -196,7 +196,8 @@ panel. A value that is neither SHALL behave as the default.
 #### Scenario: The launcher gets out of the way promptly
 
 - **WHEN** the user confirms paste or copy on an entry
-- **THEN** the launcher is no longer on screen within 100ms of the key press
+- **THEN** the launcher leaves the screen at once, without waiting for the
+  paste or copy to finish
 
 #### Scenario: Pasting is not possible on macOS without the permission
 
@@ -273,7 +274,7 @@ opening or the result list appearing.
 #### Scenario: Activation during recording
 
 - **WHEN** the user opens the launcher while an entry is being recorded
-- **THEN** the launcher opens within its activation budget of 80ms
+- **THEN** the launcher opens without waiting for the recording
 
 #### Scenario: A large image does not stall the launcher
 

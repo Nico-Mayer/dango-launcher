@@ -33,7 +33,8 @@ the typed keyword and insert that snippet's text in its place.
 #### Scenario: Expansion is fast enough to keep typing through
 
 - **WHEN** a keyword is completed
-- **THEN** the replacement has happened within 500ms
+- **THEN** the replacement happens before the user's next keystrokes land in
+  the wrong place
 
 #### Scenario: The user's clipboard is unaffected
 
@@ -131,7 +132,7 @@ SHALL NOT interfere with the keystrokes it observes.
 #### Scenario: Typing stays responsive
 
 - **WHEN** the monitor is running and the user types continuously
-- **THEN** no keystroke is delayed by more than 5ms by Dango's observation
+- **THEN** no keystroke is perceptibly delayed by Dango's observation
 
 #### Scenario: Keystrokes are never swallowed or altered
 

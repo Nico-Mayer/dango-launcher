@@ -26,14 +26,14 @@ ranked list.
 
 ### Requirement: Providers have a time budget
 
-Each root items provider SHALL be queried asynchronously with a budget of 50
-milliseconds. A provider exceeding its budget SHALL NOT delay results from
-others; its results SHALL be merged in when they arrive.
+Each root items provider SHALL be queried asynchronously with a short time
+budget. A provider exceeding its budget SHALL NOT delay results from others; its
+results SHALL be merged in when they arrive.
 
 #### Scenario: A slow provider does not block the list
 
-- **WHEN** one provider takes 400 milliseconds and others answer in 5 milliseconds
-- **THEN** the fast results are displayed within the budget
+- **WHEN** one provider is slow and the others answer at once
+- **THEN** the fast results are displayed without waiting for the slow one
 - **AND** the slow provider's results are merged in when they arrive
 
 #### Scenario: A provider never answers
@@ -222,18 +222,18 @@ labels an item a suggestion on its own account.
 #### Scenario: Splitting does not cost search time
 
 - **WHEN** the index holds 2000 candidates and the query is empty
-- **THEN** the sectioned list is ready within 30 milliseconds
+- **THEN** the sectioned list appears without visible delay
 
 ### Requirement: Search stays responsive as the index grows
 
-Ranking and merging SHALL produce results within 30 milliseconds for an index of
-2000 candidates, and the result list SHALL be bounded so rendering cost does not
-grow with index size.
+Ranking and merging SHALL keep up with typing for an index of 2000 candidates,
+and the result list SHALL be bounded so rendering cost does not grow with index
+size.
 
 #### Scenario: Large index
 
 - **WHEN** the index holds 2000 candidates and the user types a character
-- **THEN** ranked results are ready within 30 milliseconds
+- **THEN** ranked results appear without visible delay
 
 #### Scenario: Broad query
 
@@ -284,7 +284,7 @@ to produce them.
 #### Scenario: Tinting does not cost search time
 
 - **WHEN** the index holds 2000 candidates and the user types a character
-- **THEN** ranked results are still ready within 30 milliseconds
+- **THEN** ranked results still appear without visible delay
 
 ### Requirement: Confirming a result acts on it
 
@@ -354,7 +354,7 @@ work to the search path: ranking SHALL read them from memory.
 #### Scenario: Learning does not slow search
 
 - **WHEN** 2000 learned pairs exist and the user types a two-letter query over 2000 candidates
-- **THEN** ranking completes within the existing 30 millisecond budget
+- **THEN** ranked results still appear without visible delay
 
 ### Requirement: Matching folds case and accents and prefers word starts
 

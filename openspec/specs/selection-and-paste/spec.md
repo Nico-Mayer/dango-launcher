@@ -60,15 +60,14 @@ keystroke path.
 #### Scenario: Reading a selection is fast enough to act on
 
 - **WHEN** a selection of 1,000 characters is read
-- **THEN** it is returned within 300ms
+- **THEN** it is returned without visible delay
 
 #### Scenario: An application that does not answer in time
 
-- **WHEN** the frontmost application has not answered the direct request within
-  200ms
+- **WHEN** the frontmost application has not answered the direct request after
+  a short bounded wait
 - **THEN** Dango stops waiting for it
-- **AND** the read completes by the fallback or reports that it could not be done,
-  within the 300ms budget
+- **AND** the read completes by the fallback or reports that it could not be done
 
 ### Requirement: Text is delivered into the frontmost application
 
@@ -97,7 +96,7 @@ pasted it.
 #### Scenario: Text appears promptly
 
 - **WHEN** the user confirms an action that inserts text
-- **THEN** the text has appeared in the target application within 400ms
+- **THEN** the text appears in the target application without visible delay
 
 #### Scenario: The caret can be placed inside the inserted text
 
@@ -119,7 +118,6 @@ on the clipboard after it is pasted, ready to be pasted again.
 
 - **WHEN** the user has content on the clipboard and Dango inserts text
 - **THEN** the clipboard holds that same content once the insertion has finished
-- **AND** it is restored within 1 second
 
 #### Scenario: An image on the clipboard survives
 

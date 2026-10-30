@@ -113,7 +113,8 @@ enough that it feels immediate rather than animated or laggy.
 #### Scenario: The window moves promptly
 
 - **WHEN** the user confirms a window-management command
-- **THEN** the window has reached its new position and size within 100ms
+- **THEN** the window reaches its new position and size at once, without an
+  animation
 
 ### Requirement: Platform permission and gating
 

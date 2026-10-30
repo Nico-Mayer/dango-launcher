@@ -86,7 +86,7 @@ the activation path. Showing the launcher SHALL NOT wait on a database query.
 #### Scenario: Activation is independent of the database
 
 - **WHEN** the user presses the shortcut while a background write is in progress
-- **THEN** the launcher still meets its activation budget
+- **THEN** the launcher opens without waiting for the write
 
 ### Requirement: Corrupted database is recoverable
 

@@ -146,16 +146,14 @@ non-animated status information.
 
 - **WHEN** the launcher is summoned for its first or a repeat activation on
   Windows
-- **THEN** it is painted within 80 milliseconds of the global shortcut being
-  received
+- **THEN** it is painted without visible delay after the global shortcut
 - **AND** it does not start invisible or displaced by an entrance effect
 
 #### Scenario: Activation stays immediate on macOS
 
 - **WHEN** the launcher is summoned for its first or a repeat activation on
   macOS
-- **THEN** it is painted within 80 milliseconds of the global shortcut being
-  received
+- **THEN** it is painted without visible delay after the global shortcut
 - **AND** it does not start invisible or displaced by an entrance effect
 
 #### Scenario: Overlay feedback is short and non-blocking

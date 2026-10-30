@@ -27,7 +27,7 @@ MUST be preserved unchanged.
 #### Scenario: Commit without Rust files
 
 - **WHEN** the developer commits only non-Rust files, such as Markdown or Svelte
-- **THEN** no Rust tooling runs and the hook adds under 1 second to the commit
+- **THEN** no Rust tooling runs and the hook adds no noticeable time to the commit
 
 ### Requirement: Pushing runs the CI lints
 

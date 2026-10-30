@@ -95,10 +95,10 @@ matched on its name, and SHALL be distinguishable from other results.
 - **WHEN** the user types a query matching both an application and a snippet
 - **THEN** both appear, ordered by the launcher's usual ranking
 
-#### Scenario: Snippets stay inside the provider budget
+#### Scenario: Snippets keep search responsive
 
 - **WHEN** root search queries the snippets provider with 500 snippets stored
-- **THEN** it answers within the 50ms provider budget
+- **THEN** it answers without visible delay
 
 ### Requirement: Confirming a snippet inserts its text
 

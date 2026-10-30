@@ -62,10 +62,10 @@ matched on its name.
 - **WHEN** a quicklink appears in the results
 - **THEN** its name is shown along with an indication of its destination
 
-#### Scenario: Quicklinks stay inside the provider budget
+#### Scenario: Quicklinks keep search responsive
 
 - **WHEN** root search queries the quicklinks provider with 500 quicklinks stored
-- **THEN** it answers within the 50ms provider budget
+- **THEN** it answers without visible delay
 
 ### Requirement: Confirming a quicklink opens it
 
@@ -176,8 +176,7 @@ launcher's quicklink icon. Behaviour is identical on Windows and macOS.
 #### Scenario: Showing an icon costs the search path nothing
 
 - **WHEN** root search queries the quicklinks provider with 500 quicklinks stored
-- **THEN** it answers within the 50ms provider budget
-- **AND** no network request is made while answering
+- **THEN** no network request is made while answering
 
 ### Requirement: Favicons are fetched in the background and kept
 

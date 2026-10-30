@@ -21,10 +21,10 @@ re-check both each time the launcher is shown, and SHALL re-check at least every
 - **WHEN** Accessibility and Input Monitoring are both granted
 - **THEN** Dango shows no permission warning anywhere
 
-#### Scenario: Checking on show stays inside the activation budget on macOS
+#### Scenario: Checking on show does not slow activation on macOS
 
 - **WHEN** the launcher is shown
-- **THEN** the permission check adds less than 1ms to the time from hotkey to painted window
+- **THEN** the permission check adds no visible delay to the time from hotkey to painted window
 
 #### Scenario: A grant is noticed without opening the launcher on macOS
 

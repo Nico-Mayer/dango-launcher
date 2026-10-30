@@ -71,8 +71,8 @@ answer SHALL come from the application, not from how the frontend was served.
 #### Scenario: Activation latency is unchanged
 
 - **WHEN** a development build is summoned after warm-up
-- **THEN** the launcher is painted within the existing 80 millisecond budget
-  with the marker already in place
+- **THEN** the launcher is painted without added delay, with the marker
+  already in place
 
 ### Requirement: A development build is named in the tray
 

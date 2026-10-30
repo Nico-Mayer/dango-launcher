@@ -124,15 +124,15 @@ the answer is complete.
 #### Scenario: A view appears before the answer does
 
 - **WHEN** an AI command is invoked
-- **THEN** a view is on screen within 100ms showing that it is working
+- **THEN** a view showing that it is working is on screen at once, without
+  waiting for the provider
 - **AND** it is replaced by the answer as the answer arrives
 
 #### Scenario: Text arrives progressively
 
 - **WHEN** the model is producing a long answer
 - **THEN** the text on screen grows as it arrives
-- **AND** the view is updated at most once every 50ms rather than on every
-  fragment
+- **AND** view updates are throttled rather than sent on every fragment
 
 #### Scenario: The launcher stays responsive while streaming
 

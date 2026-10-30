@@ -54,19 +54,19 @@ NOT create or destroy the window or reload its content.
 
 ### Requirement: Activation latency
 
-Showing the launcher SHALL complete within 80 milliseconds, measured from the
-global shortcut being received to the first frame of the launcher window being
-painted, on both supported platforms.
+Showing the launcher SHALL feel immediate on both supported platforms. The
+activation path SHALL NOT create the window, load the frontend, or wait on work
+that could have run earlier.
 
 #### Scenario: Cold first activation
 
 - **WHEN** the user presses the shortcut for the first time after application start
-- **THEN** the launcher is painted within 80 milliseconds
+- **THEN** the launcher is painted without visible delay
 
 #### Scenario: Warm repeat activation
 
 - **WHEN** the user presses the shortcut again after a previous show and hide
-- **THEN** the launcher is painted within 80 milliseconds
+- **THEN** the launcher is painted without visible delay
 
 #### Scenario: Latency is observable in development
 

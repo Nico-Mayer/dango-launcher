@@ -33,7 +33,7 @@ all other text exactly as written.
 #### Scenario: Rendering is fast enough to be invisible
 
 - **WHEN** a template of 1,000 characters containing 10 placeholders is rendered
-- **THEN** the result is produced in under 5ms
+- **THEN** the result is produced without visible delay
 
 ### Requirement: A fixed vocabulary fills itself in
 

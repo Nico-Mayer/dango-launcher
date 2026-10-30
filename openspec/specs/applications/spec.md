@@ -101,7 +101,7 @@ once and cached, and SHALL NOT be extracted on the search path.
 #### Scenario: Icon extraction does not slow search
 
 - **WHEN** a query returns applications whose icons have not been cached yet
-- **THEN** results still appear within the search budget
+- **THEN** results appear without waiting for the icons
 - **AND** icons fill in as they become available
 
 #### Scenario: Icon cannot be extracted
@@ -117,7 +117,7 @@ the first index is being built.
 #### Scenario: First run while indexing
 
 - **WHEN** the user opens the launcher during the initial index build
-- **THEN** the launcher opens within its activation budget
+- **THEN** the launcher opens without waiting for the index
 - **AND** applications appear as they are indexed
 
 #### Scenario: Index persists across restarts
