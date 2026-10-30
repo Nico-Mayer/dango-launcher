@@ -31,6 +31,5 @@
 
 ## 5. Verification on macOS
 
-- [ ] 5.1 Repeat 4.1 and 4.4 on macOS
+- [ ] 5.1 Toggle the hotkey, wait past the period, activate, and verify the first painted frame of the panel shows the root results with no empty flash
 - [ ] 5.2 Repeat 4.2 on macOS, including a click away from the non-activating panel, and verify the cursor returns to the field; if it does not, record the finding in design.md before adding a refocus hook
-- [ ] 5.3 Repeat 4.3, 4.5, and 4.6 on macOS
