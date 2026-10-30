@@ -127,6 +127,23 @@ disabling it, or changing which key is mapped.
 - **WHEN** the user changes the hyperkey from one key to another in the file
 - **THEN** the old key returns to normal and the new key becomes the hyperkey
 
+#### Scenario: The permission is missing on macOS
+
+- **WHEN** a hyperkey is configured and Input Monitoring has not been granted
+- **THEN** the mapped key keeps its normal function
+- **AND** `dango.log` says the hyperkey needs Input Monitoring
+- **AND** the launcher shows a warning that Input Monitoring is off and names the hyperkey
+
+#### Scenario: The permission is granted on macOS
+
+- **WHEN** a hyperkey is configured, the user grants Input Monitoring, and Dango restarts as macOS requires
+- **THEN** the mapped key acts as the hyper modifier
+
+#### Scenario: Windows needs no permission
+
+- **WHEN** a hyperkey is configured on Windows
+- **THEN** it applies at startup with no permission step
+
 ### Requirement: The hyperkey does not disrupt Dango's own key injection
 
 Dango's own synthesized input, such as a snippet paste, SHALL NOT be re-processed
