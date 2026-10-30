@@ -195,3 +195,7 @@ load and are not reliable.
   need Tauri 2.12, so it is pinned with autostart.
 - tauri-action writes the `.msi` into `latest.json` unless
   `updaterJsonPreferNsis: true` is set. Updates must go through NSIS.
+- A local `npx tauri build` with bundling fails at the end without
+  `TAURI_SIGNING_PRIVATE_KEY`, after the app bundle is already signed. Pass
+  `--config '{"bundle":{"createUpdaterArtifacts":false}}'` to skip the updater
+  artifacts.
