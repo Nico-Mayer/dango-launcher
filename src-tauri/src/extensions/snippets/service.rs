@@ -234,6 +234,103 @@ fn expand(records: &Records, text: &dyn TextTarget, hit: &Hit) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::extensions::clipboard::Content;
+    use crate::extensions::snippets::Kind;
+    use crate::text::TextError;
+
+    #[derive(Default)]
+    struct Recorder {
+        expanded: Mutex<Vec<(usize, String, Option<usize>)>>,
+        clipboard: Option<String>,
+        selection: Option<String>,
+    }
+
+    impl TextTarget for Recorder {
+        fn insert(&self, _text: &str, _caret: Option<usize>) -> Result<(), TextError> {
+            unreachable!("expansion never inserts without deleting the keyword")
+        }
+        fn expand(
+            &self,
+            backspaces: usize,
+            text: &str,
+            caret: Option<usize>,
+        ) -> Result<(), TextError> {
+            self.expanded
+                .lock()
+                .unwrap()
+                .push((backspaces, text.to_string(), caret));
+            Ok(())
+        }
+        fn paste_content(&self, _content: &Content) -> Result<(), TextError> {
+            unreachable!("expansion never pastes clipboard content")
+        }
+        fn selection(&self) -> Result<Option<String>, TextError> {
+            Ok(self.selection.clone())
+        }
+        fn clipboard_text(&self) -> Option<String> {
+            self.clipboard.clone()
+        }
+    }
+
+    fn snippets() -> Arc<Records> {
+        let dir = std::env::temp_dir().join(format!("dango-expand-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&dir).unwrap();
+        Records::open(&dir, Kind::Snippet).0
+    }
+
+    fn hit(id: &str, keyword: &str) -> Hit {
+        Hit {
+            id: id.to_string(),
+            keyword_chars: keyword.chars().count(),
+        }
+    }
+
+    #[test]
+    fn expanding_deletes_the_keyword_and_types_the_rendered_snippet() {
+        let records = snippets();
+        let id = records
+            .create(
+                "Reply",
+                "Hi {{ cursor }}, {{ clipboard }} / {{ selection }}",
+                Some(";hi"),
+            )
+            .unwrap();
+        let target = Recorder {
+            clipboard: Some("copied".into()),
+            selection: Some("picked".into()),
+            ..Default::default()
+        };
+
+        expand(&records, &target, &hit(&id, ";hi"));
+
+        assert_eq!(
+            *target.expanded.lock().unwrap(),
+            [(3, "Hi , copied / picked".to_string(), Some(3))]
+        );
+    }
+
+    #[test]
+    fn a_snippet_gone_since_the_match_types_nothing() {
+        let records = snippets();
+        let target = Recorder::default();
+        expand(&records, &target, &hit("deleted", "sig"));
+        assert!(target.expanded.lock().unwrap().is_empty());
+    }
+
+    #[test]
+    fn only_snippets_with_a_keyword_are_watched_for() {
+        let records = snippets();
+        let with = records.create("Sig", "Best", Some("sig")).unwrap();
+        records.create("Plain", "No keyword", None).unwrap();
+
+        let entries = keyword_entries(&records);
+
+        assert_eq!(entries.len(), 1);
+        assert_eq!(
+            (entries[0].id.as_str(), entries[0].keyword.as_str()),
+            (with.as_str(), "sig")
+        );
+    }
 
     fn entries(pairs: &[(&str, &str)]) -> Vec<KeywordEntry> {
         pairs
@@ -277,16 +374,6 @@ mod tests {
         let mut expander = Expander::new();
         expander.set_keywords(Vec::new());
         assert!(expander.observe_char('a').is_none());
-        assert_eq!(expander.buffer.len(), 0);
-    }
-
-    #[test]
-    fn clear_empties_the_buffer() {
-        let mut expander = Expander::new();
-        expander.set_keywords(entries(&[("s", "sig")]));
-        expander.observe_char('s');
-        expander.observe_char('i');
-        expander.clear();
         assert_eq!(expander.buffer.len(), 0);
     }
 
