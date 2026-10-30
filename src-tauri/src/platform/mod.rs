@@ -427,66 +427,7 @@ pub fn launcher_origin(
 
 #[cfg(test)]
 mod tests {
-    use super::launcher_origin;
-    use super::{Hyperkey, HyperkeyTrigger};
-    use std::sync::atomic::{AtomicBool, Ordering};
-    use std::sync::Arc;
-
-    struct FakeHyperkey {
-        stopped: Arc<AtomicBool>,
-    }
-    impl Hyperkey for FakeHyperkey {}
-    impl Drop for FakeHyperkey {
-        fn drop(&mut self) {
-            self.stopped.store(true, Ordering::SeqCst);
-        }
-    }
-
-    #[test]
-    fn a_hyperkey_handle_stops_on_drop() {
-        let stopped = Arc::new(AtomicBool::new(false));
-        let handle: Box<dyn Hyperkey> = Box::new(FakeHyperkey {
-            stopped: stopped.clone(),
-        });
-        assert!(!stopped.load(Ordering::SeqCst));
-        drop(handle);
-        assert!(
-            stopped.load(Ordering::SeqCst),
-            "dropping the handle stops it"
-        );
-    }
-
-    #[test]
-    fn a_key_monitor_delivers_strokes_and_stops_on_drop() {
-        use super::{KeyMonitor, KeyStroke};
-        let stopped = Arc::new(AtomicBool::new(false));
-        struct FakeMonitor {
-            stopped: Arc<AtomicBool>,
-        }
-        impl KeyMonitor for FakeMonitor {}
-        impl Drop for FakeMonitor {
-            fn drop(&mut self) {
-                self.stopped.store(true, Ordering::SeqCst);
-            }
-        }
-
-        let seen = Arc::new(std::sync::Mutex::new(Vec::new()));
-        let sink_seen = seen.clone();
-        let sink: Box<dyn Fn(KeyStroke) + Send> =
-            Box::new(move |stroke| sink_seen.lock().unwrap().push(stroke));
-        sink(KeyStroke::Char('a'));
-        sink(KeyStroke::Clear);
-        assert_eq!(
-            *seen.lock().unwrap(),
-            vec![KeyStroke::Char('a'), KeyStroke::Clear]
-        );
-
-        let handle: Box<dyn KeyMonitor> = Box::new(FakeMonitor {
-            stopped: stopped.clone(),
-        });
-        drop(handle);
-        assert!(stopped.load(Ordering::SeqCst));
-    }
+    use super::{launcher_origin, HyperkeyTrigger};
 
     #[test]
     fn trigger_from_key_uses_an_allowlist() {

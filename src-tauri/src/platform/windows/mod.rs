@@ -3,8 +3,6 @@ mod clipboard;
 mod hyperkey;
 mod keymonitor;
 mod permissions;
-#[cfg(test)]
-mod probe;
 mod selection;
 mod system;
 mod text;

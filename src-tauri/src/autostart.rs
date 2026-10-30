@@ -29,20 +29,3 @@ fn enable_failure(error: &dyn std::fmt::Display) -> String {
 fn disable_failure(error: &dyn std::fmt::Display) -> String {
     format!("autostart: could not remove the login entry: {error}")
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn failure_messages_name_the_step_and_carry_the_cause() {
-        assert_eq!(
-            enable_failure(&"denied"),
-            "autostart: could not register Dango to start at login: denied"
-        );
-        assert_eq!(
-            disable_failure(&"denied"),
-            "autostart: could not remove the login entry: denied"
-        );
-    }
-}

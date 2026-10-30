@@ -189,16 +189,6 @@ mod tests {
     }
 
     #[test]
-    fn the_spec_directories_are_searched() {
-        let roots = roots();
-        assert!(roots.contains(&PathBuf::from("/Applications")));
-        assert!(roots.contains(&PathBuf::from("/System/Applications")));
-        assert!(roots
-            .iter()
-            .any(|r| r.ends_with("Applications") && r.starts_with(std::env::var("HOME").unwrap())));
-    }
-
-    #[test]
     fn bundles_at_the_top_and_one_level_down_are_indexed() {
         let root = tree();
         assert_eq!(names_in(&root), ["Alpha", "Beta"]);

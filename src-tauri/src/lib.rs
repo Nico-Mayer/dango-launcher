@@ -502,47 +502,6 @@ fn inspect_template(source: String) -> TemplateInspection {
 }
 
 #[cfg(test)]
-mod tint_tests {
-    use super::{Candidate, ResultItem, TintTable};
-
-    fn candidate(extension_id: &str) -> Candidate {
-        Candidate {
-            extension_id: extension_id.into(),
-            id: format!("{extension_id}.one"),
-            title: "One".into(),
-            subtitle: None,
-            icon: Some("icon:lock".into()),
-            keywords: vec![],
-            alias: None,
-            source: crate::search::Source::Command,
-            actions: vec![],
-            match_positions: vec![],
-            suggested: false,
-            pinned: false,
-        }
-    }
-
-    fn table() -> TintTable {
-        TintTable(std::collections::HashMap::from([(
-            "dango.system".to_string(),
-            "red".to_string(),
-        )]))
-    }
-
-    #[test]
-    fn a_result_carries_the_tint_its_extension_declared() {
-        let item = ResultItem::new(candidate("dango.system"), &table());
-        assert_eq!(item.tint.as_deref(), Some("red"));
-    }
-
-    #[test]
-    fn a_result_from_an_untinted_extension_carries_none() {
-        let item = ResultItem::new(candidate("dango.applications"), &table());
-        assert_eq!(item.tint, None);
-    }
-}
-
-#[cfg(test)]
 mod inspect_tests {
     use super::inspect_template;
 

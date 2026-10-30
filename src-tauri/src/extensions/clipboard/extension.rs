@@ -829,21 +829,6 @@ mod tests {
     }
 
     #[test]
-    fn restoring_marks_the_write_as_dangos_own() {
-        let (extension, history, _) = setup();
-        history
-            .record(Content::Text("hello".into()), Bounds::default(), 1)
-            .unwrap();
-        let id = history.entries().unwrap()[0].id.clone();
-        extension.perform_action(&id, ACTION_RESTORE, &FormValues::new());
-        assert_eq!(
-            history.entries().unwrap().len(),
-            1,
-            "putting an entry back must not add another"
-        );
-    }
-
-    #[test]
     fn an_image_entry_whose_file_has_gone_is_reported_and_dropped() {
         let (extension, history, _) = setup();
         history

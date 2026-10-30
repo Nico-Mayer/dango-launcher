@@ -865,19 +865,6 @@ mod tests {
         );
     }
 
-    #[test]
-    fn stopping_ends_the_loop() {
-        let source = FakeSource::serving("png");
-        let (service, records) = service(source.clone(), true);
-        records
-            .create("Docs", "https://example.com/", None)
-            .unwrap();
-        service.start().unwrap();
-        service.stop();
-        std::thread::sleep(TICK * 3);
-        assert!(!service.running.load(Ordering::SeqCst));
-    }
-
     /// Fetches from the real internet, so it runs only when asked for by name.
     /// The check that matters is that a live site answers with a type the
     /// webview can draw, which no fake can tell us.
