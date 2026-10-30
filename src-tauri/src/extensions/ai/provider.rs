@@ -4,6 +4,7 @@
 //! service lives on the other side of `Completions`, so the client can be
 //! swapped and a test can answer without a network.
 
+use std::path::PathBuf;
 use std::time::Duration;
 
 pub use crate::config::ProviderKind;
@@ -15,6 +16,8 @@ pub use crate::config::Thinking;
 pub struct CliSpec {
     pub command: String,
     pub args: Vec<String>,
+    /// Searched for the command before PATH, in order.
+    pub search: Vec<PathBuf>,
 }
 
 /// One resolved request: which service, which model, what to ask, and the key

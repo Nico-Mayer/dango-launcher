@@ -15,7 +15,9 @@
 //! wrapper scripts: killing the one we spawned would leave the agent it started
 //! running, which is what abandoning an answer must not do.
 
+use std::ffi::{OsStr, OsString};
 use std::io::{Read, Write};
+use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::sync::{mpsc, Arc, Mutex};
 
@@ -39,14 +41,26 @@ impl Completions for CliClient {
             return Chunks::new(receiver);
         };
 
+        let workspace = workspace();
+        let path = search_path(&spec.search);
+        let Some(program) = locate(&spec.command, path.as_deref(), &workspace) else {
+            let _ = sender.send(Err(AiError::CommandMissing {
+                command: spec.command.clone(),
+            }));
+            return Chunks::new(receiver);
+        };
+
         let args = arguments(&spec, &request);
-        let mut command = CommandWrap::with_new(&spec.command, |command| {
+        let mut command = CommandWrap::with_new(&program, |command| {
             command
                 .args(&args)
-                .current_dir(workspace())
+                .current_dir(&workspace)
                 .stdin(Stdio::piped())
                 .stdout(Stdio::piped())
                 .stderr(Stdio::piped());
+            if let Some(path) = &path {
+                command.env("PATH", path);
+            }
             // A launcher must not flash a console window on its way to an answer.
             #[cfg(windows)]
             {
@@ -181,6 +195,26 @@ fn workspace() -> std::path::PathBuf {
     dir
 }
 
+/// The configured directories ahead of Dango's own PATH, which is the one a
+/// program started from the tray or Finder inherits, not the shell's.
+fn search_path(search: &[PathBuf]) -> Option<OsString> {
+    let inherited = std::env::var_os("PATH").unwrap_or_default();
+    let dirs = search
+        .iter()
+        .cloned()
+        .chain(std::env::split_paths(&inherited));
+    std::env::join_paths(dirs).ok()
+}
+
+/// Found through `which` rather than left to the spawn, which on Windows only
+/// tries `.exe` and so misses the `.cmd` wrappers npm installs.
+fn locate(command: &str, path: Option<&OsStr>, workspace: &Path) -> Option<PathBuf> {
+    if Path::new(command).components().count() > 1 {
+        return Some(PathBuf::from(command));
+    }
+    which::which_in(command, path, workspace).ok()
+}
+
 fn wants_prompt_argument(spec: &CliSpec) -> bool {
     spec.args.iter().any(|arg| arg.contains(PROMPT))
 }
@@ -219,6 +253,7 @@ mod tests {
             cli: Some(CliSpec {
                 command: command.into(),
                 args: args.iter().map(|arg| arg.to_string()).collect(),
+                search: Vec::new(),
             }),
         }
     }
@@ -328,6 +363,108 @@ mod tests {
             answer.to_lowercase().contains("dango-cli"),
             "ran somewhere else: {answer}"
         );
+    }
+
+    fn scratch() -> PathBuf {
+        let dir = std::env::temp_dir().join(format!("dango-cli-test-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
+    /// A script runnable by its bare name: `name.cmd` on Windows, an
+    /// executable `name` elsewhere. `body` is one line both shells understand.
+    fn script(dir: &Path, name: &str, body: &str) -> PathBuf {
+        if cfg!(windows) {
+            let path = dir.join(format!("{name}.cmd"));
+            std::fs::write(
+                &path,
+                format!(
+                    "@echo off
+{body}
+"
+                ),
+            )
+            .unwrap();
+            path
+        } else {
+            let path = dir.join(name);
+            std::fs::write(
+                &path,
+                format!(
+                    "#!/bin/sh
+{body}
+"
+                ),
+            )
+            .unwrap();
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755)).unwrap();
+            }
+            path
+        }
+    }
+
+    fn searching(command: &str, search: &[&Path]) -> Request {
+        let mut request = request(command, &[]);
+        request.cli.as_mut().unwrap().search = search.iter().map(|dir| dir.to_path_buf()).collect();
+        request
+    }
+
+    #[test]
+    fn a_program_outside_path_is_found_in_a_configured_directory() {
+        let dir = scratch();
+        script(&dir, "dango-probe", "echo found");
+        let answer = collect(&CliClient.stream(searching("dango-probe", &[&dir]))).unwrap();
+        assert_eq!(answer.trim(), "found");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn the_first_configured_directory_wins() {
+        let (first, second) = (scratch(), scratch());
+        script(&first, "dango-probe", "echo first");
+        script(&second, "dango-probe", "echo second");
+        let answer =
+            collect(&CliClient.stream(searching("dango-probe", &[&first, &second]))).unwrap();
+        assert_eq!(answer.trim(), "first");
+        let _ = std::fs::remove_dir_all(&first);
+        let _ = std::fs::remove_dir_all(&second);
+    }
+
+    #[test]
+    fn a_command_given_as_a_path_is_run_as_given() {
+        let (dir, elsewhere) = (scratch(), scratch());
+        let program = script(&dir, "dango-probe", "echo direct");
+        script(&elsewhere, "dango-probe", "echo searched");
+        let command = program.to_string_lossy().to_string();
+        let answer = collect(&CliClient.stream(searching(&command, &[&elsewhere]))).unwrap();
+        assert_eq!(answer.trim(), "direct");
+        let _ = std::fs::remove_dir_all(&dir);
+        let _ = std::fs::remove_dir_all(&elsewhere);
+    }
+
+    #[test]
+    fn what_the_program_starts_finds_the_configured_directories_too() {
+        let dir = scratch();
+        script(&dir, "dango-outer", "dango-inner");
+        script(&dir, "dango-inner", "echo inner");
+        let answer = collect(&CliClient.stream(searching("dango-outer", &[&dir]))).unwrap();
+        assert_eq!(answer.trim(), "inner");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn a_bare_name_finds_a_command_script_on_windows() {
+        let dir = scratch();
+        let program = script(&dir, "dango-probe", "echo from cmd");
+        assert_eq!(program.extension().unwrap(), "cmd");
+        assert!(!dir.join("dango-probe.exe").exists());
+        let answer = collect(&CliClient.stream(searching("dango-probe", &[&dir]))).unwrap();
+        assert_eq!(answer.trim(), "from cmd");
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     /// Against a CLI this machine has signed in, so never part of a normal run:

@@ -37,6 +37,7 @@ Settings for the AI extension.
 | --- | --- | --- | --- | --- |
 | `commands` | map of [AI command settings](#ai-command-settings) |  |  | Per-command settings, keyed by command id. |
 | `enabled` | boolean |  |  | Whether the extension runs. Absent means enabled. |
+| `path` | [Search path](#search-path) |  |  | Directories searched for a command provider's program before PATH, in order: one list, or one per platform. A leading `~` is the home directory. |
 | `preferences` | object |  |  | The extension's preference values, overriding its defaults. |
 | `providers` | map of [Provider settings](#provider-settings) |  |  | Model services, keyed by the name commands refer to them by. That name is also the key its API key is filed under in auth.json. |
 
@@ -251,6 +252,15 @@ Per-command settings, keyed by command id.
 | Setting | Type | Default | Values | Description |
 | --- | --- | --- | --- | --- |
 | `excluded-applications` | string |  |  | Applications where Dango must never send the copy chord to read a selection, comma separated and matched ignoring case. For editors that bind Ctrl+C to something of their own. Dango says it cannot read the selection there instead. |
+
+## Search path
+
+Directories to search: one list for both platforms, or one per platform.
+
+One of:
+
+- array
+- object
 
 ## Provider settings
 

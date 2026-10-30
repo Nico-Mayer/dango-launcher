@@ -6,8 +6,9 @@
 //! settings, and the extension does the rest.
 
 use std::collections::BTreeMap;
+use std::path::PathBuf;
 
-use crate::config::{CommandSettings, Config, ProviderKind, ProviderSettings};
+use crate::config::{CommandSettings, Config, ProviderKind, ProviderSettings, SearchPath};
 
 use super::provider::{CliSpec, Request, Thinking};
 
@@ -185,6 +186,7 @@ pub struct Providers {
     entries: BTreeMap<String, ProviderSettings>,
     default_provider: Option<String>,
     default_thinking: Thinking,
+    search: Vec<PathBuf>,
 }
 
 /// Why a request could not even be made. Separate from a request that failed,
@@ -214,6 +216,11 @@ impl Providers {
             entries: extension.providers.clone(),
             default_provider: config.preference(EXTENSION_ID, None, PREF_PROVIDER),
             default_thinking,
+            search: extension
+                .path
+                .as_ref()
+                .map(SearchPath::for_platform)
+                .unwrap_or_default(),
         }
     }
 
@@ -266,6 +273,7 @@ impl Providers {
             cli: entry.command.as_ref().map(|command| CliSpec {
                 command: command.clone(),
                 args: entry.args.clone(),
+                search: self.search.clone(),
             }),
         })
     }
@@ -564,6 +572,26 @@ mod tests {
         assert_eq!(cli.command, "claude");
         assert_eq!(cli.args, ["-p"]);
         assert_eq!(request.model, "", "a program needs no model named for it");
+        assert!(cli.search.is_empty());
+    }
+
+    #[test]
+    fn a_command_provider_carries_the_configured_directories() {
+        let providers = Providers::from_config(&config(
+            r#"{ "extensions": { "dango.ai": {
+                "path": ["/opt/one", "/opt/two"],
+                "providers": { "claude": { "kind": "cli", "command": "claude" } }
+            } } }"#,
+        ));
+        let cli = providers
+            .resolve(&command(None, None, None))
+            .unwrap()
+            .cli
+            .unwrap();
+        assert_eq!(
+            cli.search,
+            [PathBuf::from("/opt/one"), PathBuf::from("/opt/two")]
+        );
     }
 
     #[test]

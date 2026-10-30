@@ -11,6 +11,7 @@
 //! back without losing anything.
 
 use std::collections::BTreeMap;
+use std::path::{Path, PathBuf};
 
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -199,8 +200,48 @@ pub struct Extension {
     /// is also the key its API key is filed under in auth.json.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub providers: BTreeMap<String, ProviderSettings>,
+    /// Directories searched for a command provider's program before PATH, in
+    /// order: one list, or one per platform. A leading `~` is the home
+    /// directory.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub path: Option<SearchPath>,
     #[serde(flatten)]
     pub extra: Map<String, Value>,
+}
+
+/// Directories to search: one list for both platforms, or one per platform.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(untagged)]
+pub enum SearchPath {
+    Portable(Vec<String>),
+    PerPlatform(PerPlatform<Vec<String>>),
+}
+
+impl SearchPath {
+    /// This platform's directories, with `~` expanded.
+    pub fn for_platform(&self) -> Vec<PathBuf> {
+        let entries = match self {
+            SearchPath::Portable(entries) => Some(entries),
+            SearchPath::PerPlatform(per) => per.for_this_platform(),
+        };
+        let home = dirs::home_dir();
+        entries
+            .into_iter()
+            .flatten()
+            .map(|entry| expand_home(entry, home.as_deref()))
+            .collect()
+    }
+}
+
+fn expand_home(entry: &str, home: Option<&Path>) -> PathBuf {
+    let rest = match entry.strip_prefix('~') {
+        Some(rest) if rest.is_empty() || rest.starts_with(['/', '\\']) => rest,
+        _ => return PathBuf::from(entry),
+    };
+    match home {
+        Some(home) => home.join(rest.trim_start_matches(['/', '\\'])),
+        None => PathBuf::from(entry),
+    }
 }
 
 /// One model service. The key it is stored under is the name a command uses to
@@ -628,6 +669,79 @@ mod tests {
             "key renamed: {json}"
         );
         assert!(Config::parse(&json).unwrap().selection.refuses("Zed"));
+    }
+
+    fn ai_path(text: &str) -> Vec<PathBuf> {
+        let config = Config::parse(&format!(
+            r#"{{ "extensions": {{ "dango.ai": {{ "path": {text} }} }} }}"#
+        ))
+        .unwrap();
+        config.extensions["dango.ai"]
+            .path
+            .as_ref()
+            .map(SearchPath::for_platform)
+            .unwrap_or_default()
+    }
+
+    #[test]
+    fn a_plain_path_list_applies_on_every_platform() {
+        assert_eq!(
+            ai_path(r#"["/opt/tools", "/usr/local/bin"]"#),
+            [PathBuf::from("/opt/tools"), PathBuf::from("/usr/local/bin")]
+        );
+    }
+
+    #[test]
+    fn an_absent_path_searches_nothing_extra() {
+        let config = Config::parse(r#"{ "extensions": { "dango.ai": {} } }"#).unwrap();
+        assert!(config.extensions["dango.ai"].path.is_none());
+    }
+
+    #[test]
+    fn a_leading_tilde_is_the_home_directory() {
+        let home = Path::new("/home/me");
+        assert_eq!(expand_home("~", Some(home)), home);
+        assert_eq!(expand_home("~/bin", Some(home)), home.join("bin"));
+        assert_eq!(expand_home("~\\bin", Some(home)), home.join("bin"));
+        assert_eq!(
+            expand_home("~other/bin", Some(home)),
+            Path::new("~other/bin")
+        );
+        assert_eq!(
+            expand_home("/opt/~/bin", Some(home)),
+            Path::new("/opt/~/bin")
+        );
+        assert_eq!(expand_home("~/bin", None), Path::new("~/bin"));
+    }
+
+    #[test]
+    fn a_path_list_round_trips() {
+        let text = r#"{ "extensions": { "dango.ai": { "path": { "windows": ["C:/tools"] } } } }"#;
+        let again = Config::parse(&Config::parse(text).unwrap().to_json()).unwrap();
+        assert!(matches!(
+            again.extensions["dango.ai"].path,
+            Some(SearchPath::PerPlatform(_))
+        ));
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn a_per_platform_path_list_uses_the_macos_side() {
+        assert_eq!(
+            ai_path(r#"{ "macos": ["/opt/homebrew/bin"], "windows": ["C:/tools"] }"#),
+            [PathBuf::from("/opt/homebrew/bin")]
+        );
+        assert!(ai_path(r#"{ "windows": ["C:/tools"] }"#).is_empty());
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn a_per_platform_path_list_uses_the_windows_side() {
+        assert_eq!(
+            ai_path(r#"{ "macos": ["/opt/homebrew/bin"], "windows": ["C:/tools"] }"#),
+            [PathBuf::from("C:/tools")]
+        );
+        assert!(ai_path(r#"{ "macos": ["/opt/homebrew/bin"] }"#).is_empty());
     }
 
     #[test]
