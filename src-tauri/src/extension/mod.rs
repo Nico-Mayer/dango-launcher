@@ -113,6 +113,9 @@ impl LoadReport {
 
 pub struct ExtensionHost {
     extensions: HashMap<String, Arc<dyn Extension>>,
+    /// Registration order, which is the order root providers are merged in, so
+    /// one extension's pinned items reliably lead another's.
+    order: Vec<String>,
     /// Maps an active extension to the services it started, so deactivation
     /// stops exactly those.
     active: HashMap<String, Vec<Arc<dyn Service>>>,
@@ -124,6 +127,7 @@ impl ExtensionHost {
     pub fn new(enabled: Arc<dyn EnabledStore>) -> Self {
         Self {
             extensions: HashMap::new(),
+            order: Vec::new(),
             active: HashMap::new(),
             registry: Registry::new(),
             enabled,
@@ -138,10 +142,12 @@ impl ExtensionHost {
         self.active.contains_key(extension_id)
     }
 
-    /// Root providers of every active extension, for the search pipeline.
+    /// Root providers of every active extension in registration order, for the
+    /// search pipeline.
     pub fn root_providers(&self) -> Vec<Arc<dyn crate::search::RootProvider>> {
-        self.active
-            .keys()
+        self.order
+            .iter()
+            .filter(|id| self.is_active(id))
             .filter_map(|id| self.extensions.get(id)?.root_provider())
             .collect()
     }
@@ -220,6 +226,7 @@ impl ExtensionHost {
             return Err(HostError::DuplicateExtension(id));
         }
         self.extensions.insert(id.clone(), extension);
+        self.order.push(id.clone());
 
         let mut report = LoadReport::default();
         if self.enabled.is_enabled(&id) {

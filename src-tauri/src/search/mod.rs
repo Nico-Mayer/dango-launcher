@@ -184,9 +184,8 @@ async fn run_query(
     limit: usize,
     tx: mpsc::UnboundedSender<SearchResults>,
 ) {
-    let mut merged = commands;
-    let emit = |merged: &[Candidate], complete: bool| {
-        let ranked = ranker.rank(&query, merged.to_vec(), limit);
+    let emit = |merged: Vec<Candidate>, complete: bool| {
+        let ranked = ranker.rank(&query, merged, limit);
         tx.send(SearchResults {
             query: query.clone(),
             items: ranked,
@@ -196,26 +195,35 @@ async fn run_query(
     };
 
     // Commands are available immediately; show them before any provider answers.
-    if !emit(&merged, providers.is_empty()) {
+    if !emit(commands.clone(), providers.is_empty()) {
         return;
     }
 
+    // Answers are merged in provider order rather than arrival order, because
+    // the order of pinned items must not depend on which provider was quicker.
+    let mut answered: Vec<Vec<Candidate>> = vec![Vec::new(); providers.len()];
     let mut set = JoinSet::new();
-    for provider in providers {
+    for (index, provider) in providers.into_iter().enumerate() {
         let query = query.clone();
         set.spawn(async move {
-            timeout(straggler_timeout, provider.items(query))
+            let items = timeout(straggler_timeout, provider.items(query))
                 .await
-                .unwrap_or_default()
+                .unwrap_or_default();
+            (index, items)
         });
     }
 
     while let Some(joined) = set.join_next().await {
         // A provider task that panicked is skipped; the rest keep streaming.
-        if let Ok(items) = joined {
-            merged.extend(items);
+        if let Ok((index, items)) = joined {
+            answered[index] = items;
         }
-        if !emit(&merged, set.is_empty()) {
+        let merged = commands
+            .iter()
+            .chain(answered.iter().flatten())
+            .cloned()
+            .collect();
+        if !emit(merged, set.is_empty()) {
             return;
         }
     }
@@ -328,6 +336,25 @@ mod tests {
             "Fast never showed before Slow: {updates:?}"
         );
         assert!(updates.last().unwrap().contains(&"Slow".to_string()));
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn answers_merge_in_provider_order_not_arrival_order() {
+        let first: Arc<dyn RootProvider> = Arc::new(SleepyProvider::named("First", 300));
+        let second: Arc<dyn RootProvider> = Arc::new(SleepyProvider::named("Second", 5));
+        let pipe = pipeline(vec![first, second]);
+        let mut rx = pipe.query("".into());
+
+        let mut last = None;
+        while let Some(update) = rx.recv().await {
+            let complete = update.complete;
+            last = Some(update);
+            if complete {
+                break;
+            }
+        }
+        let ids: Vec<String> = last.unwrap().items.into_iter().map(|c| c.id).collect();
+        assert_eq!(ids, ["Calculator", "First", "Second"]);
     }
 
     #[tokio::test(start_paused = true)]
