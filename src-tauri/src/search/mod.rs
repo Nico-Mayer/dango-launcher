@@ -294,7 +294,7 @@ mod tests {
         )
     }
 
-    #[tokio::test]
+    #[tokio::test(start_paused = true)]
     async fn commands_appear_before_any_provider_answers() {
         let slow: Arc<dyn RootProvider> = Arc::new(SleepyProvider::named("slow", 200));
         let pipe = pipeline(vec![slow]);
@@ -306,30 +306,57 @@ mod tests {
         assert!(!first.complete);
     }
 
-    #[tokio::test]
+    #[tokio::test(start_paused = true)]
     async fn a_slow_provider_does_not_delay_a_fast_one() {
         let fast: Arc<dyn RootProvider> = Arc::new(SleepyProvider::named("Fast", 5));
         let slow: Arc<dyn RootProvider> = Arc::new(SleepyProvider::named("Slow", 300));
         let pipe = pipeline(vec![fast, slow]);
         let mut rx = pipe.query("s".into());
 
-        let mut seen_fast = false;
-        let mut seen_slow = false;
+        let mut updates = Vec::new();
         while let Some(update) = rx.recv().await {
-            if update.items.iter().any(|c| c.id == "Fast") {
-                seen_fast = true;
-            }
-            if update.items.iter().any(|c| c.id == "Slow") {
-                seen_slow = true;
-            }
-            if update.complete {
+            let complete = update.complete;
+            updates.push(update.items.into_iter().map(|c| c.id).collect::<Vec<_>>());
+            if complete {
                 break;
             }
         }
-        assert!(seen_fast && seen_slow);
+        assert!(
+            updates
+                .iter()
+                .any(|ids| ids.contains(&"Fast".to_string()) && !ids.contains(&"Slow".to_string())),
+            "Fast never showed before Slow: {updates:?}"
+        );
+        assert!(updates.last().unwrap().contains(&"Slow".to_string()));
     }
 
-    #[tokio::test]
+    #[tokio::test(start_paused = true)]
+    async fn a_panicking_provider_is_skipped() {
+        struct Panics;
+        #[async_trait]
+        impl RootProvider for Panics {
+            async fn items(&self, _query: String) -> Vec<Candidate> {
+                panic!("provider bug")
+            }
+        }
+        let good: Arc<dyn RootProvider> = Arc::new(SleepyProvider::named("Good", 5));
+        let pipe = pipeline(vec![Arc::new(Panics), good]);
+        let mut rx = pipe.query("g".into());
+
+        let mut last = None;
+        while let Some(update) = rx.recv().await {
+            let complete = update.complete;
+            last = Some(update);
+            if complete {
+                break;
+            }
+        }
+        let last = last.unwrap();
+        assert!(last.complete);
+        assert!(last.items.iter().any(|c| c.id == "Good"));
+    }
+
+    #[tokio::test(start_paused = true)]
     async fn a_never_returning_provider_is_abandoned() {
         struct Pending;
         #[async_trait]
@@ -356,7 +383,7 @@ mod tests {
         assert!(last.items.iter().any(|c| c.id == "Good"));
     }
 
-    #[tokio::test]
+    #[tokio::test(start_paused = true)]
     async fn a_new_query_cancels_the_previous_one() {
         // Records, per query, whether that run completed or was dropped mid
         // flight, so the superseded run is distinguishable from the live one.
@@ -424,7 +451,7 @@ mod tests {
         );
     }
 
-    #[tokio::test]
+    #[tokio::test(start_paused = true)]
     async fn the_result_list_is_bounded() {
         let commands: Vec<Candidate> = (0..50)
             .map(|i| candidate(&format!("item{i}"), Source::Command))
