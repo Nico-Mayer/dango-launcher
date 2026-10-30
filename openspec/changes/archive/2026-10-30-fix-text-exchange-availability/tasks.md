@@ -15,15 +15,15 @@
 
 ## 4. Windows key injection
 
-- [ ] 4.1 Leave `WindowsKeys::new` eager and confirm its failure reaches the tray notice from 2.2; verify that CI on `windows-latest` builds and passes clippy
+- [x] 4.1 Leave `WindowsKeys::new` eager and confirm its failure reaches the tray notice from 2.2; verify that CI on `windows-latest` builds and passes clippy
 
 ## 5. Verification
 
-- [ ] 5.1 macOS, dev run, Accessibility revoked for the dev binary: run an AI command with paste output and verify the permission message; grant the permission in System Settings without restarting, run it again, and verify the answer is pasted
-- [ ] 5.2 macOS, dev run, permission granted: paste a clipboard history entry and a snippet right after launch and verify both arrive with no visible delay
-- [ ] 5.3 macOS, dev run with the database file made unreadable: verify the tray shows the database notice, clipboard history is off, and a snippet and an AI paste still work
-- [ ] 5.4 Windows, installed build: run the AI command that showed the Accessibility message before and verify it now pastes, or, if the exchange still fails, that the message names `dango.log`, the tray shows "Pasting is off, see dango.log", and `dango.log` names the cause
-- [ ] 5.5 Windows, installed build: paste a clipboard history entry and a snippet and verify both still work
+- [x] 5.1 macOS, dev run, Accessibility revoked for the dev binary: run an AI command with paste output and verify the permission message; grant the permission in System Settings without restarting, run it again, and verify the answer is pasted
+- [ ] 5.2 (deferred, hard to test beside the installed app; verify on the next macOS session) macOS, dev run, permission granted: paste a clipboard history entry and a snippet right after launch and verify both arrive with no visible delay
+- [ ] 5.3 (deferred with 5.2) macOS, dev run with the database file made unreadable: verify the tray shows the database notice, clipboard history is off, and a snippet and an AI paste still work
+- [x] 5.4 Windows, installed build: run the AI command that showed the Accessibility message before and verify it now pastes, or, if the exchange still fails, that the message names `dango.log`, the tray shows "Pasting is off, see dango.log", and `dango.log` names the cause
+- [x] 5.5 Windows, installed build: paste a clipboard history entry and a snippet and verify both still work
 
 ## 6. Wrap up
 
