@@ -2,6 +2,19 @@
 
 All notable changes to Dango. Generated from commit history at release time.
 
+## [0.6.0] - 2026-10-30
+
+### Features
+
+- **ai:** Search configured dirs for cli programs
+
+### Refactoring
+
+- **config:** Make PerPlatform generic
+
+### Documentation
+
+- **agents:** Note tray PATH and .cmd lookup trap
 ## [0.5.0] - 2026-10-30
 
 ### Features

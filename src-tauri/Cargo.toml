@@ -1,6 +1,6 @@
 [package]
 name = "dango"
-version = "0.5.1"
+version = "0.6.0"
 description = "Keyboard-first application launcher"
 authors = ["nimayer"]
 edition = "2021"
