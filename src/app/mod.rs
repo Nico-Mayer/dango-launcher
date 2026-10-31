@@ -48,6 +48,8 @@ pub struct Core {
     hold_generation: AtomicU64,
     visible: AtomicBool,
     tray: Mutex<TrayStatus>,
+    /// A snippet file or hotkey problem, which a config reload must not clear.
+    reported_problem: AtomicBool,
     services: Services,
 }
 
@@ -138,6 +140,7 @@ impl Core {
             hold_generation: AtomicU64::new(0),
             visible: AtomicBool::new(false),
             tray: Mutex::new(tray),
+            reported_problem: AtomicBool::new(false),
             services,
         }
     }
@@ -646,12 +649,13 @@ impl Core {
     /// to say so; the tray status line and the log are where it is visible.
     fn report_problem(&self, message: &str) {
         crate::log::append(message);
+        self.reported_problem.store(true, Ordering::SeqCst);
         self.set_config_status(true);
     }
 
     fn set_config_status(&self, error: bool) {
         let mut tray = self.tray.lock().unwrap();
-        tray.config_error = error;
+        tray.config_error = error || self.reported_problem.load(Ordering::SeqCst);
         self.shell.set_tray(&tray);
     }
 

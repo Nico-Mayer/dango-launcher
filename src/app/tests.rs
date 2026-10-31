@@ -310,6 +310,14 @@ async fn a_hotkey_for_a_missing_command_is_reported() {
     assert!(core.tray().config_error);
 }
 
+#[tokio::test]
+async fn a_clean_reload_keeps_a_reported_problem_on_the_tray() {
+    let (core, _) = core("{}");
+    core.report_problem("snippets.json: broken");
+    core.apply_config_reload(Config::parse("{}"));
+    assert!(core.tray().config_error);
+}
+
 mod inspect_tests {
     use super::super::inspect_template;
 
