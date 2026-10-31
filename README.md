@@ -1,10 +1,12 @@
-# Tauri + SvelteKit + TypeScript
+# Dango
 
-This template should help get you started developing with Tauri, SvelteKit and TypeScript in Vite.
+A keyboard-first launcher and command palette for Windows and macOS. Dango sits
+in the tray and opens a search prompt on one global shortcut.
 
-## Recommended IDE Setup
+[![Made with Slint](https://raw.githubusercontent.com/slint-ui/slint/master/logo/MadeWithSlint-logo-whitebg.png)](https://slint.dev)
 
-[VS Code](https://code.visualstudio.com/) + [Svelte](https://marketplace.visualstudio.com/items?itemName=svelte.svelte-vscode) + [Tauri](https://marketplace.visualstudio.com/items?itemName=tauri-apps.tauri-vscode) + [rust-analyzer](https://marketplace.visualstudio.com/items?itemName=rust-lang.rust-analyzer).
+The interface is built with [Slint](https://slint.dev) under its royalty-free
+license, which asks for the badge above.
 
 ## Development setup
 
@@ -17,9 +19,20 @@ hk install --mise
 
 The second command registers git hooks for this clone. Committing runs
 `cargo fmt` on the staged Rust files and stages the result. Pushing runs
-`cargo clippy --all-targets -- -D warnings` and `svelte-check`, the same checks
-CI runs, and aborts the push if either fails. `hk check` and `hk fix` run the
+`cargo clippy --all-targets -- -D warnings`, the same check CI runs, and aborts
+the push if it fails. `hk check` and `hk fix` run the
 same steps on demand. Use `git push --no-verify` to skip the push checks once.
+
+## Building and running
+
+```sh
+cargo run                    # development build, marked "dev" in the launcher
+cargo test                   # every test, the UI included
+cargo build --release        # target/release/dango(.exe)
+```
+
+A release build is installed by hand for now: copy the binary somewhere stable
+and start it. Starting it again while it runs shows the launcher.
 
 ## Configuration
 
@@ -40,13 +53,14 @@ the key file is not.
 
 ## Versioning
 
-The application version lives in `Cargo.toml` and nowhere else.
-`tauri.conf.json` has no `version` field, so Tauri reads the crate version for
-the window, the bundle metadata, and the installer file names. The `version`
-in `package.json` is a placeholder the frontend build ignores; leave it alone.
-Only the release task edits the crate version; never bump it by hand.
+The application version lives in `Cargo.toml` and nowhere else. Only the
+release task edits it; never bump it by hand.
 
 ## Releasing
+
+Releases are off until the native release pipeline lands: pushing a tag builds
+nothing. The steps below describe the release task, which still bumps the
+version, writes the changelog, and tags.
 
 Releases are cut from a clean, up-to-date `main`:
 
@@ -66,11 +80,9 @@ with a level or a version, for example `cargo release minor --execute` or
 
 The release commit touches `CHANGELOG.md`, `Cargo.toml`, and `Cargo.lock` and
 is tagged `vX.Y.Z`. The command refuses to run with uncommitted changes, from
-a branch other than `main`, or when the tag exists. Pushing the tag starts
-`.github/workflows/release.yml`, which builds the installers for macOS (Apple
-Silicon) and Windows, creates the GitHub release with that version's changelog
-section as its body, and publishes it once both builds succeed. If a build
-fails, the release stays a draft with whatever assets made it.
+a branch other than `main`, or when the tag exists. The release workflow,
+`.github/workflows/release.yml`, only runs by hand while it waits for the
+native release pipeline.
 
 ### Changelog
 
@@ -81,17 +93,17 @@ Performance, `refactor` under Refactoring, `docs` under Documentation, and
 `test`, `ci`, `build`, `chore`, and `style` under Maintenance. Commits scoped
 `(openspec)`, release commits, and non-conventional subjects are left out.
 
-### Installing a release
+### Installing a build
 
-The builds are unsigned. On macOS, Gatekeeper blocks the app until you clear
-the quarantine flag once after copying it from the `.dmg`:
+Builds are unsigned. On macOS, Gatekeeper blocks a downloaded build until you
+clear the quarantine flag once:
 
 ```sh
 xattr -cr /Applications/Dango.app
 ```
 
-On Windows, SmartScreen warns on first run of the `.msi` or `.exe` installer;
-choose "More info" and then "Run anyway".
+On Windows, SmartScreen warns on the first run of a downloaded `.exe`; choose
+"More info" and then "Run anyway".
 
 To start Dango at login, set `launcher.autostart` to `true` in the config file
 (see `docs/config.md`). The login entry records the path Dango was
