@@ -1,5 +1,3 @@
-use serde::{Deserialize, Serialize};
-
 /// The only manifest version this build understands. Bumped when the shape
 /// changes in a way older code cannot read.
 pub const SUPPORTED_MANIFEST_VERSION: u32 = 1;
@@ -9,75 +7,58 @@ pub const SUPPORTED_MANIFEST_VERSION: u32 = 1;
 /// anything without the prefix is a path to an image file.
 pub const NAMED_ICON: &str = "icon:";
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug)]
 pub struct Manifest {
     pub manifest_version: u32,
     pub id: String,
     pub name: String,
     /// Either `icon:<name>` for a named icon or a path to an image file.
-    #[serde(default)]
     pub icon: Option<String>,
-    #[serde(default)]
     pub commands: Vec<CommandDecl>,
-    #[serde(default)]
     pub preferences: Vec<PreferenceDecl>,
     /// Whether the extension supplies the single per-keystroke root items
     /// provider. The provider itself is native code, not part of the manifest.
-    #[serde(default)]
     pub root_items: bool,
     /// Whether the extension runs background services. Third-party extensions
     /// will never set this; only built-ins have it.
-    #[serde(default)]
     pub services: bool,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug)]
 pub struct CommandDecl {
     pub id: String,
     pub title: String,
     pub mode: InvocationMode,
-    #[serde(default)]
     pub subtitle: Option<String>,
     /// Either `icon:<name>` for a named icon or a path to an image file.
-    #[serde(default)]
     pub icon: Option<String>,
-    #[serde(default)]
     pub keywords: Vec<String>,
-    #[serde(default)]
     pub alias: Option<String>,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "kebab-case")]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum InvocationMode {
     View,
     NoView,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct PreferenceDecl {
     /// `None` scopes the preference to the whole extension; `Some(command_id)`
     /// scopes it to one command.
-    #[serde(default)]
     pub command_id: Option<String>,
     pub key: String,
-    #[serde(rename = "type")]
     pub kind: PreferenceKind,
-    #[serde(default)]
     pub default: Option<serde_json::Value>,
-    #[serde(default)]
     pub required: bool,
     /// One sentence for the user, shown wherever the preference is described.
-    #[serde(default)]
     pub description: String,
     /// For a string preference that takes one of a fixed set, that set. Empty
     /// means any string.
-    #[serde(default)]
     pub values: Vec<String>,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum PreferenceKind {
     String,
     Number,
