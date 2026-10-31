@@ -72,7 +72,13 @@ impl WindowsHyperkey {
         HELD.store(false, Ordering::SeqCst);
         OTHER_KEY.store(false, Ordering::SeqCst);
         *PRESS_AT.lock().unwrap() = None;
-        let tap = spec.tap.as_deref().and_then(tap_vk).unwrap_or(0);
+        let tap = match spec.tap.as_deref() {
+            Some(name) => tap_vk(name).unwrap_or_else(|| {
+                eprintln!("[dango] hyperkey tap {name:?} is not one unshifted key, tap disabled");
+                0
+            }),
+            None => 0,
+        };
         TAP_VK.store(tap as u32, Ordering::SeqCst);
         TRIGGER_VK.store(vk, Ordering::SeqCst);
 
@@ -234,10 +240,11 @@ fn tap_vk(name: &str) -> Option<u16> {
                 return None;
             };
             let scan = unsafe { VkKeyScanW(c as u16) };
-            if scan == -1 {
+            // A non-zero high byte means the character needs Shift or AltGr.
+            if scan == -1 || scan as u16 & 0xFF00 != 0 {
                 return None;
             }
-            (scan as u16) & 0x00FF
+            scan as u16
         }
     })
 }
@@ -334,6 +341,7 @@ mod tests {
         assert!(tap_vk("escape").is_some());
         assert!(tap_vk("tab").is_some());
         assert!(tap_vk("not-a-key").is_none());
+        assert!(tap_vk(":").is_none());
     }
 
     #[test]
