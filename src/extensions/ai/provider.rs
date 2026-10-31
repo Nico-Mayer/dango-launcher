@@ -42,7 +42,19 @@ impl Request {
     /// Whether the service runs on the user's own machine, which changes the
     /// message when it cannot be reached and means no key is needed.
     pub fn is_local(&self) -> bool {
-        self.kind == ProviderKind::Ollama
+        self.kind == ProviderKind::Ollama || self.base_url.as_deref().is_some_and(is_loopback)
+    }
+}
+
+fn is_loopback(base_url: &str) -> bool {
+    let Ok(url) = url::Url::parse(base_url.trim()) else {
+        return false;
+    };
+    match url.host() {
+        Some(url::Host::Domain(domain)) => domain.eq_ignore_ascii_case("localhost"),
+        Some(url::Host::Ipv4(ip)) => ip.is_loopback(),
+        Some(url::Host::Ipv6(ip)) => ip.is_loopback(),
+        None => false,
     }
 }
 
@@ -201,6 +213,20 @@ mod tests {
         let (_tx, rx) = std::sync::mpsc::channel::<Result<String, AiError>>();
         let chunks = Chunks::new(rx);
         assert_eq!(chunks.next(Duration::from_millis(10)), Next::Idle);
+    }
+
+    #[test]
+    fn an_endpoint_on_this_machine_is_local() {
+        let openai = |base: &str| Request {
+            kind: ProviderKind::Openai,
+            base_url: Some(base.into()),
+            ..request()
+        };
+        assert!(openai("http://localhost:1234/v1").is_local());
+        assert!(openai("http://127.0.0.1:8080/v1").is_local());
+        assert!(openai("http://[::1]:8080/v1").is_local());
+        assert!(!openai("https://openrouter.ai/api/v1").is_local());
+        assert!(!openai("not a url").is_local());
     }
 
     #[test]

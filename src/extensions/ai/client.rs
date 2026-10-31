@@ -81,7 +81,7 @@ fn build(request: &Request) -> Client {
     let endpoint = Endpoint::from_owned(base_url(request));
     let auth = match &request.key {
         Some(key) => AuthData::from_single(key.clone()),
-        // Ollama's adapter wants a value it never sends.
+        // The adapters want a value even for a local server that takes none.
         None => AuthData::from_single("dango"),
     };
 

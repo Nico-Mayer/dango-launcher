@@ -28,7 +28,7 @@ use crate::text::TextTarget;
 use super::commands::{
     build, AiCommand, Output, Providers, EXTENSION_ID, PREF_PROVIDER, PREF_THINKING,
 };
-use super::provider::{Completions, Request, Thinking};
+use super::provider::{Completions, ProviderKind, Request, Thinking};
 use super::stream::{drive, Ended, FIRST_FRAGMENT_TIMEOUT};
 use super::Keys;
 
@@ -230,9 +230,10 @@ impl Inner {
             }
         };
 
-        if !request.is_local() {
+        if request.kind != ProviderKind::Ollama {
             match self.keys.key(&request.provider) {
                 Ok(Some(key)) => request.key = Some(key),
+                Ok(None) if request.is_local() => {}
                 Ok(None) => {
                     ctx.fail(
                         super::provider::AiError::MissingKey {
@@ -244,6 +245,9 @@ impl Inner {
                 }
                 Err(error) => {
                     crate::log::append(&format!("ai: {error}"));
+                    if request.is_local() {
+                        return Some(request);
+                    }
                     ctx.fail(super::provider::AiError::KeyFileUnreadable.to_string());
                     return None;
                 }
@@ -766,6 +770,21 @@ mod tests {
         run(&fixture, "improve-writing", Arc::new(Recorded::default()));
         let request = fixture.client.last_request().expect("a request was made");
         assert!(request.key.is_none(), "a key was sent to a local model");
+    }
+
+    #[test]
+    fn an_openai_server_on_this_machine_is_asked_without_a_key() {
+        let fixture = fixture_with_keys(
+            r#"{ "extensions": { "dango.ai": { "providers": {
+                "studio": { "kind": "openai", "baseUrl": "http://localhost:1234/v1", "model": "qwen3" }
+            } } } }"#,
+            Scripted::answering(&["Better."]),
+            selected("text"),
+            FixedKeys(None),
+        );
+        run(&fixture, "improve-writing", Arc::new(Recorded::default()));
+        let request = fixture.client.last_request().expect("a request was made");
+        assert!(request.key.is_none());
     }
 
     #[test]
