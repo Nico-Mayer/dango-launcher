@@ -9,3 +9,4 @@
 
 # Machine-specific agent permissions
 .claude/settings.local.json
+.design
