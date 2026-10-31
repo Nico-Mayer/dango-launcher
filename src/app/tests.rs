@@ -22,7 +22,7 @@ fn core(config_json: &str) -> (Arc<Core>, Arc<RecordingShell>) {
 
 fn core_with_grab(config_json: &str, grab: FakeGrab) -> (Arc<Core>, Arc<RecordingShell>) {
     let config = Config::parse(config_json).unwrap();
-    let launcher = hotkeys::launcher(&config);
+    let (launcher, _) = hotkeys::launcher(&config);
     let config = Arc::new(FileConfig::new(
         std::env::temp_dir().join("dango-core-test.json"),
         config,

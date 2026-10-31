@@ -117,16 +117,22 @@ impl Table {
 }
 
 /// The launcher shortcut from the config file, or the platform default when it
-/// is unset or invalid. Option+Space on macOS and Alt+Space on Windows are the
-/// same chord: Option is Alt.
-pub fn launcher(config: &Config) -> HotKey {
-    if let Some(hotkey) = &config.launcher.hotkey {
-        match hotkey.parse_with_hyper(config.hyper_modifiers()) {
-            Ok(parsed) => return HotKey::new(Some(parsed.modifiers), parsed.code),
-            Err(error) => eprintln!("[dango] invalid launcher hotkey, using the default: {error}"),
-        }
+/// is unset or invalid, with why an invalid one was not used. Option+Space on
+/// macOS and Alt+Space on Windows are the same chord: Option is Alt.
+pub fn launcher(config: &Config) -> (HotKey, Option<String>) {
+    let default = HotKey::new(Some(Modifiers::ALT), Code::Space);
+    let Some(hotkey) = &config.launcher.hotkey else {
+        return (default, None);
+    };
+    match hotkey.parse_with_hyper(config.hyper_modifiers()) {
+        Ok(parsed) => (HotKey::new(Some(parsed.modifiers), parsed.code), None),
+        Err(error) => (
+            default,
+            Some(format!(
+                "invalid launcher hotkey, using the default: {error}"
+            )),
+        ),
     }
-    HotKey::new(Some(Modifiers::ALT), Code::Space)
 }
 
 /// Taking a chord system-wide and giving it back.
@@ -478,6 +484,14 @@ mod tests {
             }
             Resolution::Launch { .. } => panic!("nothing to launch"),
         }
+    }
+
+    #[test]
+    fn an_invalid_launcher_hotkey_falls_back_and_says_why() {
+        let (chord, problem) =
+            super::launcher(&config(r#"{ "launcher": { "hotkey": "ctrl+nope" } }"#));
+        assert_eq!(chord, launcher());
+        assert!(problem.is_some());
     }
 
     #[test]

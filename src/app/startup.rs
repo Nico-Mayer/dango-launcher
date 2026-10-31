@@ -464,7 +464,13 @@ fn register_snippets(
 fn register_hotkeys(file_config: &Arc<FileConfig>, notices: &mut Vec<String>) -> Registry {
     let config = file_config.shared();
     let config = config.read().unwrap();
-    let launcher = hotkeys::launcher(&config);
+    let (launcher, launcher_problem) = hotkeys::launcher(&config);
+    if let Some(problem) = launcher_problem {
+        crate::log::append(&problem);
+        notices.push(format!(
+            "Invalid launcher.hotkey, using {SHORTCUT_LABEL}, see dango.log"
+        ));
+    }
     let grab: Box<dyn Grab> = match SystemGrab::new() {
         Ok(grab) => Box::new(grab),
         Err(error) => {

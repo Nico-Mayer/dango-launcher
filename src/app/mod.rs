@@ -730,7 +730,7 @@ impl Core {
             }
         };
 
-        let launcher = hotkeys::launcher(&config);
+        let (launcher, launcher_problem) = hotkeys::launcher(&config);
         let autostart = config.launcher.autostart.unwrap_or(false);
         let autostart_changed = {
             let shared = self.config.shared();
@@ -739,7 +739,7 @@ impl Core {
         };
         self.config.replace(config);
 
-        let mut conflicts = Vec::new();
+        let mut conflicts: Vec<String> = launcher_problem.into_iter().collect();
         if let Err(error) = self.services.hotkeys.replace_launcher(launcher) {
             conflicts.push(format!(
                 "could not register the new launcher hotkey, keeping the old one: {error}"
