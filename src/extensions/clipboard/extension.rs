@@ -10,8 +10,8 @@ use crate::extension::{
 };
 use crate::invocation::{Command, InvocationContext};
 use crate::protocol::{
-    Action, EmptyState, Filtering, ListItem, ListView, Modifier, Shortcut, View, ViewTree,
-    PROTOCOL_VERSION,
+    Action, ActionStyle, EmptyState, Filtering, ListItem, ListView, Modifier, Shortcut, View,
+    ViewTree, PROTOCOL_VERSION,
 };
 use crate::text::{TextError, TextTarget};
 
@@ -322,6 +322,7 @@ fn item(entry: &Entry, primary: PrimaryAction) -> ListItem {
             key: "x".into(),
             modifiers: vec![Modifier::Ctrl],
         }),
+        style: ActionStyle::Danger,
         ..Default::default()
     };
     let actions = match primary {

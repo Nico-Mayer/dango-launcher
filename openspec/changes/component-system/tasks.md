@@ -15,7 +15,7 @@
 - [x] 2.4 Add `EmptyState.icon` and `actions`, with Enter running the first; verify a reducer test that Enter on an empty view with "Search the web" emits its action
 - [x] 2.5 Add `ActionOutcome::Toast` and the reducer toast state with `Effect::ExpireToast` and `Event::ToastExpired` per design D7; verify reducer tests for success expiry, a stale expiry ignored, and a failure cleared by a key
 - [x] 2.6 Move `snapshot.failure` to failure toasts and running and loading status to busy toasts; verify the existing failure and status tests in `src/ui/tests.rs` pass against the toast
-- [ ] 2.7 Move every built-in extension to version 2 views; verify `cargo test` passes
+- [x] 2.7 Move every built-in extension to version 2 views; verify `cargo test` passes
 
 ## 3. Shell: globals, SearchBar, ActionBar, toast
 

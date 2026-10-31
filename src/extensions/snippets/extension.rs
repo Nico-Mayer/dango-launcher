@@ -15,8 +15,8 @@ use crate::extension::{
 };
 use crate::invocation::{Command, InvocationContext};
 use crate::protocol::{
-    Action, EmptyState, FieldKind, Filtering, FormField, FormView, ListItem, ListView, View,
-    ViewTree, PROTOCOL_VERSION,
+    Action, ActionStyle, EmptyState, FieldKind, Filtering, FormField, FormView, ListItem, ListView,
+    View, ViewTree, PROTOCOL_VERSION,
 };
 use crate::search::{Candidate, RootProvider, Source};
 use crate::templates::{Template, Values};
@@ -421,6 +421,7 @@ fn item_actions(kind: Kind) -> Vec<Action> {
             id: ACTION_REMOVE.into(),
             title: "Delete".into(),
             shortcut: None,
+            style: ActionStyle::Danger,
             ..Default::default()
         },
     ]
