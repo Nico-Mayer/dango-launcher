@@ -282,12 +282,7 @@ impl ExtensionHost {
         let outcome = catch_unwind(AssertUnwindSafe(|| extension.activate()));
         match outcome {
             Ok(Ok(())) => {
-                let collisions = self.registry.register(
-                    extension_id,
-                    &extension.manifest().commands,
-                    Host::Builtin,
-                );
-                report.collisions.extend(collisions);
+                self.register_commands(extension_id, &extension, report);
                 let services = self.start_services(extension_id, &extension, report);
                 self.active.insert(extension_id.to_string(), services);
             }
@@ -298,6 +293,25 @@ impl ExtensionHost {
                 .activation_errors
                 .push((extension_id.to_string(), "activation panicked".into())),
         }
+    }
+
+    fn register_commands(
+        &mut self,
+        extension_id: &str,
+        extension: &Arc<dyn Extension>,
+        report: &mut LoadReport,
+    ) {
+        let commands: Vec<CommandDecl> = extension
+            .manifest()
+            .commands
+            .iter()
+            .filter(|decl| self.enabled.is_command_enabled(extension_id, &decl.id))
+            .cloned()
+            .collect();
+        let collisions = self
+            .registry
+            .register(extension_id, &commands, Host::Builtin);
+        report.collisions.extend(collisions);
     }
 
     fn start_services(
@@ -354,6 +368,17 @@ mod tests {
     #[derive(Default)]
     struct MemoryEnabled {
         disabled: Mutex<Vec<String>>,
+        disabled_commands: Mutex<Vec<String>>,
+    }
+
+    impl MemoryEnabled {
+        fn set_command_enabled(&self, qualified_id: &str, enabled: bool) {
+            let mut disabled = self.disabled_commands.lock().unwrap();
+            disabled.retain(|d| d != qualified_id);
+            if !enabled {
+                disabled.push(qualified_id.to_string());
+            }
+        }
     }
 
     impl EnabledStore for MemoryEnabled {
@@ -366,6 +391,13 @@ mod tests {
             if !enabled {
                 disabled.push(id.to_string());
             }
+        }
+        fn is_command_enabled(&self, extension_id: &str, command_id: &str) -> bool {
+            !self
+                .disabled_commands
+                .lock()
+                .unwrap()
+                .contains(&format!("{extension_id}.{command_id}"))
         }
     }
 
@@ -731,5 +763,94 @@ mod tests {
 
         host.set_enabled("clip", true);
         assert!(watcher.running.load(Ordering::SeqCst));
+    }
+    struct Noop;
+
+    impl crate::invocation::Command for Noop {
+        fn invoke(&self, _ctx: &crate::invocation::InvocationContext) {}
+    }
+
+    #[derive(Default)]
+    struct CountingService {
+        starts: AtomicUsize,
+        running: AtomicBool,
+    }
+
+    impl Service for CountingService {
+        fn start(&self) -> ActivationResult {
+            self.starts.fetch_add(1, Ordering::SeqCst);
+            self.running.store(true, Ordering::SeqCst);
+            Ok(())
+        }
+        fn stop(&self) {
+            self.running.store(false, Ordering::SeqCst);
+        }
+    }
+
+    struct TwoCommands {
+        manifest: Manifest,
+        service: Arc<CountingService>,
+    }
+
+    impl TwoCommands {
+        fn new() -> Arc<Self> {
+            let command = |id: &str| CommandDecl {
+                id: id.into(),
+                title: id.into(),
+                mode: InvocationMode::View,
+                subtitle: None,
+                icon: None,
+                keywords: vec![],
+                alias: None,
+            };
+            Arc::new(Self {
+                manifest: Manifest {
+                    manifest_version: 1,
+                    id: "clip".into(),
+                    name: "clip".into(),
+                    icon: None,
+                    commands: vec![command("history"), command("clear")],
+                    preferences: vec![],
+                    root_items: false,
+                    services: true,
+                },
+                service: Arc::new(CountingService::default()),
+            })
+        }
+    }
+
+    impl Extension for TwoCommands {
+        fn manifest(&self) -> &Manifest {
+            &self.manifest
+        }
+        fn services(&self) -> Vec<Arc<dyn Service>> {
+            vec![self.service.clone()]
+        }
+        fn command(&self, _command_id: &str) -> Option<Arc<dyn crate::invocation::Command>> {
+            Some(Arc::new(Noop))
+        }
+    }
+
+    fn candidate_ids(host: &ExtensionHost) -> Vec<String> {
+        let mut ids: Vec<String> = host
+            .command_candidates()
+            .into_iter()
+            .map(|candidate| candidate.id)
+            .collect();
+        ids.sort();
+        ids
+    }
+
+    #[test]
+    fn a_disabled_command_is_not_registered_but_its_sibling_is() {
+        let enabled = Arc::new(MemoryEnabled::default());
+        enabled.set_command_enabled("clip.clear", false);
+        let mut host = ExtensionHost::new(enabled);
+        host.register(TwoCommands::new()).unwrap();
+
+        assert!(host.is_active("clip"));
+        assert_eq!(candidate_ids(&host), vec!["clip.history"]);
+        assert!(host.resolve_command("clip.clear").is_none());
+        assert!(host.resolve_command("clip.history").is_some());
     }
 }
