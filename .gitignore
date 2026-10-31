@@ -10,3 +10,6 @@
 # Machine-specific agent permissions
 .claude/settings.local.json
 .design
+
+# Local audit reports
+/audit/
