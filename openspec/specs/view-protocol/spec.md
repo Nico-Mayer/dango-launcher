@@ -171,22 +171,6 @@ own primary action.
 - **THEN** in both places the panel opens for the selected row and the selection
   does not move
 
-### Requirement: Filtering ownership is declared
-
-A list view SHALL declare whether the launcher filters its items against the
-query or the command handles filtering itself. When the launcher filters, the
-command SHALL NOT receive keystrokes as query changes.
-
-#### Scenario: Launcher filters by default
-
-- **WHEN** a list declares that the launcher filters and the user types
-- **THEN** the visible items are narrowed without the command being invoked again
-
-#### Scenario: Command owns filtering
-
-- **WHEN** a list declares that the command filters and the user types
-- **THEN** the command receives the updated query and may emit a new tree
-
 ### Requirement: Loading and empty states
 
 A view SHALL be able to signal that it is loading and to declare what is shown
@@ -391,51 +375,6 @@ empty state, and action rules.
 - **WHEN** a grid declares two columns
 - **THEN** the view is rejected and an error is shown in its place
 
-### Requirement: A list or grid shows a bounded number of items
-
-A list or grid view SHALL show at most 50 items. The limit SHALL apply after
-the launcher has filtered the items against the query, and SHALL count items in
-the order they are drawn, across all sections; a section left with no shown item
-SHALL NOT be drawn. The limit SHALL apply whether the launcher or the command
-filters. A command MAY send more items than the limit; the view SHALL NOT be
-rejected for it. Items past the limit SHALL be reachable by typing a query that
-narrows the list. Selection, the action panel, and the selected item's detail
-SHALL only consider the items that are shown.
-
-#### Scenario: A long list shows the first 50 items
-
-- **WHEN** a command emits a list of 500 items and the query is empty
-- **THEN** the first 50 items, in their declared order, are shown
-- **AND** the rest are not shown
-
-#### Scenario: Filtering reaches an item past the limit
-
-- **WHEN** a list of 500 items is shown, its launcher filters, and the user
-  types a query that only the 300th item matches
-- **THEN** the 300th item is shown and can be selected
-
-#### Scenario: The limit counts across sections
-
-- **WHEN** a list has two sections of 40 items each and the query is empty
-- **THEN** all 40 items of the first section and the first 10 items of the
-  second section are shown
-
-#### Scenario: A command-filtered list is bounded too
-
-- **WHEN** a list declares that its command filters and emits 120 items
-- **THEN** the first 50 items are shown
-
-#### Scenario: A grid is bounded too
-
-- **WHEN** a command emits a grid of 80 tiles and the query is empty
-- **THEN** the first 50 tiles are shown
-
-#### Scenario: Moving past the last shown item
-
-- **WHEN** a list of 500 items is shown, the 50th item is selected, and the
-  user moves the selection down
-- **THEN** the 50th item stays selected
-
 ### Requirement: A view can declare a filter dropdown
 
 A list or grid view SHALL be able to declare a filter dropdown: a list of
@@ -491,3 +430,109 @@ one-line message. The launcher SHALL show it as a success toast.
 - **WHEN** the user runs an action that pins a clipboard entry and the action
   reports "Entry pinned"
 - **THEN** a success toast reads "Entry pinned" and the view stays
+
+### Requirement: The launcher filters lists and grids
+
+The launcher SHALL narrow a list's or grid's items against the query as the
+user types. A command SHALL NOT receive keystrokes as query changes and SHALL
+NOT be invoked again because the query changed. A view SHALL NOT be able to
+hand filtering to its command.
+
+#### Scenario: Typing narrows a list
+
+- **WHEN** a list is showing and the user types
+- **THEN** the visible items are narrowed without the command being invoked
+  again
+
+### Requirement: A Shift or Alt shortcut names a letter or a named key
+
+An action shortcut that includes Shift or Alt SHALL name a letter key, A to Z,
+or a named key: Backspace, Tab, Enter, Escape, Delete, ArrowUp, ArrowDown,
+ArrowLeft, ArrowRight, Home, End, PageUp, or PageDown. Dango SHALL refuse a
+view tree in which any action declares Shift or Alt with any other key, such as
+a digit, symbol, or punctuation key, and SHALL show an error in place of the
+view, as for any other invalid tree. A shortcut without Shift or Alt MAY name
+any key.
+
+On macOS, Option with a letter and without Cmd or Ctrl types a composed
+character, so a shortcut of Alt and a letter alone SHALL NOT be expected to
+run there.
+
+#### Scenario: A Shift shortcut on a letter runs
+
+- **WHEN** a view declares an action with the shortcut Ctrl+Shift+P and the
+  user presses Ctrl+Shift+P
+- **THEN** that action runs
+
+#### Scenario: A Shift shortcut on a named key runs
+
+- **WHEN** a view declares an action with the shortcut Shift+Enter and the
+  user presses Shift+Enter
+- **THEN** that action runs
+
+#### Scenario: An Alt shortcut on a named key runs
+
+- **WHEN** a view declares an action with the shortcut Alt+ArrowUp and the
+  user presses Alt+ArrowUp
+- **THEN** that action runs
+
+#### Scenario: A Shift shortcut on a digit is refused
+
+- **WHEN** a command emits a view with an action whose shortcut is Shift+1
+- **THEN** the view is rejected and an error is shown in its place
+
+#### Scenario: An Alt shortcut on a symbol is refused
+
+- **WHEN** a command emits a view with an action whose shortcut is Alt+/
+- **THEN** the view is rejected and an error is shown in its place
+
+#### Scenario: An Alt shortcut on a letter runs on Windows
+
+- **WHEN** a view on Windows declares an action with the shortcut Alt+P and
+  the user presses Alt+P
+- **THEN** that action runs
+
+#### Scenario: An Alt shortcut on a letter alone does not run on macOS
+
+- **WHEN** a view on macOS declares an action with the shortcut Alt+P and the
+  user presses Option+P
+- **THEN** the action does not run
+
+### Requirement: A list or grid shows at most 50 items
+
+A list or grid view SHALL show at most 50 items. The limit SHALL apply after
+the launcher has filtered the items against the query, and SHALL count items in
+the order they are drawn, across all sections; a section left with no shown item
+SHALL NOT be drawn. A command MAY send more items than the limit; the view SHALL
+NOT be rejected for it. Items past the limit SHALL be reachable by typing a
+query that narrows the list. Selection, the action panel, and the selected
+item's detail SHALL only consider the items that are shown.
+
+#### Scenario: A long list shows the first 50 items
+
+- **WHEN** a command emits a list of 500 items and the query is empty
+- **THEN** the first 50 items, in their declared order, are shown
+- **AND** the rest are not shown
+
+#### Scenario: Filtering reaches an item past the limit
+
+- **WHEN** a list of 500 items is shown and the user types a query that only
+  the 300th item matches
+- **THEN** the 300th item is shown and can be selected
+
+#### Scenario: The limit counts across sections
+
+- **WHEN** a list has two sections of 40 items each and the query is empty
+- **THEN** all 40 items of the first section and the first 10 items of the
+  second section are shown
+
+#### Scenario: A grid is bounded too
+
+- **WHEN** a command emits a grid of 80 tiles and the query is empty
+- **THEN** the first 50 tiles are shown
+
+#### Scenario: Moving past the last shown item
+
+- **WHEN** a list of 500 items is shown, the 50th item is selected, and the
+  user moves the selection down
+- **THEN** the 50th item stays selected
