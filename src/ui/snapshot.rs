@@ -1,5 +1,3 @@
-use serde::Serialize;
-
 use crate::protocol::{
     Action, EmptyState, FieldKind, FieldOption, GridItem, ListItem, Metadata, View,
 };
@@ -10,7 +8,7 @@ use super::state::{Launcher, Mode, PushedView, ToastStyle, ViewError, FILTER_PRE
 macro_rules! snapshot_types {
     ($($item:item)*) => {
         $(
-            #[derive(Clone, Debug, PartialEq, Serialize)]
+            #[derive(Clone, Debug, PartialEq)]
             $item
         )*
     };
@@ -18,7 +16,6 @@ macro_rules! snapshot_types {
 
 snapshot_types! {
     /// Everything the renderer draws. Sent whole after every change.
-    #[serde(rename_all = "camelCase")]
     pub struct Snapshot {
         pub activation: Activation,
         pub focus: Focus,
@@ -32,14 +29,12 @@ snapshot_types! {
     }
 
     /// Bumped on every activation, so the renderer knows to take the cursor.
-    #[serde(rename_all = "camelCase")]
     pub struct Activation {
         pub count: u64,
         pub probe: Option<u64>,
     }
 
     /// Which surface owns the keyboard.
-    #[serde(rename_all = "camelCase")]
     pub enum Focus {
         RootInput,
         ViewInput,
@@ -49,7 +44,6 @@ snapshot_types! {
         Nothing,
     }
 
-    #[serde(rename_all = "camelCase")]
     pub struct Binding {
         pub chord: Chord,
         /// False when a multiline field keeps the chord, as it keeps Enter for
@@ -57,7 +51,6 @@ snapshot_types! {
         pub in_multiline: bool,
     }
 
-    #[serde(tag = "kind", rename_all = "camelCase")]
     pub enum Screen {
         /// A view tree this build cannot draw, shown as an empty view.
         Error(EmptyText),
@@ -65,7 +58,6 @@ snapshot_types! {
         View(ViewScreen),
     }
 
-    #[serde(rename_all = "camelCase")]
     pub struct RootScreen {
         pub query: Text,
         pub sections: Vec<Section>,
@@ -79,25 +71,21 @@ snapshot_types! {
     /// A text field's value. The renderer writes `text` into the field only
     /// when `revision` changes, so an answer to an older keystroke never
     /// overwrites newer typing.
-    #[serde(rename_all = "camelCase")]
     pub struct Text {
         pub text: String,
         pub revision: u64,
     }
 
-    #[serde(rename_all = "camelCase")]
     pub struct Section {
         pub heading: Option<String>,
         pub items: Vec<ResultItem>,
     }
 
-    #[serde(rename_all = "camelCase")]
     pub struct ViewScreen {
         pub busy: bool,
         pub body: ViewBody,
     }
 
-    #[serde(tag = "kind", rename_all = "camelCase")]
     pub enum ViewBody {
         List(ListBody),
         Grid(GridBody),
@@ -105,7 +93,6 @@ snapshot_types! {
         Form(FormBody),
     }
 
-    #[serde(rename_all = "camelCase")]
     pub struct ListBody {
         pub query: Text,
         pub filter: Option<FilterView>,
@@ -117,13 +104,11 @@ snapshot_types! {
     }
 
     /// The view's filter dropdown with the option it shows.
-    #[serde(rename_all = "camelCase")]
     pub struct FilterView {
         pub options: Vec<FieldOption>,
         pub selected: String,
     }
 
-    #[serde(rename_all = "camelCase")]
     pub struct GridBody {
         pub query: Text,
         pub filter: Option<FilterView>,
@@ -134,21 +119,18 @@ snapshot_types! {
         pub empty: Option<EmptyText>,
     }
 
-    #[serde(rename_all = "camelCase")]
     pub struct GridSection {
         pub title: Option<String>,
         pub subtitle: Option<String>,
         pub items: Vec<GridItem>,
     }
 
-    #[serde(rename_all = "camelCase")]
     pub struct ListSection {
         pub title: Option<String>,
         pub subtitle: Option<String>,
         pub items: Vec<ListItem>,
     }
 
-    #[serde(rename_all = "camelCase")]
     pub struct EmptyText {
         pub icon: Option<String>,
         pub title: String,
@@ -157,14 +139,12 @@ snapshot_types! {
         pub truncate: bool,
     }
 
-    #[serde(rename_all = "camelCase")]
     #[derive(Default)]
     pub struct DetailBody {
         pub markdown: String,
         pub metadata: Vec<Metadata>,
     }
 
-    #[serde(rename_all = "camelCase")]
     pub struct FormBody {
         /// Bumped when the form is seeded from a tree. The fields take their
         /// values from the snapshot only then.
@@ -172,7 +152,6 @@ snapshot_types! {
         pub fields: Vec<Field>,
     }
 
-    #[serde(rename_all = "camelCase")]
     pub struct Field {
         pub id: String,
         pub label: String,
@@ -184,13 +163,11 @@ snapshot_types! {
         pub options: Vec<FieldOption>,
     }
 
-    #[serde(rename_all = "camelCase")]
     pub struct Toast {
         pub style: ToastStyle,
         pub text: String,
     }
 
-    #[serde(rename_all = "camelCase")]
     pub struct Footer {
         /// In root search the selected result's extension, in a view its
         /// command.
@@ -204,7 +181,6 @@ snapshot_types! {
         pub many_actions: bool,
     }
 
-    #[serde(rename_all = "camelCase")]
     pub struct Panel {
         /// What the panel would offer. Empty disables its trigger.
         pub actions: Vec<Action>,

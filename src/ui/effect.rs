@@ -17,7 +17,6 @@ pub enum Effect {
         field: String,
         source: String,
     },
-    FinishWarmup,
     ReportPaint(u64),
     /// Answered with `Event::ToastExpired` after a success toast's time is up.
     ExpireToast {

@@ -119,8 +119,7 @@ impl Grouped for GridItem {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ToastStyle {
     Busy,
     Success,
@@ -195,10 +194,7 @@ impl Launcher {
             self.clear_failure();
         }
         match intent {
-            Intent::Ready => {
-                fx.push(Effect::Search(self.query.clone()));
-                fx.push(Effect::FinishWarmup);
-            }
+            Intent::Ready => fx.push(Effect::Search(self.query.clone())),
             Intent::Painted { probe } => fx.push(Effect::ReportPaint(probe)),
             Intent::QueryChanged { text } => self.query_changed(text, fx),
             Intent::FieldChanged { id, value } => self.field_changed(id, value, fx),
@@ -212,7 +208,6 @@ impl Launcher {
                 }
             }
             Intent::ClosePanel => self.panel = None,
-            Intent::Blur => fx.push(Effect::Dismiss),
             Intent::FilterChosen { id } => self.choose_filter(id, fx),
             Intent::PanelFilterChanged { text } => {
                 if let Some(panel) = self.panel.as_mut() {

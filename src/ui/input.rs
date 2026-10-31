@@ -1,5 +1,3 @@
-use serde::{Deserialize, Serialize};
-
 use crate::extension::ActionOutcome;
 use crate::protocol::{Action, Modifier, Shortcut, ViewTree};
 
@@ -15,8 +13,7 @@ pub enum Input {
 
 /// What the user did, in terms of the launcher rather than the DOM. Keys arrive
 /// only for a chord the snapshot declared in `bindings`.
-#[derive(Clone, Debug, PartialEq, Deserialize)]
-#[serde(tag = "kind", rename_all = "camelCase")]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Intent {
     /// The renderer is mounted and listening.
     Ready,
@@ -51,13 +48,11 @@ pub enum Intent {
     FilterChosen {
         id: String,
     },
-    Blur,
 }
 
 /// A key with its modifiers. `command` is Cmd on macOS and Ctrl on Windows,
 /// and either one counts, as both always have. `key` is lowercase.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Chord {
     pub key: String,
     pub command: bool,
@@ -131,8 +126,7 @@ pub enum Event {
     },
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(Clone, Debug, PartialEq)]
 pub struct ResultItem {
     pub extension_id: String,
     /// The contributing extension, named in the ActionBar while selected.
@@ -148,15 +142,14 @@ pub struct ResultItem {
 }
 
 /// A name and icon the ActionBar shows for where the user is.
-#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct Context {
     pub title: String,
     pub icon: Option<String>,
 }
 
 /// What a template field's text will ask for.
-#[derive(Clone, Debug, Default, PartialEq, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct TemplateInspection {
     pub arguments: Vec<String>,
     pub error: Option<String>,

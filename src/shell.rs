@@ -17,9 +17,6 @@ pub trait Shell: Send + Sync {
     /// Called from any thread.
     fn set_tray(&self, tray: &TrayStatus);
     fn quit(&self);
-    /// The renderer has mounted. Only a shell that warms its window up at
-    /// startup has anything to do.
-    fn finish_warmup(&self) {}
 }
 
 /// Runs work on the main thread, inline when already there.

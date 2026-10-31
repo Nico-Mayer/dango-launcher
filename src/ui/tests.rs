@@ -1716,13 +1716,9 @@ fn the_footer_names_the_extension_at_root_and_the_command_in_a_view() {
 }
 
 #[test]
-fn blur_dismisses_and_ready_searches_and_finishes_warmup() {
+fn ready_searches_and_painted_reports() {
     let mut h = Harness::new();
-    assert_eq!(
-        h.intent(Intent::Ready),
-        vec![Effect::Search(String::new()), Effect::FinishWarmup]
-    );
-    assert_eq!(h.intent(Intent::Blur), vec![Effect::Dismiss]);
+    assert_eq!(h.intent(Intent::Ready), vec![Effect::Search(String::new())]);
     assert_eq!(
         h.intent(Intent::Painted { probe: 7 }),
         vec![Effect::ReportPaint(7)]

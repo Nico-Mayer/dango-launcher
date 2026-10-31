@@ -156,10 +156,6 @@ impl Core {
         }
     }
 
-    pub fn runtime(&self) -> &Handle {
-        &self.runtime
-    }
-
     /// Everything the renderer does arrives here, in the order it happened.
     pub fn dispatch(self: &Arc<Self>, intent: ui::Intent) {
         if intent == ui::Intent::Ready {
@@ -235,15 +231,6 @@ impl Core {
                     source,
                     inspection,
                 }));
-            }
-            ui::Effect::FinishWarmup => {
-                let shell = self.shell.clone();
-                self.on_main_thread(move || {
-                    // Once per renderer mount. More than one line here across a
-                    // session means the renderer reloaded.
-                    eprintln!("[dango] renderer mounted");
-                    shell.finish_warmup();
-                });
             }
             ui::Effect::ReportPaint(probe) => self.latency.finish(probe),
             ui::Effect::ExpireToast { id } => {
