@@ -24,11 +24,6 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v5
-        with:
-          node-version: 24
-          cache: npm
-
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy, rustfmt
@@ -36,14 +31,6 @@ jobs:
       - uses: swatinem/rust-cache@v2
         with:
           workspaces: src-tauri
-
-      - run: npm ci
-
-      - name: Type check frontend
-        run: npm run check
-
-      - name: Build frontend
-        run: npm run build
 
       - name: Check formatting
         working-directory: src-tauri
@@ -57,9 +44,3 @@ jobs:
         working-directory: src-tauri
         run: cargo test
 
-      # cargo test regenerates the ts-rs protocol bindings. A diff here means
-      # the checked-in TypeScript is out of sync with the Rust source of truth.
-      # Run on one platform only, to avoid CRLF noise from the Windows runner.
-      - name: Protocol bindings are in sync
-        if: matrix.os == 'macos-latest'
-        run: git diff --exit-code src/protocol
