@@ -17,5 +17,5 @@
 
 ## 4. Review
 
-- [ ] 4.1 Run `hk check` and `cargo test`.
-- [ ] 4.2 Run the `ponytail-review` skill in a fresh subagent on this change's commits, without the apply context. It reports findings only; the author decides what to fix.
+- [x] 4.1 Run `hk check` and `cargo test`.
+- [x] 4.2 Run the `ponytail-review` skill in a fresh subagent on this change's commits, without the apply context. It reports findings only; the author decides what to fix.
