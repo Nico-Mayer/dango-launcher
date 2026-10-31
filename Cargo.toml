@@ -79,6 +79,7 @@ reqwest = { version = "0.13", default-features = false, features = ["blocking", 
 nucleo-matcher = "0.3.1"
 bytesize = "2.7.0"
 cargo-packager-updater = "0.2.3"
+rolling-file = "0.2"
 
 [dev-dependencies]
 base64 = "0.22"
