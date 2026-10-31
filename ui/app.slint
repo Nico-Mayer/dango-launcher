@@ -271,7 +271,6 @@ component Prompt inherits Rectangle {
 }
 
 component Footer inherits Rectangle {
-    in property <bool> development;
     in property <string> primary-label;
     in property <string> confirm-key;
     in property <string> status;
@@ -301,25 +300,6 @@ component Footer inherits Rectangle {
                 font-size: Theme.text-small;
                 font-weight: 500;
                 vertical-alignment: center;
-            }
-            if root.development: VerticalLayout {
-                alignment: center;
-                dev-badge := Rectangle {
-                    background: Theme.raised;
-                    border-radius: Theme.radius / 2;
-                    accessible-role: text;
-                    accessible-label: "dev";
-                    HorizontalLayout {
-                        padding-left: 6px;
-                        padding-right: 6px;
-                        Text {
-                            text: "dev";
-                            color: Theme.text;
-                            font-size: Theme.text-small;
-                            font-weight: 500;
-                        }
-                    }
-                }
             }
         }
         HorizontalLayout {
@@ -537,7 +517,6 @@ export component LauncherWindow inherits Window {
     default-font-size: Theme.text-body;
     default-font-family: Theme.font;
 
-    in property <bool> development;
     in property <ScreenKind> screen: ScreenKind.root;
     in property <[RowData]> rows;
     in property <string> empty;
@@ -598,9 +577,9 @@ export component LauncherWindow inherits Window {
             background: Theme.background;
             border-radius: Theme.radius * 1.5;
             border-width: 1px;
-            border-color: root.development ? Theme.accent : Theme.border;
+            border-color: Theme.border;
             accessible-role: groupbox;
-            accessible-label: root.development ? "Dango (development build)" : "Dango";
+            accessible-label: "Dango";
             clip: true;
 
             if root.screen == ScreenKind.error: VerticalLayout {
@@ -696,7 +675,6 @@ export component LauncherWindow inherits Window {
             Footer {
                 visible: root.screen != ScreenKind.error;
                 y: parent.height - Theme.action-bar-height;
-                development: root.development;
                 primary-label: root.primary-label;
                 confirm-key: root.confirm-key;
                 status: root.status;

@@ -110,7 +110,7 @@ struct Harness {
 impl Harness {
     fn new() -> Self {
         Self {
-            launcher: Launcher::new(false),
+            launcher: Launcher::new(),
             effects: Vec::new(),
         }
     }
@@ -1216,12 +1216,6 @@ fn blur_dismisses_and_ready_searches_and_finishes_warmup() {
         h.intent(Intent::Painted { probe: 7 }),
         vec![Effect::ReportPaint(7)]
     );
-}
-
-#[test]
-fn the_snapshot_carries_the_build_kind() {
-    assert!(Launcher::new(true).snapshot().development);
-    assert!(!Launcher::new(false).snapshot().development);
 }
 
 // Hold

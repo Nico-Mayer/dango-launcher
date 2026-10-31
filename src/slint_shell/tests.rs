@@ -14,7 +14,7 @@ use crate::protocol::{
     Action, DetailView, FieldKind, Filtering, FormField, FormView, ListItem, ListView, View,
     ViewTree,
 };
-use crate::shell::{self, TrayStatus};
+use crate::shell::TrayStatus;
 use crate::ui::{Event, Input, Intent, Launcher, ResultItem, TemplateInspection};
 
 const LIST_TOP: f32 = 56.0 + 8.0;
@@ -31,13 +31,13 @@ struct Harness {
 }
 
 impl Harness {
-    fn new(development: bool) -> Self {
+    fn new() -> Self {
         i_slint_backend_testing::init_no_event_loop();
         let ui = LauncherWindow::new().unwrap();
         ui.window().set_size(slint::LogicalSize::new(720.0, 400.0));
         ui.show().unwrap();
         let renderer = Rc::new(RefCell::new(Renderer::new(&ui)));
-        let launcher = Rc::new(RefCell::new(Launcher::new(development)));
+        let launcher = Rc::new(RefCell::new(Launcher::new()));
         let intents = Rc::new(RefCell::new(Vec::new()));
         let frozen = Rc::new(RefCell::new(false));
         let dispatch = {
@@ -72,7 +72,7 @@ impl Harness {
     }
 
     fn root(items: Vec<ResultItem>) -> Self {
-        let harness = Self::new(false);
+        let harness = Self::new();
         harness.event(Event::Results {
             query: String::new(),
             items,
@@ -184,7 +184,7 @@ mod theme {
 
     #[test]
     fn the_scheme_picks_the_theme() {
-        let h = Harness::new(false);
+        let h = Harness::new();
         let palette = h.ui.global::<StdPalette>();
         let theme = h.ui.global::<Theme>();
 
@@ -238,41 +238,16 @@ mod atoms {
     }
 }
 
-mod development_indicator {
+mod protocol_error {
     use super::*;
 
     #[test]
-    fn root_search_marks_a_development_build() {
-        let h = Harness::new(true);
-        assert!(h.find("Dango (development build)").is_some());
-        assert!(h.find("dev").is_some());
-    }
-
-    #[test]
-    fn root_search_shows_nothing_in_a_release_build() {
-        let h = Harness::new(false);
-        assert!(h.find("Dango (development build)").is_none());
-        assert!(h.find("Dango").is_some());
-        assert!(h.find("dev").is_none());
-    }
-
-    #[test]
-    fn a_pushed_view_keeps_the_marker() {
-        let h = Harness::new(true);
-        h.view(detail_tree("Working"));
-        assert_eq!(h.ui.get_screen(), ScreenKind::Detail);
-        assert!(h.find("Dango (development build)").is_some());
-        assert!(h.find("dev").is_some());
-    }
-
-    #[test]
-    fn protocol_error_screen_keeps_the_edge() {
-        let h = Harness::new(true);
+    fn a_newer_tree_shows_the_error_screen() {
+        let h = Harness::new();
         let mut tree = detail_tree("Working");
         tree.protocol_version = 99;
         h.view(tree);
         assert_eq!(h.ui.get_screen(), ScreenKind::Error);
-        assert!(h.find("Dango (development build)").is_some());
         assert!(h
             .find("This view needs a newer version of Dango.")
             .is_some());
@@ -515,10 +490,9 @@ mod tray {
     use super::*;
 
     #[test]
-    fn the_tray_lists_the_notices_and_names_a_development_build() {
+    fn the_tray_lists_the_notices() {
         i_slint_backend_testing::init_no_event_loop();
         let tray = Tray::new().unwrap();
-        tray.set_hint(shell::tooltip().into());
         super::super::show_tray(
             &tray,
             &TrayStatus {
@@ -533,7 +507,5 @@ mod tray {
             ["Pasting is off, see dango.log", "Config file loaded"]
         );
         assert!(!tray.get_grant_accessibility());
-        #[cfg(debug_assertions)]
-        assert_eq!(tray.get_hint(), "Dango (development build)");
     }
 }

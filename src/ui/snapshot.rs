@@ -18,7 +18,6 @@ snapshot_types! {
     /// Everything the renderer draws. Sent whole after every change.
     #[serde(rename_all = "camelCase")]
     pub struct Snapshot {
-        pub development: bool,
         pub activation: Activation,
         pub focus: Focus,
         /// The chords the launcher wants right now. Any other key stays with the
@@ -164,7 +163,6 @@ impl Launcher {
     pub fn snapshot(&self) -> Snapshot {
         let mode = self.mode();
         Snapshot {
-            development: self.development,
             activation: Activation {
                 count: self.activations,
                 probe: self.probe,

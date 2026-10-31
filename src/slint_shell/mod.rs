@@ -21,7 +21,7 @@ use slint::{ComponentHandle, ModelRc, SharedString, VecModel};
 use crate::app::{self, Core, Startup};
 use crate::extensions::updates;
 use crate::platform::{self, LauncherWindow as PlatformWindow, Permission, RawWindowHandle};
-use crate::shell::{self, Shell, TrayCommand, TrayStatus};
+use crate::shell::{Shell, TrayCommand, TrayStatus};
 use crate::ui::{self, Intent};
 use generated::{LauncherWindow, Tray};
 use render::Renderer;
@@ -173,7 +173,7 @@ pub fn run() {
     let window = LauncherWindow::new().expect("the launcher window");
     let tray = Tray::new().expect("the tray icon");
     tray.set_image(tray_icon());
-    tray.set_hint(shell::tooltip().into());
+    tray.set_hint("Dango".into());
 
     let renderer = Rc::new(RefCell::new(Renderer::new(&window)));
     RENDERER.with(|slot| *slot.borrow_mut() = Some(renderer.clone()));

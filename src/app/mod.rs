@@ -123,7 +123,7 @@ impl Core {
             runtime,
             config,
             ui: Mutex::new(UiState {
-                launcher: ui::Launcher::new(cfg!(debug_assertions)),
+                launcher: ui::Launcher::new(),
                 shown: None,
             }),
             latency: LatencyProbe::default(),

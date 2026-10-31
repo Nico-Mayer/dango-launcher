@@ -58,7 +58,6 @@ impl Renderer {
     }
 
     pub fn render(&mut self, ui: &LauncherWindow, snapshot: Snapshot) {
-        ui.set_development(snapshot.development);
         ui.set_failure(snapshot.failure.clone().unwrap_or_default().into());
         let footer = &snapshot.footer;
         ui.set_primary_label(footer.primary_label.as_str().into());

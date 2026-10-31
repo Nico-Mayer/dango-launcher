@@ -5,7 +5,7 @@
 - [x] 1.3 Add `ui/atoms/` Icon, Kbd, Tag, Accessory, and Dot built only on `Theme`; verify UI tests find each by `accessible-label` and that a Kbd renders the platform chord from `keys.rs`
 - [x] 1.4 Move `ui/app.slint` from `Palette` to `Theme` and delete `Palette`; verify `cargo test` and `hk check` pass and `rg Palette ui` finds only the std-widgets import
 - [x] 1.5 Remove tints: `Manifest.tint`, `ResultItem.tint`, `ExtensionHost::tints`, `tint_index`, `IconTile` tint, and the built-in manifests' tint fields; verify `cargo test` passes and `rg -w tint src ui` is empty
-- [ ] 1.6 Remove the development marker: `Snapshot.development`, the dev badge, the frame colour, and the tray's development tooltip; verify `cargo test` passes and `rg -i "development build" src ui` is empty
+- [x] 1.6 Remove the development marker: `Snapshot.development`, the dev badge, the frame colour, and the tray's development tooltip; verify `cargo test` passes and `rg -i "development build" src ui` is empty
 
 ## 2. View protocol version 2
 

@@ -8,8 +8,8 @@ use super::input::{Chord, Event, Input, Intent, ResultItem, TemplateInspection};
 
 /// All interaction state of the launcher. A pure reducer: input goes in,
 /// effects for the shell come out, and `snapshot` says what to draw.
+#[derive(Default)]
 pub struct Launcher {
-    pub(super) development: bool,
     pub(super) activations: u64,
     pub(super) probe: Option<u64>,
     revisions: u64,
@@ -70,26 +70,8 @@ pub(super) enum Mode {
 }
 
 impl Launcher {
-    pub fn new(development: bool) -> Self {
-        Self {
-            development,
-            activations: 0,
-            probe: None,
-            revisions: 0,
-            query: String::new(),
-            query_revision: 0,
-            results: Vec::new(),
-            picked: None,
-            stack: Vec::new(),
-            owner: None,
-            shown_invocation: None,
-            last_invocation: None,
-            abandoned_invocation: None,
-            panel: None,
-            failure: None,
-            working: None,
-            protocol_error: false,
-        }
+    pub fn new() -> Self {
+        Self::default()
     }
 
     pub fn apply(&mut self, input: Input) -> Vec<Effect> {

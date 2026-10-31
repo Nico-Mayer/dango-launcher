@@ -36,14 +36,6 @@ pub fn on_main_thread(shell: &dyn Shell, work: impl FnOnce() + Send + 'static) {
     shell.on_main_thread(Box::new(work));
 }
 
-pub fn tooltip() -> &'static str {
-    if cfg!(debug_assertions) {
-        "Dango (development build)"
-    } else {
-        "Dango"
-    }
-}
-
 /// What the tray menu shows. Startup problems and the config file's health
 /// have no other surface while the launcher is hidden.
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -207,11 +199,5 @@ mod tests {
         assert_eq!(items[0].command, None);
         assert_eq!(items[1].text, "Config file has an error, see dango.log");
         assert_eq!(items[1].command, None);
-    }
-
-    #[cfg(debug_assertions)]
-    #[test]
-    fn a_development_build_says_so_in_the_tooltip() {
-        assert_eq!(tooltip(), "Dango (development build)");
     }
 }
