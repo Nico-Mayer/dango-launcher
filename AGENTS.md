@@ -222,6 +222,9 @@ load and are not reliable.
   value to its own type (`unnecessary_cast`, easy with `HWND`).
 - On the Mac the shell is fish: `VAR=value cmd` is invalid. Use
   `env VAR=value cmd`.
+- A release build applies `launcher.autostart`, so running one from `target/`
+  with the author's config points the login entry at that build. Test release
+  builds with `DANGO_CONFIG_DIR` set to a scratch directory.
 - `DANGO_MEASURE=1` enables activation timing logs (stderr) in a release build.
   A `windows_subsystem = "windows"` build shows stderr only when it is
   redirected.
