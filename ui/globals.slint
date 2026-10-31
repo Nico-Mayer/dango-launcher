@@ -97,6 +97,8 @@ export global Shell {
     in property <string> title;
     in-out property <bool> pointer-resting;
     in-out property <bool> multiline-focused;
+    /// The window's height, set before each snapshot is drawn.
+    in property <length> height: 480px;
 }
 
 export global Search {

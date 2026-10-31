@@ -7,6 +7,7 @@ mod detail;
 mod empty;
 mod form;
 mod grid;
+mod height;
 mod list;
 mod panel;
 mod shell;
@@ -19,6 +20,7 @@ use slint::{ComponentHandle, Image};
 use super::generated::{IconKind, Intents, LauncherWindow, ScreenKind};
 use super::icons::{Icon, Icons};
 use super::keys::{self, Held};
+use crate::shell::Shell;
 use crate::ui::snapshot::{Focus, Screen, Snapshot, ViewBody};
 use crate::ui::{Chord, Intent};
 
@@ -151,6 +153,18 @@ impl Renderer {
             Focus::Detail | Focus::Nothing => ui.invoke_focus_surface(),
         }
     }
+}
+
+/// Sizes the window for the snapshot, then draws it, in one main-thread turn
+/// so no frame shows the old size with the new content or the other way round.
+pub fn publish(
+    shell: &dyn Shell,
+    renderer: &mut Renderer,
+    ui: &LauncherWindow,
+    snapshot: Snapshot,
+) {
+    shell.set_launcher_height(height::height(&snapshot));
+    renderer.render(ui, snapshot);
 }
 
 /// Whether the SearchBar holds a query, which root, a list, and a grid do,

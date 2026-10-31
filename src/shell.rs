@@ -20,6 +20,10 @@ pub trait Shell: Send + Sync {
     /// The renderer has mounted. Only a shell that warms its window up at
     /// startup has anything to do.
     fn finish_warmup(&self) {}
+    /// Makes the launcher this many logical pixels tall, keeping its top edge
+    /// where it is. Main thread only, before the snapshot that needs it is
+    /// drawn.
+    fn set_launcher_height(&self, _height: f32) {}
 }
 
 /// Runs work on the main thread, inline when already there.
@@ -115,6 +119,7 @@ pub mod testing {
         Hide { restore_focus: bool },
         Tray(TrayStatus),
         Quit,
+        Height(f32),
     }
 
     /// Runs main-thread work inline and records everything else.
@@ -160,6 +165,9 @@ pub mod testing {
         }
         fn quit(&self) {
             self.calls.lock().unwrap().push(Call::Quit);
+        }
+        fn set_launcher_height(&self, height: f32) {
+            self.calls.lock().unwrap().push(Call::Height(height));
         }
     }
 }

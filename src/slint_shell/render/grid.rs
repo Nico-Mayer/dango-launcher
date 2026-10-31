@@ -34,11 +34,13 @@ impl Writer {
     }
 
     pub fn write(&mut self, ui: &LauncherWindow, grid: &GridBody, icons: &Icons) {
-        let columns = usize::from(grid.columns.max(1));
-        let inner = WIDTH - 2.0 * PADDING;
-        let width = (inner - GAP * (columns as f32 - 1.0)) / columns as f32;
-        let box_height = width / grid.aspect.max(0.1);
-        let row_height = box_height + TITLE_HEIGHT + GAP;
+        let Layout {
+            columns,
+            inner,
+            width,
+            box_height,
+            row_height,
+        } = Layout::of(grid);
 
         let mut tiles = Vec::new();
         let mut top = GAP;
@@ -84,6 +86,44 @@ impl Writer {
             self.selected = grid.selected.clone();
         }
     }
+}
+
+struct Layout {
+    columns: usize,
+    inner: f32,
+    width: f32,
+    box_height: f32,
+    row_height: f32,
+}
+
+impl Layout {
+    fn of(grid: &GridBody) -> Self {
+        let columns = usize::from(grid.columns.max(1));
+        let inner = WIDTH - 2.0 * PADDING;
+        let width = (inner - GAP * (columns as f32 - 1.0)) / columns as f32;
+        let box_height = width / grid.aspect.max(0.1);
+        Self {
+            columns,
+            inner,
+            width,
+            box_height,
+            row_height: box_height + TITLE_HEIGHT + GAP,
+        }
+    }
+}
+
+/// How tall the tiles and headings are together, as `write` places them.
+pub fn content_height(grid: &GridBody) -> f32 {
+    let layout = Layout::of(grid);
+    let sections = grid.sections.iter().map(|section| {
+        let heading = if section.title.is_some() {
+            HEADING_HEIGHT
+        } else {
+            0.0
+        };
+        heading + section.items.len().div_ceil(layout.columns) as f32 * layout.row_height
+    });
+    2.0 * GAP + sections.sum::<f32>()
 }
 
 fn tile(item: &GridItem, icons: &Icons) -> TileData {

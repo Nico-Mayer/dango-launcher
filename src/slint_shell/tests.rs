@@ -14,6 +14,7 @@ use crate::protocol::{
     Action, DetailView, FieldKind, Filtering, FormField, FormView, ListItem, ListView, View,
     ViewTree,
 };
+use crate::shell::testing::{Call, RecordingShell};
 use crate::shell::TrayStatus;
 use crate::ui::{Context, Event, Input, Intent, Launcher, ResultItem, TemplateInspection};
 
@@ -28,6 +29,7 @@ struct Harness {
     /// Records intents without feeding them to the state machine, so what is
     /// on screen can only change through a snapshot.
     frozen: Rc<RefCell<bool>>,
+    recorder: Rc<RecordingShell>,
 }
 
 impl Harness {
@@ -40,7 +42,9 @@ impl Harness {
         let launcher = Rc::new(RefCell::new(Launcher::new()));
         let intents = Rc::new(RefCell::new(Vec::new()));
         let frozen = Rc::new(RefCell::new(false));
+        let recorder = Rc::new(RecordingShell::default());
         let dispatch = {
+            let recorder = recorder.clone();
             let weak = ui.as_weak();
             let launcher = launcher.clone();
             let renderer = renderer.clone();
@@ -53,7 +57,12 @@ impl Harness {
                 }
                 launcher.borrow_mut().apply(Input::Intent(intent));
                 let snapshot = launcher.borrow().snapshot();
-                renderer.borrow_mut().render(&weak.unwrap(), snapshot);
+                render::publish(
+                    &*recorder,
+                    &mut renderer.borrow_mut(),
+                    &weak.unwrap(),
+                    snapshot,
+                );
             }) as Rc<dyn Fn(Intent)>
         };
         render::connect(&ui, renderer.clone(), dispatch);
@@ -63,6 +72,7 @@ impl Harness {
             renderer,
             intents,
             frozen,
+            recorder,
         };
         harness.event(Event::Activated {
             held: false,
@@ -83,7 +93,24 @@ impl Harness {
     fn event(&self, event: Event) {
         self.launcher.borrow_mut().apply(Input::Event(event));
         let snapshot = self.launcher.borrow().snapshot();
-        self.renderer.borrow_mut().render(&self.ui, snapshot);
+        render::publish(
+            &*self.recorder,
+            &mut self.renderer.borrow_mut(),
+            &self.ui,
+            snapshot,
+        );
+    }
+
+    fn height(&self) -> f32 {
+        self.recorder
+            .calls()
+            .into_iter()
+            .rev()
+            .find_map(|call| match call {
+                Call::Height(height) => Some(height),
+                _ => None,
+            })
+            .expect("a height was set")
     }
 
     fn view(&self, tree: ViewTree) {
@@ -968,6 +995,29 @@ mod filter_dropdown {
             Some("Text only")
         );
         assert_eq!(h.query_of("Search"), "it");
+    }
+}
+
+mod window_height {
+    use super::*;
+
+    #[test]
+    fn three_results_make_a_short_window() {
+        let h = Harness::root(results(3));
+        assert_eq!(h.height(), 56.0 + 6.0 + 3.0 * 40.0 + 6.0 + 40.0);
+    }
+
+    #[test]
+    fn forty_results_stop_at_the_maximum() {
+        let h = Harness::root(results(40));
+        assert_eq!(h.height(), 480.0);
+    }
+
+    #[test]
+    fn a_detail_takes_the_full_height() {
+        let h = Harness::root(results(3));
+        h.view(detail_tree("Body"));
+        assert_eq!(h.height(), 480.0);
     }
 }
 

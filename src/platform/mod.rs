@@ -20,9 +20,20 @@ pub trait LauncherWindow: Send {
     fn will_show(&mut self);
     /// After the shell has shown the window: takes the keyboard.
     fn did_show(&mut self, window: RawWindowHandle);
+    /// Centres the launcher as if it were `LAUNCHER_MAX_HEIGHT` tall, so a
+    /// short launcher sits where a full one would.
     fn position_on_active_display(&self, window: RawWindowHandle);
     fn restore_previous_focus(&mut self);
+    /// Resizes the window to this many logical pixels tall, keeping its top
+    /// edge where it is. False where the platform cannot yet, and the window
+    /// stays at `LAUNCHER_MAX_HEIGHT`.
+    fn set_height(&self, _window: RawWindowHandle, _height: f64) -> bool {
+        false
+    }
 }
+
+/// The launcher's tallest, in logical pixels.
+pub const LAUNCHER_MAX_HEIGHT: f64 = 480.0;
 
 /// Calls `lost` on the main thread whenever another application takes the
 /// foreground. Main thread only, and once.

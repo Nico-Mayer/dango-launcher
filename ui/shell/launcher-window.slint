@@ -17,7 +17,7 @@ export component LauncherWindow inherits Window {
     background: transparent;
     title: "Dango";
     width: Theme.window-width;
-    height: Theme.max-height;
+    height: Shell.height;
     default-font-size: Theme.text-body;
     default-font-family: Theme.font;
     out property <bool> toast-cut: Shell.toast-shown && action-bar.label-cut;

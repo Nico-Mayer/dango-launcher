@@ -32,6 +32,9 @@ thread_local! {
 }
 
 struct SlintShell {
+    /// So a snapshot published from any thread is drawn through this shell's
+    /// own `set_launcher_height` once it reaches the main thread.
+    me: std::sync::Weak<SlintShell>,
     window: slint::Weak<LauncherWindow>,
     tray: slint::Weak<Tray>,
     /// Attached once the native window exists, which is after its first show.
@@ -55,14 +58,15 @@ impl SlintShell {
 impl Shell for SlintShell {
     fn publish(&self, snapshot: &ui::Snapshot) {
         let window = self.window.clone();
+        let me = self.me.clone();
         let snapshot = snapshot.clone();
         let _ = slint::invoke_from_event_loop(move || {
-            let Some(window) = window.upgrade() else {
+            let (Some(window), Some(shell)) = (window.upgrade(), me.upgrade()) else {
                 return;
             };
             RENDERER.with(|renderer| {
                 if let Some(renderer) = renderer.borrow().as_ref() {
-                    renderer.borrow_mut().render(&window, snapshot);
+                    render::publish(&*shell, &mut renderer.borrow_mut(), &window, snapshot);
                 }
             });
         });
@@ -124,6 +128,28 @@ impl Shell for SlintShell {
     fn quit(&self) {
         let _ = slint::quit_event_loop();
     }
+
+    fn set_launcher_height(&self, height: f32) {
+        let Some(window) = self.window.upgrade() else {
+            return;
+        };
+        let shell = window.global::<generated::Shell>();
+        if shell.get_height() == height {
+            return;
+        }
+        let resized = match (
+            self.platform.lock().unwrap().as_ref(),
+            Self::handle(&window),
+        ) {
+            (Some(platform), Some(handle)) => platform.set_height(handle, height.into()),
+            _ => false,
+        };
+        // Slint would resize the window itself, which on macOS moves the top
+        // edge; only a platform that kept it lets the component follow.
+        if resized {
+            shell.set_height(height);
+        }
+    }
 }
 
 fn show_tray(component: &Tray, tray: &TrayStatus) {
@@ -178,7 +204,8 @@ pub fn run() {
     let renderer = Rc::new(RefCell::new(Renderer::new(&window)));
     RENDERER.with(|slot| *slot.borrow_mut() = Some(renderer.clone()));
 
-    let shell = Arc::new(SlintShell {
+    let shell = Arc::new_cyclic(|me| SlintShell {
+        me: me.clone(),
         window: window.as_weak(),
         tray: tray.as_weak(),
         platform: Mutex::new(None),

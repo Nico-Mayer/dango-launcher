@@ -112,7 +112,7 @@ impl LauncherWindow for WindowsLauncherWindow {
             }
             let scale = f64::from(target_dpi) / f64::from(window_dpi);
             let width = f64::from(rect.right - rect.left) * scale;
-            let height = f64::from(rect.bottom - rect.top) * scale;
+            let height = super::LAUNCHER_MAX_HEIGHT * f64::from(target_dpi) / 96.0;
             let area = info.rcWork;
             let (x, y) = super::launcher_origin(
                 f64::from(area.left),
@@ -142,6 +142,31 @@ impl LauncherWindow for WindowsLauncherWindow {
             let hwnd = previous as HWND;
             AllowSetForegroundWindow(u32::MAX);
             force_foreground(hwnd);
+        }
+    }
+
+    /// In physical pixels at the window's own DPI. `SWP_NOMOVE` keeps the
+    /// top-left corner, so only the bottom edge moves.
+    fn set_height(&self, window: RawWindowHandle, height: f64) -> bool {
+        let Some(hwnd) = hwnd(window) else {
+            return false;
+        };
+        unsafe {
+            let dpi = GetDpiForWindow(hwnd);
+            let mut rect: RECT = std::mem::zeroed();
+            if dpi == 0 || GetWindowRect(hwnd, &mut rect) == 0 {
+                return false;
+            }
+            let height = (height * f64::from(dpi) / 96.0).round() as i32;
+            SetWindowPos(
+                hwnd,
+                std::ptr::null_mut(),
+                0,
+                0,
+                rect.right - rect.left,
+                height,
+                SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE,
+            ) != 0
         }
     }
 }

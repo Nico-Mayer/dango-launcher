@@ -65,8 +65,8 @@
 
 ## 10. Window height
 
-- [ ] 10.1 Compute the launcher height in the renderer from row, heading, and tile heights, capped at 480, full height for empty, detail, and form views, and send it through `Shell::set_launcher_height`; verify a UI test with the recording shell for three results and for forty
-- [ ] 10.2 Windows: implement the resize with `SWP_NOMOVE` and centre with the maximum height in `position_on_active_display`; verify `cargo clippy -- -D warnings` passes on Windows
+- [x] 10.1 Compute the launcher height in the renderer from row, heading, and tile heights, capped at 480, full height for empty, detail, and form views, and send it through `Shell::set_launcher_height`; verify a UI test with the recording shell for three results and for forty
+- [x] 10.2 Windows: implement the resize with `SWP_NOMOVE` and centre with the maximum height in `position_on_active_display`; verify `cargo clippy -- -D warnings` passes on Windows
 - [ ] 10.3 macOS: implement the resize with `setFrame:display:` keeping the top edge, and centre with the maximum height; verify `cargo clippy -- -D warnings` passes on macOS
 - [ ] 10.4 Windows manual check: type so the result count changes on each key; the SearchBar does not move and nothing flickers
 - [ ] 10.5 macOS manual check: type so the result count changes on each key; the SearchBar does not move and nothing flickers
