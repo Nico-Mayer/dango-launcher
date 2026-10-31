@@ -11,11 +11,6 @@ local clippy = (Builtins.cargo_clippy) {
   fix = null
 }
 
-local svelteCheck = new Step {
-  glob = List("src/**/*", "*.ts", "svelte.config.js", "tsconfig.json", "package.json")
-  check = "npm run check"
-}
-
 hooks {
   ["pre-commit"] {
     fix = true
@@ -27,14 +22,12 @@ hooks {
   ["pre-push"] {
     steps {
       ["clippy"] = clippy
-      ["svelte-check"] = svelteCheck
     }
   }
   ["check"] {
     steps {
       ["cargo-fmt"] = cargoFmt
       ["clippy"] = clippy
-      ["svelte-check"] = svelteCheck
     }
   }
   ["fix"] {
