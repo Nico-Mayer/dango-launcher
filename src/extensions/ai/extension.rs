@@ -415,7 +415,6 @@ pub(crate) fn manifest(commands: &[AiCommand]) -> Manifest {
                 key: PREF_PROVIDER.into(),
                 kind: PreferenceKind::String,
                 default: None,
-                required: false,
                 description: "The provider a command uses when it names none.".into(),
                 values: vec![],
             },
@@ -424,7 +423,6 @@ pub(crate) fn manifest(commands: &[AiCommand]) -> Manifest {
                 key: PREF_THINKING.into(),
                 kind: PreferenceKind::String,
                 default: Some("off".into()),
-                required: false,
                 description: "How hard the model thinks when a command does not say.".into(),
                 values: Thinking::NAMES
                     .iter()

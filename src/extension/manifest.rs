@@ -50,7 +50,6 @@ pub struct PreferenceDecl {
     pub key: String,
     pub kind: PreferenceKind,
     pub default: Option<serde_json::Value>,
-    pub required: bool,
     /// One sentence for the user, shown wherever the preference is described.
     pub description: String,
     /// For a string preference that takes one of a fixed set, that set. Empty
@@ -130,20 +129,6 @@ impl CommandDecl {
 }
 
 impl PreferenceDecl {
-    /// The stored value if the user set one, otherwise the declared default.
-    pub fn effective<'a>(
-        &'a self,
-        stored: Option<&'a serde_json::Value>,
-    ) -> Option<&'a serde_json::Value> {
-        stored.or(self.default.as_ref())
-    }
-
-    /// A required preference with neither a stored value nor a default. A
-    /// command with one of these must prompt instead of running.
-    pub fn is_unsatisfied(&self, stored: Option<&serde_json::Value>) -> bool {
-        self.required && self.effective(stored).is_none()
-    }
-
     /// Whether a raw stored value is one this preference allows. Only a string
     /// preference with a declared set can refuse one.
     pub fn accepts(&self, raw: &str) -> bool {
@@ -226,13 +211,12 @@ mod tests {
         assert_eq!(command("open").qualified_id("apps"), "apps.open");
     }
 
-    fn preference(default: Option<serde_json::Value>, required: bool) -> PreferenceDecl {
+    fn preference() -> PreferenceDecl {
         PreferenceDecl {
             command_id: None,
             key: "token".into(),
             kind: PreferenceKind::String,
-            default,
-            required,
+            default: None,
             description: "A token.".into(),
             values: vec![],
         }
@@ -241,7 +225,7 @@ mod tests {
     #[test]
     fn a_preference_without_a_description_is_rejected() {
         let mut m = manifest(1, vec![command("a")]);
-        let mut pref = preference(None, false);
+        let mut pref = preference();
         pref.description = " ".into();
         m.preferences.push(pref);
         assert_eq!(
@@ -255,32 +239,12 @@ mod tests {
 
     #[test]
     fn a_declared_set_decides_what_is_accepted() {
-        let mut pref = preference(None, false);
+        let mut pref = preference();
         assert!(pref.accepts("anything"));
         pref.values = vec!["paste".into(), "copy".into()];
         assert!(pref.accepts("copy"));
         assert!(!pref.accepts("speak"));
         pref.kind = PreferenceKind::Number;
         assert!(pref.accepts("speak"), "only strings have a set");
-    }
-
-    #[test]
-    fn default_is_returned_when_no_value_is_stored() {
-        let pref = preference(Some(serde_json::json!("fallback")), false);
-        assert_eq!(pref.effective(None), Some(&serde_json::json!("fallback")));
-    }
-
-    #[test]
-    fn stored_value_overrides_the_default() {
-        let pref = preference(Some(serde_json::json!("fallback")), false);
-        let stored = serde_json::json!("set");
-        assert_eq!(pref.effective(Some(&stored)), Some(&stored));
-    }
-
-    #[test]
-    fn required_without_value_or_default_is_unsatisfied() {
-        let pref = preference(None, true);
-        assert!(pref.is_unsatisfied(None));
-        assert!(!pref.is_unsatisfied(Some(&serde_json::json!("set"))));
     }
 }

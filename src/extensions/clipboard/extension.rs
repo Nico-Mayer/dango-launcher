@@ -167,7 +167,6 @@ pub(crate) fn manifest() -> Manifest {
                 key: PREF_EXCLUDED.into(),
                 kind: PreferenceKind::String,
                 default: Some(DEFAULT_EXCLUDED_APPLICATIONS.join(", ").into()),
-                required: false,
                 description: "Applications whose copies are never recorded, comma separated."
                     .into(),
                 values: vec![],
@@ -177,7 +176,6 @@ pub(crate) fn manifest() -> Manifest {
                 key: PREF_PRIMARY_ACTION.into(),
                 kind: PreferenceKind::String,
                 default: Some("paste".into()),
-                required: false,
                 description:
                     "What Enter does to an entry: paste it into the previous app, or only copy it."
                         .into(),
@@ -195,7 +193,6 @@ fn number(key: &str, default: f64, description: &str) -> PreferenceDecl {
         key: key.into(),
         kind: PreferenceKind::Number,
         default: Some(default.into()),
-        required: false,
         description: description.into(),
         values: vec![],
     }

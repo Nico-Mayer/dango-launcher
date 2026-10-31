@@ -157,7 +157,6 @@ mod tests {
             key: key.into(),
             kind,
             default,
-            required: false,
             description: "A preference.".into(),
             values: vec![],
         }
