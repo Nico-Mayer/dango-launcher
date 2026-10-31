@@ -15,8 +15,9 @@ use notify::{RecursiveMode, Watcher};
 const DEBOUNCE: Duration = Duration::from_millis(150);
 
 /// Watches `path` and calls `apply` with the file's current text whenever it
-/// changes, other than the app's own writes; the caller parses. A missing file
-/// yields empty text, so deleting the file is a change to the empty state.
+/// changes, other than the app's own writes; the caller parses. A file still
+/// missing after the debounce yields empty text, so deleting the file is a
+/// change to the empty state. A read that fails otherwise is skipped.
 /// Returns whether the watch started; the watcher lives on its own thread for
 /// the life of the process.
 pub fn watch(
@@ -65,8 +66,14 @@ pub fn watch(
             while rx.try_recv().is_ok() {}
 
             // A missing file reads as empty, which parses to the defaults, so
-            // deleting the file returns everything to its defaults.
-            let text = std::fs::read_to_string(&path).unwrap_or_default();
+            // deleting the file returns everything to its defaults. Any other
+            // read error, such as a sharing violation while an editor or a sync
+            // tool holds the file, is skipped: the next event retries.
+            let text = match std::fs::read_to_string(&path) {
+                Ok(text) => text,
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => String::new(),
+                Err(_) => continue,
+            };
             {
                 let mut own = own_write.lock().unwrap();
                 if own.as_deref() == Some(text.as_str()) {
