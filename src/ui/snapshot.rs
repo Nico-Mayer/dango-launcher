@@ -72,6 +72,8 @@ snapshot_types! {
         pub selected: Option<String>,
         pub empty: Option<EmptyText>,
         pub busy: bool,
+        /// More results may still arrive for the query.
+        pub settling: bool,
     }
 
     /// A text field's value. The renderer writes `text` into the field only
@@ -352,13 +354,17 @@ impl Launcher {
             },
             sections,
             selected: self.root_selected().map(|item| item.id.clone()),
-            empty: (self.results.is_empty() && !self.query.is_empty()).then(|| EmptyText {
-                icon: Some(SEARCH_ICON.to_string()),
-                title: format!("No results for “{}”", self.query),
-                description: None,
-                truncate: true,
-            }),
+            // Said only once every provider has answered, so a slow one does
+            // not flash it up between keystrokes.
+            empty: (self.results.is_empty() && !self.query.is_empty() && self.results_complete)
+                .then(|| EmptyText {
+                    icon: Some(SEARCH_ICON.to_string()),
+                    title: format!("No results for “{}”", self.query),
+                    description: None,
+                    truncate: true,
+                }),
             busy: self.working.is_some(),
+            settling: !self.results_complete,
         }
     }
 

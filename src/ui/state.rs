@@ -20,6 +20,9 @@ pub struct Launcher {
     pub(super) query: String,
     pub(super) query_revision: u64,
     pub(super) results: Vec<ResultItem>,
+    /// Whether `results` is the last answer for `query`. Until it is, more
+    /// providers may still add rows.
+    pub(super) results_complete: bool,
     /// What the keyboard or a click last picked. Results arriving without it
     /// fall back to the first row instead of leaving nothing selected.
     picked: Option<String>,
@@ -230,10 +233,15 @@ impl Launcher {
 
     fn event(&mut self, event: Event, fx: &mut Vec<Effect>) {
         match event {
-            Event::Results { query, items } => {
+            Event::Results {
+                query,
+                items,
+                complete,
+            } => {
                 // A late answer for an older query was cancelled and must not show.
                 if query == self.query {
                     self.results = items;
+                    self.results_complete = complete;
                 }
             }
             Event::Rendered {
@@ -287,6 +295,7 @@ impl Launcher {
         self.query.clear();
         self.query_revision = self.next_revision();
         self.results.clear();
+        self.results_complete = false;
         self.picked = None;
         self.stack.clear();
         self.owner = None;
@@ -469,6 +478,7 @@ impl Launcher {
         match self.stack.last_mut() {
             None => {
                 self.query = text.clone();
+                self.results_complete = false;
                 self.picked = None;
                 self.clear_failure();
                 fx.push(Effect::Search(text));

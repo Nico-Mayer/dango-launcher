@@ -86,6 +86,7 @@ impl Harness {
         harness.event(Event::Results {
             query: String::new(),
             items,
+            complete: true,
         });
         harness
     }
@@ -595,6 +596,7 @@ mod root_search {
         h.event(Event::Results {
             query: "a".into(),
             items: results(2),
+            complete: true,
         });
         assert_eq!(h.query(), "ab");
     }
@@ -760,6 +762,7 @@ mod list_view {
         h.event(Event::Results {
             query: "zzz".into(),
             items: Vec::new(),
+            complete: true,
         });
         assert_eq!(h.shell().get_screen(), ScreenKind::Empty);
         assert!(h.find("No results for “zzz”").is_some());
@@ -1037,6 +1040,31 @@ mod window_height {
     fn forty_results_stop_at_the_maximum() {
         let h = Harness::root(results(40));
         assert_eq!(h.height(), 480.0);
+    }
+
+    #[test]
+    fn a_partial_answer_does_not_shrink_the_window() {
+        let h = Harness::root(results(5));
+        let full = h.height();
+        h.type_text("re");
+        h.event(Event::Results {
+            query: "re".into(),
+            items: results(2),
+            complete: false,
+        });
+        assert_eq!(h.height(), full);
+        h.event(Event::Results {
+            query: "re".into(),
+            items: results(8),
+            complete: false,
+        });
+        assert_eq!(h.height(), 56.0 + 6.0 + 8.0 * 40.0 + 6.0 + 40.0);
+        h.event(Event::Results {
+            query: "re".into(),
+            items: results(2),
+            complete: true,
+        });
+        assert_eq!(h.height(), 56.0 + 6.0 + 2.0 * 40.0 + 6.0 + 40.0);
     }
 
     #[test]

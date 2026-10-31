@@ -38,6 +38,7 @@ pub struct Renderer {
     focus: Option<Focus>,
     /// The activation probe still waiting for its frame.
     painting: Option<u64>,
+    height: f32,
 }
 
 impl Renderer {
@@ -56,6 +57,7 @@ impl Renderer {
             activation: 0,
             focus: None,
             painting: None,
+            height: height::MAX,
         }
     }
 
@@ -64,6 +66,20 @@ impl Renderer {
         self.last
             .as_ref()
             .is_some_and(|snapshot| keys::bound(&snapshot.bindings, chord, in_multiline))
+    }
+
+    /// How tall the window is for this snapshot. While root search is still
+    /// receiving results it grows but does not shrink, so a fast provider's
+    /// partial answer does not shrink the window just before the rest arrive.
+    fn height(&mut self, snapshot: &Snapshot) -> f32 {
+        let wanted = height::height(snapshot);
+        let settling = matches!(&snapshot.screen, Screen::Root(root) if root.settling);
+        self.height = if settling {
+            wanted.max(self.height)
+        } else {
+            wanted
+        };
+        self.height
     }
 
     /// The probe of an activation that has now been painted.
@@ -163,7 +179,7 @@ pub fn publish(
     ui: &LauncherWindow,
     snapshot: Snapshot,
 ) {
-    shell.set_launcher_height(height::height(&snapshot));
+    shell.set_launcher_height(renderer.height(&snapshot));
     renderer.render(ui, snapshot);
 }
 

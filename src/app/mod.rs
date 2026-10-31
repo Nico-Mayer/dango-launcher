@@ -261,6 +261,7 @@ impl Core {
                 core.apply(ui::Input::Event(ui::Event::Results {
                     query: results.query,
                     items,
+                    complete: results.complete,
                 }));
             }
         });

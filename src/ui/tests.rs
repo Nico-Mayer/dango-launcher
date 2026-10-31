@@ -170,6 +170,7 @@ impl Harness {
         self.event(Event::Results {
             query: query.into(),
             items,
+            complete: true,
         });
     }
 
@@ -374,6 +375,24 @@ fn root_without_groups_is_one_untitled_section() {
     let sections = h.root_screen().sections;
     assert_eq!(sections.len(), 1);
     assert_eq!(sections[0].heading, None);
+}
+
+#[test]
+fn nothing_found_waits_for_every_provider() {
+    let mut h = Harness::root(3);
+    h.typed("zzz");
+    h.event(Event::Results {
+        query: "zzz".into(),
+        items: Vec::new(),
+        complete: false,
+    });
+    let root = h.root_screen();
+    assert_eq!(root.empty, None);
+    assert!(root.settling);
+    h.results("zzz", Vec::new());
+    let root = h.root_screen();
+    assert!(root.empty.is_some());
+    assert!(!root.settling);
 }
 
 #[test]

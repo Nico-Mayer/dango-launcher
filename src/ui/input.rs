@@ -101,6 +101,8 @@ pub enum Event {
     Results {
         query: String,
         items: Vec<ResultItem>,
+        /// Every provider has answered, or been given up on, for this query.
+        complete: bool,
     },
     Rendered {
         owner: String,

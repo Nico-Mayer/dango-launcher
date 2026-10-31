@@ -9,7 +9,9 @@ Its height SHALL follow its content: a list or grid SHALL make the window as
 tall as the SearchBar, its rows, and the ActionBar, up to 480 logical pixels,
 and scroll beyond that. An empty view, a detail, and a form SHALL use the full
 480 logical pixels. A height change SHALL NOT flicker or show the window at an
-old and a new size in the same frame.
+old and a new size in the same frame. While root search is still receiving
+results for a query, the window SHALL grow with them but SHALL NOT shrink, and
+"No results" SHALL NOT show, until every provider has answered.
 
 #### Scenario: Window has no system chrome
 
@@ -37,6 +39,13 @@ old and a new size in the same frame.
 - **WHEN** a query leaves three results
 - **THEN** the window is as tall as the SearchBar, three rows, and the
   ActionBar
+
+#### Scenario: A partial answer does not shrink the window
+
+- **WHEN** the user types and a fast provider answers with two results before
+  the others answer
+- **THEN** the window keeps its height until every provider has answered, and
+  then fits the final results
 
 #### Scenario: Many results stop at the maximum
 
