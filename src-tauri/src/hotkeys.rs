@@ -7,7 +7,7 @@
 
 use std::fmt;
 
-use tauri_plugin_global_shortcut::Shortcut;
+use global_hotkey::hotkey::HotKey;
 
 use crate::config::Config;
 use crate::extensions::applications::IndexedApp;
@@ -30,7 +30,7 @@ impl fmt::Display for Target {
 }
 
 pub struct Binding {
-    pub chord: Shortcut,
+    pub chord: HotKey,
     pub target: Target,
 }
 
@@ -45,7 +45,7 @@ pub struct Bindings {
 /// commands before applications within an extension, makes first-wins
 /// deterministic: the first target to claim a chord keeps it, and later
 /// claims, or a claim on the launcher chord, are reported rather than applied.
-pub fn bindings(config: &Config, launcher: Shortcut) -> Bindings {
+pub fn bindings(config: &Config, launcher: HotKey) -> Bindings {
     let mut table = Table {
         launcher,
         hyper: config.hyper_modifiers(),
@@ -80,8 +80,8 @@ pub fn bindings(config: &Config, launcher: Shortcut) -> Bindings {
 }
 
 struct Table {
-    launcher: Shortcut,
-    hyper: tauri_plugin_global_shortcut::Modifiers,
+    launcher: HotKey,
+    hyper: global_hotkey::hotkey::Modifiers,
     bindings: Vec<Binding>,
     conflicts: Vec<String>,
 }
@@ -96,7 +96,7 @@ impl Table {
                 return;
             }
         };
-        let chord = Shortcut::new(Some(parsed.modifiers), parsed.code);
+        let chord = HotKey::new(Some(parsed.modifiers), parsed.code);
 
         if chord == self.launcher {
             self.conflicts.push(format!(
@@ -147,14 +147,14 @@ pub fn resolve_application(name: &str, matches: Vec<IndexedApp>) -> Resolution {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tauri_plugin_global_shortcut::{Code, Modifiers};
+    use global_hotkey::hotkey::{Code, Modifiers};
 
     fn config(json: &str) -> Config {
         Config::parse(json).unwrap()
     }
 
-    fn launcher() -> Shortcut {
-        Shortcut::new(Some(Modifiers::ALT), Code::Space)
+    fn launcher() -> HotKey {
+        HotKey::new(Some(Modifiers::ALT), Code::Space)
     }
 
     #[test]

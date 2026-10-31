@@ -6,9 +6,9 @@
 //! does not shift the binding. When a chord must differ per platform, a hotkey
 //! may be an object with `macos` and `windows` strings instead of a string.
 
+use global_hotkey::hotkey::{Code, Modifiers};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use tauri_plugin_global_shortcut::{Code, Modifiers};
 
 /// A hotkey: one chord that works on both platforms, such as `mod+shift+k`
 /// where `mod` is Cmd on macOS and Ctrl on Windows, or a chord per platform.

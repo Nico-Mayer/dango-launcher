@@ -12,10 +12,10 @@
 
 use std::collections::BTreeMap;
 
+use global_hotkey::hotkey::Modifiers;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
-use tauri_plugin_global_shortcut::Modifiers;
 
 pub mod hotkey;
 mod location;
