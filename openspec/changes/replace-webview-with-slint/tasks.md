@@ -4,7 +4,7 @@ leaves a runnable app.
 ## 1. Agent workflow first
 
 - [x] 1.1 Update `openspec/config.yaml` rules: design names the Slint widget per surface instead of the Bits UI primitive, tasks verify with `cargo test` (including the Slint testing backend) instead of `npm run test:browser`, manual checks run a debug build instead of `tauri dev`. Verify `openspec validate replace-webview-with-slint --strict` still passes.
-- [ ] 1.2 Install the Slint skill with `npx skills add slint-ui/ai-plugins --skill slint` and decline the repo star prompt. Verify `skills-lock.json` lists `slint` and `.claude/skills/slint` resolves.
+- [x] 1.2 Install the Slint skill with `npx skills add slint-ui/ai-plugins --skill slint` and decline the repo star prompt. Verify `skills-lock.json` lists `slint` and `.claude/skills/slint` resolves.
 - [x] 1.3 Add `.mcp.json` with `slint-docs` (`https://docs.slint.dev/mcp`) and `dango-ui` (`http://localhost:9315/mcp`). Verify `claude mcp list` shows both from the project.
 
 ## 2. Plugin types out of the core

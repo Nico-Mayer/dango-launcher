@@ -7,6 +7,12 @@
       "skillPath": "skills/rust-best-practices/SKILL.md",
       "computedHash": "0ac6606adb27e64a31bdc8c1ed34e446ae0c14bff1c7648867c46e106adc048f"
     },
+    "slint": {
+      "source": "slint-ui/ai-plugins",
+      "sourceType": "github",
+      "skillPath": "skills/slint/SKILL.md",
+      "computedHash": "a016cbdd1aaf29bbfd91a02c049fd8af5f6d774f0c501c473135940f319d9588"
+    },
     "svelte-code-writer": {
       "source": "sveltejs/ai-tools",
       "sourceType": "github",
