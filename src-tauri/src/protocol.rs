@@ -9,13 +9,9 @@ use serde::{Deserialize, Serialize};
 #[cfg(test)]
 use ts_rs::TS;
 
-/// Bumped when the protocol changes shape. The frontend refuses a tree whose
+/// Bumped when the protocol changes shape. Dango refuses a tree whose
 /// version it does not recognise.
 pub const PROTOCOL_VERSION: u32 = 1;
-
-/// Event carrying a full view tree from a command to the frontend. Updates are
-/// whole-tree replacements, never patches.
-pub const EVENT_RENDER: &str = "dango://render";
 
 macro_rules! protocol_types {
     ($($item:item)*) => {

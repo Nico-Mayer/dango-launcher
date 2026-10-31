@@ -54,13 +54,13 @@ test("BusyStatus: root pending uses footer, failure/reset stop work, searches in
   await expect(edge(page)).toHaveCount(1);
   expect(await viewport.boundingBox()).toEqual(before);
   await expect(page.getByRole("option")).toHaveCount(1);
-  await page.evaluate(() => window.dangoFixture.emit("dango://failed", "Couldn't paste. Try again."));
+  await page.evaluate(() => window.dangoFixture.fail("Couldn't paste. Try again."));
   await expect(status(page)).toBeEmpty();
   await expect(edge(page)).toHaveCount(0);
   await expect(page.getByText("Couldn't paste. Try again.")).toBeVisible();
   await page.keyboard.press("Enter");
   await expect(edge(page)).toHaveCount(1);
-  await page.evaluate(() => window.dangoFixture.emit("dango://reset"));
+  await page.evaluate(() => window.dangoFixture.reset());
   await expect(status(page)).toBeEmpty();
   await expect(edge(page)).toHaveCount(0);
   await page.getByRole("combobox").fill("Result");
@@ -149,7 +149,7 @@ for (const change of ["reduce", "hidden"] as const) {
     await expect(panel.locator("[data-command-root]")).toBeFocused();
     await page.keyboard.press("Escape");
     await expect(panel).toHaveCount(0);
-    await page.evaluate(() => window.dangoFixture.emit("dango://reset"));
+    await page.evaluate(() => window.dangoFixture.reset());
     await expect(edge(page)).toHaveCount(0);
     if (change === "reduce") await page.emulateMedia({ reducedMotion: "no-preference" });
     else await page.evaluate(() => {

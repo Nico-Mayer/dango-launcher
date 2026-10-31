@@ -10,9 +10,18 @@ export default defineConfig({
     trace: "retain-on-failure",
   },
   projects: [{ name: "chromium", use: { browserName: "chromium" } }],
-  webServer: {
-    command: "npm run dev -- --port 1422",
-    url: "http://127.0.0.1:1422/tests/fixtures/",
-    reuseExistingServer: false,
-  },
+  webServer: [
+    {
+      command: "cargo run --quiet --manifest-path src-tauri/Cargo.toml --example ui_fixture -- 1423",
+      url: "http://127.0.0.1:1423/health",
+      reuseExistingServer: false,
+      // The first run compiles the app crate.
+      timeout: 600_000,
+    },
+    {
+      command: "npm run dev -- --port 1422",
+      url: "http://127.0.0.1:1422/tests/fixtures/",
+      reuseExistingServer: false,
+    },
+  ],
 });

@@ -20,7 +20,10 @@ for (const { scene, chord, reducedMotion } of flows) {
       const origin = scene === "form" ? page.getByLabel("Password", { exact: true }) : scene === "detail" ? page.getByText("Working…", { exact: true }) : page.getByRole("combobox");
       if (scene === "form") await origin.focus();
       else await expect(origin).toBeFocused();
-      if (["root", "list"].includes(scene)) await page.keyboard.press("ArrowDown");
+      if (["root", "list"].includes(scene)) {
+        await page.keyboard.press("ArrowDown");
+        await expect(page.locator("main [data-command-item][data-selected]")).toHaveAttribute("data-value", "result-2");
+      }
       const parentValue = ["root", "list"].includes(scene) ? await page.locator("main [data-command-item][data-selected]").getAttribute("data-value") : null;
       await page.keyboard.press(chord);
       const scope = panel(page).locator("[data-command-root]");
@@ -138,12 +141,13 @@ for (const scene of ["root", "form"]) {
       await page.goto(`/tests/fixtures/?scene=${scene}`);
       await expect(page.getByRole("button", { name: "Actions", exact: true })).toBeEnabled();
       await page.keyboard.press("Control+k");
+      await expect(panel(page).locator("[data-command-root]")).toBeFocused();
       await page.keyboard.down(key);
       await page.keyboard.down(key);
       await page.keyboard.down(key);
       await page.keyboard.up(key);
       await expect(panel(page)).toHaveCount(0);
-      expect(await calls(page)).toHaveLength(key === "Enter" ? 1 : 0);
+      await expect.poll(() => calls(page)).toHaveLength(key === "Enter" ? 1 : 0);
       expect(await calls(page, "dismiss")).toHaveLength(0);
       expect(await calls(page, "cancel_invocation")).toHaveLength(0);
       await page.keyboard.press("Control+k");

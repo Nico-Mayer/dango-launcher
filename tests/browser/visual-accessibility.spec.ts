@@ -176,7 +176,7 @@ for (const palette of ["dark", "light"]) {
     await expect(panel.locator("[data-selected]")).toHaveCSS("background-color", "rgb(41, 81, 121)");
     await page.keyboard.press("Escape");
     await expect(panel).toHaveCount(0);
-    await page.evaluate(() => window.dangoFixture.emit("dango://failed", "Couldn't paste. Try again."));
+    await page.evaluate(() => window.dangoFixture.fail("Couldn't paste. Try again."));
     await expect(page.getByText("Couldn't paste. Try again.")).toHaveCSS("color", "rgb(241, 141, 151)");
     await expect(page.getByRole("status")).toHaveCSS("color", "rgb(201, 202, 203)");
   });

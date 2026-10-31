@@ -57,7 +57,7 @@ spend design on honouring old values.
 - Rust + Tauri v2 for the shell, all OS integration, and all business logic.
   Prefer official Tauri v2 plugins over hand-rolled equivalents.
 - Svelte 5 (runes) + TypeScript on plain Vite, not SvelteKit. The frontend is a
-  renderer, not a place for logic.
+  renderer of the launcher snapshot, not a place for logic.
 - Bits UI for interactive components, Tailwind v4 for styling, with the token
   set in `src/app.css`. The root search is the Bits UI `Command` primitive with
   its filtering disabled, since ranking happens in Rust.
@@ -88,6 +88,14 @@ extension. Built-in features are extensions too. The contract is in
   sandboxed host. Do not route built-ins through the sandbox.
 - The manifest and the view protocol are versioned contracts. A change that
   touches them says so in its design.
+- The launcher's interaction state lives in one Rust state machine,
+  `src-tauri/src/ui/`: query, selection, the view stack, the action panel,
+  Escape stages, and what each key does. It is a pure reducer, tested with
+  `cargo test` and no window. The renderer sends intents through one
+  `dispatch` command and draws the full snapshot from one `dango://state`
+  event. No interaction rule lives in a renderer. Keys reach the state machine
+  only through the snapshot's `bindings`, and a renderer keeps only hover,
+  focus placement, scroll-into-view, and exit transitions.
 - Secrets live only in `auth.json` (see `openspec/specs/ai-providers`). The read
   sits behind one function, so the `keyring` crate can take it over later.
 
@@ -185,6 +193,14 @@ load and are not reliable.
   command it panics with no reactor. Release sets `panic = "abort"` and a
   `windows_subsystem = "windows"` build has no stderr, so this shows only as a
   silent crash (`0xC0000409`) in a release run.
+- `dispatch` is a sync Tauri command on purpose. Sync commands run on the main
+  thread in the order they were sent, and each search cancels the one before
+  it, so two keystrokes must not swap places. It enters the tokio runtime
+  explicitly before running effects that spawn.
+- Browser tests need the fixture server, a cargo example
+  (`src-tauri/examples/ui_fixture.rs`) that runs the real state machine.
+  Playwright starts it, and its first run compiles the app crate. A key press
+  is a round trip there, so a test waits with `expect` before reading state.
 - Serving cached files to the webview needs the `protocol-asset` Tauri
   feature, `assetProtocol.enable` in `tauri.conf.json`, an `img-src` allowing
   `asset:` and `http://asset.localhost`, and a runtime

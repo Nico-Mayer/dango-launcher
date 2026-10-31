@@ -1,13 +1,26 @@
 # Browser fixtures
 
-Run `npm run dev`, then open `http://127.0.0.1:1420/tests/fixtures/?scene=root`.
+Run the fixture server and Vite, then open
+`http://127.0.0.1:1420/tests/fixtures/?scene=root`:
+
+```sh
+cargo run --manifest-path src-tauri/Cargo.toml --example ui_fixture
+npm run dev
+```
+
 Scenes: `root`, `list`, `empty-list`, `loading-list`, `refreshing-list`, `detail`,
 `form`, `template`, `failure`, `long-actions`.
 
 Fixtures mount the real App with the official Tauri `mockIPC` event implementation.
-Commands are recorded, never sent to Rust. Unknown commands fail rather than reaching
-native APIs. Template inspection returns fixed sample data; it does not implement the
-backend template engine. All displayed data, including the password value, is synthetic.
+The mocked `dispatch` command posts each intent to the fixture server
+(`src-tauri/examples/ui_fixture.rs`, port 1423), which runs the real launcher state
+machine, one per page. The fixture emits the snapshot it answers with as
+`dango://state` and plays the backend for the effects: search answers from fixture
+data, template inspection returns fixed sample data. Every effect is recorded in
+`calls` under the name of the shell command it stands for (`search`, `run_action`,
+`dismiss`, `cancel_invocation`, `invoke_command`, `inspect_template`,
+`warmup_done`). Any other mocked command fails rather than reaching native APIs. All
+displayed data, including the password value, is synthetic.
 
 Browser console controls:
 
@@ -15,15 +28,20 @@ Browser console controls:
 await dangoFixture.show("detail");
 dangoFixture.stream(); // 30 full-tree replacements, then loading ends
 await dangoFixture.show("long-actions"); // Ctrl+K or Cmd+K opens actions
-await dangoFixture.emit("dango://failed", "Couldn't paste. Try again.");
-await dangoFixture.emit("dango://reset");
+await dangoFixture.fail("Couldn't paste. Try again.");
+await dangoFixture.reset();
+await dangoFixture.activate(); // activate again after a reset
 await dangoFixture.reactivate(); // activate again with held state, no reset
+await dangoFixture.settled(); // every queued input and its effects have landed
 dangoFixture.calls;
 ```
 
-`replace(tree)` sends another tree for the current invocation; `results(query, items,
-complete)` delivers root results, including deliberately stale/delayed results. Streaming
+`replace(tree)` sends another tree for the current invocation; `results(query, items)`
+delivers root results, including deliberately stale/delayed results. Streaming
 stops on cancellation, dismissal, scene changes, completion, or page exit.
+
+Each key press now makes a round trip to the state machine before the selection
+moves, so a test that reads state right after a key waits for it with `expect`.
 
 Append `&dev=1` to a scene URL to mount the launcher as a development build: the
 frame edge turns amber and the footer shows a `dev` badge. Without it the fixture
@@ -54,7 +72,8 @@ npm run check
 npm run build
 ```
 
-Playwright starts its own Vite server on port 1422. Tests use isolated contexts at
+Playwright starts its own fixture server on port 1423 and Vite server on port 1422.
+The first run compiles the app crate. Tests use isolated contexts at
 720×400 CSS pixels. Runtime screenshots/traces go to ignored `test-results/`.
 Fixture smoke tests capture screenshots without asserting pixel equality, so later
 intentional visual changes do not require overwriting the original evidence.

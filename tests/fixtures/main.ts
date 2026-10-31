@@ -1,11 +1,11 @@
 import { mount, tick, unmount } from "svelte";
 import { emit } from "@tauri-apps/api/event";
 import { mockConvertFileSrc, mockIPC } from "@tauri-apps/api/mocks";
-import type { InvokeArgs } from "@tauri-apps/api/core";
 import App from "../../src/App.svelte";
 import "../../src/app.css";
-import type { ResultItem } from "../../src/lib/types";
-import type { TemplateInspection } from "../../src/protocol/TemplateInspection";
+import type { Intent } from "../../src/protocol/Intent";
+import type { ResultItem } from "../../src/protocol/ResultItem";
+import type { Snapshot } from "../../src/protocol/Snapshot";
 import type { ViewTree } from "../../src/protocol/ViewTree";
 import { fixtureNames, longActions, rootItems, treeFor, type FixtureName } from "./data";
 
@@ -13,76 +13,124 @@ if (!import.meta.env.DEV) throw new Error("Browser fixtures are development-only
 
 mockConvertFileSrc("windows");
 
-const calls: { command: string; args?: InvokeArgs }[] = [];
+/// The launcher state machine, served by `src-tauri/examples/ui_fixture.rs`.
+const server = "http://127.0.0.1:1423";
+const session = crypto.randomUUID();
+const development = new URLSearchParams(location.search).get("dev") === "1";
+
+type TemplateInspection = { arguments: string[]; error: string | null };
+type Call = { command: string; args: Record<string, unknown> | null };
+type BackendEvent =
+  | { kind: "results"; query: string; items: ResultItem[] }
+  | { kind: "rendered"; owner: string; invocation: number; tree: ViewTree }
+  | { kind: "failed"; message: string }
+  | { kind: "templateInspected"; field: string; source: string; inspection: TemplateInspection }
+  | { kind: "activated"; held: boolean }
+  | { kind: "reset" };
+
+const calls: Call[] = [];
 let current: FixtureName = "root";
 let invocation = 0;
 let streamTimer: ReturnType<typeof setInterval> | undefined;
 let templateInspection: TemplateInspection = { arguments: ["name"], error: null };
+let queue: Promise<void> = Promise.resolve();
 
 function stopStream() {
   clearInterval(streamTimer);
   streamTimer = undefined;
 }
 
-async function results(query: string, items: ResultItem[], complete = true) {
-  await emit("dango://results", { query, items, complete });
-  await tick();
+/// One input at a time, in order, as the app's sync `dispatch` runs them.
+function send(input: { type: "intent"; intent: Intent } | { type: "event"; event: BackendEvent }) {
+  const next = queue.then(async () => {
+    const response = await fetch(`${server}/apply`, {
+      method: "POST",
+      body: JSON.stringify({ session, development, input }),
+    });
+    if (!response.ok) throw new Error(`Fixture server: ${await response.text()}`);
+    const answer = (await response.json()) as { snapshot: Snapshot; calls: Call[] };
+    await emit("dango://state", answer.snapshot);
+    await tick();
+    answer.calls.forEach(play);
+  });
+  queue = next.catch((error) => console.error(error));
+  return next;
 }
 
-async function replace(tree: ViewTree) {
-  await emit("dango://render", { owner: "fixture", invocation, tree });
-  await tick();
-}
-
-mockIPC((command, args) => {
-  calls.push({ command, args });
-  const payload = args as Record<string, unknown> | undefined;
-  switch (command) {
+/// The fixture's stand-in for the shell: what search and template inspection
+/// would answer, from fixture data.
+function play(call: Call) {
+  calls.push(call);
+  const args = call.args ?? {};
+  switch (call.command) {
     case "search": {
-      const query = String(payload?.query ?? "");
+      const query = String(args.query ?? "");
       const items = current === "long-actions"
         ? rootItems.map((item) => ({ ...item, actions: longActions }))
         : rootItems;
-      // Events arrive after App registers its listeners, as native IPC does.
-      setTimeout(() => void results(query, items.filter((item) =>
-        item.title.toLowerCase().includes(query.toLowerCase()))), 0);
+      void results(query, items.filter((item) => item.title.toLowerCase().includes(query.toLowerCase())));
       return;
     }
-    case "run_action":
-      return { kind: "done" };
     case "inspect_template":
-      return templateInspection;
+      void event({ kind: "templateInspected", field: String(args.field), source: String(args.source), inspection: templateInspection });
+      return;
     case "dismiss":
     case "cancel_invocation":
       stopStream();
-      return;
-    case "is_development_build":
-      return new URLSearchParams(location.search).get("dev") === "1";
-    case "warmup_done":
-    case "report_paint":
-    case "invoke_command":
-      return;
-    default:
-      throw new Error(`Unstubbed fixture command: ${command}`);
   }
+}
+
+const event = (backend: BackendEvent) => send({ type: "event", event: backend });
+
+/// Resolves once every queued input, and whatever it set off, has landed.
+async function settled() {
+  let seen: Promise<void> | undefined;
+  while (seen !== queue) {
+    seen = queue;
+    await seen;
+  }
+}
+
+mockIPC((command, args) => {
+  if (command === "dispatch") return send({ type: "intent", intent: (args as { intent: Intent }).intent });
+  throw new Error(`Unstubbed fixture command: ${command}`);
 }, { shouldMockEvents: true });
+
+async function results(query: string, items: ResultItem[]) {
+  await event({ kind: "results", query, items });
+}
+
+async function replace(tree: ViewTree) {
+  await event({ kind: "rendered", owner: "fixture", invocation, tree });
+}
+
+async function fail(message: string) {
+  await event({ kind: "failed", message });
+}
+
+async function reset() {
+  await event({ kind: "reset" });
+}
+
+async function activate(held = false) {
+  await event({ kind: "activated", held });
+}
 
 async function show(name: FixtureName) {
   stopStream();
   current = name;
-  await emit("dango://reset");
-  await tick();
+  await reset();
   invocation += 1;
   const tree = treeFor(name);
   if (tree) await replace(tree);
-  if (name === "failure") await emit("dango://failed", "Couldn't paste. Try again.");
-  await emit("dango://activate", { probe: null, held: false });
-  await tick();
+  if (name === "failure") await fail("Couldn't paste. Try again.");
+  await activate();
+  await settled();
 }
 
 async function reactivate() {
-  await emit("dango://activate", { probe: null, held: true });
-  await tick();
+  await activate(true);
+  await settled();
 }
 
 function stream(chunks = 30, interval = 1000 / 30) {
@@ -101,7 +149,7 @@ function stream(chunks = 30, interval = 1000 / 30) {
   }, interval);
 }
 
-function setTemplateInspection(result: typeof templateInspection) {
+function setTemplateInspection(result: TemplateInspection) {
   templateInspection = result;
 }
 
@@ -110,7 +158,10 @@ async function destroy() {
   await unmount(app);
 }
 
-export const fixture = { destroy, calls, show, reactivate, results, replace, stream, stopStream, emit, setTemplateInspection };
+export const fixture = {
+  destroy, calls, show, reactivate, results, replace, fail, reset, activate, settled, stream, stopStream,
+  setTemplateInspection,
+};
 declare global {
   interface Window { dangoFixture: typeof fixture }
 }

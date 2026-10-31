@@ -1,6 +1,6 @@
 import type { Action } from "../../src/protocol/Action";
 import type { ViewTree } from "../../src/protocol/ViewTree";
-import type { ResultItem } from "../../src/lib/types";
+import type { ResultItem } from "../../src/protocol/ResultItem";
 
 export const actions: Action[] = [
   { id: "open", title: "Open", shortcut: null },

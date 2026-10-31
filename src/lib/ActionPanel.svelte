@@ -2,60 +2,53 @@
   import { Command, Popover } from "bits-ui";
   import { onMount } from "svelte";
   import Shortcut from "./ui/Shortcut.svelte";
-  import { inUserGesture, pointerActive } from "./input.svelte";
+  import { pointerActive } from "./input.svelte";
+  import { dispatch } from "./launcher.svelte";
   import { modKey, shortcutLabel } from "./platform";
-  import type { ActionDto } from "./types";
+  import type { Panel } from "../protocol/Panel";
 
-  let { actions, open = $bindable(false), present = $bindable(false), returnFocus, onrun }: {
-    actions: ActionDto[];
-    open?: boolean;
+  let { panel, present = $bindable(false), returnFocus }: {
+    panel: Panel;
     present?: boolean;
     returnFocus: () => HTMLElement | null;
-    onrun: (id: string) => void;
   } = $props();
 
   const uid = $props.id();
-  let selected = $state("");
-  const selectedId = $derived(open ? (actions.some(action => action.id === selected) ? selected : (actions[0]?.id ?? "")) : "");
+  const open = $derived(panel.open);
   let commandEl = $state<HTMLDivElement | null>(null);
   let contentEl = $state<HTMLDivElement | null>(null);
   let triggerEl = $state<HTMLButtonElement | null>(null);
   let origin: HTMLElement | null = null;
   let closingKey: string | null = null;
-  let pressedKey: string | null = null;
   const optionId = (id: string) => `${uid}-action-${encodeURIComponent(id)}`;
 
-  function changeOpen(value: boolean) {
-    if (value) {
-      origin = returnFocus();
-      selected = actions[0]?.id ?? "";
-      present = true;
-    }
-    open = value;
-  }
-
-  function run(id: string) {
-    if (!open) return;
-    closingKey = pressedKey;
-    open = false;
-    onrun(id);
-  }
-
   $effect(() => {
-    if (open && actions.length === 0) open = false;
+    if (panel.selected) document.getElementById(optionId(panel.selected))?.scrollIntoView({ block: "nearest" });
   });
 
+  function changeOpen(value: boolean) {
+    if (value === open) return;
+    if (value) {
+      origin = returnFocus();
+      present = true;
+      dispatch({ kind: "togglePanel" });
+    } else {
+      dispatch({ kind: "closePanel" });
+    }
+  }
+
+  // The exit guard: input crossing the closing boundary must not reach the
+  // parent while the panel is still on screen, nor may a held closing key.
   onMount(() => {
     function keydown(event: KeyboardEvent) {
-      pressedKey = event.key;
-      // Bits owns navigation; only block input crossing the closing boundary.
       if ((!open && present) || (event.repeat && event.key === closingKey)) {
         event.preventDefault();
         event.stopImmediatePropagation();
+        return;
       }
+      if (open && (event.key === "Enter" || event.key === "Escape")) closingKey = event.key;
     }
     function keyup(event: KeyboardEvent) {
-      if (event.key === pressedKey) pressedKey = null;
       if (event.key === closingKey) closingKey = null;
     }
     let outsidePress = false;
@@ -92,13 +85,11 @@
 <Popover.Root bind:open={() => open, changeOpen} onOpenChangeComplete={(value) => { if (!value) present = false; }}>
   <Popover.Trigger
     bind:ref={triggerEl}
-    disabled={actions.length === 0}
+    data-native-keys
+    disabled={panel.actions.length === 0}
     aria-label="Actions"
     class="dango-button flex shrink-0 items-center gap-1.5 rounded-button text-xs focus-visible:outline-control-focus disabled:text-text-disabled"
     onmousedown={(event) => event.preventDefault()}
-    onkeydown={(event) => {
-      if (event.key === "Enter" || event.key === " ") event.stopPropagation();
-    }}
   >
     Actions <Shortcut>{modKey} K</Shortcut>
   </Popover.Trigger>
@@ -110,7 +101,6 @@
       onOpenAutoFocus={(event) => {
         event.preventDefault();
         origin ??= returnFocus();
-        selected = actions[0]?.id ?? "";
         present = true;
         commandEl?.focus();
       }}
@@ -119,27 +109,22 @@
         (origin?.isConnected ? origin : returnFocus())?.focus();
         origin = null;
       }}
-      onEscapeKeydown={(event) => {
-        closingKey = event.key;
-      }}
-      onkeydown={(event) => { if (event.key !== "Escape") event.stopPropagation(); }}
     >
       <Command.Root
         data-pointer={pointerActive() ? "" : undefined}
-        bind:ref={commandEl} bind:value={() => selectedId, () => {}}
-        onValueChange={(id) => { if (inUserGesture()) selected = id; }}
+        bind:ref={commandEl} bind:value={() => panel.selected ?? "", () => {}}
         label="Actions" aria-label="Actions"
-        aria-activedescendant={selectedId ? optionId(selectedId) : undefined}
+        aria-activedescendant={panel.selected ? optionId(panel.selected) : undefined}
         aria-controls={`${uid}-list`}
         shouldFilter={false} disablePointerSelection vimBindings={false} loop={false}
         class="outline-none"
       >
         <Command.List id={`${uid}-list`} aria-label="Actions" class="action-list overflow-y-auto">
           <Command.Viewport>
-            {#each actions as action (action.id)}
+            {#each panel.actions as action (action.id)}
               <Command.Item
                 id={optionId(action.id)} value={action.id} disabled={!open}
-                onSelect={() => run(action.id)}
+                onSelect={() => open && dispatch({ kind: "activate", id: action.id })}
                 onmousedown={(event) => event.preventDefault()}
                 class="flex cursor-default items-center justify-between gap-3 px-3 py-2 text-sm text-foreground-alt data-selected:bg-selection-bg data-selected:text-selection-text data-selected:inset-shadow-selection [&:not([data-selected]):hover]:[[data-pointer]_&]:bg-hover-bg"
               >

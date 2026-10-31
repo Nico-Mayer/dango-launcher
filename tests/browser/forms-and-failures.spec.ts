@@ -41,10 +41,10 @@ for (const order of ["before-reset", "after-reset"]) {
       await page.goto("/tests/fixtures/");
       await expect(page.getByRole("option")).toHaveCount(18);
       await page.evaluate(async (order) => {
-        if (order === "before-reset") await window.dangoFixture.emit("dango://failed", "Couldn't paste. Try again.");
-        await window.dangoFixture.emit("dango://reset");
-        if (order === "after-reset") await window.dangoFixture.emit("dango://failed", "Couldn't paste. Try again.");
-        await window.dangoFixture.emit("dango://activate", { probe: null, held: false });
+        if (order === "before-reset") await window.dangoFixture.fail("Couldn't paste. Try again.");
+        await window.dangoFixture.reset();
+        if (order === "after-reset") await window.dangoFixture.fail("Couldn't paste. Try again.");
+        await window.dangoFixture.activate();
       }, order);
       const failure = page.getByText("Couldn't paste. Try again.");
       await expect(failure).toBeVisible();

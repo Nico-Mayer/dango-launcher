@@ -78,7 +78,7 @@ for (const scene of ["root", "list"]) {
     if (scene === "root") {
       await page.evaluate(async (items) => {
         await new Promise((resolve) => setTimeout(resolve, 50));
-        await window.dangoFixture.results("", items, false);
+        await window.dangoFixture.results("", items);
       }, reordered);
     } else {
       const tree = structuredClone(listTree);

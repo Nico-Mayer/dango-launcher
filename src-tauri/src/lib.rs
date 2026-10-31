@@ -49,44 +49,21 @@ use text::TextExchange;
 /// The most results streamed to the frontend for one query.
 const RESULT_LIMIT: usize = 50;
 
-/// Event carrying a streamed search snapshot to the frontend.
-const EVENT_RESULTS: &str = "dango://results";
+/// Event carrying the launcher's full UI state to the renderer.
+const EVENT_STATE: &str = "dango://state";
 
-/// Event carrying the message from a command that failed. Success needs no
-/// event: the launcher simply gets out of the way.
-const EVENT_FAILED: &str = "dango://failed";
-
-#[cfg_attr(test, derive(ts_rs::TS))]
-#[cfg_attr(test, ts(export, export_to = "../../src/protocol/"))]
-#[derive(Clone, serde::Serialize)]
-#[serde(rename_all = "camelCase")]
-struct ResultItem {
-    extension_id: String,
-    id: String,
-    title: String,
-    subtitle: Option<String>,
-    icon: Option<String>,
-    tint: Option<String>,
-    actions: Vec<protocol::Action>,
-    match_positions: Vec<usize>,
-    suggested: bool,
-    pinned: bool,
-}
-
-impl ResultItem {
-    fn new(c: Candidate, tints: &TintTable) -> Self {
-        Self {
-            tint: tints.0.get(&c.extension_id).cloned(),
-            extension_id: c.extension_id,
-            id: c.id,
-            title: c.title,
-            subtitle: c.subtitle,
-            icon: c.icon,
-            actions: c.actions,
-            match_positions: c.match_positions,
-            suggested: c.suggested,
-            pinned: c.pinned,
-        }
+fn result_item(c: Candidate, tints: &TintTable) -> ui::ResultItem {
+    ui::ResultItem {
+        tint: tints.0.get(&c.extension_id).cloned(),
+        extension_id: c.extension_id,
+        id: c.id,
+        title: c.title,
+        subtitle: c.subtitle,
+        icon: c.icon,
+        actions: c.actions,
+        match_positions: c.match_positions,
+        suggested: c.suggested,
+        pinned: c.pinned,
     }
 }
 
@@ -95,56 +72,12 @@ impl ResultItem {
 /// path that streams results.
 struct TintTable(std::collections::HashMap<String, String>);
 
-#[cfg_attr(test, derive(ts_rs::TS))]
-#[cfg_attr(test, ts(export, export_to = "../../src/protocol/"))]
-#[derive(Clone, serde::Serialize)]
-#[serde(rename_all = "camelCase")]
-struct ResultsPayload {
-    query: String,
-    items: Vec<ResultItem>,
-    complete: bool,
-}
+/// The launcher's interaction state and the snapshot the renderer last got.
+struct Ui(Mutex<UiState>);
 
-/// A view tree with the extension whose command produced it. The frontend needs
-/// the owner to send an action back, and a command started from its own hotkey
-/// never goes through `invoke_command`, so the tree has to carry it.
-///
-/// `invocation` says which run produced the tree. A streaming command emits
-/// many, and they replace one another rather than stacking up, which is what
-/// tells the launcher the difference between the next frame of this answer and
-/// a new view.
-#[cfg_attr(test, derive(ts_rs::TS))]
-#[cfg_attr(test, ts(export, export_to = "../../src/protocol/"))]
-#[derive(Clone, serde::Serialize)]
-#[serde(rename_all = "camelCase")]
-struct RenderPayload {
-    owner: String,
-    #[cfg_attr(test, ts(type = "number"))]
-    invocation: u64,
-    tree: protocol::ViewTree,
-}
-
-#[cfg_attr(test, derive(ts_rs::TS))]
-#[cfg_attr(test, ts(export, export_to = "../../src/protocol/"))]
-#[derive(serde::Serialize)]
-#[serde(tag = "kind", rename_all = "camelCase")]
-enum ActionResponse {
-    Done,
-    /// The action started work that reports through the render channel. The
-    /// launcher leaves the view it is showing alone and waits.
-    Started,
-    Copy {
-        text: String,
-    },
-    Replaced {
-        tree: protocol::ViewTree,
-    },
-    Removed {
-        tree: protocol::ViewTree,
-    },
-    Failed {
-        message: String,
-    },
+struct UiState {
+    launcher: ui::Launcher,
+    shown: Option<ui::Snapshot>,
 }
 
 /// Hops a closure onto the main thread and waits for it.
@@ -233,15 +166,6 @@ enum HideReason {
 
 const DEFAULT_RESET_AFTER_SECS: u32 = 60;
 
-#[cfg_attr(test, derive(ts_rs::TS))]
-#[cfg_attr(test, ts(export, export_to = "../../src/protocol/"))]
-#[derive(Clone, serde::Serialize)]
-struct ActivatePayload {
-    #[cfg_attr(test, ts(type = "number | null"))]
-    probe: Option<u64>,
-    held: bool,
-}
-
 fn reset_after(app: &tauri::AppHandle) -> Duration {
     let seconds = app
         .try_state::<Arc<config::FileConfig>>()
@@ -286,7 +210,7 @@ fn start_hold(app: &tauri::AppHandle, period: Duration) {
             hold.take();
         }
         abandon_running_command(&handle);
-        let _ = handle.emit_to("main", "dango://reset", ());
+        apply(&handle, ui::Input::Event(ui::Event::Reset));
     });
     *hold = Some(Hold { generation, expiry });
 }
@@ -310,7 +234,7 @@ fn settle_hide(app: &tauri::AppHandle, reason: HideReason) {
             clear_hold(app);
         }
     }
-    let _ = app.emit_to("main", "dango://reset", ());
+    apply(app, ui::Input::Event(ui::Event::Reset));
 }
 
 /// Runs window work on the main thread, inline when already there.
@@ -342,11 +266,14 @@ fn show(app: &tauri::AppHandle, probe_id: Option<u64>) {
         let mut launcher = state.launcher.lock().unwrap();
         launcher.position_on_active_display(&window);
         launcher.show(&window);
-        let payload = ActivatePayload {
-            probe: probe_id,
-            held,
-        };
-        let _ = app.emit_to("main", "dango://activate", payload);
+        drop(launcher);
+        apply(
+            app,
+            ui::Input::Event(ui::Event::Activated {
+                held,
+                probe: probe_id,
+            }),
+        );
     });
 }
 
@@ -400,167 +327,159 @@ fn toggle(app: &tauri::AppHandle) {
     });
 }
 
+/// Everything the renderer does arrives here. Sync on purpose: Tauri runs sync
+/// commands on the main thread in the order they were sent, and a search
+/// cancels the one before it, so two keystrokes must not swap places.
 #[tauri::command]
-fn report_paint(app: tauri::AppHandle, id: u64) {
-    app.state::<LatencyProbe>().finish(id);
-}
-
-#[tauri::command]
-fn dismiss(app: tauri::AppHandle) {
-    on_main_thread(&app, |app| {
-        if hide(app) {
-            app.state::<LatencyProbe>().note("dismissed by frontend");
+fn dispatch(app: tauri::AppHandle, intent: ui::Intent) {
+    if intent == ui::Intent::Ready {
+        // A reloaded renderer has none of what was already sent.
+        if let Some(ui) = app.try_state::<Ui>() {
+            ui.0.lock().unwrap().shown = None;
         }
-    });
+    }
+    apply(&app, ui::Input::Intent(intent));
 }
 
-/// Stops whatever the launcher started. Hiding already does this; this is for
-/// leaving a view while its work is still running, where the launcher stays
-/// open and the work is no longer wanted.
-#[tauri::command]
-fn cancel_invocation(app: tauri::AppHandle) {
-    abandon_running_command(&app);
+/// Feeds the launcher state machine, sends the renderer the new snapshot, and
+/// runs what the state machine asked for. The snapshot goes out under the lock,
+/// so snapshots reach the renderer in the order they were made.
+fn apply(app: &tauri::AppHandle, input: ui::Input) {
+    let Some(ui) = app.try_state::<Ui>() else {
+        return;
+    };
+    let effects = {
+        let mut state = ui.0.lock().unwrap();
+        let effects = state.launcher.apply(input);
+        let snapshot = state.launcher.snapshot();
+        if state.shown.as_ref() != Some(&snapshot) {
+            let _ = app.emit_to("main", EVENT_STATE, &snapshot);
+            state.shown = Some(snapshot);
+        }
+        effects
+    };
+    // `apply` also runs on the main thread and in the hold timer, where there
+    // is no runtime context for the effects to spawn into.
+    let _runtime = tauri::async_runtime::handle().inner().enter();
+    for effect in effects {
+        run_effect(app, effect);
+    }
 }
 
-/// Runs a query and streams merged snapshots to the frontend as providers
-/// answer. Async so it executes on Tauri's tokio runtime, where the pipeline
-/// can spawn its per-query task. Returns at once; results arrive on the event.
-#[tauri::command]
-async fn search(app: tauri::AppHandle, query: String) {
+fn run_effect(app: &tauri::AppHandle, effect: ui::Effect) {
+    match effect {
+        ui::Effect::Search(query) => search(app, query),
+        ui::Effect::RunAction(request) => {
+            let app = app.clone();
+            tauri::async_runtime::spawn_blocking(move || {
+                let outcome = run_action(&app, &request);
+                apply(
+                    &app,
+                    ui::Input::Event(ui::Event::ActionFinished { request, outcome }),
+                );
+            });
+        }
+        ui::Effect::InvokeCommand { command_id, query } => match run_command(app, &command_id) {
+            Ok(()) => record_use(app, &command_id, Some(&query)),
+            Err(error) => apply(app, ui::Input::Event(ui::Event::Failed(error.to_string()))),
+        },
+        ui::Effect::CancelInvocation => abandon_running_command(app),
+        ui::Effect::Dismiss => on_main_thread(app, |app| {
+            if hide(app) {
+                app.state::<LatencyProbe>().note("dismissed by frontend");
+            }
+        }),
+        ui::Effect::CopyText(text) => on_main_thread(app, move |_| {
+            use clipboard_rs::Clipboard;
+            let copied = clipboard_rs::ClipboardContext::new()
+                .and_then(|clipboard| clipboard.set_text(text));
+            if let Err(error) = copied {
+                eprintln!("[dango] could not copy to the clipboard: {error}");
+            }
+        }),
+        ui::Effect::InspectTemplate { field, source } => {
+            let inspection = inspect_template(&source);
+            apply(
+                app,
+                ui::Input::Event(ui::Event::TemplateInspected {
+                    field,
+                    source,
+                    inspection,
+                }),
+            );
+        }
+        ui::Effect::FinishWarmup => on_main_thread(app, |app| {
+            // Once per renderer mount. More than one line here across a session
+            // means the webview reloaded, which would defeat the warm-window
+            // design.
+            eprintln!("[dango] frontend mounted");
+            finish_warmup(app);
+        }),
+        ui::Effect::ReportPaint(probe) => app.state::<LatencyProbe>().finish(probe),
+    }
+}
+
+/// Runs a query and feeds merged results to the launcher as providers answer.
+fn search(app: &tauri::AppHandle, query: String) {
     let Some(pipeline) = app.try_state::<SearchPipeline>() else {
         return;
     };
     let mut rx = pipeline.query(query);
+    let app = app.clone();
     tauri::async_runtime::spawn(async move {
         while let Some(results) = rx.recv().await {
             let tints = app.state::<TintTable>();
-            let payload = ResultsPayload {
-                query: results.query,
-                items: results
-                    .items
-                    .into_iter()
-                    .map(|c| ResultItem::new(c, &tints))
-                    .collect(),
-                complete: results.complete,
-            };
-            if app.emit_to("main", EVENT_RESULTS, payload).is_err() {
-                break;
-            }
+            let items = results
+                .items
+                .into_iter()
+                .map(|c| result_item(c, &tints))
+                .collect();
+            apply(
+                &app,
+                ui::Input::Event(ui::Event::Results {
+                    query: results.query,
+                    items,
+                }),
+            );
         }
     });
 }
 
-/// Runs an action on a result, through the extension that contributed it.
-/// Success hides the launcher; copy hands the text back for the frontend to
-/// place on the clipboard; failure keeps the launcher open with a message.
-#[tauri::command]
-async fn run_action(
-    app: tauri::AppHandle,
-    extension_id: String,
-    item_id: String,
-    action_id: String,
-    values: Option<FormValues>,
-    query: Option<String>,
-) -> ActionResponse {
+/// Runs an action through the extension that contributed the item. Success
+/// hides the launcher; anything else goes back to the state machine.
+fn run_action(app: &tauri::AppHandle, request: &ui::ActionRequest) -> ActionOutcome {
     let Some(host) = app.try_state::<Arc<Mutex<ExtensionHost>>>() else {
-        return ActionResponse::Failed {
-            message: "no extensions are loaded".into(),
-        };
+        return ActionOutcome::Failed("no extensions are loaded".into());
     };
     let outcome = host.lock().unwrap().perform_action(
-        &extension_id,
-        &item_id,
-        &action_id,
-        &values.unwrap_or_default(),
+        &request.extension_id,
+        &request.item_id,
+        &request.action_id,
+        &request.values.clone().unwrap_or_default(),
     );
-    match outcome {
-        ActionOutcome::Done => {
-            // Any successful action counts as use. Revealing an application is
-            // reaching for it just as much as launching it is.
-            record_use(&app, &item_id, query.as_deref());
-            hide_after_launch(&app);
-            ActionResponse::Done
-        }
-        ActionOutcome::Started => ActionResponse::Started,
-        ActionOutcome::CopyToClipboard(text) => ActionResponse::Copy { text },
-        ActionOutcome::Replaced(tree) => ActionResponse::Replaced { tree: *tree },
-        ActionOutcome::Removed(tree) => ActionResponse::Removed { tree: *tree },
-        ActionOutcome::Failed(message) => ActionResponse::Failed { message },
+    if outcome == ActionOutcome::Done {
+        // Any successful action counts as use. Revealing an application is
+        // reaching for it just as much as launching it is.
+        record_use(app, &request.item_id, request.query.as_deref());
+        hide_after_launch(app);
     }
-}
-
-/// What a template field's text will ask for. Pure: nothing is stored and
-/// nothing is rendered, so the form can call it on every keystroke.
-#[cfg_attr(test, derive(ts_rs::TS))]
-#[cfg_attr(test, ts(export, export_to = "../../src/protocol/"))]
-#[derive(Debug, serde::Serialize)]
-#[serde(rename_all = "camelCase")]
-struct TemplateInspection {
-    arguments: Vec<String>,
-    error: Option<String>,
+    outcome
 }
 
 /// Parses a template and answers with the arguments it would ask for, or why it
 /// cannot be read. This is what makes a doubled-brace expression pasted from
 /// another templating system visible before it is saved.
-#[tauri::command]
-fn inspect_template(source: String) -> TemplateInspection {
-    match templates::Template::parse(&source) {
-        Ok(template) => TemplateInspection {
+fn inspect_template(source: &str) -> ui::TemplateInspection {
+    match templates::Template::parse(source) {
+        Ok(template) => ui::TemplateInspection {
             arguments: template.prompts(),
             error: None,
         },
-        Err(error) => TemplateInspection {
+        Err(error) => ui::TemplateInspection {
             arguments: Vec::new(),
             error: Some(error.to_string()),
         },
     }
-}
-
-#[cfg(test)]
-mod inspect_tests {
-    use super::inspect_template;
-
-    #[test]
-    fn a_template_with_arguments_reports_them_in_order() {
-        let inspection = inspect_template("{{ zebra }} and {{ apple }}".into());
-        assert_eq!(inspection.arguments, vec!["zebra", "apple"]);
-        assert_eq!(inspection.error, None);
-    }
-
-    #[test]
-    fn a_template_with_no_arguments_reports_none() {
-        let inspection = inspect_template("just {{ date }}, no questions".into());
-        assert!(inspection.arguments.is_empty());
-        assert_eq!(inspection.error, None);
-    }
-
-    #[test]
-    fn a_template_that_will_not_parse_reports_why() {
-        let inspection = inspect_template("unclosed {{ name".into());
-        assert!(inspection.arguments.is_empty());
-        assert!(inspection.error.is_some());
-    }
-
-    #[test]
-    fn a_pasted_doubled_brace_expression_is_visible_before_it_is_saved() {
-        let inspection = inspect_template("runs-on: ${{ matrix.os }}".into());
-        assert_eq!(inspection.arguments, vec!["matrix"]);
-    }
-}
-
-/// Invokes a command and streams what it produces to the frontend. Returns the
-/// extension that owns it, so an action chosen inside a view the command pushes
-/// can be sent back to the right place, or the reason it could not start.
-#[tauri::command]
-async fn invoke_command(
-    app: tauri::AppHandle,
-    command_id: String,
-    query: Option<String>,
-) -> Result<(), String> {
-    run_command(&app, &command_id).map_err(|error| error.to_string())?;
-    record_use(&app, &command_id, query.as_deref());
-    Ok(())
 }
 
 /// Credits a use of a result and, when the launcher knows what was typed to
@@ -617,24 +536,21 @@ fn pump(app: &tauri::AppHandle, owner: String, running: invocation::Running) {
                     if !visible(&app) && !holding(&app) {
                         show(&app, None);
                     }
-                    let payload = RenderPayload {
-                        owner: owner.clone(),
-                        invocation,
-                        tree,
-                    };
-                    if app
-                        .emit_to("main", protocol::EVENT_RENDER, payload)
-                        .is_err()
-                    {
-                        break;
-                    }
+                    apply(
+                        &app,
+                        ui::Input::Event(ui::Event::Rendered {
+                            owner: owner.clone(),
+                            invocation,
+                            tree,
+                        }),
+                    );
                 }
                 Output::Finished(Outcome::Success) => {
                     hide_after_launch(&app);
                     break;
                 }
                 Output::Finished(Outcome::Failure(message)) => {
-                    let _ = app.emit_to("main", EVENT_FAILED, message);
+                    apply(&app, ui::Input::Event(ui::Event::Failed(message)));
                     break;
                 }
             }
@@ -838,23 +754,10 @@ fn hide_for_work(app: &tauri::AppHandle) {
     });
 }
 
-#[tauri::command]
-fn is_development_build() -> bool {
-    cfg!(debug_assertions)
-}
-
 /// The webview does not allocate its drawing surface until the window is shown
 /// once, and paying that cost on the user's first hotkey pushed cold activation
 /// to the edge of the budget. Showing far offscreen at startup pays it early
-/// without a visible flash.
-#[tauri::command]
-fn warmup_done(app: tauri::AppHandle) {
-    // Called once per frontend mount. More than one line here across a session
-    // means the webview reloaded, which would defeat the warm-window design.
-    eprintln!("[dango] frontend mounted");
-    finish_warmup(&app);
-}
-
+/// without a visible flash, and the renderer's `Ready` hides it again.
 fn finish_warmup(app: &tauri::AppHandle) {
     let Some(window) = app.get_webview_window("main") else {
         return;
@@ -1246,17 +1149,11 @@ pub fn run() {
                 .build(),
         )
         .manage(LatencyProbe::default())
-        .invoke_handler(tauri::generate_handler![
-            report_paint,
-            dismiss,
-            warmup_done,
-            is_development_build,
-            search,
-            run_action,
-            invoke_command,
-            cancel_invocation,
-            inspect_template
-        ])
+        .manage(Ui(Mutex::new(UiState {
+            launcher: ui::Launcher::new(cfg!(debug_assertions)),
+            shown: None,
+        })))
+        .invoke_handler(tauri::generate_handler![dispatch])
         .setup(move |app| {
             #[cfg(target_os = "macos")]
             app.set_activation_policy(tauri::ActivationPolicy::Accessory);
@@ -1802,4 +1699,36 @@ pub fn run() {
         })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+#[cfg(test)]
+mod inspect_tests {
+    use super::inspect_template;
+
+    #[test]
+    fn a_template_with_arguments_reports_them_in_order() {
+        let inspection = inspect_template("{{ zebra }} and {{ apple }}");
+        assert_eq!(inspection.arguments, vec!["zebra", "apple"]);
+        assert_eq!(inspection.error, None);
+    }
+
+    #[test]
+    fn a_template_with_no_arguments_reports_none() {
+        let inspection = inspect_template("just {{ date }}, no questions");
+        assert!(inspection.arguments.is_empty());
+        assert_eq!(inspection.error, None);
+    }
+
+    #[test]
+    fn a_template_that_will_not_parse_reports_why() {
+        let inspection = inspect_template("unclosed {{ name");
+        assert!(inspection.arguments.is_empty());
+        assert!(inspection.error.is_some());
+    }
+
+    #[test]
+    fn a_pasted_doubled_brace_expression_is_visible_before_it_is_saved() {
+        let inspection = inspect_template("runs-on: ${{ matrix.os }}");
+        assert_eq!(inspection.arguments, vec!["matrix"]);
+    }
 }

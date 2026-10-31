@@ -12,6 +12,7 @@ test("held activation keeps the prompt and selection and refreshes the results",
   await expect(input).toHaveValue("Result 1");
   await page.keyboard.press("ArrowDown");
   const selected = page.getByRole("option", { selected: true });
+  await expect(selected).toHaveAttribute("data-value", "result-10");
   const picked = await selected.getAttribute("data-value");
   const before = await searchesFor(page, "Result 1");
   await page.evaluate(() => window.dangoFixture.reactivate());
