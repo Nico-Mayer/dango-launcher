@@ -26,14 +26,9 @@ use crate::ui::{self, Intent};
 use generated::{LauncherWindow, Tray};
 use render::Renderer;
 
-type NotifierHook = Box<dyn Fn(&LauncherWindow) -> bool>;
-
 thread_local! {
     /// Lives on the UI thread, as the component does.
     static RENDERER: RefCell<Option<Rc<RefCell<Renderer>>>> = const { RefCell::new(None) };
-    /// Hooks the paint notifier in once the renderer exists, which is some
-    /// time after the window is first shown. Answers whether it is in.
-    static NOTIFIER: RefCell<Option<NotifierHook>> = const { RefCell::new(None) };
 }
 
 struct SlintShell {
@@ -97,8 +92,6 @@ impl Shell for SlintShell {
             attached
         });
         attached.did_show(handle);
-        drop(platform);
-        hook_notifier(&window);
     }
 
     fn hide(&self, restore_focus: bool) {
@@ -131,25 +124,6 @@ impl Shell for SlintShell {
     fn quit(&self) {
         let _ = slint::quit_event_loop();
     }
-}
-
-fn hook_notifier(window: &LauncherWindow) {
-    let pending = NOTIFIER.with(|slot| slot.borrow().is_some());
-    if !pending {
-        return;
-    }
-    let weak = window.as_weak();
-    slint::Timer::single_shot(std::time::Duration::ZERO, move || {
-        let Some(window) = weak.upgrade() else {
-            return;
-        };
-        NOTIFIER.with(|slot| {
-            let hooked = slot.borrow().as_ref().is_some_and(|hook| hook(&window));
-            if hooked {
-                slot.borrow_mut().take();
-            }
-        });
-    });
 }
 
 fn show_tray(component: &Tray, tray: &TrayStatus) {
@@ -255,31 +229,21 @@ fn connect(
     }
     {
         let core = core.clone();
+        // The frame is drawn while Slint handles this redraw. A rendering
+        // notifier would be exact, but the software renderer, which Slint
+        // falls back to without OpenGL 2, has none.
         window.window().on_winit_window_event(move |_, event| {
-            if let winit::event::WindowEvent::Focused(false) = event {
-                core.hide_on_focus_loss();
+            match event {
+                winit::event::WindowEvent::Focused(false) => core.hide_on_focus_loss(),
+                winit::event::WindowEvent::RedrawRequested => {
+                    if let Some(probe) = renderer.borrow_mut().painted() {
+                        core.dispatch(Intent::Painted { probe });
+                    }
+                }
+                _ => {}
             }
             EventResult::Propagate
         });
-    }
-
-    {
-        let core = core.clone();
-        let hook = move |window: &LauncherWindow| {
-            let core = core.clone();
-            let renderer = renderer.clone();
-            window
-                .window()
-                .set_rendering_notifier(move |state, _| {
-                    if let slint::RenderingState::AfterRendering = state {
-                        if let Some(probe) = renderer.borrow_mut().painted() {
-                            core.dispatch(Intent::Painted { probe });
-                        }
-                    }
-                })
-                .is_ok()
-        };
-        NOTIFIER.with(|slot| *slot.borrow_mut() = Some(Box::new(hook)));
     }
 
     let tray_core = core.clone();
