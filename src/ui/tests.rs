@@ -437,6 +437,15 @@ fn an_unsupported_protocol_version_shows_the_error_until_escape() {
 }
 
 #[test]
+fn a_version_1_tree_is_unsupported() {
+    let mut h = Harness::root(3);
+    let mut tree = detail_tree("Old");
+    tree.protocol_version = 1;
+    h.render(1, tree);
+    assert_eq!(h.snapshot().screen, Screen::Error);
+}
+
+#[test]
 fn an_action_in_a_view_goes_to_the_owner_of_the_view() {
     let mut h = Harness::new();
     h.event(Event::Rendered {

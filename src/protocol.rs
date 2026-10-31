@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 
 /// Bumped when the protocol changes shape. Dango refuses a tree whose
 /// version it does not recognise.
-pub const PROTOCOL_VERSION: u32 = 1;
+pub const PROTOCOL_VERSION: u32 = 2;
 
 macro_rules! protocol_types {
     ($($item:item)*) => {
