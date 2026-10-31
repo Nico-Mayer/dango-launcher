@@ -1,16 +1,10 @@
 .DS_Store
-node_modules
-/dist
 .env
 .env.*
 !.env.example
-vite.config.js.timestamp-*
-vite.config.ts.timestamp-*
 
 # Vendored agent skills, restorable from skills-lock.json
 .agents/skills
-.playwright-cli/
-test-results/
 
 # Machine-specific agent permissions
 .claude/settings.local.json
