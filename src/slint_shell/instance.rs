@@ -1,7 +1,8 @@
 //! One Dango per user. A second launch asks the running one to show the
 //! launcher and exits, so starting Dango again is a way to summon it.
 
-use std::io::{self, BufRead, BufReader, Write};
+use std::io::{self, BufRead, BufReader, Read, Write};
+use std::sync::Arc;
 
 use interprocess::local_socket::{prelude::*, GenericNamespaced, ListenerOptions, Stream};
 use single_instance::SingleInstance;
@@ -18,7 +19,8 @@ pub fn claim() -> Option<SingleInstance> {
 }
 
 /// Answers a second launch on its own thread.
-pub fn listen(name: &str, show: impl Fn() + Send + 'static) -> io::Result<()> {
+pub fn listen(name: &str, show: impl Fn() + Send + Sync + 'static) -> io::Result<()> {
+    let show = Arc::new(show);
     let name = socket_name(name)?;
     let listener = ListenerOptions::new()
         .name(name)
@@ -28,10 +30,19 @@ pub fn listen(name: &str, show: impl Fn() + Send + 'static) -> io::Result<()> {
         .name("dango-instance".into())
         .spawn(move || {
             for connection in listener.incoming().filter_map(Result::ok) {
-                let mut line = String::new();
-                if BufReader::new(connection).read_line(&mut line).is_ok() && line.trim() == SHOW {
-                    show();
-                }
+                // Named pipes on Windows take no read timeout, so a client that
+                // never writes holds only its own thread.
+                let show = Arc::clone(&show);
+                std::thread::spawn(move || {
+                    let mut line = String::new();
+                    if BufReader::new(connection.take(16))
+                        .read_line(&mut line)
+                        .is_ok()
+                        && line.trim() == SHOW
+                    {
+                        show();
+                    }
+                });
             }
         })?;
     Ok(())
@@ -62,6 +73,19 @@ mod tests {
             let _ = shown.send(());
         })
         .unwrap();
+        signal(&name).unwrap();
+        assert!(received.recv_timeout(Duration::from_secs(5)).is_ok());
+    }
+
+    #[test]
+    fn a_silent_client_does_not_block_the_next_launch() {
+        let name = format!("dango-test-silent-{}", std::process::id());
+        let (shown, received) = mpsc::channel();
+        listen(&name, move || {
+            let _ = shown.send(());
+        })
+        .unwrap();
+        let _silent = Stream::connect(socket_name(&name).unwrap()).unwrap();
         signal(&name).unwrap();
         assert!(received.recv_timeout(Duration::from_secs(5)).is_ok());
     }
