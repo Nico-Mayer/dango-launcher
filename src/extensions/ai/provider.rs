@@ -73,6 +73,8 @@ pub enum AiError {
     Unreachable { provider: String },
     #[error("{provider} refused this request. See dango.log for the reason.")]
     Refused { provider: String },
+    #[error("{provider} had a problem on its side. Try again later.")]
+    ServerError { provider: String },
     #[error("Couldn't reach your local model server")]
     LocalUnreachable,
     #[error("{provider} is busy right now. Try again in a moment.")]

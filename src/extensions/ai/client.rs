@@ -186,6 +186,9 @@ fn translate(request: &Request, error: &genai::Error) -> AiError {
         Some(429) => AiError::RateLimited {
             provider: request.provider.clone(),
         },
+        Some(500..) => AiError::ServerError {
+            provider: request.provider.clone(),
+        },
         Some(400..) => AiError::Refused {
             provider: request.provider.clone(),
         },
@@ -349,7 +352,7 @@ mod tests {
             (
                 &ollama,
                 http(503),
-                AiError::Refused {
+                AiError::ServerError {
                     provider: provider(),
                 },
             ),
