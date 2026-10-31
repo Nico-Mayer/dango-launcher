@@ -526,14 +526,14 @@ impl Launcher {
                     let actions = self.panel_actions();
                     let next = step(
                         actions.iter().map(|a| a.id.as_str()),
-                        self.panel_selected(),
+                        self.panel_selected(&actions),
                         down,
                     );
                     if let Some(panel) = self.panel.as_mut() {
                         panel.picked = next;
                     }
                 } else if enter {
-                    if let Some(id) = self.panel_selected() {
+                    if let Some(id) = self.panel_selected(&self.panel_actions()) {
                         self.run_available(&id, fx);
                     }
                 }
@@ -860,19 +860,15 @@ impl Launcher {
     }
 
     pub(super) fn entry_selected(&self) -> Option<Entry<'_>> {
-        let entries = self.entries();
+        self.pick_entry(&self.entries())
+    }
+
+    pub(super) fn pick_entry<'a>(&self, entries: &[Entry<'a>]) -> Option<Entry<'a>> {
         let picked = self.stack.last().and_then(|view| view.picked.as_deref());
         picked
             .and_then(|picked| entries.iter().find(|entry| entry.id() == picked))
             .or_else(|| entries.first())
             .copied()
-    }
-
-    pub(super) fn view_selected(&self) -> Option<&ListItem> {
-        match self.entry_selected() {
-            Some(Entry::List(item)) => Some(item),
-            _ => None,
-        }
     }
 
     /// The tile an arrow key moves to. Rows restart under each section, so
@@ -924,9 +920,13 @@ impl Launcher {
     /// What the action panel offers. A list item's own actions win over the
     /// view's, because the item is what the user has selected.
     pub(super) fn available_actions(&self) -> &[Action] {
+        self.actions_for(self.entry_selected())
+    }
+
+    pub(super) fn actions_for<'a>(&'a self, selected: Option<Entry<'a>>) -> &'a [Action] {
         match self.surface() {
             Mode::Root => self.root_selected().map_or(&[], |item| &item.actions),
-            Mode::List | Mode::Grid => match self.entry_selected() {
+            Mode::List | Mode::Grid => match selected {
                 Some(entry) => entry.actions(),
                 None => self.empty_actions(),
             },
@@ -953,7 +953,11 @@ impl Launcher {
     /// the order sections first appear, then the view's filter options, with
     /// danger actions after all others, narrowed by the panel's filter.
     pub(super) fn panel_actions(&self) -> Vec<Action> {
-        let ordered = self.ordered_actions();
+        self.panel_actions_for(self.available_actions())
+    }
+
+    pub(super) fn panel_actions_for(&self, actions: &[Action]) -> Vec<Action> {
+        let ordered = ordered_actions(actions);
         let (normal, danger): (Vec<&Action>, Vec<&Action>) = ordered
             .into_iter()
             .partition(|action| action.style != ActionStyle::Danger);
@@ -1002,28 +1006,8 @@ impl Launcher {
             .map_or("", |panel| panel.filter.as_str())
     }
 
-    fn ordered_actions(&self) -> Vec<&Action> {
-        let actions = self.available_actions();
-        let mut sections: Vec<Option<&str>> = Vec::new();
-        for action in actions {
-            if !sections.contains(&action.section.as_deref()) {
-                sections.push(action.section.as_deref());
-            }
-        }
-        let pass = |danger: bool| {
-            sections.iter().flat_map(move |section| {
-                actions.iter().filter(move |action| {
-                    action.section.as_deref() == *section
-                        && (action.style == ActionStyle::Danger) == danger
-                })
-            })
-        };
-        pass(false).chain(pass(true)).collect()
-    }
-
-    pub(super) fn panel_selected(&self) -> Option<String> {
+    pub(super) fn panel_selected(&self, actions: &[Action]) -> Option<String> {
         let panel = self.panel.as_ref()?;
-        let actions = self.panel_actions();
         panel
             .picked
             .as_deref()
@@ -1047,6 +1031,24 @@ impl Launcher {
             Some(View::Detail(_)) | None => None,
         }
     }
+}
+
+fn ordered_actions(actions: &[Action]) -> Vec<&Action> {
+    let mut sections: Vec<Option<&str>> = Vec::new();
+    for action in actions {
+        if !sections.contains(&action.section.as_deref()) {
+            sections.push(action.section.as_deref());
+        }
+    }
+    let pass = |danger: bool| {
+        sections.iter().flat_map(move |section| {
+            actions.iter().filter(move |action| {
+                action.section.as_deref() == *section
+                    && (action.style == ActionStyle::Danger) == danger
+            })
+        })
+    };
+    pass(false).chain(pass(true)).collect()
 }
 
 /// Marks a panel entry as a filter option rather than an action.

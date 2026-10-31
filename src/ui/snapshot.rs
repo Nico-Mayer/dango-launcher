@@ -3,7 +3,7 @@ use crate::protocol::{
 };
 
 use super::input::{Chord, Context, ResultItem};
-use super::state::{Launcher, Mode, PushedView, ToastStyle, ViewError, FILTER_PREFIX};
+use super::state::{Entry, Launcher, Mode, PushedView, ToastStyle, ViewError, FILTER_PREFIX};
 
 macro_rules! snapshot_types {
     ($($item:item)*) => {
@@ -196,6 +196,9 @@ snapshot_types! {
 impl Launcher {
     pub fn snapshot(&self) -> Snapshot {
         let mode = self.mode();
+        let selected = self.pick_entry(&self.entries());
+        let actions = self.actions_for(selected);
+        let panel_actions = self.panel_actions_for(actions);
         Snapshot {
             activation: Activation {
                 count: self.activations,
@@ -209,27 +212,27 @@ impl Launcher {
                 Mode::Detail => Focus::Detail,
                 Mode::Form => Focus::Form,
             },
-            bindings: self.bindings(mode),
+            bindings: self.bindings(mode, actions),
             screen: match (self.view_error, self.stack.last()) {
                 (Some(error), _) => Screen::Error(error_text(error)),
                 (None, None) => Screen::Root(self.root_screen()),
-                (None, Some(view)) => Screen::View(self.view_screen(view)),
+                (None, Some(view)) => Screen::View(self.view_screen(view, selected)),
             },
             toast: self.toast(),
-            footer: self.footer(),
+            footer: self.footer(actions),
             panel: Panel {
-                actions: self.panel_actions(),
+                selected: self.panel_selected(&panel_actions),
+                actions: panel_actions,
                 checked: self
                     .filter_selected()
                     .map(|id| format!("{FILTER_PREFIX}{id}")),
                 open: self.panel_open(),
                 filter: self.panel_filter().to_string(),
-                selected: self.panel_selected(),
             },
         }
     }
 
-    fn bindings(&self, mode: Mode) -> Vec<Binding> {
+    fn bindings(&self, mode: Mode, actions: &[Action]) -> Vec<Binding> {
         let anywhere = |chord| Binding {
             chord,
             in_multiline: true,
@@ -289,10 +292,7 @@ impl Launcher {
             bindings.push(anywhere(shift_tab));
         }
         if !matches!(mode, Mode::Error | Mode::Panel) {
-            let shortcuts = self
-                .available_actions()
-                .iter()
-                .filter_map(|a| a.shortcut.as_ref());
+            let shortcuts = actions.iter().filter_map(|a| a.shortcut.as_ref());
             for chord in shortcuts.map(Chord::from) {
                 if !bindings.iter().any(|taken| taken.chord == chord) {
                     bindings.push(anywhere(chord));
@@ -344,7 +344,11 @@ impl Launcher {
         }
     }
 
-    fn view_screen(&self, view: &PushedView) -> ViewScreen {
+    fn view_screen(&self, view: &PushedView, selected: Option<Entry>) -> ViewScreen {
+        let list_selected = match selected {
+            Some(Entry::List(item)) => Some(item),
+            _ => None,
+        };
         let body = match &view.tree.view {
             View::List(list) => {
                 let sections: Vec<ListSection> = self
@@ -370,7 +374,7 @@ impl Launcher {
                     filter: self.filter_view(),
                     sections,
                     pane: list.detail_pane.then(|| {
-                        self.view_selected()
+                        list_selected
                             .and_then(|item| item.detail.as_ref())
                             .map(|detail| DetailBody {
                                 markdown: detail.markdown.clone(),
@@ -378,7 +382,7 @@ impl Launcher {
                             })
                             .unwrap_or_default()
                     }),
-                    selected: self.view_selected().map(|item| item.id.clone()),
+                    selected: list_selected.map(|item| item.id.clone()),
                     empty,
                 })
             }
@@ -407,7 +411,7 @@ impl Launcher {
                     columns: grid.columns,
                     aspect: grid.aspect,
                     sections,
-                    selected: self.entry_selected().map(|entry| entry.id().to_string()),
+                    selected: selected.map(|entry| entry.id().to_string()),
                     empty,
                 })
             }
@@ -482,7 +486,7 @@ impl Launcher {
         }
     }
 
-    fn footer(&self) -> Footer {
+    fn footer(&self, actions: &[Action]) -> Footer {
         let Some(view) = self.stack.last() else {
             // A command result carries no actions and is invoked instead.
             return Footer {
@@ -496,18 +500,15 @@ impl Launcher {
                         .map_or_else(|| "Open".to_string(), |action| action.title.clone())
                 }),
                 confirm_with_command: false,
-                many_actions: self.available_actions().len() > 1,
+                many_actions: actions.len() > 1,
             };
         };
         Footer {
             context: view.context.clone(),
-            primary_label: self
-                .available_actions()
-                .first()
-                .map(|action| action.title.clone()),
+            primary_label: actions.first().map(|action| action.title.clone()),
             confirm_with_command: matches!(&view.tree.view, View::Form(form)
                 if form.fields.iter().any(|field| field.kind.is_multiline())),
-            many_actions: self.available_actions().len() > 1,
+            many_actions: actions.len() > 1,
         }
     }
 }
