@@ -7,11 +7,12 @@
 //! preferences and frecency.
 
 use std::collections::HashSet;
-use std::hash::{DefaultHasher, Hash, Hasher};
+use std::hash::Hasher;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use rusqlite::OptionalExtension;
+use siphasher::sip::SipHasher13;
 
 use crate::store::Store;
 
@@ -35,17 +36,13 @@ impl Content {
     /// duplicates. A hash rather than the content itself, because the column is
     /// unique-indexed and an image is megabytes.
     fn fingerprint(&self) -> String {
-        let mut hasher = DefaultHasher::new();
-        match self {
-            Content::Text(text) => {
-                "text".hash(&mut hasher);
-                text.hash(&mut hasher);
-            }
-            Content::Image(bytes) => {
-                "image".hash(&mut hasher);
-                bytes.hash(&mut hasher);
-            }
-        }
+        let (kind, bytes): (&[u8], &[u8]) = match self {
+            Content::Text(text) => (b"text\0", text.as_bytes()),
+            Content::Image(bytes) => (b"image\0", bytes),
+        };
+        let mut hasher = SipHasher13::new();
+        hasher.write(kind);
+        hasher.write(bytes);
         format!("{:016x}", hasher.finish())
     }
 }
@@ -561,6 +558,11 @@ mod tests {
 
         assert!(!orphan.exists());
         assert!(Path::new(&kept).exists());
+    }
+
+    #[test]
+    fn a_fingerprint_does_not_depend_on_the_toolchain() {
+        assert_eq!(text("hello").fingerprint(), "ae8e2ff1480d4dd4");
     }
 
     #[test]

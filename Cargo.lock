@@ -1332,6 +1332,7 @@ dependencies = [
  "serde",
  "serde_json",
  "single-instance",
+ "siphasher",
  "slint",
  "slint-build",
  "thiserror 2.0.20",
