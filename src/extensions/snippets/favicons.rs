@@ -12,7 +12,7 @@
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc, Mutex, RwLock};
 use std::time::{Duration, SystemTime};
 
 use reqwest::blocking::Client;
@@ -350,7 +350,9 @@ pub struct FaviconService {
     cache: Arc<FaviconCache>,
     source: Arc<dyn FaviconSource>,
     enabled: FaviconsEnabled,
-    running: Arc<AtomicBool>,
+    /// The flag of the sweep thread started last. Each start gets its own, so a
+    /// thread from before a stop cannot see a later start's `true` and keep going.
+    running: Mutex<Arc<AtomicBool>>,
 }
 
 impl FaviconService {
@@ -365,8 +367,12 @@ impl FaviconService {
             cache,
             source,
             enabled,
-            running: Arc::new(AtomicBool::new(false)),
+            running: Mutex::new(Arc::new(AtomicBool::new(false))),
         }
+    }
+
+    fn is_running(&self) -> bool {
+        self.running.lock().unwrap().load(Ordering::SeqCst)
     }
 
     fn sweep(&self) {
@@ -381,7 +387,7 @@ impl FaviconService {
             // Both are re-read per record rather than once, so stopping the
             // extension or turning the preference off ends a sweep already
             // under way instead of letting it work through what is left.
-            if !self.running.load(Ordering::SeqCst) || !(self.enabled)() {
+            if !self.is_running() || !(self.enabled)() {
                 return;
             }
             let Some((host, site)) = site_of(record) else {
@@ -427,7 +433,7 @@ impl FaviconService {
         // instead of sleeping until the next edit or the next interval.
         let was_wanted = (self.enabled)();
         let started = std::time::Instant::now();
-        while self.running.load(Ordering::SeqCst) && started.elapsed() < REFRESH_INTERVAL {
+        while self.is_running() && started.elapsed() < REFRESH_INTERVAL {
             std::thread::sleep(TICK);
             if self.fingerprint() != baseline || (!was_wanted && (self.enabled)()) {
                 return;
@@ -438,19 +444,20 @@ impl FaviconService {
 
 impl Service for FaviconService {
     fn start(&self) -> ActivationResult {
-        self.running.store(true, Ordering::SeqCst);
+        let running = Arc::new(AtomicBool::new(true));
+        let previous = std::mem::replace(&mut *self.running.lock().unwrap(), running.clone());
+        previous.store(false, Ordering::SeqCst);
         let records = self.records.clone();
         let cache = self.cache.clone();
         let source = self.source.clone();
         let enabled = self.enabled.clone();
-        let running = self.running.clone();
         std::thread::spawn(move || {
             let service = FaviconService {
                 records,
                 cache,
                 source,
                 enabled,
-                running: running.clone(),
+                running: Mutex::new(running.clone()),
             };
             while running.load(Ordering::SeqCst) {
                 let baseline = service.fingerprint();
@@ -462,14 +469,13 @@ impl Service for FaviconService {
     }
 
     fn stop(&self) {
-        self.running.store(false, Ordering::SeqCst);
+        self.running.lock().unwrap().store(false, Ordering::SeqCst);
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::sync::Mutex;
 
     use crate::extensions::snippets::store::Kind;
 
@@ -705,7 +711,11 @@ mod tests {
         );
         // The sweep stops when the service is not running, which is what a
         // started service would have set.
-        service.running.store(true, Ordering::SeqCst);
+        service
+            .running
+            .lock()
+            .unwrap()
+            .store(true, Ordering::SeqCst);
         (service, records, switch)
     }
 
@@ -853,6 +863,19 @@ mod tests {
             std::thread::sleep(TICK);
         }
         false
+    }
+
+    #[test]
+    fn a_restart_ends_the_thread_from_before_the_stop() {
+        let (service, _records) = service(FakeSource::failing(), false);
+        service.start().unwrap();
+        let first = service.running.lock().unwrap().clone();
+        service.stop();
+        service.start().unwrap();
+        let second = service.running.lock().unwrap().clone();
+        service.stop();
+        assert!(!first.load(Ordering::SeqCst));
+        assert!(!Arc::ptr_eq(&first, &second));
     }
 
     #[test]
