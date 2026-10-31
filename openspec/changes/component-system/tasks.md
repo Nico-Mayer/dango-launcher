@@ -10,7 +10,7 @@
 ## 2. View protocol version 2
 
 - [x] 2.1 Move `src/protocol.rs` to version 2 per design D6 and reject version 1; verify a unit test that a version 1 tree yields the unsupported-view state
-- [ ] 2.2 Add item sections, section titles and subtitles, accessories, and keywords; verify reducer tests for section order, hidden empty sections when filtering, Arrow Down crossing a section, and a keyword match
+- [x] 2.2 Add item sections, section titles and subtitles, accessories, and keywords; verify reducer tests for section order, hidden empty sections when filtering, Arrow Down crossing a section, and a keyword match
 - [ ] 2.3 Add action `section` and `style`, ordering danger actions last; verify a reducer test with "Pin entry" and "Delete entry" under "Manage"
 - [ ] 2.4 Add `EmptyState.icon` and `actions`, with Enter running the first; verify a reducer test that Enter on an empty view with "Search the web" emits its action
 - [ ] 2.5 Add `ActionOutcome::Toast` and the reducer toast state with `Effect::ExpireToast` and `Event::ToastExpired` per design D7; verify reducer tests for success expiry, a stale expiry ignored, and a failure cleared by a key

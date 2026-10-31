@@ -30,6 +30,7 @@ protocol_types! {
         Form(FormView),
     }
 
+    #[derive(Default)]
     #[serde(rename_all = "camelCase")]
     pub struct ListView {
         pub filtering: Filtering,
@@ -37,18 +38,32 @@ protocol_types! {
         pub loading: bool,
         #[serde(default)]
         pub empty_state: Option<EmptyState>,
+        /// In the order they are shown. Items name the one they belong to.
+        #[serde(default)]
+        pub sections: Vec<Section>,
         pub items: Vec<ListItem>,
+    }
+
+    #[serde(rename_all = "camelCase")]
+    pub struct Section {
+        pub id: String,
+        pub title: String,
+        #[serde(default)]
+        pub subtitle: Option<String>,
     }
 
     /// Who narrows a list as the user types. `Launcher` filters the given items
     /// without re-invoking the command; `Command` means the command owns
     /// filtering and receives each query change.
+    #[derive(Default)]
     #[serde(rename_all = "camelCase")]
     pub enum Filtering {
+        #[default]
         Launcher,
         Command,
     }
 
+    #[derive(Default)]
     #[serde(rename_all = "camelCase")]
     pub struct ListItem {
         pub id: String,
@@ -57,9 +72,40 @@ protocol_types! {
         pub subtitle: Option<String>,
         #[serde(default)]
         pub icon: Option<String>,
+        /// The id of the section it is shown under. Items without one come
+        /// first, under no heading.
+        #[serde(default)]
+        pub section: Option<String>,
+        /// A row shows the first three.
+        #[serde(default)]
+        pub accessories: Vec<Accessory>,
+        /// Matched by the launcher's filter as the title is, never shown.
+        #[serde(default)]
+        pub keywords: Vec<String>,
         /// The selected item's action panel. The first action is primary.
         #[serde(default)]
         pub actions: Vec<Action>,
+    }
+
+    #[serde(tag = "kind", rename_all = "camelCase")]
+    pub enum Accessory {
+        Text { text: String },
+        Icon { icon: String },
+        Tag {
+            text: String,
+            #[serde(default)]
+            role: TagRole,
+        },
+        Kbd { shortcut: Shortcut },
+    }
+
+    #[derive(Default)]
+    #[serde(rename_all = "camelCase")]
+    pub enum TagRole {
+        Accent,
+        #[default]
+        Muted,
+        Danger,
     }
 
     #[serde(rename_all = "camelCase")]

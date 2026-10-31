@@ -548,8 +548,10 @@ fn list_tree(records: &[Record], sheet: &Sheet) -> ViewTree {
                     subtitle: Some(one_line(&record.body)),
                     icon: Some(sheet.of(record)),
                     actions: item_actions(sheet.kind),
+                    ..Default::default()
                 })
                 .collect(),
+            ..Default::default()
         }),
     }
 }
@@ -569,6 +571,7 @@ fn failure_tree(message: &str, kind: Kind) -> ViewTree {
                 description: Some(message.into()),
             }),
             items: vec![],
+            ..Default::default()
         }),
     }
 }

@@ -103,9 +103,16 @@ snapshot_types! {
     #[serde(rename_all = "camelCase")]
     pub struct ListBody {
         pub query: Text,
-        pub items: Vec<ListItem>,
+        pub sections: Vec<ListSection>,
         pub selected: Option<String>,
         pub empty: Option<EmptyText>,
+    }
+
+    #[serde(rename_all = "camelCase")]
+    pub struct ListSection {
+        pub title: Option<String>,
+        pub subtitle: Option<String>,
+        pub items: Vec<ListItem>,
     }
 
     #[serde(rename_all = "camelCase")]
@@ -275,8 +282,16 @@ impl Launcher {
     fn view_screen(&self, view: &PushedView) -> ViewScreen {
         let body = match &view.tree.view {
             View::List(list) => {
-                let items: Vec<ListItem> = self.view_items().into_iter().cloned().collect();
-                let empty = items.is_empty().then(|| {
+                let sections: Vec<ListSection> = self
+                    .view_sections()
+                    .into_iter()
+                    .map(|(section, items)| ListSection {
+                        title: section.map(|s| s.title.clone()),
+                        subtitle: section.and_then(|s| s.subtitle.clone()),
+                        items: items.into_iter().cloned().collect(),
+                    })
+                    .collect();
+                let empty = sections.is_empty().then(|| {
                     if list.loading {
                         EmptyText::plain("Loading…")
                     } else if !view.query.is_empty() {
@@ -300,7 +315,7 @@ impl Launcher {
                         text: view.query.clone(),
                         revision: view.query_revision,
                     },
-                    items,
+                    sections,
                     selected: self.view_selected().map(|item| item.id.clone()),
                     empty,
                 })

@@ -250,8 +250,10 @@ fn running_list(apps: Vec<crate::platform::RunningApp>, icons: &IconCache) -> Vi
                         title: "Quit".into(),
                         shortcut: None,
                     }],
+                    ..Default::default()
                 })
                 .collect(),
+            ..Default::default()
         }),
     }
 }

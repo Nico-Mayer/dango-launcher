@@ -1,7 +1,9 @@
 use std::collections::HashMap;
 
 use crate::extension::{ActionOutcome, FormValues};
-use crate::protocol::{Action, FieldKind, Filtering, ListItem, View, ViewTree, PROTOCOL_VERSION};
+use crate::protocol::{
+    Action, FieldKind, Filtering, ListItem, Section, View, ViewTree, PROTOCOL_VERSION,
+};
 
 use super::effect::{ActionRequest, Effect, Origin};
 use super::input::{Chord, Event, Input, Intent, ResultItem, TemplateInspection};
@@ -593,23 +595,53 @@ impl Launcher {
             .or_else(|| self.root_order().next())
     }
 
-    /// A pushed list's items after launcher-side narrowing. A view that owns its
-    /// own filtering would get each query change instead, which no command
-    /// needs yet.
-    pub(super) fn view_items(&self) -> Vec<&ListItem> {
+    /// A pushed list's items after launcher-side narrowing, grouped in section
+    /// order, without the groups left empty. Items naming no declared section
+    /// come first. A view that owns its own filtering would get each query
+    /// change instead, which no command needs yet.
+    pub(super) fn view_sections(&self) -> Vec<(Option<&Section>, Vec<&ListItem>)> {
         let Some(view) = self.stack.last() else {
             return Vec::new();
         };
         let View::List(list) = &view.tree.view else {
             return Vec::new();
         };
-        if list.filtering != Filtering::Launcher || view.query.is_empty() {
-            return list.items.iter().collect();
-        }
         let needle = view.query.to_lowercase();
-        list.items
+        let shown = |item: &&ListItem| {
+            list.filtering != Filtering::Launcher
+                || needle.is_empty()
+                || item.title.to_lowercase().contains(&needle)
+                || item
+                    .keywords
+                    .iter()
+                    .any(|keyword| keyword.to_lowercase().contains(&needle))
+        };
+        let declared = |id: &str| list.sections.iter().any(|section| section.id == id);
+        let loose = list
+            .items
             .iter()
-            .filter(|item| item.title.to_lowercase().contains(&needle))
+            .filter(|item| item.section.as_deref().is_none_or(|id| !declared(id)))
+            .filter(shown)
+            .collect();
+        let mut groups = vec![(None, loose)];
+        for section in &list.sections {
+            let items = list
+                .items
+                .iter()
+                .filter(|item| item.section.as_deref() == Some(section.id.as_str()))
+                .filter(shown)
+                .collect();
+            groups.push((Some(section), items));
+        }
+        groups.retain(|(_, items): &(_, Vec<_>)| !items.is_empty());
+        groups
+    }
+
+    /// The list's items in the order they are drawn.
+    pub(super) fn view_items(&self) -> Vec<&ListItem> {
+        self.view_sections()
+            .into_iter()
+            .flat_map(|(_, items)| items)
             .collect()
     }
 

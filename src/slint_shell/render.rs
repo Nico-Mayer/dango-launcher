@@ -99,10 +99,14 @@ impl Renderer {
             Screen::View(view) => match &view.body {
                 ViewBody::List(list) => {
                     self.write_query(ui, kind, &list.query.text, list.query.revision);
-                    let rows = list
-                        .items
-                        .iter()
-                        .map(|item| self.list_row(item, list.selected.as_deref()));
+                    let rows = list.sections.iter().flat_map(|section| {
+                        let heading = section.title.iter().map(|title| heading_row(title));
+                        let items = section
+                            .items
+                            .iter()
+                            .map(|item| self.list_row(item, list.selected.as_deref()));
+                        heading.chain(items).collect::<Vec<_>>()
+                    });
                     self.rows.set_vec(rows.collect::<Vec<_>>());
                     let empty = list.empty.as_ref();
                     ui.set_empty(empty.map(|e| e.title.as_str()).unwrap_or("").into());

@@ -287,6 +287,7 @@ pub fn history_view(entries: &[Entry], primary: PrimaryAction) -> ViewTree {
                 ),
             }),
             items: entries.iter().map(|entry| item(entry, primary)).collect(),
+            ..Default::default()
         }),
     }
 }
@@ -329,6 +330,7 @@ fn item(entry: &Entry, primary: PrimaryAction) -> ListItem {
         subtitle: None,
         icon,
         actions,
+        ..Default::default()
     }
 }
 

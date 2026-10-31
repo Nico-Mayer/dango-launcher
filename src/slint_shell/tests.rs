@@ -351,8 +351,10 @@ mod views {
                     subtitle: Some("Subtitle".into()),
                     icon: None,
                     actions: Vec::new(),
+                    ..Default::default()
                 })
                 .collect(),
+            ..Default::default()
         }))
     }
 

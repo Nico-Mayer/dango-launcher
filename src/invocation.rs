@@ -269,6 +269,7 @@ mod tests {
                 loading: false,
                 empty_state: None,
                 items: vec![],
+                ..Default::default()
             }),
         }
     }

@@ -50,6 +50,7 @@ fn list_item(n: usize) -> ListItem {
         subtitle: None,
         icon: None,
         actions: actions(),
+        ..Default::default()
     }
 }
 
@@ -59,6 +60,7 @@ fn list_tree(items: Vec<ListItem>) -> ViewTree {
         loading: false,
         empty_state: None,
         items,
+        ..Default::default()
     }))
 }
 
@@ -389,7 +391,7 @@ fn list_replacement_keeps_identity_and_falls_back_to_the_first_row() {
     let mut items: Vec<_> = (1..=18).map(list_item).collect();
     items.swap(0, 2);
     h.render(1, list_tree(items.clone()));
-    assert_eq!(h.list().items[0].id, "item-3");
+    assert_eq!(h.list().sections[0].items[0].id, "item-3");
     assert_eq!(h.selected(), item_id(2));
     let items: Vec<_> = (1..=18).filter(|n| *n != 2).map(list_item).collect();
     h.render(1, list_tree(items));
@@ -482,7 +484,7 @@ fn a_launcher_filtered_list_narrows_by_title_and_keeps_its_own_query() {
     let revision = h.list().query.revision;
     assert!(h.typed("item 1").is_empty());
     let list = h.list();
-    assert_eq!(list.items.len(), 10);
+    assert_eq!(list.sections[0].items.len(), 10);
     assert_eq!(list.query.text, "item 1");
     assert_eq!(list.query.revision, revision);
     h.typed("item 12");
@@ -498,6 +500,81 @@ impl Harness {
     fn root_screen_query(&self) -> String {
         self.launcher.query.clone()
     }
+}
+
+fn sectioned_tree() -> ViewTree {
+    let item = |n: usize, section: &str| ListItem {
+        section: Some(section.into()),
+        ..list_item(n)
+    };
+    let section = |id: &str| crate::protocol::Section {
+        id: id.into(),
+        title: id.into(),
+        subtitle: None,
+    };
+    ViewTree::new(View::List(ListView {
+        // Declared out of item order: sections decide what comes first.
+        sections: vec![section("Today"), section("Yesterday")],
+        items: vec![
+            item(4, "Yesterday"),
+            item(1, "Today"),
+            item(2, "Today"),
+            item(3, "Today"),
+        ],
+        ..Default::default()
+    }))
+}
+
+fn section_titles(list: &ListBody) -> Vec<String> {
+    list.sections
+        .iter()
+        .filter_map(|section| section.title.clone())
+        .collect()
+}
+
+#[test]
+fn sections_are_shown_in_their_order() {
+    let h = Harness::view(sectioned_tree());
+    let list = h.list();
+    assert_eq!(section_titles(&list), ["Today", "Yesterday"]);
+    let ids: Vec<&str> = list.sections[0]
+        .items
+        .iter()
+        .map(|i| i.id.as_str())
+        .collect();
+    assert_eq!(ids, ["item-1", "item-2", "item-3"]);
+    assert_eq!(h.selected(), item_id(1));
+}
+
+#[test]
+fn filtering_hides_a_section_with_no_match() {
+    let mut h = Harness::view(sectioned_tree());
+    h.typed("item 2");
+    assert_eq!(section_titles(&h.list()), ["Today"]);
+}
+
+#[test]
+fn arrow_down_crosses_into_the_next_section() {
+    let mut h = Harness::view(sectioned_tree());
+    for _ in 0..3 {
+        h.press("ArrowDown");
+    }
+    assert_eq!(h.selected(), item_id(4));
+}
+
+#[test]
+fn a_keyword_matches_without_being_the_title() {
+    let terminal = ListItem {
+        title: "Terminal".into(),
+        keywords: vec!["shell".into()],
+        ..list_item(1)
+    };
+    let mut h = Harness::view(list_tree(vec![terminal, list_item(2)]));
+    h.typed("shell");
+    let list = h.list();
+    assert_eq!(list.sections.len(), 1);
+    assert_eq!(list.sections[0].items[0].title, "Terminal");
+    assert_eq!(list.sections[0].items.len(), 1);
 }
 
 #[test]
