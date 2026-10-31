@@ -784,6 +784,109 @@ mod action_panel {
         assert!(h.panel().get_open(), "only a snapshot closes the panel");
     }
 
+    fn managed() -> ResultItem {
+        let manage = |id: &str, title: &str, style| Action {
+            id: id.into(),
+            title: title.into(),
+            section: Some("Manage".into()),
+            style,
+            ..Default::default()
+        };
+        let mut item = result(1);
+        item.actions.push(manage(
+            "delete",
+            "Delete entry",
+            crate::protocol::ActionStyle::Danger,
+        ));
+        item.actions.push(manage(
+            "pin",
+            "Pin entry",
+            crate::protocol::ActionStyle::Normal,
+        ));
+        item
+    }
+
+    #[test]
+    fn sections_head_their_actions_and_danger_comes_last() {
+        let h = Harness::root(vec![managed()]);
+        actions_button(&h).mock_single_click(PointerEventButton::Left);
+        assert!(h.find("Manage").is_some());
+        let rows = h.panel().get_rows();
+        let last = rows.row_data(rows.row_count() - 1).unwrap();
+        assert_eq!(last.title, "Delete entry");
+        assert!(last.danger);
+        let pin = h.find("Pin entry").unwrap().absolute_position().y;
+        let delete = h.find("Delete entry").unwrap().absolute_position().y;
+        assert!(delete > pin);
+    }
+
+    #[test]
+    fn typing_in_the_panel_filters_it_and_escape_returns_to_the_query() {
+        let h = Harness::root(two_actions(3));
+        actions_button(&h).mock_single_click(PointerEventButton::Left);
+        h.type_text("co");
+        assert_eq!(h.query(), "");
+        let rows = h.panel().get_rows();
+        assert_eq!(rows.row_count(), 1);
+        assert_eq!(rows.row_data(0).unwrap().title, "Copy");
+
+        h.type_text("zz");
+        assert!(h.find("No matching actions").is_some());
+
+        h.key("\u{1b}");
+        assert!(!h.panel().get_open());
+        h.type_text("r");
+        assert_eq!(h.query(), "r");
+    }
+
+    #[test]
+    fn confirming_in_the_panel_runs_one_action() {
+        let h = Harness::root(two_actions(3));
+        actions_button(&h).mock_single_click(PointerEventButton::Left);
+        h.arrow_down();
+        h.intents.borrow_mut().clear();
+        h.key("\n");
+        assert_eq!(
+            h.intents(),
+            [Intent::Key {
+                chord: crate::ui::Chord::plain("Enter")
+            }]
+        );
+        assert!(!h.panel().get_open());
+        assert_eq!(h.row("result-1").accessible_item_selected(), Some(true));
+    }
+
+    #[test]
+    fn closing_over_a_detail_gives_it_its_shortcuts_back() {
+        let h = Harness::root(results(1));
+        let mut tree = detail_tree("Body");
+        if let View::Detail(detail) = &mut tree.view {
+            detail.actions = vec![
+                Action {
+                    id: "open".into(),
+                    title: "Open".into(),
+                    ..Default::default()
+                },
+                Action {
+                    id: "copy".into(),
+                    title: "Copy".into(),
+                    shortcut: Some(crate::protocol::Shortcut {
+                        key: "c".into(),
+                        modifiers: vec![crate::protocol::Modifier::Ctrl],
+                    }),
+                    ..Default::default()
+                },
+            ];
+        }
+        h.view(tree);
+        let copy = crate::ui::Chord::command("c");
+        assert!(h.renderer.borrow().binds(&copy, false));
+        actions_button(&h).mock_single_click(PointerEventButton::Left);
+        assert!(!h.renderer.borrow().binds(&copy, false));
+        h.key("\u{1b}");
+        assert!(h.renderer.borrow().binds(&copy, false));
+    }
+
     #[test]
     fn the_shortcut_is_shown_beside_its_action() {
         let mut item = result(1);

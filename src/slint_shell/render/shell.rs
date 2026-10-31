@@ -36,7 +36,7 @@ pub fn write(ui: &LauncherWindow, snapshot: &Snapshot, kind: ScreenKind, icons: 
     shell.set_title(footer.context.title.as_str().into());
     shell.set_primary_label(footer.primary_label.clone().unwrap_or_default().into());
     shell.set_confirm_key(keys::confirm_label(footer.confirm_with_command).into());
-    shell.set_panel_hint(snapshot.panel.actions.len() > 1);
+    shell.set_panel_hint(footer.many_actions);
 
     match &snapshot.toast {
         Some(toast) => {

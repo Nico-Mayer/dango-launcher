@@ -4,7 +4,7 @@
 //! that touch storage, and only on launch, never on the search path.
 
 mod frecency;
-mod fuzzy;
+pub(crate) mod fuzzy;
 mod input_history;
 
 use std::sync::Arc;

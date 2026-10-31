@@ -168,6 +168,8 @@ snapshot_types! {
         /// The confirm key is Cmd or Ctrl with Enter, because Enter makes a
         /// newline in a template field.
         pub confirm_with_command: bool,
+        /// More than one action, so the panel is worth offering.
+        pub many_actions: bool,
     }
 
     #[serde(rename_all = "camelCase")]
@@ -175,6 +177,8 @@ snapshot_types! {
         /// What the panel would offer. Empty disables its trigger.
         pub actions: Vec<Action>,
         pub open: bool,
+        /// What the panel's own filter holds. Narrows `actions`.
+        pub filter: String,
         pub selected: Option<String>,
     }
 }
@@ -206,6 +210,7 @@ impl Launcher {
             panel: Panel {
                 actions: self.panel_actions().into_iter().cloned().collect(),
                 open: self.panel_open(),
+                filter: self.panel_filter().to_string(),
                 selected: self.panel_selected(),
             },
         }
@@ -428,6 +433,7 @@ impl Launcher {
                         .map_or_else(|| "Open".to_string(), |action| action.title.clone())
                 }),
                 confirm_with_command: false,
+                many_actions: self.available_actions().len() > 1,
             };
         };
         Footer {
@@ -438,6 +444,7 @@ impl Launcher {
                 .map(|action| action.title.clone()),
             confirm_with_command: matches!(&view.tree.view, View::Form(form)
                 if form.fields.iter().any(|field| field.kind == FieldKind::Template)),
+            many_actions: self.available_actions().len() > 1,
         }
     }
 }

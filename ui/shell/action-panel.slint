@@ -63,9 +63,11 @@ component PanelRow inherits Rectangle {
     }
 }
 
-/// Every action on the selection, floating above the ActionBar.
+/// Every action on the selection, floating above the ActionBar, with its own
+/// filter at the bottom.
 export component ActionPanel inherits Rectangle {
-    out property <length> content-height: column.preferred-height;
+    property <length> filter-height: 36px;
+    out property <length> content-height: (Panel.rows.length > 0 ? column.preferred-height : Theme.panel-row-height + 12px) + self.filter-height;
     background: Theme.surface;
     border-radius: Theme.radius;
     border-width: 1px;
@@ -84,11 +86,19 @@ export component ActionPanel inherits Rectangle {
         }
     }
 
+    public function set-filter(text: string) {
+        filter.text = text;
+    }
+
+    public function focus-filter() {
+        filter.focus();
+    }
+
     scroller := ScrollView {
         x: 0;
         y: 0;
         width: parent.width;
-        height: parent.height;
+        height: parent.height - root.filter-height;
 
         column := VerticalLayout {
             padding: 6px;
@@ -100,6 +110,63 @@ export component ActionPanel inherits Rectangle {
                 if row.heading == "": PanelRow {
                     data: row;
                 }
+            }
+        }
+    }
+
+    if Panel.rows.length == 0: Text {
+        x: 16px;
+        y: 6px;
+        height: Theme.panel-row-height;
+        text: "No matching actions";
+        color: Theme.muted;
+        font-size: Theme.text-body;
+        vertical-alignment: center;
+        accessible-role: AccessibleRole.text;
+        accessible-label: self.text;
+    }
+
+    Rectangle {
+        y: parent.height - root.filter-height;
+        height: 1px;
+        background: Theme.border;
+    }
+
+    Rectangle {
+        x: 16px;
+        y: parent.height - root.filter-height + 1px;
+        width: parent.width - 32px;
+        height: root.filter-height - 1px;
+        accessible-role: text-input;
+        accessible-label: "Search actions";
+        accessible-placeholder-text: "Search actions";
+        accessible-value: filter.text;
+        accessible-action-set-value(value) => {
+            filter.text = value;
+            Intents.panel-filter-edited(value);
+        }
+        Text {
+            x: 0;
+            width: parent.width;
+            text: filter.text == "" && filter.preedit-text == "" ? "Search actions" : "";
+            color: Theme.muted;
+            font-size: Theme.text-small;
+            vertical-alignment: center;
+            accessible-role: none;
+        }
+        filter := TextInput {
+            x: 0;
+            width: parent.width;
+            height: parent.height;
+            single-line: true;
+            color: Theme.text;
+            selection-background-color: Theme.selection;
+            selection-foreground-color: Theme.text;
+            font-size: Theme.text-small;
+            vertical-alignment: center;
+            accessible-role: none;
+            edited => {
+                Intents.panel-filter-edited(self.text);
             }
         }
     }

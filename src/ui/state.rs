@@ -7,6 +7,7 @@ use crate::protocol::{
 
 use super::effect::{ActionRequest, Effect, Origin};
 use super::input::{Chord, Context, Event, Input, Intent, ResultItem, TemplateInspection};
+use crate::ranking::fuzzy;
 
 /// All interaction state of the launcher. A pure reducer: input goes in,
 /// effects for the shell come out, and `snapshot` says what to draw.
@@ -83,8 +84,10 @@ pub(super) struct FormState {
     pub(super) revision: u64,
 }
 
+#[derive(Default)]
 struct PanelState {
     picked: Option<String>,
+    filter: String,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -123,6 +126,7 @@ impl Launcher {
                 | Intent::Activate { .. }
                 | Intent::TogglePanel
                 | Intent::ClosePanel
+                | Intent::PanelFilterChanged { .. }
         ) {
             self.clear_failure();
         }
@@ -145,6 +149,12 @@ impl Launcher {
             }
             Intent::ClosePanel => self.panel = None,
             Intent::Blur => fx.push(Effect::Dismiss),
+            Intent::PanelFilterChanged { text } => {
+                if let Some(panel) = self.panel.as_mut() {
+                    panel.filter = text;
+                    panel.picked = None;
+                }
+            }
             Intent::GoBack => match self.mode() {
                 Mode::Error => self.view_error = None,
                 _ if !self.stack.is_empty() => {
@@ -608,7 +618,7 @@ impl Launcher {
 
     fn open_panel(&mut self) {
         if !self.available_actions().is_empty() {
-            self.panel = Some(PanelState { picked: None });
+            self.panel = Some(PanelState::default());
         }
     }
 
@@ -795,8 +805,26 @@ impl Launcher {
     }
 
     /// The actions in the order the panel lists them: grouped by section in
-    /// the order sections first appear, with danger actions after all others.
+    /// the order sections first appear, with danger actions after all others,
+    /// narrowed by the panel's filter.
     pub(super) fn panel_actions(&self) -> Vec<&Action> {
+        let mut actions = self.ordered_actions();
+        if let Some(filter) = self.panel.as_ref().map(|panel| &panel.filter) {
+            if !filter.is_empty() {
+                let mut query = fuzzy::Query::new(filter);
+                actions.retain(|action| query.score(&action.title).is_some());
+            }
+        }
+        actions
+    }
+
+    pub(super) fn panel_filter(&self) -> &str {
+        self.panel
+            .as_ref()
+            .map_or("", |panel| panel.filter.as_str())
+    }
+
+    fn ordered_actions(&self) -> Vec<&Action> {
         let actions = self.available_actions();
         let mut sections: Vec<Option<&str>> = Vec::new();
         for action in actions {

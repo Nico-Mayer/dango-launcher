@@ -16,6 +16,7 @@ const HEADING_HEIGHT: f32 = 28.0;
 pub struct Writer {
     rows: Rc<VecModel<ActionData>>,
     selected: Option<String>,
+    open: bool,
 }
 
 impl Writer {
@@ -25,6 +26,7 @@ impl Writer {
         Self {
             rows,
             selected: None,
+            open: false,
         }
     }
 
@@ -56,6 +58,12 @@ impl Writer {
         let place = place(&rows, panel.selected.as_deref());
         self.rows.set_vec(rows);
         ui.global::<Panel>().set_open(panel.open);
+        // The input owns its text while the panel is open, so it is seeded
+        // only as the panel opens.
+        if panel.open && !self.open {
+            ui.invoke_set_panel_filter(panel.filter.as_str().into());
+        }
+        self.open = panel.open;
 
         if panel.selected != self.selected {
             if let Some((top, height)) = place {

@@ -145,7 +145,8 @@ impl Renderer {
             Focus::RootInput | Focus::ViewInput => ui.invoke_focus_prompt(activated),
             // A form puts the cursor in its first field as it is seeded.
             Focus::Form => {}
-            Focus::Detail | Focus::Panel | Focus::Nothing => ui.invoke_focus_surface(),
+            Focus::Panel => ui.invoke_focus_panel_filter(),
+            Focus::Detail | Focus::Nothing => ui.invoke_focus_surface(),
         }
     }
 }
@@ -214,5 +215,9 @@ pub fn connect(ui: &LauncherWindow, renderer: Rc<RefCell<Renderer>>, dispatch: R
     intents.on_toggle_panel(move || send(Intent::TogglePanel));
     let send = dispatch.clone();
     intents.on_close_panel(move || send(Intent::ClosePanel));
-    intents.on_go_back(move || dispatch(Intent::GoBack));
+    let send = dispatch.clone();
+    intents.on_go_back(move || send(Intent::GoBack));
+    intents.on_panel_filter_edited(move |text| {
+        dispatch(Intent::PanelFilterChanged { text: text.into() })
+    });
 }

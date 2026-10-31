@@ -1025,6 +1025,31 @@ fn danger_actions_come_last_under_their_section() {
 }
 
 #[test]
+fn the_panel_filter_narrows_actions_and_leaves_the_query() {
+    let mut h = Harness::root(3);
+    h.typed("res");
+    h.results("res", results(3));
+    h.command("k");
+    h.intent(Intent::PanelFilterChanged { text: "co".into() });
+    let panel = h.snapshot().panel;
+    let titles: Vec<&str> = panel.actions.iter().map(|a| a.title.as_str()).collect();
+    assert_eq!(titles, ["Copy"]);
+    assert_eq!(panel.selected.as_deref(), Some("copy"));
+    assert_eq!(h.launcher.query, "res");
+
+    h.intent(Intent::PanelFilterChanged { text: "zz".into() });
+    assert!(h.snapshot().panel.actions.is_empty());
+    assert!(h.snapshot().panel.open);
+    assert!(h.press("Enter").is_empty());
+
+    h.press("Escape");
+    assert_eq!(h.snapshot().focus, Focus::RootInput);
+    h.command("k");
+    assert_eq!(h.snapshot().panel.filter, "");
+    assert_eq!(h.snapshot().panel.actions.len(), 2);
+}
+
+#[test]
 fn a_click_on_a_panel_action_runs_it() {
     let mut h = Harness::root(3);
     h.intent(Intent::TogglePanel);

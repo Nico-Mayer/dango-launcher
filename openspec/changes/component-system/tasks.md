@@ -36,9 +36,9 @@
 
 ## 5. Action panel
 
-- [ ] 5.1 Restyle the panel with a shadow, section headings, and danger rows in the danger role; verify UI tests for the "Manage" section and the danger row's position
-- [ ] 5.2 Add the panel filter input with "Search actions" as placeholder and "No matching actions" when empty, with `Focus::Panel` placing the cursor in it; verify reducer and UI tests that typing "co" narrows the actions and leaves the query, and that Escape returns typing to the SearchBar
-- [ ] 5.3 Verify the overlay rules in UI tests: confirming in the panel runs one action and not the row below, and closing over a detail view gives it its shortcuts back
+- [x] 5.1 Restyle the panel with a shadow, section headings, and danger rows in the danger role; verify UI tests for the "Manage" section and the danger row's position
+- [x] 5.2 Add the panel filter input with "Search actions" as placeholder and "No matching actions" when empty, with `Focus::Panel` placing the cursor in it; verify reducer and UI tests that typing "co" narrows the actions and leaves the query, and that Escape returns typing to the SearchBar
+- [x] 5.3 Verify the overlay rules in UI tests: confirming in the panel runs one action and not the row below, and closing over a detail view gives it its shortcuts back
 
 ## 6. Detail view
 

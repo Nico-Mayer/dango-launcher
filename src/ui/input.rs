@@ -43,6 +43,10 @@ pub enum Intent {
     ClosePanel,
     /// The SearchBar's back control.
     GoBack,
+    /// The action panel's own filter input.
+    PanelFilterChanged {
+        text: String,
+    },
     Blur,
 }
 

@@ -41,6 +41,14 @@ export component LauncherWindow inherits Window {
         panel.reveal(top, height);
     }
 
+    public function set-panel-filter(text: string) {
+        panel.set-filter(text);
+    }
+
+    public function focus-panel-filter() {
+        panel.focus-filter();
+    }
+
     surface := FocusScope {
         capture-key-pressed(event) => {
             Shell.pointer-resting = true;
