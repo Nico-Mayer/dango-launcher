@@ -71,27 +71,11 @@ pub enum Next {
 /// request.
 pub struct Chunks {
     receiver: std::sync::mpsc::Receiver<Result<String, AiError>>,
-    /// Run when the answer is let go of. An HTTP request ends by itself once
-    /// nothing is reading it; a child process has to be told.
-    cleanup: Option<Box<dyn FnOnce() + Send>>,
 }
 
 impl Chunks {
     pub fn new(receiver: std::sync::mpsc::Receiver<Result<String, AiError>>) -> Self {
-        Self {
-            receiver,
-            cleanup: None,
-        }
-    }
-
-    pub fn with_cleanup(
-        receiver: std::sync::mpsc::Receiver<Result<String, AiError>>,
-        cleanup: impl FnOnce() + Send + 'static,
-    ) -> Self {
-        Self {
-            receiver,
-            cleanup: Some(Box::new(cleanup)),
-        }
+        Self { receiver }
     }
 
     pub fn next(&self, within: Duration) -> Next {
@@ -102,14 +86,6 @@ impl Chunks {
             Ok(Err(error)) => Next::Failed(error),
             Err(RecvTimeoutError::Timeout) => Next::Idle,
             Err(RecvTimeoutError::Disconnected) => Next::Done,
-        }
-    }
-}
-
-impl Drop for Chunks {
-    fn drop(&mut self) {
-        if let Some(cleanup) = self.cleanup.take() {
-            cleanup();
         }
     }
 }
