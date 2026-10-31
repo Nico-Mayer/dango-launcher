@@ -8,7 +8,7 @@ use i_slint_backend_testing::ElementHandle;
 use slint::platform::{PointerEventButton, WindowEvent};
 use slint::{ComponentHandle, LogicalPosition, Model};
 
-use super::generated::{Intents, LauncherWindow, Panel, ScreenKind, Shell, Tray};
+use super::generated::{GridData, Intents, LauncherWindow, Panel, ScreenKind, Shell, Tray};
 use super::render::{self, Renderer};
 use crate::protocol::{
     Action, DetailView, FieldKind, Filtering, FormField, FormView, ListItem, ListView, View,
@@ -973,6 +973,17 @@ mod grid {
         h.type_text("c");
         assert_eq!(h.query_of("Search"), "abc");
     }
+
+    #[test]
+    fn two_rows_of_tiles_set_the_window_height() {
+        let h = Harness::root(results(1));
+        h.view(grid_tree(7));
+        let content = h.ui.global::<GridData>().get_content_height();
+        assert!((h.height() - (56.0 + content + 40.0)).abs() < 0.01);
+        let last = h.row("tile-7");
+        let bottom = last.absolute_position().y + last.size().height;
+        assert!(bottom <= h.height() - 40.0, "the last row is not cut off");
+    }
 }
 
 mod filter_dropdown {
@@ -1151,6 +1162,18 @@ mod action_panel {
         let pin = h.find("Pin entry").unwrap().absolute_position().y;
         let delete = h.find("Delete entry").unwrap().absolute_position().y;
         assert!(delete > pin);
+    }
+
+    #[test]
+    fn the_panel_over_a_short_list_sets_the_window_height() {
+        let h = Harness::root(vec![managed()]);
+        actions_button(&h).mock_single_click(PointerEventButton::Left);
+        let panel = ElementHandle::find_by_accessible_label(&h.ui, "Actions")
+            .find(|element| {
+                element.accessible_role() == Some(i_slint_backend_testing::AccessibleRole::List)
+            })
+            .expect("the action panel");
+        assert_eq!(h.height(), panel.size().height + 40.0 + 2.0 * 8.0);
     }
 
     #[test]
