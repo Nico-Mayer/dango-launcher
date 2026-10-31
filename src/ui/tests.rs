@@ -75,6 +75,7 @@ fn detail_tree(markdown: &str) -> ViewTree {
         markdown: markdown.into(),
         loading: true,
         actions: actions(),
+        ..Default::default()
     }))
 }
 
@@ -433,7 +434,8 @@ fn a_later_invocation_pushes_on_top() {
     assert_eq!(
         h.view_body(),
         ViewBody::Detail(DetailBody {
-            markdown: "first".into()
+            markdown: "first".into(),
+            ..Default::default()
         })
     );
 }

@@ -215,6 +215,7 @@ fn confirmation(count: usize) -> ViewTree {
                     ..Default::default()
                 },
             ],
+            ..Default::default()
         }),
     }
 }

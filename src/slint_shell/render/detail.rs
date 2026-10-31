@@ -5,6 +5,7 @@ use std::rc::Rc;
 use slint::{ComponentHandle, ModelRc, StyledText, VecModel};
 
 use crate::slint_shell::generated::{DetailData, LauncherWindow, MetaData};
+use crate::ui::snapshot::DetailBody;
 
 pub struct Writer {
     metadata: Rc<VecModel<MetaData>>,
@@ -22,13 +23,17 @@ impl Writer {
         }
     }
 
-    pub fn write(&self, markdown: &str) {
+    pub fn write(&self, body: &DetailBody) {
         let Some(ui) = self.ui.upgrade() else {
             return;
         };
         let detail = ui.global::<DetailData>();
-        detail.set_body(StyledText::from_plain_text(markdown));
-        detail.set_text(markdown.into());
-        self.metadata.set_vec(Vec::new());
+        detail.set_body(StyledText::from_plain_text(&body.markdown));
+        detail.set_text(body.markdown.as_str().into());
+        let metadata = body.metadata.iter().map(|pair| MetaData {
+            label: pair.label.as_str().into(),
+            value: pair.value.as_str().into(),
+        });
+        self.metadata.set_vec(metadata.collect::<Vec<_>>());
     }
 }

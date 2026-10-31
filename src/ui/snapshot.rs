@@ -1,6 +1,6 @@
 use serde::Serialize;
 
-use crate::protocol::{Action, FieldKind, ListItem, View};
+use crate::protocol::{Action, FieldKind, ListItem, Metadata, View};
 
 use super::input::{Chord, Context, ResultItem};
 use super::state::{Launcher, Mode, PushedView, ToastStyle, ViewError};
@@ -104,6 +104,8 @@ snapshot_types! {
     pub struct ListBody {
         pub query: Text,
         pub sections: Vec<ListSection>,
+        /// The selected item's detail, when the list shows a pane for it.
+        pub pane: Option<DetailBody>,
         pub selected: Option<String>,
         pub empty: Option<EmptyText>,
     }
@@ -125,8 +127,10 @@ snapshot_types! {
     }
 
     #[serde(rename_all = "camelCase")]
+    #[derive(Default)]
     pub struct DetailBody {
         pub markdown: String,
+        pub metadata: Vec<Metadata>,
     }
 
     #[serde(rename_all = "camelCase")]
@@ -334,12 +338,22 @@ impl Launcher {
                         revision: view.query_revision,
                     },
                     sections,
+                    pane: list.detail_pane.then(|| {
+                        self.view_selected()
+                            .and_then(|item| item.detail.as_ref())
+                            .map(|detail| DetailBody {
+                                markdown: detail.markdown.clone(),
+                                metadata: detail.metadata.clone(),
+                            })
+                            .unwrap_or_default()
+                    }),
                     selected: self.view_selected().map(|item| item.id.clone()),
                     empty,
                 })
             }
             View::Detail(detail) => ViewBody::Detail(DetailBody {
                 markdown: detail.markdown.clone(),
+                metadata: detail.metadata.clone(),
             }),
             View::Form(form) => ViewBody::Form(FormBody {
                 revision: view.form.revision,

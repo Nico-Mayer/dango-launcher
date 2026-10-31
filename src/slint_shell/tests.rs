@@ -189,6 +189,7 @@ fn detail_tree(markdown: &str) -> ViewTree {
         markdown: markdown.into(),
         loading: false,
         actions: Vec::new(),
+        ..Default::default()
     }))
 }
 
@@ -633,6 +634,99 @@ mod views {
             .filter_map(|field| field.accessible_description())
             .any(|description| description == "The template doesn't close");
         assert!(described);
+    }
+}
+
+mod list_view {
+    use slint::language::ColorScheme;
+
+    use super::super::generated::{StdPalette, Theme};
+    use super::*;
+    use crate::protocol::{Accessory, ItemDetail};
+
+    fn tree(items: Vec<ListItem>, detail_pane: bool) -> ViewTree {
+        ViewTree::new(View::List(ListView {
+            detail_pane,
+            items,
+            ..Default::default()
+        }))
+    }
+
+    fn item(n: usize) -> ListItem {
+        ListItem {
+            id: format!("item-{n}"),
+            title: format!("Item {n}"),
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn a_row_is_forty_pixels_high() {
+        let h = Harness::root(results(3));
+        assert_eq!(h.row("result-1").size().height, 40.0);
+    }
+
+    #[test]
+    fn a_fourth_accessory_is_dropped() {
+        let accessories = (1..=4)
+            .map(|n| Accessory::Text {
+                text: format!("Accessory {n}"),
+            })
+            .collect();
+        let h = Harness::root(results(1));
+        h.view(tree(
+            vec![ListItem {
+                accessories,
+                ..item(1)
+            }],
+            false,
+        ));
+        assert!(h.find("Accessory 3").is_some());
+        assert!(h.find("Accessory 4").is_none());
+    }
+
+    #[test]
+    fn hover_is_weaker_than_selection() {
+        let h = Harness::new();
+        let theme = h.ui.global::<Theme>();
+        for scheme in [ColorScheme::Dark, ColorScheme::Light] {
+            h.ui.global::<StdPalette>().set_color_scheme(scheme);
+            assert!(theme.get_hover().alpha() < theme.get_selection().alpha());
+        }
+    }
+
+    #[test]
+    fn no_results_shows_the_empty_view_with_the_query() {
+        let h = Harness::root(results(3));
+        h.type_text("zzz");
+        h.event(Event::Results {
+            query: "zzz".into(),
+            items: Vec::new(),
+        });
+        assert_eq!(h.shell().get_screen(), ScreenKind::Empty);
+        assert!(h.find("No results for “zzz”").is_some());
+    }
+
+    #[test]
+    fn arrow_down_changes_the_detail_pane() {
+        let detailed = |n: usize, body: &str| ListItem {
+            detail: Some(ItemDetail {
+                markdown: body.into(),
+                metadata: Vec::new(),
+            }),
+            ..item(n)
+        };
+        let h = Harness::root(results(1));
+        h.view(tree(
+            vec![detailed(1, "First body"), detailed(2, "Second body")],
+            true,
+        ));
+        let first = h.find("First body").expect("the first detail");
+        assert!(first.absolute_position().x >= 720.0 * 2.0 / 5.0);
+        assert!(h.row("item-1").size().width <= 720.0 * 2.0 / 5.0);
+        h.arrow_down();
+        assert!(h.find("Second body").is_some());
+        assert!(h.find("First body").is_none());
     }
 }
 

@@ -280,6 +280,7 @@ fn detail(markdown: String, loading: bool, actions: Vec<Action>) -> ViewTree {
         markdown,
         loading,
         actions,
+        ..Default::default()
     }))
 }
 

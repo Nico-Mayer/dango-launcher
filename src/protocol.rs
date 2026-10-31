@@ -41,6 +41,9 @@ protocol_types! {
         /// In the order they are shown. Items name the one they belong to.
         #[serde(default)]
         pub sections: Vec<Section>,
+        /// Shows the selected item's detail beside the list.
+        #[serde(default)]
+        pub detail_pane: bool,
         pub items: Vec<ListItem>,
     }
 
@@ -82,9 +85,27 @@ protocol_types! {
         /// Matched by the launcher's filter as the title is, never shown.
         #[serde(default)]
         pub keywords: Vec<String>,
+        /// Shown in the list's detail pane while the item is selected.
+        #[serde(default)]
+        pub detail: Option<ItemDetail>,
         /// The selected item's action panel. The first action is primary.
         #[serde(default)]
         pub actions: Vec<Action>,
+    }
+
+    #[serde(rename_all = "camelCase")]
+    pub struct ItemDetail {
+        #[serde(default)]
+        pub markdown: String,
+        #[serde(default)]
+        pub metadata: Vec<Metadata>,
+    }
+
+    /// A label and value pair shown below a detail's body.
+    #[serde(rename_all = "camelCase")]
+    pub struct Metadata {
+        pub label: String,
+        pub value: String,
     }
 
     #[serde(tag = "kind", rename_all = "camelCase")]
@@ -109,8 +130,11 @@ protocol_types! {
     }
 
     #[serde(rename_all = "camelCase")]
+    #[derive(Default)]
     pub struct DetailView {
         pub markdown: String,
+        #[serde(default)]
+        pub metadata: Vec<Metadata>,
         #[serde(default)]
         pub loading: bool,
         #[serde(default)]

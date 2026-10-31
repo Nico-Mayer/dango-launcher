@@ -29,10 +29,10 @@
 
 ## 4. List view
 
-- [ ] 4.1 Render section headings with optional subtitle and rows at 40 logical pixels with a 20 pixel icon, up to three accessories, selection and hover from `Theme`; verify UI tests for row height, a fourth accessory dropped, and hover weaker than selection
-- [ ] 4.2 Update `reveal` for the new row and heading heights; verify the existing "arrowing back to the top shows the heading" UI test passes
-- [ ] 4.3 Build the EmptyView with icon, title, and hint, centred; verify a UI test for "No results for" with the query
-- [ ] 4.4 Build the list detail pane at two fifths and three fifths; verify a UI test that Arrow Down changes the pane's content
+- [x] 4.1 Render section headings with optional subtitle and rows at 40 logical pixels with a 20 pixel icon, up to three accessories, selection and hover from `Theme`; verify UI tests for row height, a fourth accessory dropped, and hover weaker than selection
+- [x] 4.2 Update `reveal` for the new row and heading heights; verify the existing "arrowing back to the top shows the heading" UI test passes
+- [x] 4.3 Build the EmptyView with icon, title, and hint, centred; verify a UI test for "No results for" with the query
+- [x] 4.4 Build the list detail pane at two fifths and three fifths; verify a UI test that Arrow Down changes the pane's content
 
 ## 5. Action panel
 

@@ -39,7 +39,8 @@ impl Writer {
         self.rows.set_vec(Vec::new());
     }
 
-    pub fn root(&mut self, root: &RootScreen, icons: &Icons) {
+    pub fn root(&mut self, ui: &LauncherWindow, root: &RootScreen, icons: &Icons) {
+        ui.global::<ListData>().set_detail_pane(false);
         let selected = root.selected.as_deref();
         let rows = root.sections.iter().flat_map(|section| {
             let heading = section.heading.iter().map(|title| heading(title, None));
@@ -52,7 +53,8 @@ impl Writer {
         self.rows.set_vec(rows.collect::<Vec<_>>());
     }
 
-    pub fn view(&mut self, list: &ListBody, icons: &Icons) {
+    pub fn view(&mut self, ui: &LauncherWindow, list: &ListBody, icons: &Icons) {
+        ui.global::<ListData>().set_detail_pane(list.pane.is_some());
         let selected = list.selected.as_deref();
         let rows = list.sections.iter().flat_map(|section| {
             let heading = section

@@ -77,7 +77,7 @@ impl Renderer {
             }
             Screen::Root(root) => {
                 self.write_query(ui, kind, &root.query.text, root.query.revision);
-                self.list.root(root, &self.icons);
+                self.list.root(ui, root, &self.icons);
                 if let Some(text) = &root.empty {
                     empty::write(ui, text, &self.icons);
                 }
@@ -86,13 +86,16 @@ impl Renderer {
             Screen::View(view) => match &view.body {
                 ViewBody::List(body) => {
                     self.write_query(ui, kind, &body.query.text, body.query.revision);
-                    self.list.view(body, &self.icons);
+                    self.list.view(ui, body, &self.icons);
+                    if let Some(pane) = &body.pane {
+                        self.detail.write(pane);
+                    }
                     if let Some(text) = &body.empty {
                         empty::write(ui, text, &self.icons);
                     }
                     selected = body.selected.clone();
                 }
-                ViewBody::Detail(body) => self.detail.write(&body.markdown),
+                ViewBody::Detail(body) => self.detail.write(body),
                 ViewBody::Form(body) => self.form.write(body),
             },
         }

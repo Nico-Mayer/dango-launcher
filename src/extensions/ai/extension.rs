@@ -356,6 +356,7 @@ fn detail_tree(markdown: &str, loading: bool, actionable: bool) -> ViewTree {
             markdown: markdown.into(),
             loading,
             actions,
+            ..Default::default()
         }),
     }
 }
