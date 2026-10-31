@@ -2,6 +2,19 @@
 
 All notable changes to Dango. Generated from commit history at release time.
 
+## [1.0.0] - 2026-10-31
+
+### Features
+
+- **ai:** [**breaking**] Remove the cli provider kind
+
+### Refactoring
+
+- **config:** Make PerPlatform a string again
+
+### Documentation
+
+- **agents:** Drop tray PATH trap
 ## [0.6.0] - 2026-10-30
 
 ### Features
