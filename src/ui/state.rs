@@ -1062,8 +1062,9 @@ fn ordered_actions(actions: &[Action]) -> Vec<&Action> {
 /// Marks a panel entry as a filter option rather than an action.
 pub(super) const FILTER_PREFIX: &str = "dango.filter:";
 
-/// Items in section order, narrowed by the query and then cut to the item limit, without the groups left empty. Items naming no
-/// declared section come first.
+/// Items in section order, narrowed by the query and then cut to the item
+/// limit, without the groups left empty. Items naming no declared section come
+/// first.
 fn group<'a, T: Grouped>(
     items: &'a [T],
     sections: &'a [Section],
