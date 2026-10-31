@@ -230,6 +230,7 @@ mod tests {
     #[test]
     fn pairs_are_persisted_and_loaded_back() {
         use std::sync::Arc;
+        const NOW: i64 = 1_700_000_000_000;
         #[derive(Default)]
         struct Spy(Mutex<Vec<(String, String, u32)>>);
         impl InputHistoryPersistence for Arc<Spy> {
@@ -239,7 +240,7 @@ mod tests {
                     "item".into(),
                     Record {
                         use_count: 2,
-                        last_used_at: now_millis(),
+                        last_used_at: NOW,
                     },
                 )]
             }
@@ -252,9 +253,8 @@ mod tests {
         }
         let spy = Arc::new(Spy::default());
         let history = InputHistory::load(Box::new(spy.clone()));
-        let now = now_millis();
-        assert_eq!(history.lookup("seed", now).exact["item"], 2.0);
-        history.record("Seed", "item", now);
+        assert_eq!(history.lookup("seed", NOW).exact["item"], 2.0);
+        history.record("Seed", "item", NOW);
         assert_eq!(
             spy.0.lock().unwrap().as_slice(),
             &[("seed".to_string(), "item".to_string(), 3)]
