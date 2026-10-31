@@ -53,6 +53,8 @@ static PRESS_AT: Mutex<Option<Instant>> = Mutex::new(None);
 /// Longer than this held is a hold, not a tap.
 const TAP_THRESHOLD: Duration = Duration::from_millis(200);
 
+const UNMAPPED_VK: VIRTUAL_KEY = 0xFF;
+
 pub struct WindowsHyperkey {
     thread_id: u32,
     thread: Option<JoinHandle<()>>,
@@ -167,6 +169,12 @@ unsafe extern "system" fn hook_proc(code: i32, wparam: WPARAM, lparam: LPARAM) -
                         emit_modifiers(true);
                     }
                     KeyEdge::Up => {
+                        if !OTHER_KEY.load(Ordering::SeqCst) {
+                            // Win+Ctrl+Alt+Shift released alone is the Office
+                            // key chord, which opens Microsoft 365.
+                            send_key(UNMAPPED_VK, true);
+                            send_key(UNMAPPED_VK, false);
+                        }
                         emit_modifiers(false);
                         maybe_send_tap();
                     }
@@ -252,8 +260,7 @@ fn transition(held: bool, edge: KeyEdge) -> (bool, bool) {
 }
 
 /// Presses or releases the configured modifiers. Win goes down first and up last
-/// so it is never pressed and released "clean": the Ctrl and Alt events around
-/// it stop Windows from opening the Start menu on a lone hyperkey tap.
+/// so it is never pressed and released "clean", which would open the Start menu.
 unsafe fn emit_modifiers(down: bool) {
     let meta = EMIT_META.load(Ordering::SeqCst);
     let ctrl = EMIT_CTRL.load(Ordering::SeqCst);
