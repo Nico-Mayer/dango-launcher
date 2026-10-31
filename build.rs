@@ -1,6 +1,8 @@
 fn main() {
-    // Fluent on both platforms, so the launcher looks the same everywhere. The
-    // UI tests find elements through debug info, which a release leaves out.
+    // The launcher draws its own controls; a std-widgets style is still needed
+    // for ScrollView and for Palette.color-scheme, which follows the system.
+    // The UI tests find elements through debug info, which a release leaves
+    // out.
     let config = slint_build::CompilerConfiguration::new()
         .with_style("fluent".into())
         .with_debug_info(std::env::var("PROFILE").as_deref() == Ok("debug"));

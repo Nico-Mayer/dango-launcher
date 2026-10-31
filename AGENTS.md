@@ -64,10 +64,24 @@ spend design on honouring old values.
 - One Rust crate at the repo root: all OS integration, all business logic,
   and the UI. Rust in `src/`, `.slint` files in `ui/`.
 - Slint draws the launcher and the tray in the Dango process, on the winit
-  backend with the Fluent style on both platforms. Build on `std-widgets.slint`
-  first. The UI is a renderer of the launcher snapshot, not a place for logic.
-- One palette, the `Palette` global in `ui/app.slint`. Every colour, radius,
-  and type size comes from it; Rust passes indexes into it, never colours.
+  backend. The UI is a renderer of the launcher snapshot, not a place for
+  logic. The look is the design system in `openspec/specs/design-system`.
+- One theme, the `Theme` global in `ui/theme.slint`. Every colour, radius,
+  size, and type face comes from it, in a dark and a light value. It reads the
+  operating system's scheme through std-widgets' `Palette.color-scheme`, which
+  is the only reason the build keeps a std-widgets style. Rust never passes a
+  colour.
+- `ui/` holds `theme.slint`, `atoms/` (icon, kbd, tag, accessory, dot, and
+  the form controls), `shell/` (window, SearchBar, ActionBar, action panel),
+  `views/` (list, grid, detail, form, empty view), and `app.slint`, which
+  exports the window, the tray, and the globals. Each part maps to one part of
+  the design.
+- Controls are our own, built on `TextInput`, `FocusScope`, `TouchArea`, and
+  `PopupWindow`. std-widgets' controls cannot take our colours, radii, or
+  focus border (their palette is `out`), so only `ScrollView` is used from
+  them. A control carries `accessible-role`, `-label`, `-value`, and
+  `-description` itself, with its inner `TextInput` set to `accessible-role:
+  none`.
 - Named icons come from `icondata_lu` behind one registry in
   `src/slint_shell/icons.rs`. Never draw an icon elsewhere and never hand-roll
   an SVG: add the name to that registry. An extension names one as
@@ -103,12 +117,18 @@ extension. Built-in features are extensions too. The contract is in
   hotkeys, and the tray status. Window and tray work goes through the narrow
   `Shell` trait (`src/shell.rs`), which `src/slint_shell/` implements and a
   recording fake implements in tests.
-- The renderer (`src/slint_shell/render.rs`) turns each snapshot into Slint
-  models and properties, replacing everything. It sends intents to
-  `Core::dispatch` in order on the main thread. A root `FocusScope` asks Rust
+- The renderer (`src/slint_shell/render/`) turns each snapshot into Slint
+  globals, replacing everything, with one writer per global: `Shell`,
+  `Search`, `ListData`, `GridData`, `EmptyData`, `DetailData`, `Panel`, and
+  `FormData`. Components read the globals they need, so nothing is threaded
+  through the window. Callbacks go through the `Intents` global to
+  `Core::dispatch`, in order on the main thread. A root `FocusScope` asks Rust
   through `capture-key-pressed` whether a chord is in the snapshot's
   `bindings` before the focused control sees it. The renderer keeps only
   hover, focus placement, and scroll-into-view.
+- Rows, headings, tiles, and panel entries have fixed heights, so the renderer
+  places and reveals them, and sizes the window, by counting. Change a height
+  in `Theme` and the matching constant in `render/` together.
 - Slint owns the main thread; a tokio runtime owned by the shell runs beside
   it. Backend work reaches the UI through `Shell::on_main_thread`, which is
   `slint::invoke_from_event_loop`.
@@ -138,10 +158,10 @@ load and are not reliable.
   reasoning, a surprising constraint, or a subtle workaround.
 - Rust: borrow over clone, `Result` with typed errors over strings, small
   focused modules.
-- UI is built on `std-widgets.slint` with markup close to the documented
-  example. Hand-roll a surface only where no widget fits, and say why in the
-  design. Interactive elements carry an `accessible-label`, which is also how
-  the UI tests find them.
+- A surface is built from the design system's parts in `ui/atoms/`,
+  `ui/shell/`, and `ui/views/`. A new part goes where the design puts it and
+  takes every value from `Theme`. Interactive elements carry an
+  `accessible-label`, which is also how the UI tests find them.
 - UI tests run the real state machine against the component on
   `i_slint_backend_testing` (`src/slint_shell/tests.rs`).
 - Any element that needs an icon uses one. A placeholder square only where the
@@ -180,6 +200,13 @@ load and are not reliable.
   Monitoring, not Accessibility. An Input Monitoring grant applies only after
   a restart; an Accessibility grant applies at once.
 - Showing the launcher over fullscreen apps on macOS needs an NSPanel.
+- winit resizes a macOS window with `setContentSize`, which keeps the
+  bottom-left origin, so a Slint `Window::set_size` or a changed `height`
+  grows the launcher upward and moves the SearchBar. The height goes through
+  `LauncherWindow::set_height`, which keeps the top edge, and the component
+  only follows when the platform reports it resized. Windows uses
+  `SetWindowPos` with `SWP_NOMOVE`; macOS has no implementation yet
+  (`setFrame:display:` with the origin moved down) and stays at full height.
 - Reading the selection is direct on macOS via `AXSelectedText`. On Windows the
   realistic path is copy, read clipboard, restore clipboard.
 - An ad-hoc signed macOS build has a designated requirement of its own
