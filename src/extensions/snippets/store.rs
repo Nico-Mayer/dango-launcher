@@ -369,13 +369,27 @@ fn parse(text: &str) -> Result<Vec<Map<String, Value>>, RecordError> {
     serde_json::from_str(text).map_err(|error| RecordError::Parse(error.to_string()))
 }
 
-/// Assigns an id to any record that was hand-authored without one, so it has a
-/// stable identity from now on. The id is written the next time the file is.
+/// Assigns an id to any record that was hand-authored without one. The id is
+/// derived from the name, so it stays the same across loads until the next save
+/// writes it, and frecency and an open edit form keep pointing at the record.
 fn with_ids(mut records: Vec<Map<String, Value>>) -> Vec<Map<String, Value>> {
-    for record in &mut records {
-        if record_id(record).is_none() {
-            record.insert("id".into(), Value::String(uuid::Uuid::new_v4().to_string()));
+    for index in 0..records.len() {
+        if record_id(&records[index]).is_some() {
+            continue;
         }
+        let name = records[index]
+            .get("name")
+            .and_then(Value::as_str)
+            .unwrap_or_default()
+            .trim()
+            .to_string();
+        let mut id = format!("name:{name}");
+        let mut count = 1;
+        while records.iter().any(|record| record_id(record) == Some(&id)) {
+            count += 1;
+            id = format!("name:{name}#{count}");
+        }
+        records[index].insert("id".into(), Value::String(id));
     }
     records
 }
@@ -475,6 +489,18 @@ mod tests {
         assert_eq!(all.len(), 1);
         assert!(!all[0].id.is_empty(), "an id was assigned");
         assert_eq!(all[0].body, "typed by hand");
+    }
+
+    #[test]
+    fn a_hand_added_entry_keeps_its_id_across_loads() {
+        let text = r#"[{ "name": "Hand", "template": "a" }, { "name": "Hand", "template": "b" }]"#;
+        let records = records(Kind::Snippet);
+        records.reload(text).unwrap();
+        let first: Vec<_> = records.all().unwrap().into_iter().map(|r| r.id).collect();
+        records.reload(text).unwrap();
+        let second: Vec<_> = records.all().unwrap().into_iter().map(|r| r.id).collect();
+        assert_eq!(first, second);
+        assert_ne!(first[0], first[1], "same name, distinct ids");
     }
 
     #[test]
