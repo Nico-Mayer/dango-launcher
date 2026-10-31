@@ -148,12 +148,7 @@ fn set_launcher_height(window: &LauncherWindow, platform: &Platform, height: f32
 }
 
 fn show_tray(component: &Tray, tray: &TrayStatus) {
-    let lines: Vec<SharedString> = tray
-        .items()
-        .into_iter()
-        .filter(|item| item.command.is_none())
-        .map(|item| item.text.into())
-        .collect();
+    let lines: Vec<SharedString> = tray.lines().into_iter().map(Into::into).collect();
     component.set_lines(ModelRc::from(Rc::new(VecModel::from(lines))));
     component.set_grant_accessibility(tray.missing.contains(&Permission::Accessibility));
     component.set_grant_input_monitoring(tray.missing.contains(&Permission::InputMonitoring));

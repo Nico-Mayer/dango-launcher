@@ -52,46 +52,12 @@ pub enum TrayCommand {
     Quit,
 }
 
-#[derive(Clone, Debug, PartialEq)]
-pub struct TrayItem {
-    pub text: String,
-    /// `None` for a status line, which is shown disabled.
-    pub command: Option<TrayCommand>,
-}
-
 impl TrayStatus {
-    pub fn items(&self) -> Vec<TrayItem> {
-        let grants = [
-            (Permission::Accessibility, "Grant Accessibility"),
-            (Permission::InputMonitoring, "Grant Input Monitoring"),
-        ]
-        .into_iter()
-        .filter(|(permission, _)| self.missing.contains(permission))
-        .map(|(permission, text)| TrayItem {
-            text: text.into(),
-            command: Some(TrayCommand::Grant(permission)),
-        });
-        let notices = self.notices.iter().map(|text| TrayItem {
-            text: text.clone(),
-            command: None,
-        });
-        let config = TrayItem {
-            text: config_status_text(self.config_error).into(),
-            command: None,
-        };
-        let commands = [
-            ("Show or hide Dango", TrayCommand::Toggle),
-            ("Quit Dango", TrayCommand::Quit),
-        ]
-        .map(|(text, command)| TrayItem {
-            text: text.into(),
-            command: Some(command),
-        });
-        grants
-            .chain(notices)
-            .chain([config])
-            .chain(commands)
-            .collect()
+    /// The disabled status lines. The grants and commands around them are in
+    /// the Slint menu.
+    pub fn lines(&self) -> Vec<String> {
+        let config = config_status_text(self.config_error).to_string();
+        self.notices.iter().cloned().chain([config]).collect()
     }
 }
 
@@ -169,35 +135,18 @@ mod tests {
     use super::*;
 
     #[test]
-    fn tray_lists_grants_first_and_commands_last() {
-        let tray = TrayStatus {
-            notices: vec!["Pasting is off, see dango.log".into()],
-            config_error: false,
-            missing: vec![Permission::InputMonitoring],
-        };
-        let texts: Vec<String> = tray.items().into_iter().map(|item| item.text).collect();
-        assert_eq!(
-            texts,
-            [
-                "Grant Input Monitoring",
-                "Pasting is off, see dango.log",
-                "Config file loaded",
-                "Show or hide Dango",
-                "Quit Dango",
-            ]
-        );
-    }
-
-    #[test]
-    fn notices_and_status_lines_are_not_commands() {
+    fn notices_come_before_the_config_status() {
         let tray = TrayStatus {
             notices: vec!["Database unavailable, see dango.log".into()],
             config_error: true,
             missing: vec![],
         };
-        let items = tray.items();
-        assert_eq!(items[0].command, None);
-        assert_eq!(items[1].text, "Config file has an error, see dango.log");
-        assert_eq!(items[1].command, None);
+        assert_eq!(
+            tray.lines(),
+            [
+                "Database unavailable, see dango.log",
+                "Config file has an error, see dango.log",
+            ]
+        );
     }
 }
