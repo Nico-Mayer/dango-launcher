@@ -186,6 +186,9 @@ load and are not reliable.
   Paste, snippet expansion, and AI replace-selection all depend on it.
   `AttachThreadInput` is in `Win32::System::Threading`, not
   `Win32::UI::WindowsAndMessaging`.
+- Windows reports AltGr as left Ctrl plus right Alt, so a chord check must
+  look at `VK_RMENU` before treating Ctrl+Alt as a shortcut, or every AltGr
+  character (`@`, `{`, `\` on a German layout) reads as one.
 - A non-elevated process cannot hook or manage elevated windows on Windows.
   Accept the limit.
 - On Windows, `WS_EX_TOOLWINDOW` is re-applied after each show: tao rewrote
