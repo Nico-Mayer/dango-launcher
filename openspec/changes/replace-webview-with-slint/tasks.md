@@ -55,7 +55,7 @@ Tauri app keeps working until group 6.
 ## 8. Docs and tooling cleanup
 
 - [x] 8.1 Rewrite `AGENTS.md` for the new stack: Slint and std-widgets, the icon registry rule, renderer rules, the debug-only Slint MCP command, and any traps found in groups 4 and 5. Drop the Tauri, Svelte, Bits UI, asset protocol, `tauri-action`, and fixture server facts. Verify `rg -i "tauri|svelte|bits ui|webview" AGENTS.md` only finds history notes, if any.
-- [ ] 8.2 Add the Slint attribution badge to `README.md` and update its build instructions. Verify the README build steps work from a fresh clone.
+- [x] 8.2 Add the Slint attribution badge to `README.md` and update its build instructions. Verify the README build steps work from a fresh clone.
 - [ ] 8.3 Remove the 51 `tauri*` skills and `svelte-code-writer` from `.claude/skills` and `skills-lock.json`, and set `"svelte@svelte": false` in `.claude/settings.json`. Verify a new Claude Code session in the repo lists no Tauri or Svelte skills.
 
 ## 9. Manual checks on the real OS
