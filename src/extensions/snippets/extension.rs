@@ -19,7 +19,7 @@ use crate::protocol::{
     View, ViewTree, PROTOCOL_VERSION,
 };
 use crate::search::{Candidate, RootProvider, Source};
-use crate::templates::{Template, Values};
+use crate::templates::{Rendered, Template, Values};
 use crate::text::{TextError, TextTarget};
 
 use super::favicons::{site_of, FaviconCache, FaviconService, FaviconSource, FaviconsEnabled};
@@ -165,13 +165,9 @@ impl SnippetsExtension {
         let template = Template::parse(&record.body)
             .map_err(|error| ActionOutcome::Failed(error.to_string()))?;
         let values = self.values(&template, arguments);
-        let rendered = template
+        template
             .render(&values)
-            .map_err(|error| ActionOutcome::Failed(error.to_string()))?;
-        Ok(Rendered {
-            text: rendered.text,
-            caret: rendered.caret,
-        })
+            .map_err(|error| ActionOutcome::Failed(error.to_string()))
     }
 
     fn insert(&self, record: &Record, arguments: FormValues) -> ActionOutcome {
@@ -216,11 +212,6 @@ impl SnippetsExtension {
         };
         list_tree(&items, &self.icons.sheet(self.kind()))
     }
-}
-
-pub struct Rendered {
-    pub text: String,
-    pub caret: Option<usize>,
 }
 
 impl Extension for SnippetsExtension {
