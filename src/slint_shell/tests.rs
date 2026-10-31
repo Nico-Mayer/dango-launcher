@@ -259,13 +259,182 @@ mod protocol_error {
     use super::*;
 
     #[test]
-    fn a_newer_tree_shows_the_error_screen() {
+    fn a_version_1_tree_shows_an_empty_view() {
         let h = Harness::new();
         let mut tree = detail_tree("Working");
-        tree.protocol_version = 99;
+        tree.protocol_version = 1;
         h.view(tree);
         assert_eq!(h.shell().get_screen(), ScreenKind::Empty);
         assert!(h.find("This view needs a newer version of Dango").is_some());
+        assert!(h.find("Press Escape to go back").is_some());
+    }
+}
+
+mod search_bar {
+    use super::views::{form_tree, list_tree};
+    use super::*;
+
+    #[test]
+    fn root_shows_no_back_control() {
+        let h = Harness::root(results(3));
+        assert!(h.find("Go back").is_none());
+    }
+
+    #[test]
+    fn the_back_control_pops_a_view() {
+        let h = Harness::root(results(3));
+        h.view(list_tree());
+        h.find("Go back")
+            .expect("the back control")
+            .mock_single_click(PointerEventButton::Left);
+        assert_eq!(h.shell().get_screen(), ScreenKind::Root);
+        assert!(h.find("result-1").is_some());
+    }
+
+    #[test]
+    fn a_loading_view_shows_the_loading_bar() {
+        let h = Harness::root(results(3));
+        h.view(detail_tree("Working"));
+        assert!(h.find("Loading…").is_none());
+        let mut tree = detail_tree("Working");
+        if let View::Detail(detail) = &mut tree.view {
+            detail.loading = true;
+        }
+        h.view(tree);
+        let bar = ElementHandle::find_by_accessible_label(&h.ui, "Loading…").find(|element| {
+            element.accessible_role()
+                == Some(i_slint_backend_testing::AccessibleRole::ProgressIndicator)
+        });
+        assert!(bar.is_some());
+    }
+
+    #[test]
+    fn a_form_shows_its_title_instead_of_the_query() {
+        let h = Harness::root(results(3));
+        h.view(form_tree());
+        assert!(!h.shell().get_typing());
+        assert!(h.find("Fixture Command").is_some());
+    }
+}
+
+mod action_bar {
+    use super::*;
+
+    fn application() -> ResultItem {
+        ResultItem {
+            context: Context {
+                title: "Applications".into(),
+                icon: None,
+            },
+            ..result(1)
+        }
+    }
+
+    #[test]
+    fn an_application_names_its_extension_and_open() {
+        let h = Harness::root(vec![application()]);
+        assert!(h.find("Applications").is_some());
+        assert!(h.find("Open").is_some());
+    }
+
+    #[test]
+    fn a_pushed_view_names_its_command() {
+        let h = Harness::root(results(3));
+        h.event(Event::Rendered {
+            owner: "dango.clipboard".into(),
+            context: Context {
+                title: "Clipboard History".into(),
+                icon: None,
+            },
+            invocation: 1,
+            tree: views::list_tree(),
+        });
+        assert!(h.find("Clipboard History").is_some());
+    }
+
+    #[test]
+    fn a_single_action_shows_no_actions_hint() {
+        let h = Harness::root(vec![application()]);
+        assert!(h.find("Actions").is_none());
+        assert!(!h.shell().get_panel_hint());
+    }
+}
+
+mod toast {
+    use super::*;
+    use crate::extension::ActionOutcome;
+    use crate::ui::{ActionRequest, Origin};
+
+    fn toast(h: &Harness) -> ElementHandle {
+        let text = h.shell().get_toast_text();
+        h.find(&text).expect("the toast")
+    }
+
+    fn request() -> ActionRequest {
+        ActionRequest {
+            origin: Origin::View,
+            extension_id: "fixture".into(),
+            item_id: "item-1".into(),
+            action_id: "pin".into(),
+            values: None,
+            query: None,
+        }
+    }
+
+    #[test]
+    fn a_busy_toast_says_what_is_running() {
+        let mut command = result(1);
+        command.title = "Clipboard History".into();
+        command.actions.clear();
+        let h = Harness::root(vec![command]);
+        h.key(
+            "
+",
+        );
+        assert_eq!(
+            h.shell().get_toast_style(),
+            super::super::generated::ToastStyle::Busy
+        );
+        assert!(h.find("Running Clipboard History…").is_some());
+    }
+
+    #[test]
+    fn a_success_toast_replaces_the_context() {
+        let h = Harness::root(results(3));
+        h.view(views::list_tree());
+        h.event(Event::ActionFinished {
+            request: request(),
+            outcome: ActionOutcome::Toast("Entry pinned".into()),
+        });
+        assert!(h.shell().get_toast_shown());
+        assert_eq!(
+            h.shell().get_toast_style(),
+            super::super::generated::ToastStyle::Success
+        );
+        assert!(h.find("Entry pinned").is_some());
+        assert!(h.find("Fixture Command").is_none());
+    }
+
+    #[test]
+    fn a_failure_toast_says_it_failed() {
+        let h = Harness::root(results(3));
+        h.event(Event::Failed("That command is no longer available".into()));
+        assert_eq!(
+            h.shell().get_toast_style(),
+            super::super::generated::ToastStyle::Failure
+        );
+        assert_eq!(
+            toast(&h).accessible_description().as_deref(),
+            Some("Failed")
+        );
+    }
+
+    #[test]
+    fn typing_reaches_the_search_bar_while_a_toast_shows() {
+        let h = Harness::root(results(3));
+        h.event(Event::Failed("That command is no longer available".into()));
+        h.type_text("res");
+        assert_eq!(h.query(), "res");
     }
 }
 
@@ -354,7 +523,7 @@ mod root_search {
 mod views {
     use super::*;
 
-    fn list_tree() -> ViewTree {
+    pub(super) fn list_tree() -> ViewTree {
         ViewTree::new(View::List(ListView {
             filtering: Filtering::Launcher,
             loading: false,
@@ -373,7 +542,7 @@ mod views {
         }))
     }
 
-    fn form_tree() -> ViewTree {
+    pub(super) fn form_tree() -> ViewTree {
         let field = |id: &str, kind| FormField {
             id: id.into(),
             label: id.into(),
