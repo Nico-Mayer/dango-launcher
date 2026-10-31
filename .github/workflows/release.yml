@@ -1,8 +1,10 @@
 name: Release
 
-# Off until native-release-pipeline: this still builds with tauri-action,
-# which the Slint app no longer uses. A tag produces no release meanwhile.
 on:
+  push:
+    tags: ["v*"]
+  # A dry run: fills a draft release named dry-run-<run id> and never
+  # publishes it.
   workflow_dispatch:
 
 permissions:
@@ -15,7 +17,7 @@ jobs:
   changelog:
     runs-on: ubuntu-latest
     outputs:
-      release-id: ${{ steps.release.outputs.id }}
+      tag: ${{ steps.release.outputs.tag }}
     steps:
       - uses: actions/checkout@v5
         with:
@@ -30,11 +32,11 @@ jobs:
         id: release
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: ${{ github.ref_name }}
+          TAG: ${{ github.event_name == 'push' && github.ref_name || format('dry-run-{0}', github.run_id) }}
           NOTES: ${{ steps.cliff.outputs.changelog }}
         run: |
-          gh release create "$TAG" --draft --title "Dango $TAG" --notes-file "$NOTES"
-          echo "id=$(gh release view "$TAG" --json databaseId --jq .databaseId)" >> "$GITHUB_OUTPUT"
+          gh release create "$TAG" --draft --target "$GITHUB_SHA" --title "Dango $TAG" --notes-file "$NOTES"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
 
   build:
     name: ${{ matrix.name }}
@@ -46,46 +48,93 @@ jobs:
         include:
           - name: macOS
             os: macos-latest
+            formats: app,dmg
+            assets: target/release/*.dmg target/release/*.app.tar.gz target/release/*.app.tar.gz.sig
           - name: Windows
             os: windows-latest
+            formats: nsis
+            assets: target/release/*-setup.exe target/release/*-setup.exe.sig
 
     steps:
       - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v5
-        with:
-          node-version: 24
-          cache: npm
-
       - uses: dtolnay/rust-toolchain@stable
 
       - uses: swatinem/rust-cache@v2
+
+      - uses: jdx/mise-action@v5
         with:
-          workspaces: .
+          install_args: cargo:cargo-packager
 
-      - run: npm ci
-
-      - uses: tauri-apps/tauri-action@v1
+      # cargo-packager reads the identity only from its config, and a
+      # --config replaces the Cargo.toml table instead of merging into it.
+      - name: Set the macOS signing identity
+        if: runner.os == 'macOS'
         env:
-          GITHUB_TOKEN: ${{ github.token }}
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-          # No Apple ID or API key, so the build is signed but not notarized.
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+        run: |
+          perl -0pi -e 's/^\[package\.metadata\.packager\.macos\]\n/$&signingIdentity = "$ENV{APPLE_SIGNING_IDENTITY}"\n/m' Cargo.toml
+          grep -q '^signingIdentity = ' Cargo.toml
+
+      - name: Package
+        env:
+          CARGO_PACKAGER_SIGN_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          CARGO_PACKAGER_SIGN_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          # No Apple ID or API key, so the app is signed but not notarized.
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
-        with:
-          releaseId: ${{ needs.changelog.outputs.release-id }}
-          uploadUpdaterJson: true
-          updaterJsonPreferNsis: true
+        run: cargo packager --release --formats ${{ matrix.formats }}
+
+      - name: Upload
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.changelog.outputs.tag }}
+        run: gh release upload "$TAG" ${{ matrix.assets }} --clobber
+
+  manifest:
+    needs: [changelog, build]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Upload latest.json
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.changelog.outputs.tag }}
+        run: |
+          gh release download "$TAG" --pattern '*.sig' --dir sigs
+          windows=$(cd sigs && ls -- *-setup.exe.sig)
+          macos=$(cd sigs && ls -- *.app.tar.gz.sig)
+          url="https://github.com/$GITHUB_REPOSITORY/releases/download/$TAG"
+          jq -n \
+            --arg version "$(sed -n 's/^version = "\(.*\)"$/\1/p' Cargo.toml | head -n 1)" \
+            --arg notes "$(gh release view "$TAG" --json body --jq .body)" \
+            --arg date "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --arg windows_url "$url/${windows%.sig}" \
+            --arg windows_sig "$(cat "sigs/$windows")" \
+            --arg macos_url "$url/${macos%.sig}" \
+            --arg macos_sig "$(cat "sigs/$macos")" \
+            '{
+              version: $version,
+              notes: $notes,
+              pub_date: $date,
+              platforms: {
+                "windows-x86_64": {url: $windows_url, signature: $windows_sig, format: "nsis"},
+                "macos-aarch64": {url: $macos_url, signature: $macos_sig, format: "app"}
+              }
+            }' > latest.json
+          cat latest.json
+          gh release upload "$TAG" latest.json --clobber
 
   publish:
-    needs: build
+    needs: [changelog, manifest]
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     steps:
       - name: Publish release
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-          TAG: ${{ github.ref_name }}
+          TAG: ${{ needs.changelog.outputs.tag }}
         run: gh release edit "$TAG" --draft=false
