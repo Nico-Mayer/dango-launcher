@@ -19,6 +19,8 @@ use serde_json::{Map, Value};
 
 use crate::templates::{Template, TemplateError, Values};
 
+use super::matcher::KeywordEntry;
+
 #[derive(Debug, thiserror::Error)]
 pub enum RecordError {
     #[error("Enter a name")]
@@ -277,6 +279,26 @@ impl Records {
         }
         *cache = next;
         Ok(())
+    }
+
+    /// The snippets' keywords, read without copying or sorting the records,
+    /// because the expansion worker asks on every keystroke.
+    pub fn keywords(&self) -> Vec<KeywordEntry> {
+        if self.kind != Kind::Snippet {
+            return Vec::new();
+        }
+        self.cache
+            .read()
+            .unwrap()
+            .iter()
+            .filter_map(|record| {
+                record.get("name")?.as_str()?;
+                Some(KeywordEntry {
+                    id: record_id(record)?.to_string(),
+                    keyword: record.get("keyword")?.as_str()?.to_string(),
+                })
+            })
+            .collect()
     }
 
     pub fn all(&self) -> Result<Vec<Record>, RecordError> {

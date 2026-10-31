@@ -174,7 +174,7 @@ fn run(
                     expander.clear();
                     continue;
                 }
-                expander.set_keywords(keyword_entries(&records));
+                expander.set_keywords(records.keywords());
                 if let Some(hit) = expander.observe_char(c) {
                     expand(&records, text.as_ref(), &hit);
                 }
@@ -191,20 +191,6 @@ fn is_excluded(app: Option<&str>, excluded: &ExcludedApps) -> bool {
         return false;
     };
     excluded().iter().any(|name| name.eq_ignore_ascii_case(app))
-}
-
-fn keyword_entries(records: &Records) -> Vec<KeywordEntry> {
-    records
-        .all()
-        .unwrap_or_default()
-        .into_iter()
-        .filter_map(|record| {
-            record.keyword.map(|keyword| KeywordEntry {
-                id: record.id,
-                keyword,
-            })
-        })
-        .collect()
 }
 
 fn expand(records: &Records, text: &dyn TextTarget, hit: &Hit) {
@@ -323,7 +309,7 @@ mod tests {
         let with = records.create("Sig", "Best", Some("sig")).unwrap();
         records.create("Plain", "No keyword", None).unwrap();
 
-        let entries = keyword_entries(&records);
+        let entries = records.keywords();
 
         assert_eq!(entries.len(), 1);
         assert_eq!(
