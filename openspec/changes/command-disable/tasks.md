@@ -10,6 +10,6 @@
 
 ## 3. Wire-up and checks
 
-- [ ] 3.1 Confirm config reload in `src/app/mod.rs` rebuilds candidates and hotkeys after the command re-sync, and add a `cargo test` with the recording fake shell that a command disabled by a reload is gone from root search and confirming a stale result reports "That command is no longer available"
+- [x] 3.1 Confirm config reload in `src/app/mod.rs` rebuilds candidates and hotkeys after the command re-sync, and add a `cargo test` with the recording fake shell that a command disabled by a reload is gone from root search and confirming a stale result reports "That command is no longer available"
 - [ ] 3.2 Run `hk check` and `cargo test`; both pass
 - [ ] 3.3 Run the `ponytail-review` skill in a fresh subagent on this change's commits, without the apply context; it reports findings only and the author decides what to fix

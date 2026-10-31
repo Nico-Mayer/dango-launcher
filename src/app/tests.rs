@@ -376,3 +376,113 @@ mod inspect_tests {
         assert_eq!(inspection.arguments, vec!["matrix"]);
     }
 }
+
+struct TwoCommands(crate::extension::Manifest);
+
+impl crate::extension::Extension for TwoCommands {
+    fn manifest(&self) -> &crate::extension::Manifest {
+        &self.0
+    }
+    fn command(&self, _command_id: &str) -> Option<Arc<dyn crate::invocation::Command>> {
+        struct Noop;
+        impl crate::invocation::Command for Noop {
+            fn invoke(&self, _ctx: &InvocationContext) {}
+        }
+        Some(Arc::new(Noop))
+    }
+}
+
+fn two_commands() -> Arc<TwoCommands> {
+    use crate::extension::{CommandDecl, InvocationMode, Manifest};
+    let command = |id: &str| CommandDecl {
+        id: id.into(),
+        title: format!("Fire {id}"),
+        mode: InvocationMode::View,
+        subtitle: None,
+        icon: None,
+        keywords: vec![],
+        alias: None,
+    };
+    Arc::new(TwoCommands(Manifest {
+        manifest_version: 1,
+        id: "x".into(),
+        name: "X".into(),
+        icon: None,
+        commands: vec![command("keep"), command("drop")],
+        preferences: vec![],
+        root_items: false,
+        services: false,
+    }))
+}
+
+fn root_ids(shell: &RecordingShell) -> Vec<String> {
+    match shell.last_snapshot().screen {
+        Screen::Root(root) => {
+            let mut ids: Vec<String> = root
+                .sections
+                .into_iter()
+                .flat_map(|section| section.items)
+                .map(|item| item.id)
+                .collect();
+            ids.sort();
+            ids
+        }
+        other => panic!("expected root search, got {other:?}"),
+    }
+}
+
+fn selected(shell: &RecordingShell) -> Option<String> {
+    match shell.last_snapshot().screen {
+        Screen::Root(root) => root.selected,
+        other => panic!("expected root search, got {other:?}"),
+    }
+}
+
+fn press(core: &Arc<Core>, key: &str) {
+    core.dispatch(Intent::Key {
+        chord: Chord::plain(key),
+    });
+}
+
+#[tokio::test]
+async fn a_command_disabled_by_a_reload_leaves_search_and_a_stale_result_fails() {
+    let (core, shell) = core("{}");
+    core.services
+        .host
+        .lock()
+        .unwrap()
+        .register(two_commands())
+        .unwrap();
+    core.apply_config_reload(Config::parse("{}"));
+
+    core.toggle();
+    type_query(&core, "fire");
+    settle().await;
+    assert_eq!(root_ids(&shell), ["x.drop", "x.keep"]);
+
+    core.apply_config_reload(Config::parse(
+        r#"{ "extensions": { "x": { "commands": { "drop": { "enabled": false } } } } }"#,
+    ));
+
+    if selected(&shell).as_deref() != Some("x.drop") {
+        press(&core, "ArrowDown");
+    }
+    assert_eq!(selected(&shell).as_deref(), Some("x.drop"));
+    press(&core, "Enter");
+    assert_eq!(
+        shell
+            .last_snapshot()
+            .toast
+            .map(|toast| toast.text)
+            .as_deref(),
+        Some("That command is no longer available")
+    );
+    assert!(!shell
+        .calls()
+        .iter()
+        .any(|call| matches!(call, Call::Hide { .. })));
+
+    type_query(&core, "fir");
+    settle().await;
+    assert_eq!(root_ids(&shell), ["x.keep"]);
+}
