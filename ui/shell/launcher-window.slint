@@ -119,10 +119,10 @@ export component LauncherWindow inherits Window {
 
             panel := ActionPanel {
                 visible: Panel.open;
-                width: min(Theme.panel-width, parent.width - 16px);
-                height: min(self.content-height, parent.height - Theme.action-bar-height - 16px);
-                x: parent.width - self.width - 8px;
-                y: parent.height - Theme.action-bar-height - self.height - 8px;
+                width: min(Theme.panel-width, parent.width - 2 * Theme.panel-margin);
+                height: min(self.content-height, parent.height - Theme.action-bar-height - 2 * Theme.panel-margin);
+                x: parent.width - self.width - Theme.panel-margin;
+                y: parent.height - Theme.action-bar-height - self.height - Theme.panel-margin;
             }
 
             // Drawn last so no region paints over the outline.

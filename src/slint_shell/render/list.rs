@@ -5,6 +5,7 @@ use std::rc::Rc;
 
 use slint::{ComponentHandle, Model, ModelRc, StyledText, VecModel};
 
+use super::height::{HEADING, ROW};
 use super::icon;
 use crate::protocol::{Accessory, ListItem, TagRole};
 use crate::slint_shell::generated::{
@@ -15,8 +16,6 @@ use crate::slint_shell::keys;
 use crate::ui::snapshot::{ListBody, RootScreen};
 use crate::ui::ResultItem;
 
-const ROW_HEIGHT: f32 = 40.0;
-const HEADING_HEIGHT: f32 = 28.0;
 const ACCESSORY_LIMIT: usize = 3;
 
 pub struct Writer {
@@ -90,18 +89,18 @@ impl Writer {
         let mut heading_above = false;
         for row in self.rows.iter() {
             if !row.heading.is_empty() {
-                top += HEADING_HEIGHT;
+                top += HEADING;
                 heading_above = true;
                 continue;
             }
             if row.id == id {
                 return Some(if heading_above {
-                    (top - HEADING_HEIGHT, ROW_HEIGHT + HEADING_HEIGHT)
+                    (top - HEADING, ROW + HEADING)
                 } else {
-                    (top, ROW_HEIGHT)
+                    (top, ROW)
                 });
             }
-            top += ROW_HEIGHT;
+            top += ROW;
             heading_above = false;
         }
         None

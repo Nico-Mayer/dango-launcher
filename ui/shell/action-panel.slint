@@ -76,8 +76,8 @@ component PanelRow inherits Rectangle {
 /// Every action on the selection, floating above the ActionBar, with its own
 /// filter at the bottom.
 export component ActionPanel inherits Rectangle {
-    property <length> filter-height: 36px;
-    out property <length> content-height: (Panel.rows.length > 0 ? column.preferred-height : Theme.panel-row-height + 12px) + self.filter-height;
+    property <length> filter-height: Theme.panel-filter-height;
+    out property <length> content-height: (Panel.rows.length > 0 ? column.preferred-height : Theme.panel-row-height + 2 * Theme.panel-padding) + self.filter-height;
     background: Theme.surface;
     border-radius: Theme.radius;
     border-width: 1px;
@@ -111,7 +111,7 @@ export component ActionPanel inherits Rectangle {
         height: parent.height - root.filter-height;
 
         column := VerticalLayout {
-            padding: 6px;
+            padding: Theme.panel-padding;
             for row in Panel.rows: Rectangle {
                 height: row.heading != "" ? Theme.heading-height : Theme.panel-row-height;
                 if row.heading != "": PanelHeading {
@@ -126,7 +126,7 @@ export component ActionPanel inherits Rectangle {
 
     if Panel.rows.length == 0: Text {
         x: 16px;
-        y: 6px;
+        y: Theme.panel-padding;
         height: Theme.panel-row-height;
         text: "No matching actions";
         color: Theme.muted;

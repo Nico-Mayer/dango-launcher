@@ -5,17 +5,12 @@ use std::rc::Rc;
 
 use slint::{Color, ComponentHandle, Model, ModelRc, VecModel};
 
+use super::height::{GRID_GAP, GRID_PADDING, HEADING, TILE_TITLE, WIDTH};
 use super::icon;
 use crate::protocol::{GridItem, TileContent};
 use crate::slint_shell::generated::{GridData, LauncherWindow, TileData, TileKind};
 use crate::slint_shell::icons::Icons;
 use crate::ui::snapshot::GridBody;
-
-const WIDTH: f32 = 720.0;
-const PADDING: f32 = 16.0;
-const GAP: f32 = 8.0;
-const TITLE_HEIGHT: f32 = 24.0;
-const HEADING_HEIGHT: f32 = 28.0;
 
 pub struct Writer {
     tiles: Rc<VecModel<TileData>>,
@@ -43,27 +38,27 @@ impl Writer {
         } = Layout::of(grid);
 
         let mut tiles = Vec::new();
-        let mut top = GAP;
+        let mut top = GRID_GAP;
         for section in &grid.sections {
             if let Some(title) = &section.title {
                 tiles.push(TileData {
                     heading: title.as_str().into(),
                     heading_subtitle: section.subtitle.clone().unwrap_or_default().into(),
-                    x: PADDING,
+                    x: GRID_PADDING,
                     y: top,
                     width: inner,
-                    height: HEADING_HEIGHT,
+                    height: HEADING,
                     ..Default::default()
                 });
-                top += HEADING_HEIGHT;
+                top += HEADING;
             }
             for (index, item) in section.items.iter().enumerate() {
                 let (row, column) = (index / columns, index % columns);
                 tiles.push(TileData {
-                    x: PADDING + column as f32 * (width + GAP),
+                    x: GRID_PADDING + column as f32 * (width + GRID_GAP),
                     y: top + row as f32 * row_height,
                     width,
-                    height: box_height + TITLE_HEIGHT,
+                    height: box_height + TILE_TITLE,
                     box_height,
                     selected: grid.selected.as_deref() == Some(item.id.as_str()),
                     ..tile(item, icons)
@@ -71,7 +66,7 @@ impl Writer {
             }
             top += section.items.len().div_ceil(columns) as f32 * row_height;
         }
-        ui.global::<GridData>().set_content_height(top + GAP);
+        ui.global::<GridData>().set_content_height(top + GRID_GAP);
         self.tiles.set_vec(tiles);
 
         if grid.selected != self.selected {
@@ -99,15 +94,15 @@ struct Layout {
 impl Layout {
     fn of(grid: &GridBody) -> Self {
         let columns = usize::from(grid.columns.max(1));
-        let inner = WIDTH - 2.0 * PADDING;
-        let width = (inner - GAP * (columns as f32 - 1.0)) / columns as f32;
+        let inner = WIDTH - 2.0 * GRID_PADDING;
+        let width = (inner - GRID_GAP * (columns as f32 - 1.0)) / columns as f32;
         let box_height = width / grid.aspect.max(0.1);
         Self {
             columns,
             inner,
             width,
             box_height,
-            row_height: box_height + TITLE_HEIGHT + GAP,
+            row_height: box_height + TILE_TITLE + GRID_GAP,
         }
     }
 }
@@ -117,13 +112,13 @@ pub fn content_height(grid: &GridBody) -> f32 {
     let layout = Layout::of(grid);
     let sections = grid.sections.iter().map(|section| {
         let heading = if section.title.is_some() {
-            HEADING_HEIGHT
+            HEADING
         } else {
             0.0
         };
         heading + section.items.len().div_ceil(layout.columns) as f32 * layout.row_height
     });
-    2.0 * GAP + sections.sum::<f32>()
+    2.0 * GRID_GAP + sections.sum::<f32>()
 }
 
 fn tile(item: &GridItem, icons: &Icons) -> TileData {

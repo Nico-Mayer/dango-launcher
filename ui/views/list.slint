@@ -123,9 +123,9 @@ export component List inherits Rectangle {
     // has built, and would clamp a scroll to one it has not.
     scroller := ScrollView {
         x: 0;
-        y: 6px;
+        y: Theme.list-padding;
         width: ListData.detail-pane ? parent.width * 2 / 5 : parent.width;
-        height: parent.height - 12px;
+        height: parent.height - 2 * Theme.list-padding;
         accessible-role: AccessibleRole.list;
         rows := VerticalLayout {
             alignment: start;

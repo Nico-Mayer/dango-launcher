@@ -1,18 +1,23 @@
 //! How tall the launcher is: the SearchBar, the view, and the ActionBar, from
-//! the same fixed heights the parts are drawn with.
+//! the same fixed sizes the parts are drawn with. Each size here matches one
+//! in `Theme`.
 
 use crate::ui::snapshot::{Screen, Snapshot, ViewBody};
 
 pub const MAX: f32 = crate::platform::LAUNCHER_MAX_HEIGHT as f32;
+pub const WIDTH: f32 = 720.0;
 const SEARCH_BAR: f32 = 56.0;
 const ACTION_BAR: f32 = 40.0;
 const LIST_PADDING: f32 = 6.0;
-const ROW: f32 = 40.0;
-const HEADING: f32 = 28.0;
-const PANEL_ROW: f32 = 32.0;
-const PANEL_PADDING: f32 = 6.0;
+pub const ROW: f32 = 40.0;
+pub const HEADING: f32 = 28.0;
+pub const PANEL_ROW: f32 = 32.0;
+pub const PANEL_PADDING: f32 = 6.0;
 const PANEL_FILTER: f32 = 36.0;
 const PANEL_MARGIN: f32 = 8.0;
+pub const GRID_PADDING: f32 = 16.0;
+pub const GRID_GAP: f32 = 8.0;
+pub const TILE_TITLE: f32 = 24.0;
 
 /// A list or grid is as tall as its content, up to the maximum. Everything
 /// else, and an empty view, takes the maximum. An open panel keeps the room
@@ -50,14 +55,9 @@ fn list(headings: usize, rows: usize) -> f32 {
 
 fn panel(snapshot: &Snapshot) -> f32 {
     let actions = &snapshot.panel.actions;
-    let mut headings = 0;
-    let mut section = None;
-    for action in actions {
-        if action.section.is_some() && action.section != section {
-            headings += 1;
-        }
-        section = action.section.clone();
-    }
+    let headings = super::panel::sectioned(actions)
+        .filter(|(heading, _)| heading.is_some())
+        .count();
     let rows = actions.len().max(1);
     2.0 * PANEL_PADDING + headings as f32 * HEADING + rows as f32 * PANEL_ROW + PANEL_FILTER
 }
