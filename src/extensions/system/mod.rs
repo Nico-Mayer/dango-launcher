@@ -234,6 +234,7 @@ fn running_list(apps: Vec<crate::platform::RunningApp>, icons: &IconCache) -> Vi
             empty_state: Some(crate::protocol::EmptyState {
                 title: "No apps to quit".into(),
                 description: None,
+                ..Default::default()
             }),
             items: apps
                 .into_iter()

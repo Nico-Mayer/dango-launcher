@@ -438,15 +438,20 @@ impl Launcher {
                     }
                 }
             }
-            Mode::List => {
-                let Some(item) = self.view_selected() else {
-                    return;
-                };
-                if let Some(action) = item.actions.first() {
-                    let (action, item) = (action.id.clone(), item.id.clone());
-                    self.run_view_action(action, Some(item), None, fx);
+            Mode::List => match self.view_selected() {
+                Some(item) => {
+                    if let Some(action) = item.actions.first() {
+                        let (action, item) = (action.id.clone(), item.id.clone());
+                        self.run_view_action(action, Some(item), None, fx);
+                    }
                 }
-            }
+                None => {
+                    if let Some(action) = self.empty_actions().first() {
+                        let action = action.id.clone();
+                        self.run_view_action(action, None, None, fx);
+                    }
+                }
+            },
             Mode::Detail => {
                 if let Some(action) = self.view_actions().first() {
                     let action = action.id.clone();
@@ -671,8 +676,22 @@ impl Launcher {
     pub(super) fn available_actions(&self) -> &[Action] {
         match self.surface() {
             Mode::Root => self.root_selected().map_or(&[], |item| &item.actions),
-            Mode::List => self.view_selected().map_or(&[], |item| &item.actions),
+            Mode::List => match self.view_selected() {
+                Some(item) => &item.actions,
+                None => self.empty_actions(),
+            },
             _ => self.view_actions(),
+        }
+    }
+
+    /// What an empty list offers. Nothing while it is still loading.
+    fn empty_actions(&self) -> &[Action] {
+        match self.stack.last().map(|view| &view.tree.view) {
+            Some(View::List(list)) if !list.loading => list
+                .empty_state
+                .as_ref()
+                .map_or(&[], |state| &state.actions),
+            _ => &[],
         }
     }
 

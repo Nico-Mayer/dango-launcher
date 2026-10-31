@@ -641,6 +641,34 @@ fn clicking_a_list_row_picks_and_runs_it() {
 }
 
 #[test]
+fn enter_on_an_empty_view_runs_its_first_action() {
+    let mut tree = list_tree(Vec::new());
+    if let View::List(list) = &mut tree.view {
+        list.empty_state = Some(crate::protocol::EmptyState {
+            title: "No matches".into(),
+            icon: Some("icon:sparkles".into()),
+            actions: vec![Action {
+                id: "web".into(),
+                title: "Search the web".into(),
+                ..Default::default()
+            }],
+            ..Default::default()
+        });
+    }
+    let mut h = Harness::view(tree);
+    let list = h.list();
+    assert_eq!(list.empty.unwrap().icon.as_deref(), Some("icon:sparkles"));
+    assert_eq!(h.snapshot().footer.primary_label, "Search the web");
+    h.press("Enter");
+    let runs = h.runs();
+    assert_eq!(runs.len(), 1);
+    assert_eq!(
+        (runs[0].item_id.as_str(), runs[0].action_id.as_str()),
+        ("", "web")
+    );
+}
+
+#[test]
 fn enter_in_a_detail_view_runs_the_view_s_primary_action_on_no_item() {
     let mut h = Harness::view(detail_tree("Working…"));
     assert_eq!(h.snapshot().focus, Focus::Detail);

@@ -117,6 +117,7 @@ snapshot_types! {
 
     #[serde(rename_all = "camelCase")]
     pub struct EmptyText {
+        pub icon: Option<String>,
         pub title: String,
         pub description: Option<String>,
         /// A title quoting the query, which can be any length.
@@ -296,12 +297,14 @@ impl Launcher {
                         EmptyText::plain("Loading…")
                     } else if !view.query.is_empty() {
                         EmptyText {
+                            icon: list.empty_state.as_ref().and_then(|s| s.icon.clone()),
                             title: format!("No results for “{}”", view.query),
                             description: None,
                             truncate: true,
                         }
                     } else if let Some(state) = &list.empty_state {
                         EmptyText {
+                            icon: state.icon.clone(),
                             title: state.title.clone(),
                             description: state.description.clone(),
                             truncate: false,
@@ -392,6 +395,7 @@ impl Launcher {
 impl EmptyText {
     fn plain(title: &str) -> Self {
         Self {
+            icon: None,
             title: title.to_string(),
             description: None,
             truncate: false,

@@ -146,11 +146,17 @@ protocol_types! {
         Template,
     }
 
+    #[derive(Default)]
     #[serde(rename_all = "camelCase")]
     pub struct EmptyState {
         pub title: String,
         #[serde(default)]
         pub description: Option<String>,
+        #[serde(default)]
+        pub icon: Option<String>,
+        /// Offered while the view shows nothing. The first runs on Enter.
+        #[serde(default)]
+        pub actions: Vec<Action>,
     }
 
     /// The first action in a view's list is primary and runs on Enter. Others

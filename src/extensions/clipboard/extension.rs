@@ -285,6 +285,7 @@ pub fn history_view(entries: &[Entry], primary: PrimaryAction) -> ViewTree {
                     "Text and images you copy will show up here. Copies from excluded apps are left out."
                         .into(),
                 ),
+                ..Default::default()
             }),
             items: entries.iter().map(|entry| item(entry, primary)).collect(),
             ..Default::default()

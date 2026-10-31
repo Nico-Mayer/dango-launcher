@@ -545,6 +545,7 @@ fn list_tree(records: &[Record], sheet: &Sheet) -> ViewTree {
             empty_state: Some(EmptyState {
                 title: title.into(),
                 description: Some(description.into()),
+                ..Default::default()
             }),
             items: records
                 .iter()
@@ -575,6 +576,7 @@ fn failure_tree(message: &str, kind: Kind) -> ViewTree {
             empty_state: Some(EmptyState {
                 title: title.into(),
                 description: Some(message.into()),
+                ..Default::default()
             }),
             items: vec![],
             ..Default::default()
