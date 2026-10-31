@@ -176,8 +176,27 @@ load and are not reliable.
   to Finder (Empty Trash) needs the `com.apple.security.automation.apple-events`
   entitlement in `Entitlements.plist` and an `NSAppleEventsUsageDescription`
   in `Info.plist`, or tccd denies it.
+- winit never reports focus for the Slint launcher on Windows: the window is
+  the foreground and has the keyboard, yet `has_focus` stays false and no
+  `Focused` event arrives. Focus loss is watched with a
+  `SetWinEventHook(EVENT_SYSTEM_FOREGROUND)` in `platform/windows` instead.
+- Slint's winit backend probes for OpenGL 2 on Windows and silently falls back
+  to the software renderer without it. That renderer refuses
+  `set_rendering_notifier`, so paint timing hangs off `RedrawRequested` in the
+  window event filter.
 
 ## Build and verification facts
+
+- Slint's `ElementHandle` test API finds nothing without debug info in the
+  generated code, so `build.rs` turns it on for the debug profile.
+- The Slint tray links Common Controls 6. A Windows binary without the
+  manifest that selects it fails to load (`STATUS_ENTRYPOINT_NOT_FOUND`), the
+  test binary included, so `build.rs` has the linker embed it in every
+  artifact instead of letting tauri-build embed it in the app alone.
+- A Slint `ListView` estimates its height from the rows it has built and
+  clamps a scroll to that estimate, so scrolling to an unbuilt row stops
+  short. The result list builds every row in a `ScrollView`; it holds at most
+  50.
 
 - Windows cannot be cross-compiled from macOS here (the Tauri build script
   needs `llvm-rc`). CI on `windows-latest` is the only Windows compile check.
