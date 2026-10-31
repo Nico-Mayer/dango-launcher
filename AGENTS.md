@@ -28,8 +28,9 @@ spec.
 - Agents commit their own work as they go, without asking: atomic
   conventional commits, each one building and passing its tests. Pushing
   still waits for the author.
-- Run `hk check` before pushing: `cargo fmt` and `cargo clippy -D warnings`,
-  which also compiles the `.slint` files. Tests, UI included: `cargo test`.
+- Run `hk check` before pushing: `cargo fmt` and
+  `cargo clippy --all-targets -- -D warnings`, which also compiles the
+  `.slint` files. Tests, UI included: `cargo test`.
 - Work one platform at a time. Finish and verify on the machine at hand, and
   leave the other platform's hand checks open until a session on that
   machine. Do not switch back and forth within a session.
@@ -249,7 +250,8 @@ load and are not reliable.
 - Tauri used to switch on crate features for us. Without it, a missing
   feature shows up as an item "configured out" (`windows`, `time`): add the
   feature the compiler names.
-- CI runs `cargo clippy -- -D warnings`. Two lints that bite in platform code:
+- CI runs `cargo clippy --all-targets -- -D warnings`, which lints the tests
+  too. Two lints that bite in platform code:
   an inner `unsafe` block inside an `unsafe fn` (`unused_unsafe`) and casting a
   value to its own type (`unnecessary_cast`, easy with `HWND`).
 - On the Mac the shell is fish: `VAR=value cmd` is invalid. Use
