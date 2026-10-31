@@ -122,6 +122,14 @@ impl EnabledStore for FileConfig {
         }
         self.persist();
     }
+
+    fn is_command_enabled(&self, extension_id: &str, command_id: &str) -> bool {
+        self.config
+            .read()
+            .unwrap()
+            .command_enabled(extension_id, command_id)
+            .unwrap_or(true)
+    }
 }
 
 #[cfg(test)]
@@ -155,6 +163,21 @@ mod tests {
         let text = r#"{ "extensions": { "x": { "enabled": false } } }"#;
         let store = FileConfig::new(temp_path("dis"), Config::parse(text).unwrap());
         assert!(!store.is_enabled("x"));
+    }
+
+    #[test]
+    fn a_command_is_enabled_unless_the_file_says_false() {
+        let text = r#"{ "extensions": { "x": { "commands": {
+            "on": { "enabled": true },
+            "off": { "enabled": false },
+            "plain": { "alias": "p" }
+        } } } }"#;
+        let store = FileConfig::new(temp_path("cmd"), Config::parse(text).unwrap());
+        assert!(store.is_command_enabled("x", "on"));
+        assert!(!store.is_command_enabled("x", "off"));
+        assert!(store.is_command_enabled("x", "plain"));
+        assert!(store.is_command_enabled("x", "missing"));
+        assert!(store.is_command_enabled("y", "missing"));
     }
 
     #[test]

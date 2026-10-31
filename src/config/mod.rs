@@ -387,6 +387,15 @@ impl Config {
         self.extensions.get(extension_id).and_then(|e| e.enabled)
     }
 
+    /// The enabled state the file declares for one command, if any.
+    pub fn command_enabled(&self, extension_id: &str, command_id: &str) -> Option<bool> {
+        self.extensions
+            .get(extension_id)?
+            .commands
+            .get(command_id)?
+            .enabled
+    }
+
     /// A preference value the file sets, as the string the reader expects.
     /// Typed JSON is rendered to the string form: a number to its digits, a
     /// boolean to `true`/`false`, a string to itself.

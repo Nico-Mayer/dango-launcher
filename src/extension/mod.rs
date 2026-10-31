@@ -89,6 +89,9 @@ pub trait Service: Send + Sync {
 pub trait EnabledStore: Send + Sync {
     fn is_enabled(&self, extension_id: &str) -> bool;
     fn set_enabled(&self, extension_id: &str, enabled: bool);
+    fn is_command_enabled(&self, _extension_id: &str, _command_id: &str) -> bool {
+        true
+    }
 }
 
 #[derive(Debug, thiserror::Error)]
