@@ -24,12 +24,14 @@ pub trait LauncherWindow: Send {
     /// short launcher sits where a full one would.
     fn position_on_active_display(&self, window: RawWindowHandle);
     fn restore_previous_focus(&mut self);
-    /// Resizes the window to this many logical pixels tall, keeping its top
-    /// edge where it is. False where the platform cannot yet, and the window
-    /// stays at `LAUNCHER_MAX_HEIGHT`.
-    fn set_height(&self, _window: RawWindowHandle, _height: f64) -> bool {
+    /// Whether `set_height` keeps the top edge. Where it cannot yet, the
+    /// window stays at `LAUNCHER_MAX_HEIGHT`.
+    fn keeps_top_edge(&self) -> bool {
         false
     }
+    /// Resizes the window to this many logical pixels tall, keeping its top
+    /// edge where it is.
+    fn set_height(&self, _window: RawWindowHandle, _height: f64) {}
 }
 
 /// The launcher's tallest, in logical pixels.

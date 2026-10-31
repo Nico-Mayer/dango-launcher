@@ -201,10 +201,12 @@ load and are not reliable.
 - winit resizes a macOS window with `setContentSize`, which keeps the
   bottom-left origin, so a Slint `Window::set_size` or a changed `height`
   grows the launcher upward and moves the SearchBar. The height goes through
-  `LauncherWindow::set_height`, which keeps the top edge, and the component
-  only follows when the platform reports it resized. Windows uses
-  `SetWindowPos` with `SWP_NOMOVE`; macOS has no implementation yet
-  (`setFrame:display:` with the origin moved down) and stays at full height.
+  `LauncherWindow::set_height`, which keeps the top edge, and only where
+  `keeps_top_edge` is true. Set the component's `height` before the native
+  resize: Slint sizes a window back to the height its component allows, within
+  the same `SetWindowPos`. Windows uses `SetWindowPos` with `SWP_NOMOVE`;
+  macOS has no implementation yet (`setFrame:display:` with the origin moved
+  down) and stays at full height.
 - Reading the selection is direct on macOS via `AXSelectedText`. On Windows the
   realistic path is copy, read clipboard, restore clipboard.
 - An ad-hoc signed macOS build has a designated requirement of its own

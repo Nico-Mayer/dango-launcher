@@ -137,18 +137,19 @@ impl Shell for SlintShell {
         if shell.get_height() == height {
             return;
         }
-        let resized = match (
-            self.platform.lock().unwrap().as_ref(),
-            Self::handle(&window),
-        ) {
-            (Some(platform), Some(handle)) => platform.set_height(handle, height.into()),
-            _ => false,
+        let platform = self.platform.lock().unwrap();
+        let (Some(platform), Some(handle)) = (platform.as_ref(), Self::handle(&window)) else {
+            return;
         };
-        // Slint would resize the window itself, which on macOS moves the top
-        // edge; only a platform that kept it lets the component follow.
-        if resized {
-            shell.set_height(height);
+        // Slint resizes the window itself when the component's height changes,
+        // which on macOS moves the top edge, so only a platform that keeps it
+        // lets the component follow. The component goes first: a native resize
+        // to a height it does not allow is sized straight back.
+        if !platform.keeps_top_edge() {
+            return;
         }
+        shell.set_height(height);
+        platform.set_height(handle, height.into());
     }
 }
 

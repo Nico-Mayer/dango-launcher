@@ -145,17 +145,21 @@ impl LauncherWindow for WindowsLauncherWindow {
         }
     }
 
+    fn keeps_top_edge(&self) -> bool {
+        true
+    }
+
     /// In physical pixels at the window's own DPI. `SWP_NOMOVE` keeps the
     /// top-left corner, so only the bottom edge moves.
-    fn set_height(&self, window: RawWindowHandle, height: f64) -> bool {
+    fn set_height(&self, window: RawWindowHandle, height: f64) {
         let Some(hwnd) = hwnd(window) else {
-            return false;
+            return;
         };
         unsafe {
             let dpi = GetDpiForWindow(hwnd);
             let mut rect: RECT = std::mem::zeroed();
             if dpi == 0 || GetWindowRect(hwnd, &mut rect) == 0 {
-                return false;
+                return;
             }
             let height = (height * f64::from(dpi) / 96.0).round() as i32;
             SetWindowPos(
@@ -166,7 +170,7 @@ impl LauncherWindow for WindowsLauncherWindow {
                 rect.right - rect.left,
                 height,
                 SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE,
-            ) != 0
+            );
         }
     }
 }
