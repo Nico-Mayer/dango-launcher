@@ -101,11 +101,11 @@ overwriting it.
 - **AND** the corrupt file is preserved
 - **AND** the user is told what happened
 
-### Requirement: Preference values are stored and read back
+### Requirement: Extension preference values are stored and read back
 
-The store SHALL persist a preference value against the extension and, where the
-preference is command-scoped, the command that declares it. Reading a preference
-that has never been set SHALL yield the declared default rather than an absence.
+The store SHALL persist a preference value against the extension that declares
+it. Reading a preference that has never been set SHALL yield the declared
+default, or nothing when the preference declares no default.
 
 #### Scenario: Value is stored and read back
 
@@ -116,11 +116,6 @@ that has never been set SHALL yield the declared default rather than an absence.
 
 - **WHEN** a preference that has never been set is read
 - **THEN** the default declared in the manifest is returned
-
-#### Scenario: Extension and command scopes are separate
-
-- **WHEN** an extension-level preference and a command-level preference share a key
-- **THEN** each reads back its own value
 
 #### Scenario: Value survives a restart
 

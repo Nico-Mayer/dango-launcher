@@ -140,37 +140,6 @@ them without restarting the application.
 - **WHEN** an extension is disabled and the application is restarted
 - **THEN** the extension is still disabled
 
-### Requirement: Typed preferences
-
-An extension SHALL be able to declare preferences at extension level and at
-command level, each with a type, a default value, whether it is required, a
-description written for the user, and, for a string preference that takes one
-of a fixed set of values, that set. Dango SHALL supply the declared default
-when no value has been set, and SHALL use the description and values wherever
-it describes the preference to the user, including the config schema and the
-settings reference.
-
-#### Scenario: Default is supplied
-
-- **WHEN** a preference has never been set by the user
-- **THEN** reading it returns the declared default
-
-#### Scenario: Required preference is missing
-
-- **WHEN** a command declares a required preference with no default and no value is set
-- **THEN** invoking that command prompts for the value instead of running
-
-#### Scenario: Every built-in preference is described
-
-- **WHEN** a built-in extension's manifest is validated
-- **THEN** every preference it declares has a non-empty description
-
-#### Scenario: A fixed set of values is declared once
-
-- **WHEN** a string preference accepts only certain values, such as the clipboard's primary action
-- **THEN** the declaration lists them
-- **AND** reading a stored value outside the set returns the default
-
 ### Requirement: Built-ins are extensions
 
 Built-in features SHALL be declared as extensions using the same manifest,
@@ -204,3 +173,33 @@ prevent other extensions from working or stop the launcher from opening.
 - **WHEN** an invoked command raises an error
 - **THEN** the failure is shown to the user
 - **AND** the launcher remains usable
+
+### Requirement: Extension preferences
+
+An extension SHALL be able to declare preferences at extension level, each
+with a type, an optional default value, a description written for the user,
+and, for a string preference that takes one of a fixed set of values, that
+set. Dango SHALL supply the declared default when no value has been set, and
+SHALL use the description and values wherever it describes the preference to
+the user, including the config schema and the settings reference.
+
+#### Scenario: Default is supplied
+
+- **WHEN** a preference has never been set by the user
+- **THEN** reading it returns the declared default
+
+#### Scenario: No value and no default
+
+- **WHEN** a preference declares no default and the user has set no value
+- **THEN** reading it returns no value and the extension decides what to do
+
+#### Scenario: Every built-in preference is described
+
+- **WHEN** a built-in extension's manifest is validated
+- **THEN** every preference it declares has a non-empty description
+
+#### Scenario: A fixed set of values is declared once
+
+- **WHEN** a string preference accepts only certain values, such as the clipboard's primary action
+- **THEN** the declaration lists them
+- **AND** reading a stored value outside the set returns the default
