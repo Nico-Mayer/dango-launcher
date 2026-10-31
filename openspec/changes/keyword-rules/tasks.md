@@ -6,7 +6,7 @@
 
 - [x] 2.1 Add `platform::foreground_is_dango()` with a Windows implementation in `src/platform/windows/mod.rs` that compares the foreground window's process id with `std::process::id()`, and a macOS implementation that returns false; verify `cargo clippy --all-targets -- -D warnings` passes
 - [x] 2.2 In `run` in `src/extensions/snippets/service.rs`, clear the buffer and skip the character when `foreground_is_dango()` is true, before the exclusion check, with the decision in a pure helper next to `is_excluded`; verify with a new test in `service.rs` (`cargo test snippets`)
-- [ ] 2.3 Hand check on Windows: start a debug build, open the launcher with `scripts/send-keys.ps1`, type a snippet's keyword, and confirm with `scripts/screenshot.ps1` that the search field shows the keyword unexpanded; then type the keyword in Notepad and confirm it expands
+- [x] 2.3 Hand check on Windows: start a debug build, open the launcher with `scripts/send-keys.ps1`, type a snippet's keyword, and confirm with `scripts/screenshot.ps1` that the search field shows the keyword unexpanded; then type the keyword in Notepad and confirm it expands
 
 ## 3. Skip keystrokes aimed at Dango on macOS
 
@@ -17,7 +17,7 @@
 
 - [x] 4.1 Move the chord test in `src/platform/windows/keymonitor.rs` into a pure function that, with right Alt down and no Win key, answers "translate with Ctrl+Alt" instead of `Clear`; set Ctrl and Alt in the `ToUnicodeEx` state array in that case; verify with a new test of the pure function covering AltGr, left Ctrl+Alt, Ctrl alone, and Win (`cargo test keymonitor`)
 - [x] 4.2 Add the trap to AGENTS.md "Platform traps": Windows reports AltGr as left Ctrl plus right Alt, so a chord check must look at `VK_RMENU` before treating Ctrl+Alt as a shortcut; verify the entry is there
-- [ ] 4.3 Hand check on Windows with the German layout: give a snippet the keyword `@@mail`, type it in Notepad, and confirm it expands; confirm Ctrl+C still clears a half-typed keyword
+- [x] 4.3 Hand check on Windows with the German layout: give a snippet the keyword `@@mail`, type it in Notepad, and confirm it expands; confirm Ctrl+C still clears a half-typed keyword
 
 ## 5. Wrap up
 
