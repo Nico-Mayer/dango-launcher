@@ -41,6 +41,8 @@ pub enum Intent {
     TogglePanel,
     /// A press outside the open action panel.
     ClosePanel,
+    /// The SearchBar's back control.
+    GoBack,
     Blur,
 }
 

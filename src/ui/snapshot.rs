@@ -3,7 +3,7 @@ use serde::Serialize;
 use crate::protocol::{Action, FieldKind, ListItem, View};
 
 use super::input::{Chord, Context, ResultItem};
-use super::state::{Launcher, Mode, PushedView, ToastStyle};
+use super::state::{Launcher, Mode, PushedView, ToastStyle, ViewError};
 
 macro_rules! snapshot_types {
     ($($item:item)*) => {
@@ -57,8 +57,8 @@ snapshot_types! {
 
     #[serde(tag = "kind", rename_all = "camelCase")]
     pub enum Screen {
-        /// A view tree with a protocol version this build does not support.
-        Error,
+        /// A view tree this build cannot draw, shown as an empty view.
+        Error(EmptyText),
         Root(RootScreen),
         View(ViewScreen),
     }
@@ -68,7 +68,7 @@ snapshot_types! {
         pub query: Text,
         pub sections: Vec<Section>,
         pub selected: Option<String>,
-        pub empty: Option<String>,
+        pub empty: Option<EmptyText>,
         pub busy: bool,
     }
 
@@ -192,10 +192,10 @@ impl Launcher {
                 Mode::Form => Focus::Form,
             },
             bindings: self.bindings(mode),
-            screen: match (self.protocol_error, self.stack.last()) {
-                (true, _) => Screen::Error,
-                (false, None) => Screen::Root(self.root_screen()),
-                (false, Some(view)) => Screen::View(self.view_screen(view)),
+            screen: match (self.view_error, self.stack.last()) {
+                (Some(error), _) => Screen::Error(error_text(error)),
+                (None, None) => Screen::Root(self.root_screen()),
+                (None, Some(view)) => Screen::View(self.view_screen(view)),
             },
             toast: self.toast(),
             footer: self.footer(),
@@ -282,8 +282,12 @@ impl Launcher {
             },
             sections,
             selected: self.root_selected().map(|item| item.id.clone()),
-            empty: (self.results.is_empty() && !self.query.is_empty())
-                .then(|| format!("No results for “{}”", self.query)),
+            empty: (self.results.is_empty() && !self.query.is_empty()).then(|| EmptyText {
+                icon: Some(SEARCH_ICON.to_string()),
+                title: format!("No results for “{}”", self.query),
+                description: None,
+                truncate: true,
+            }),
             busy: self.working.is_some(),
         }
     }
@@ -304,14 +308,18 @@ impl Launcher {
                 let empty = (sections.is_empty() && !list.loading).then(|| {
                     if !view.query.is_empty() {
                         EmptyText {
-                            icon: list.empty_state.as_ref().and_then(|s| s.icon.clone()),
+                            icon: list
+                                .empty_state
+                                .as_ref()
+                                .and_then(|s| s.icon.clone())
+                                .or_else(|| Some(SEARCH_ICON.to_string())),
                             title: format!("No results for “{}”", view.query),
                             description: None,
                             truncate: true,
                         }
                     } else if let Some(state) = &list.empty_state {
                         EmptyText {
-                            icon: state.icon.clone(),
+                            icon: state.icon.clone().or_else(|| Some(SEARCH_ICON.to_string())),
                             title: state.title.clone(),
                             description: state.description.clone(),
                             truncate: false,
@@ -420,10 +428,24 @@ impl Launcher {
     }
 }
 
+const SEARCH_ICON: &str = "icon:search";
+
+fn error_text(error: ViewError) -> EmptyText {
+    let title = match error {
+        ViewError::Unsupported => "This view needs a newer version of Dango",
+    };
+    EmptyText {
+        icon: Some("icon:triangle-alert".to_string()),
+        title: title.to_string(),
+        description: Some("Press Escape to go back".to_string()),
+        truncate: false,
+    }
+}
+
 impl EmptyText {
     fn plain(title: &str) -> Self {
         Self {
-            icon: None,
+            icon: Some(SEARCH_ICON.to_string()),
             title: title.to_string(),
             description: None,
             truncate: false,

@@ -1,0 +1,158 @@
+import { ScrollView } from "std-widgets.slint";
+import { Theme } from "../theme.slint";
+import { Icon } from "../atoms/icon.slint";
+import { Accessory } from "../atoms/accessory.slint";
+import { Intents, ListData, Panel, RowData, Shell } from "../globals.slint";
+import { Detail } from "detail.slint";
+
+component Heading inherits Rectangle {
+    in property <string> text;
+    in property <string> subtitle;
+    height: Theme.heading-height;
+    HorizontalLayout {
+        padding-left: 16px;
+        padding-right: 16px;
+        spacing: Theme.gap;
+        alignment: start;
+        Text {
+            text: root.text;
+            color: Theme.muted;
+            font-size: Theme.text-small;
+            font-weight: 500;
+            vertical-alignment: center;
+            accessible-role: AccessibleRole.text;
+            accessible-label: root.text;
+        }
+        if root.subtitle != "": Text {
+            text: root.subtitle;
+            color: Theme.muted;
+            font-size: Theme.text-small;
+            vertical-alignment: center;
+            accessible-role: AccessibleRole.text;
+            accessible-label: root.subtitle;
+        }
+    }
+}
+
+component Row inherits Rectangle {
+    in property <RowData> data;
+    height: Theme.row-height;
+    accessible-role: list-item;
+    accessible-label: root.data.id;
+    accessible-item-selected: root.data.selected;
+
+    fill := Rectangle {
+        x: 6px;
+        width: parent.width - 12px;
+        border-radius: Theme.radius;
+        background: root.data.selected ? Theme.selection
+            : touch.has-hover && !Shell.pointer-resting ? Theme.hover : transparent;
+
+        HorizontalLayout {
+            padding-left: 10px;
+            padding-right: 10px;
+            spacing: 12px;
+            VerticalLayout {
+                alignment: center;
+                Icon {
+                    source: root.data.icon;
+                    kind: root.data.icon-kind;
+                    content: root.data.content;
+                }
+            }
+            HorizontalLayout {
+                spacing: Theme.gap;
+                horizontal-stretch: 1;
+                Rectangle {
+                    horizontal-stretch: 1;
+                    clip: true;
+                    StyledText {
+                        x: 0;
+                        width: parent.width;
+                        text: root.data.title;
+                        default-color: Theme.text;
+                        default-font-size: Theme.text-body;
+                        max-lines: 1;
+                        vertical-alignment: center;
+                    }
+                }
+                if root.data.subtitle != "": Text {
+                    horizontal-stretch: 0;
+                    max-width: 240px;
+                    text: root.data.subtitle;
+                    color: Theme.muted;
+                    font-size: Theme.text-small;
+                    overflow: elide;
+                    vertical-alignment: center;
+                }
+            }
+            for accessory in root.data.accessories: Accessory {
+                horizontal-stretch: 0;
+                data: accessory;
+            }
+        }
+    }
+
+    touch := TouchArea {
+        clicked => {
+            if !Panel.open {
+                Intents.activate(root.data.id);
+            }
+        }
+        changed mouse-x => {
+            Shell.pointer-resting = false;
+        }
+        changed mouse-y => {
+            Shell.pointer-resting = false;
+        }
+    }
+}
+
+/// Rows under optional section headings, with the selected item's detail
+/// beside them when the view asks for it.
+export component List inherits Rectangle {
+    public function reveal(top: length, height: length) {
+        if top + scroller.content-y < 0 {
+            scroller.content-y = -top;
+        } else if top + height + scroller.content-y > scroller.visible-height {
+            scroller.content-y = scroller.visible-height - top - height;
+        }
+    }
+
+    // Every row is built: a ListView estimates its height from the rows it
+    // has built, and would clamp a scroll to one it has not.
+    scroller := ScrollView {
+        x: 0;
+        y: 6px;
+        width: ListData.detail-pane ? parent.width * 2 / 5 : parent.width;
+        height: parent.height - 12px;
+        accessible-role: AccessibleRole.list;
+        VerticalLayout {
+            alignment: start;
+            for row in ListData.rows: Rectangle {
+                height: row.heading != "" ? Theme.heading-height : Theme.row-height;
+                if row.heading != "": Heading {
+                    text: row.heading;
+                    subtitle: row.heading-subtitle;
+                }
+                if row.heading == "": Row {
+                    data: row;
+                }
+            }
+        }
+    }
+
+    if ListData.detail-pane: Rectangle {
+        x: parent.width * 2 / 5;
+        width: parent.width * 3 / 5;
+        Rectangle {
+            x: 0;
+            width: 1px;
+            background: Theme.border;
+        }
+        Detail {
+            x: 1px;
+            width: parent.width - 1px;
+        }
+    }
+}

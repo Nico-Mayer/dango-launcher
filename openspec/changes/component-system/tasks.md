@@ -19,8 +19,8 @@
 
 ## 3. Shell: globals, SearchBar, ActionBar, toast
 
-- [ ] 3.1 Split `ui/` into `theme`, `atoms/`, `shell/`, `views/`, and `app.slint` per design D3, with the globals from design D2; verify `hk check` and `cargo test` pass
-- [ ] 3.2 Split `render.rs` into `render/` with one writer per global; verify every test in `src/slint_shell/tests.rs` passes
+- [x] 3.1 Split `ui/` into `theme`, `atoms/`, `shell/`, `views/`, and `app.slint` per design D3, with the globals from design D2; verify `hk check` and `cargo test` pass
+- [x] 3.2 Split `render.rs` into `render/` with one writer per global; verify every test in `src/slint_shell/tests.rs` passes
 - [ ] 3.3 Build the SearchBar on `TextInput` with placeholder, "Go back" control, static loading bar, and title mode for detail and form; verify UI tests for the back control popping a view, the loading bar under a loading view, and a form showing its title
 - [ ] 3.4 Build the ActionBar: context (extension name and icon at root, command title and icon in a view), primary label with Enter Kbd, and "Actions" with the panel chord only when there is more than one action; verify UI tests for "Applications" with "Open", "Clipboard History" as context, and a single-action row
 - [ ] 3.5 Show toasts in the ActionBar's left slot with a static dot per style and accessible text; verify UI tests for each style and that typing reaches the SearchBar while a toast shows

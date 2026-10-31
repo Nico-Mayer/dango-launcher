@@ -1,0 +1,46 @@
+import { ScrollView } from "std-widgets.slint";
+import { Theme } from "../theme.slint";
+import { DetailData } from "../globals.slint";
+
+/// A body and its metadata, standalone or in a list's pane.
+export component Detail inherits Rectangle {
+    ScrollView {
+        VerticalLayout {
+            padding: 16px;
+            spacing: 16px;
+            alignment: start;
+            StyledText {
+                text: DetailData.body;
+                default-color: Theme.text;
+                default-font-size: Theme.text-body;
+                accessible-role: AccessibleRole.text;
+                accessible-label: DetailData.text;
+            }
+            if DetailData.metadata.length > 0: Rectangle {
+                height: 1px;
+                background: Theme.border;
+            }
+            for pair in DetailData.metadata: HorizontalLayout {
+                spacing: 12px;
+                Text {
+                    width: 120px;
+                    text: pair.label;
+                    color: Theme.muted;
+                    font-size: Theme.text-small;
+                    overflow: elide;
+                    accessible-role: AccessibleRole.text;
+                    accessible-label: pair.label;
+                }
+                Text {
+                    horizontal-stretch: 1;
+                    text: pair.value;
+                    color: Theme.text;
+                    font-size: Theme.text-small;
+                    wrap: word-wrap;
+                    accessible-role: AccessibleRole.text;
+                    accessible-label: pair.value;
+                }
+            }
+        }
+    }
+}

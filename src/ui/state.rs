@@ -38,7 +38,8 @@ pub struct Launcher {
     /// The title of a command invoked from root that has neither finished nor
     /// shown a view yet.
     pub(super) working: Option<String>,
-    pub(super) protocol_error: bool,
+    /// A tree that cannot be drawn, shown in place of a view until Escape.
+    pub(super) view_error: Option<ViewError>,
     pub(super) toast: Option<HeldToast>,
 }
 
@@ -49,6 +50,12 @@ pub(super) struct HeldToast {
     id: u64,
     pub(super) style: ToastStyle,
     pub(super) text: String,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum ViewError {
+    /// A protocol version this build does not know.
+    Unsupported,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize)]
@@ -138,6 +145,14 @@ impl Launcher {
             }
             Intent::ClosePanel => self.panel = None,
             Intent::Blur => fx.push(Effect::Dismiss),
+            Intent::GoBack => match self.mode() {
+                Mode::Error => self.view_error = None,
+                _ if !self.stack.is_empty() => {
+                    self.panel = None;
+                    self.escape(fx);
+                }
+                _ => {}
+            },
         }
     }
 
@@ -208,7 +223,7 @@ impl Launcher {
         // what brings the launcher back.
         self.shown_invocation = None;
         self.panel = None;
-        self.protocol_error = false;
+        self.view_error = None;
         self.working = None;
         fx.push(Effect::Search(String::new()));
     }
@@ -230,7 +245,7 @@ impl Launcher {
         self.last_invocation = Some(invocation);
         self.working = None;
         if tree.protocol_version != PROTOCOL_VERSION {
-            self.protocol_error = true;
+            self.view_error = Some(ViewError::Unsupported);
             return;
         }
         self.owner = Some(owner);
@@ -414,7 +429,7 @@ impl Launcher {
         match mode {
             Mode::Error => {
                 if escape {
-                    self.protocol_error = false;
+                    self.view_error = None;
                 }
                 return;
             }
@@ -647,7 +662,7 @@ impl Launcher {
     }
 
     pub(super) fn mode(&self) -> Mode {
-        if self.protocol_error {
+        if self.view_error.is_some() {
             Mode::Error
         } else if self.panel.is_some() {
             Mode::Panel

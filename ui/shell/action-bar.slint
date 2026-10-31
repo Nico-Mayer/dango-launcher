@@ -1,0 +1,130 @@
+import { Theme } from "../theme.slint";
+import { Icon } from "../atoms/icon.slint";
+import { Kbd } from "../atoms/kbd.slint";
+import { Dot, ToastStyle } from "../atoms/dot.slint";
+import { Intents, Shell } from "../globals.slint";
+
+/// Where the user is, or a toast, and what Enter does.
+export component ActionBar inherits Rectangle {
+    height: Theme.action-bar-height;
+    background: Theme.raised;
+
+    Rectangle {
+        y: 0;
+        height: 1px;
+        background: Theme.border;
+    }
+
+    HorizontalLayout {
+        padding-left: 12px;
+        padding-right: 12px;
+        spacing: 12px;
+
+        if Shell.toast-shown: HorizontalLayout {
+            horizontal-stretch: 1;
+            spacing: Theme.gap;
+            accessible-role: AccessibleRole.text;
+            accessible-label: Shell.toast-text;
+            accessible-description: Shell.toast-style == ToastStyle.failure ? "Failed" : "";
+            VerticalLayout {
+                alignment: center;
+                Dot {
+                    style: Shell.toast-style;
+                }
+            }
+            Text {
+                text: Shell.toast-text;
+                color: Shell.toast-style == ToastStyle.failure ? Theme.text : Theme.muted;
+                font-size: Theme.text-small;
+                vertical-alignment: center;
+                overflow: elide;
+                accessible-role: none;
+            }
+        }
+
+        if !Shell.toast-shown: HorizontalLayout {
+            horizontal-stretch: 1;
+            spacing: Theme.gap;
+            if Shell.context != "": VerticalLayout {
+                alignment: center;
+                Icon {
+                    width: 16px;
+                    height: 16px;
+                    source: Shell.context-icon;
+                    kind: Shell.context-icon-kind;
+                }
+            }
+            Text {
+                text: Shell.context;
+                color: Theme.muted;
+                font-size: Theme.text-small;
+                vertical-alignment: center;
+                overflow: elide;
+                accessible-role: AccessibleRole.text;
+                accessible-label: Shell.context;
+            }
+        }
+
+        if Shell.primary-label != "": HorizontalLayout {
+            horizontal-stretch: 0;
+            spacing: Theme.gap;
+            Text {
+                text: Shell.primary-label;
+                color: Theme.text;
+                font-size: Theme.text-small;
+                vertical-alignment: center;
+                overflow: elide;
+                max-width: 200px;
+                accessible-role: AccessibleRole.text;
+                accessible-label: Shell.primary-label;
+            }
+            VerticalLayout {
+                alignment: center;
+                Kbd {
+                    keys: Shell.confirm-key;
+                }
+            }
+        }
+
+        if Shell.panel-hint: HorizontalLayout {
+            horizontal-stretch: 0;
+            spacing: 12px;
+            VerticalLayout {
+                alignment: center;
+                Rectangle {
+                    width: 1px;
+                    height: 14px;
+                    background: Theme.border;
+                }
+            }
+            Rectangle {
+                accessible-role: button;
+                accessible-label: "Actions";
+                accessible-action-default => {
+                    Intents.toggle-panel();
+                }
+                HorizontalLayout {
+                    spacing: 6px;
+                    Text {
+                        text: "Actions";
+                        color: actions-touch.has-hover ? Theme.text : Theme.muted;
+                        font-size: Theme.text-small;
+                        vertical-alignment: center;
+                        accessible-role: none;
+                    }
+                    VerticalLayout {
+                        alignment: center;
+                        Kbd {
+                            keys: Shell.panel-key;
+                        }
+                    }
+                }
+                actions-touch := TouchArea {
+                    clicked => {
+                        Intents.toggle-panel();
+                    }
+                }
+            }
+        }
+    }
+}

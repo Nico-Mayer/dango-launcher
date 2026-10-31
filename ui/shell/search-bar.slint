@@ -1,0 +1,114 @@
+import { Theme } from "../theme.slint";
+import { Icon, IconKind } from "../atoms/icon.slint";
+import { Intents, Search, Shell } from "../globals.slint";
+
+/// The query for a list, or the command's title for a detail or form.
+export component SearchBar inherits Rectangle {
+    height: Theme.search-height;
+
+    public function set-text(text: string) {
+        input.text = text;
+    }
+
+    public function take-focus(select: bool) {
+        input.focus();
+        if select {
+            input.select-all();
+        }
+    }
+
+    HorizontalLayout {
+        padding-left: 16px;
+        padding-right: 16px;
+        spacing: 12px;
+
+        if Shell.can-go-back: VerticalLayout {
+            alignment: center;
+            Rectangle {
+                width: Theme.icon-size + 8px;
+                height: Theme.icon-size + 8px;
+                border-radius: Theme.radius / 2;
+                background: back-touch.has-hover ? Theme.hover : transparent;
+                accessible-role: button;
+                accessible-label: "Go back";
+                accessible-action-default => {
+                    Intents.go-back();
+                }
+                Icon {
+                    source: Shell.back-icon;
+                    kind: IconKind.named;
+                    role: Theme.muted;
+                }
+                back-touch := TouchArea {
+                    clicked => {
+                        Intents.go-back();
+                    }
+                }
+            }
+        }
+
+        Rectangle {
+            visible: Shell.typing;
+            horizontal-stretch: 1;
+            accessible-role: text-input;
+            accessible-label: Search.placeholder;
+            accessible-placeholder-text: Search.placeholder;
+            accessible-value: input.text;
+            accessible-action-set-value(value) => {
+                input.text = value;
+                Intents.query-edited(value);
+            }
+            Text {
+                x: 0;
+                width: parent.width;
+                text: input.text == "" && input.preedit-text == "" ? Search.placeholder : "";
+                color: Theme.muted;
+                font-size: Theme.text-large;
+                vertical-alignment: center;
+                overflow: elide;
+                accessible-role: none;
+            }
+            input := TextInput {
+                x: 0;
+                width: parent.width;
+                height: parent.height;
+                single-line: true;
+                color: Theme.text;
+                selection-background-color: Theme.selection;
+                selection-foreground-color: Theme.text;
+                font-size: Theme.text-large;
+                vertical-alignment: center;
+                accessible-role: none;
+                edited => {
+                    Intents.query-edited(self.text);
+                }
+            }
+        }
+
+        if !Shell.typing: Text {
+            horizontal-stretch: 1;
+            text: Shell.title;
+            color: Theme.text;
+            font-size: Theme.text-large;
+            font-weight: 500;
+            vertical-alignment: center;
+            overflow: elide;
+            accessible-role: AccessibleRole.text;
+            accessible-label: Shell.title;
+        }
+    }
+
+    // Static: a busy state is shown, never animated.
+    if Shell.loading: Rectangle {
+        y: parent.height - 2px;
+        height: 2px;
+        background: Theme.accent;
+        accessible-role: progress-indicator;
+        accessible-label: "Loading…";
+    }
+    if !Shell.loading: Rectangle {
+        y: parent.height - 1px;
+        height: 1px;
+        background: Theme.border;
+    }
+}

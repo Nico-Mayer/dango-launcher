@@ -1,0 +1,106 @@
+import { ScrollView } from "std-widgets.slint";
+import { Theme } from "../theme.slint";
+import { Kbd } from "../atoms/kbd.slint";
+import { ActionData, Intents, Panel, Shell } from "../globals.slint";
+
+component PanelHeading inherits Rectangle {
+    in property <string> text;
+    height: Theme.heading-height;
+    HorizontalLayout {
+        padding-left: 10px;
+        Text {
+            text: root.text;
+            color: Theme.muted;
+            font-size: Theme.text-small;
+            font-weight: 500;
+            vertical-alignment: center;
+            accessible-role: AccessibleRole.text;
+            accessible-label: root.text;
+        }
+    }
+}
+
+component PanelRow inherits Rectangle {
+    in property <ActionData> data;
+    height: Theme.panel-row-height;
+    border-radius: Theme.radius / 2;
+    background: root.data.selected ? Theme.selection
+        : touch.has-hover && !Shell.pointer-resting ? Theme.hover : transparent;
+    accessible-role: list-item;
+    accessible-label: root.data.title;
+    accessible-item-selected: root.data.selected;
+    HorizontalLayout {
+        padding-left: 10px;
+        padding-right: 10px;
+        spacing: Theme.gap;
+        Text {
+            text: root.data.title;
+            color: root.data.danger ? Theme.danger : Theme.text;
+            font-size: Theme.text-body;
+            overflow: elide;
+            vertical-alignment: center;
+            horizontal-stretch: 1;
+            accessible-role: none;
+        }
+        if root.data.shortcut != "": VerticalLayout {
+            alignment: center;
+            horizontal-stretch: 0;
+            Kbd {
+                keys: root.data.shortcut;
+            }
+        }
+    }
+    touch := TouchArea {
+        clicked => {
+            Intents.activate(root.data.id);
+        }
+        changed mouse-x => {
+            Shell.pointer-resting = false;
+        }
+        changed mouse-y => {
+            Shell.pointer-resting = false;
+        }
+    }
+}
+
+/// Every action on the selection, floating above the ActionBar.
+export component ActionPanel inherits Rectangle {
+    out property <length> content-height: column.preferred-height;
+    background: Theme.surface;
+    border-radius: Theme.radius;
+    border-width: 1px;
+    border-color: Theme.border;
+    drop-shadow-blur: 24px;
+    drop-shadow-offset-y: 8px;
+    drop-shadow-color: Theme.shadow;
+    accessible-role: list;
+    accessible-label: "Actions";
+
+    public function reveal(top: length, height: length) {
+        if top + scroller.content-y < 0 {
+            scroller.content-y = -top;
+        } else if top + height + scroller.content-y > scroller.visible-height {
+            scroller.content-y = scroller.visible-height - top - height;
+        }
+    }
+
+    scroller := ScrollView {
+        x: 0;
+        y: 0;
+        width: parent.width;
+        height: parent.height;
+
+        column := VerticalLayout {
+            padding: 6px;
+            for row in Panel.rows: Rectangle {
+                height: row.heading != "" ? Theme.heading-height : Theme.panel-row-height;
+                if row.heading != "": PanelHeading {
+                    text: row.heading;
+                }
+                if row.heading == "": PanelRow {
+                    data: row;
+                }
+            }
+        }
+    }
+}

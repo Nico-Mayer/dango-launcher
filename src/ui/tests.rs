@@ -234,7 +234,7 @@ impl Harness {
                 ViewBody::List(list) => list.selected,
                 _ => None,
             },
-            Screen::Error => None,
+            Screen::Error(_) => None,
         }
     }
 
@@ -380,7 +380,7 @@ fn an_empty_search_says_what_found_nothing() {
     h.typed("zzz");
     h.results("zzz", Vec::new());
     assert_eq!(
-        h.root_screen().empty.as_deref(),
+        h.root_screen().empty.map(|empty| empty.title).as_deref(),
         Some("No results for “zzz”")
     );
 }
@@ -457,7 +457,7 @@ fn an_unsupported_protocol_version_shows_the_error_until_escape() {
     tree.protocol_version = 99;
     h.render(1, tree);
     let snapshot = h.snapshot();
-    assert_eq!(snapshot.screen, Screen::Error);
+    assert!(matches!(snapshot.screen, Screen::Error(_)));
     assert_eq!(snapshot.focus, Focus::Nothing);
     assert_eq!(snapshot.bindings.len(), 1);
     assert!(h.press("Escape").is_empty());
@@ -470,7 +470,11 @@ fn a_version_1_tree_is_unsupported() {
     let mut tree = detail_tree("Old");
     tree.protocol_version = 1;
     h.render(1, tree);
-    assert_eq!(h.snapshot().screen, Screen::Error);
+    let Screen::Error(text) = h.snapshot().screen else {
+        panic!("expected the unsupported view");
+    };
+    assert_eq!(text.title, "This view needs a newer version of Dango");
+    assert_eq!(text.description.as_deref(), Some("Press Escape to go back"));
 }
 
 #[test]

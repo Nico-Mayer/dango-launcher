@@ -1,0 +1,116 @@
+import { IconKind } from "atoms/icon.slint";
+import { AccessoryData } from "atoms/accessory.slint";
+import { ToastStyle } from "atoms/dot.slint";
+
+export enum ScreenKind { root, list, detail, form, empty }
+
+/// A non-empty heading makes this a section heading rather than an item.
+export struct RowData {
+    heading: string,
+    heading-subtitle: string,
+    id: string,
+    title: styled-text,
+    subtitle: string,
+    icon: image,
+    icon-kind: IconKind,
+    /// The icon is content in its own right, as a copied image is.
+    content: bool,
+    accessories: [AccessoryData],
+    selected: bool,
+}
+
+/// A non-empty heading makes this a section heading rather than an action.
+export struct ActionData {
+    heading: string,
+    id: string,
+    title: string,
+    shortcut: string,
+    danger: bool,
+    selected: bool,
+}
+
+export struct MetaData {
+    label: string,
+    value: string,
+}
+
+export enum FieldKind { text, password, toggle, template }
+
+export struct FieldData {
+    id: string,
+    label: string,
+    kind: FieldKind,
+    value: string,
+    help: string,
+    help-emphasized: bool,
+    error: string,
+}
+
+/// Where the user is, what Enter does, and what is happening.
+export global Shell {
+    in property <ScreenKind> screen: ScreenKind.root;
+    /// The SearchBar holds a query rather than the command's title.
+    in property <bool> typing: true;
+    in property <string> context;
+    in property <image> context-icon;
+    in property <IconKind> context-icon-kind;
+    in property <bool> toast-shown;
+    in property <ToastStyle> toast-style;
+    in property <string> toast-text;
+    in property <string> primary-label;
+    in property <string> confirm-key;
+    in property <string> panel-key;
+    /// More than one action, so the panel is worth offering.
+    in property <bool> panel-hint;
+    in property <bool> can-go-back;
+    in property <image> back-icon;
+    in property <bool> loading;
+    /// A detail or form shows its command's title in place of the query.
+    in property <string> title;
+    in-out property <bool> pointer-resting;
+    in-out property <bool> multiline-focused;
+}
+
+export global Search {
+    in property <string> placeholder;
+}
+
+export global ListData {
+    in property <[RowData]> rows;
+    in property <bool> detail-pane;
+}
+
+export global EmptyData {
+    in property <image> icon;
+    in property <IconKind> icon-kind;
+    in property <string> title;
+    in property <string> hint;
+}
+
+export global DetailData {
+    in property <styled-text> body;
+    /// The body as plain text, for assistive technology.
+    in property <string> text;
+    in property <[MetaData]> metadata;
+}
+
+export global Panel {
+    in property <bool> open;
+    in property <[ActionData]> rows;
+}
+
+export global FormData {
+    in property <[FieldData]> fields;
+}
+
+export global Intents {
+    /// Whether the chord belongs to the launcher. Asked before the focused
+    /// control sees the key.
+    callback key(text: string, control: bool, alt: bool, shift: bool, meta: bool) -> bool;
+    callback query-edited(text: string);
+    callback field-edited(id: string, value: string);
+    callback activate(id: string);
+    callback toggle-panel();
+    callback close-panel();
+    callback go-back();
+}

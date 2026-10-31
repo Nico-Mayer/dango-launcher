@@ -8,7 +8,7 @@ use i_slint_backend_testing::ElementHandle;
 use slint::platform::{PointerEventButton, WindowEvent};
 use slint::{ComponentHandle, LogicalPosition, Model};
 
-use super::generated::{LauncherWindow, ScreenKind, Tray};
+use super::generated::{Intents, LauncherWindow, Panel, ScreenKind, Shell, Tray};
 use super::render::{self, Renderer};
 use crate::protocol::{
     Action, DetailView, FieldKind, Filtering, FormField, FormView, ListItem, ListView, View,
@@ -17,8 +17,8 @@ use crate::protocol::{
 use crate::shell::TrayStatus;
 use crate::ui::{Context, Event, Input, Intent, Launcher, ResultItem, TemplateInspection};
 
-const LIST_TOP: f32 = 56.0 + 8.0;
-const LIST_BOTTOM: f32 = 400.0 - 40.0 - 8.0;
+const LIST_TOP: f32 = 56.0 + 6.0;
+const LIST_BOTTOM: f32 = 480.0 - 40.0 - 6.0;
 
 struct Harness {
     ui: LauncherWindow,
@@ -34,7 +34,7 @@ impl Harness {
     fn new() -> Self {
         i_slint_backend_testing::init_no_event_loop();
         let ui = LauncherWindow::new().unwrap();
-        ui.window().set_size(slint::LogicalSize::new(720.0, 400.0));
+        ui.window().set_size(slint::LogicalSize::new(720.0, 480.0));
         ui.show().unwrap();
         let renderer = Rc::new(RefCell::new(Renderer::new(&ui)));
         let launcher = Rc::new(RefCell::new(Launcher::new()));
@@ -96,6 +96,14 @@ impl Harness {
             invocation: 1,
             tree,
         });
+    }
+
+    fn shell(&self) -> Shell<'_> {
+        self.ui.global::<Shell>()
+    }
+
+    fn panel(&self) -> Panel<'_> {
+        self.ui.global::<Panel>()
     }
 
     fn freeze(&self) {
@@ -256,10 +264,8 @@ mod protocol_error {
         let mut tree = detail_tree("Working");
         tree.protocol_version = 99;
         h.view(tree);
-        assert_eq!(h.ui.get_screen(), ScreenKind::Error);
-        assert!(h
-            .find("This view needs a newer version of Dango.")
-            .is_some());
+        assert_eq!(h.shell().get_screen(), ScreenKind::Empty);
+        assert!(h.find("This view needs a newer version of Dango").is_some());
     }
 }
 
@@ -272,17 +278,17 @@ mod root_search {
         assert_eq!(h.row("result-1").accessible_item_selected(), Some(true));
 
         h.move_pointer_to(&h.row("result-3"));
-        assert!(!h.ui.get_pointer_resting());
+        assert!(!h.shell().get_pointer_resting());
         assert_eq!(h.row("result-1").accessible_item_selected(), Some(true));
         assert_eq!(h.row("result-3").accessible_item_selected(), Some(false));
         assert!(h.intents().is_empty(), "hover sent {:?}", h.intents());
 
         h.arrow_down();
-        assert!(h.ui.get_pointer_resting());
+        assert!(h.shell().get_pointer_resting());
         assert_eq!(h.row("result-2").accessible_item_selected(), Some(true));
 
         h.move_pointer_to(&h.row("result-4"));
-        assert!(!h.ui.get_pointer_resting());
+        assert!(!h.shell().get_pointer_resting());
     }
 
     #[test]
@@ -394,7 +400,7 @@ mod views {
     fn a_pushed_list_renders_its_items() {
         let h = Harness::root(results(3));
         h.view(list_tree());
-        assert_eq!(h.ui.get_screen(), ScreenKind::List);
+        assert_eq!(h.shell().get_screen(), ScreenKind::List);
         assert!(h.find("Search").is_some());
         assert_eq!(h.row("item-1").accessible_item_selected(), Some(true));
         assert!(h.find("item-3").is_some());
@@ -404,7 +410,7 @@ mod views {
     fn a_detail_renders_its_text() {
         let h = Harness::root(results(3));
         h.view(detail_tree("Plain words"));
-        assert_eq!(h.ui.get_screen(), ScreenKind::Detail);
+        assert_eq!(h.shell().get_screen(), ScreenKind::Detail);
         assert!(h.find("Plain words").is_some());
     }
 
@@ -412,7 +418,7 @@ mod views {
     fn a_form_renders_every_field() {
         let h = Harness::root(results(3));
         h.view(form_tree());
-        assert_eq!(h.ui.get_screen(), ScreenKind::Form);
+        assert_eq!(h.shell().get_screen(), ScreenKind::Form);
         for label in ["name", "enabled", "template"] {
             assert!(h.find(label).is_some(), "{label} is drawn");
         }
@@ -422,7 +428,8 @@ mod views {
     fn a_template_error_is_the_fields_accessible_description() {
         let h = Harness::root(results(3));
         h.view(form_tree());
-        h.ui.invoke_field_edited("template".into(), "{{ broken".into());
+        h.ui.global::<Intents>()
+            .invoke_field_edited("template".into(), "{{ broken".into());
         h.event(Event::TemplateInspected {
             field: "template".into(),
             source: "{{ broken".into(),
@@ -449,35 +456,47 @@ mod action_panel {
             .expect("the Actions button")
     }
 
+    fn two_actions(count: usize) -> Vec<ResultItem> {
+        let mut items = results(count);
+        for item in &mut items {
+            item.actions.push(Action {
+                id: "copy".into(),
+                title: "Copy".into(),
+                ..Default::default()
+            });
+        }
+        items
+    }
+
     #[test]
     fn the_panel_opens_and_closes_only_from_the_snapshot() {
-        let h = Harness::root(results(3));
+        let h = Harness::root(two_actions(3));
         h.freeze();
         actions_button(&h).mock_single_click(PointerEventButton::Left);
         assert_eq!(h.intents(), [Intent::TogglePanel]);
-        assert!(!h.ui.get_panel_open());
+        assert!(!h.panel().get_open());
 
         h.launcher
             .borrow_mut()
             .apply(Input::Intent(Intent::TogglePanel));
         let snapshot = h.launcher.borrow().snapshot();
         h.renderer.borrow_mut().render(&h.ui, snapshot);
-        assert!(h.ui.get_panel_open());
-        assert_eq!(h.ui.get_actions().row_count(), 1);
+        assert!(h.panel().get_open());
+        assert_eq!(h.panel().get_rows().row_count(), 2);
     }
 
     #[test]
     fn a_click_outside_does_not_reach_the_parent() {
-        let h = Harness::root(results(3));
+        let h = Harness::root(two_actions(3));
         actions_button(&h).mock_single_click(PointerEventButton::Left);
-        assert!(h.ui.get_panel_open());
+        assert!(h.panel().get_open());
         h.freeze();
         h.intents.borrow_mut().clear();
 
         h.row("result-2")
             .mock_single_click(PointerEventButton::Left);
         assert_eq!(h.intents(), [Intent::ClosePanel]);
-        assert!(h.ui.get_panel_open(), "only a snapshot closes the panel");
+        assert!(h.panel().get_open(), "only a snapshot closes the panel");
     }
 
     #[test]
@@ -494,7 +513,7 @@ mod action_panel {
         });
         let h = Harness::root(vec![item]);
         actions_button(&h).mock_single_click(PointerEventButton::Left);
-        let shortcut = h.ui.get_actions().row_data(1).unwrap().shortcut;
+        let shortcut = h.panel().get_rows().row_data(1).unwrap().shortcut;
         assert!(shortcut.ends_with('C'), "{shortcut}");
     }
 }

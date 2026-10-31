@@ -1,0 +1,107 @@
+import { Theme } from "../theme.slint";
+import { Intents, Panel, ScreenKind, Shell } from "../globals.slint";
+import { SearchBar } from "search-bar.slint";
+import { ActionBar } from "action-bar.slint";
+import { ActionPanel } from "action-panel.slint";
+import { List } from "../views/list.slint";
+import { Detail } from "../views/detail.slint";
+import { EmptyView } from "../views/empty-view.slint";
+import { Form } from "../views/form.slint";
+
+/// The SearchBar, one view, and the ActionBar, with the action panel
+/// floating above them.
+export component LauncherWindow inherits Window {
+    no-frame: true;
+    always-on-top: true;
+    background: transparent;
+    title: "Dango";
+    width: Theme.window-width;
+    height: Theme.max-height;
+    default-font-size: Theme.text-body;
+    default-font-family: Theme.font;
+
+    public function set-query(text: string) {
+        search.set-text(text);
+    }
+
+    public function focus-prompt(select: bool) {
+        search.take-focus(select);
+    }
+
+    public function focus-surface() {
+        surface.focus();
+    }
+
+    public function reveal-row(top: length, height: length) {
+        list.reveal(top, height);
+    }
+
+    public function reveal-action(top: length, height: length) {
+        panel.reveal(top, height);
+    }
+
+    surface := FocusScope {
+        capture-key-pressed(event) => {
+            Shell.pointer-resting = true;
+            if Intents.key(event.text, event.modifiers.control, event.modifiers.alt, event.modifiers.shift, event.modifiers.meta) {
+                return accept;
+            }
+            reject
+        }
+
+        frame := Rectangle {
+            background: Theme.background;
+            border-radius: Theme.radius * 1.5;
+            border-width: 1px;
+            border-color: Theme.border;
+            accessible-role: groupbox;
+            accessible-label: "Dango";
+            clip: true;
+
+            property <length> body-top: Theme.search-height;
+            property <length> body-height: self.height - Theme.search-height - Theme.action-bar-height;
+
+            search := SearchBar {
+                y: 0;
+            }
+
+            list := List {
+                visible: Shell.screen == ScreenKind.root || Shell.screen == ScreenKind.list;
+                y: parent.body-top;
+                height: parent.body-height;
+            }
+            if Shell.screen == ScreenKind.empty: EmptyView {
+                y: parent.body-top;
+                height: parent.body-height;
+            }
+            if Shell.screen == ScreenKind.detail: Detail {
+                y: parent.body-top;
+                height: parent.body-height;
+            }
+            if Shell.screen == ScreenKind.form: Form {
+                y: parent.body-top;
+                height: parent.body-height;
+            }
+
+            ActionBar {
+                y: parent.height - Theme.action-bar-height;
+            }
+
+            // Swallows a press outside the open panel, so it never reaches the
+            // view underneath. The state machine decides what it means.
+            if Panel.open: TouchArea {
+                clicked => {
+                    Intents.close-panel();
+                }
+            }
+
+            panel := ActionPanel {
+                visible: Panel.open;
+                width: min(Theme.panel-width, parent.width - 16px);
+                height: min(self.content-height, parent.height - Theme.action-bar-height - 16px);
+                x: parent.width - self.width - 8px;
+                y: parent.height - Theme.action-bar-height - self.height - 8px;
+            }
+        }
+    }
+}

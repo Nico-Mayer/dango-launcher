@@ -1,0 +1,77 @@
+import { CheckBox, LineEdit, ScrollView, TextEdit } from "std-widgets.slint";
+import { Theme } from "../theme.slint";
+import { FieldKind, FormData, Intents, Shell } from "../globals.slint";
+
+/// Fields in order, each with its help or error below it.
+export component Form inherits Rectangle {
+    ScrollView {
+        VerticalLayout {
+            padding-left: 20px;
+            padding-right: 20px;
+            padding-top: 16px;
+            padding-bottom: 16px;
+            spacing: 16px;
+            alignment: start;
+            for field[index] in FormData.fields: VerticalLayout {
+                spacing: 6px;
+                if field.kind != FieldKind.toggle: Text {
+                    text: field.label;
+                    color: Theme.text;
+                    font-size: Theme.text-small;
+                    font-weight: 500;
+                }
+                if field.kind == FieldKind.text || field.kind == FieldKind.password: LineEdit {
+                    text: field.value;
+                    input-type: field.kind == FieldKind.password ? InputType.password : InputType.text;
+                    accessible-label: field.label;
+                    // The launcher is summoned to be typed into, so a form
+                    // takes the cursor in its first field as it is seeded.
+                    init => {
+                        if index == 0 {
+                            self.focus();
+                        }
+                    }
+                    edited(text) => {
+                        Intents.field-edited(field.id, text);
+                    }
+                }
+                if field.kind == FieldKind.template: template := TextEdit {
+                    height: 96px;
+                    text: field.value;
+                    accessible-label: field.label;
+                    accessible-description: field.error;
+                    init => {
+                        if index == 0 {
+                            self.focus();
+                        }
+                    }
+                    edited(text) => {
+                        Intents.field-edited(field.id, text);
+                    }
+                    changed has-focus => {
+                        Shell.multiline-focused = self.has-focus;
+                    }
+                }
+                if field.kind == FieldKind.toggle: CheckBox {
+                    text: field.label;
+                    checked: field.value == "true";
+                    toggled => {
+                        Intents.field-edited(field.id, self.checked ? "true" : "false");
+                    }
+                }
+                if field.error != "": Text {
+                    text: field.error;
+                    color: Theme.danger;
+                    font-size: Theme.text-small;
+                    wrap: word-wrap;
+                }
+                if field.error == "" && field.help != "": Text {
+                    text: field.help;
+                    color: field.help-emphasized ? Theme.text : Theme.muted;
+                    font-size: Theme.text-small;
+                    wrap: word-wrap;
+                }
+            }
+        }
+    }
+}

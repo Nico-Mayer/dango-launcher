@@ -1,0 +1,41 @@
+import { Theme } from "../theme.slint";
+import { Icon } from "../atoms/icon.slint";
+import { EmptyData } from "../globals.slint";
+
+/// One icon, one title, and at most one line of hint, centred.
+export component EmptyView inherits Rectangle {
+    VerticalLayout {
+        alignment: center;
+        padding-left: 24px;
+        padding-right: 24px;
+        spacing: Theme.gap;
+        HorizontalLayout {
+            alignment: center;
+            Icon {
+                width: 32px;
+                height: 32px;
+                source: EmptyData.icon;
+                kind: EmptyData.icon-kind;
+            }
+        }
+        Text {
+            text: EmptyData.title;
+            color: Theme.text;
+            font-size: Theme.text-body;
+            font-weight: 500;
+            horizontal-alignment: center;
+            overflow: elide;
+            accessible-role: AccessibleRole.text;
+            accessible-label: EmptyData.title;
+        }
+        if EmptyData.hint != "": Text {
+            text: EmptyData.hint;
+            color: Theme.muted;
+            font-size: Theme.text-small;
+            horizontal-alignment: center;
+            overflow: elide;
+            accessible-role: AccessibleRole.text;
+            accessible-label: EmptyData.hint;
+        }
+    }
+}
