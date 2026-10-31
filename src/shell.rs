@@ -25,8 +25,7 @@ pub trait Shell: Send + Sync {
 /// aborts the process. Queuing from the main thread would deadlock a caller
 /// that waits for the result.
 pub fn on_main_thread(shell: &dyn Shell, work: impl FnOnce() + Send + 'static) {
-    #[cfg(target_os = "macos")]
-    if objc2_foundation::MainThreadMarker::new().is_some() {
+    if crate::platform::is_main_thread() {
         work();
         return;
     }

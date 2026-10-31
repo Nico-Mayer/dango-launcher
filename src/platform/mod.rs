@@ -54,6 +54,15 @@ pub fn watch_focus_loss(lost: Box<dyn Fn()>) {
     drop(lost);
 }
 
+/// Whether this is the main thread. Only macOS, where AppKit work from another
+/// thread aborts, answers; elsewhere it is always false.
+pub fn is_main_thread() -> bool {
+    #[cfg(target_os = "macos")]
+    return objc2_foundation::MainThreadMarker::new().is_some();
+    #[cfg(target_os = "windows")]
+    return false;
+}
+
 pub fn launcher_window() -> Box<dyn LauncherWindow> {
     #[cfg(target_os = "macos")]
     return Box::new(macos::MacLauncherWindow);
