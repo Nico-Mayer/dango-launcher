@@ -296,13 +296,18 @@ impl TextExchange {
         self.own_writes.expect(&Content::Text(sentinel.clone()));
         self.clipboard.set_text(&sentinel);
 
-        let after_copy = self.keys.copy().map(|()| self.wait_for_copy(&sentinel))?;
+        let copied = self.keys.copy();
+        let after_copy = match copied {
+            Ok(()) => self.wait_for_copy(&sentinel),
+            Err(_) => None,
+        };
 
         // One read, not two: anything that appears after this point came from
         // the user, and re-reading would hand them their own content back as
         // the thing Dango borrowed.
         let borrowed = after_copy.clone().unwrap_or_else(|| sentinel.clone());
         self.restore(saved, &borrowed);
+        copied?;
 
         Ok(after_copy.filter(|text| *text != sentinel && !text.is_empty()))
     }
@@ -339,20 +344,7 @@ impl TextExchange {
         self.launcher.dismiss();
         self.handoff.yield_to_previous()?;
 
-        let outgoing = Content::Text(text.to_string());
-        self.own_writes.expect(&outgoing);
-        self.clipboard.set_text(text);
-
-        // A failed paste must leave the clipboard as it was found, so the
-        // restore happens either way.
-        let pasted = self.keys.paste();
-        self.handoff.settle_after_paste();
-        if pasted.is_ok() {
-            self.place_caret(text, caret)?;
-            std::thread::sleep(PASTE_GRACE);
-        }
-        self.restore(saved, text);
-        pasted
+        self.paste_borrowed(saved, text, caret)
     }
 
     /// Pastes a clipboard history entry. The order is what makes the failure
@@ -405,18 +397,30 @@ impl TextExchange {
             self.keys.backspace(backspaces)?;
         }
 
+        self.paste_borrowed(saved, text, caret)
+    }
+
+    fn paste_borrowed(
+        &self,
+        saved: Option<Content>,
+        text: &str,
+        caret: Option<usize>,
+    ) -> Result<(), TextError> {
         let outgoing = Content::Text(text.to_string());
         self.own_writes.expect(&outgoing);
         self.clipboard.set_text(text);
 
+        // A failed paste or caret move must leave the clipboard as it was
+        // found, so the restore happens either way.
         let pasted = self.keys.paste();
         self.handoff.settle_after_paste();
-        if pasted.is_ok() {
-            self.place_caret(text, caret)?;
+        let result = pasted.and_then(|()| {
+            let placed = self.place_caret(text, caret);
             std::thread::sleep(PASTE_GRACE);
-        }
+            placed
+        });
         self.restore(saved, text);
-        pasted
+        result
     }
 
     fn place_caret(&self, text: &str, caret: Option<usize>) -> Result<(), TextError> {
@@ -528,6 +532,8 @@ mod tests {
     struct FakeKeys {
         permitted: bool,
         paste_fails: bool,
+        copy_fails: bool,
+        caret_fails: bool,
         events: Mutex<Vec<String>>,
         /// What the target "types" when it is pasted into.
         pastes_into: Option<Arc<FakeClipboard>>,
@@ -561,6 +567,9 @@ mod tests {
     impl Keys for FakeKeys {
         fn copy(&self) -> Result<(), TextError> {
             self.events.lock().unwrap().push("copy".into());
+            if self.copy_fails {
+                return Err(TextError::TargetUnavailable("nope".into()));
+            }
             if let Some(clipboard) = &self.pastes_into {
                 clipboard.set_text("what was selected");
                 clipboard.writes.lock().unwrap().pop();
@@ -578,6 +587,9 @@ mod tests {
         }
         fn caret_left(&self, times: usize) -> Result<(), TextError> {
             self.events.lock().unwrap().push(format!("left {times}"));
+            if self.caret_fails {
+                return Err(TextError::TargetUnavailable("nope".into()));
+            }
             Ok(())
         }
         fn backspace(&self, times: usize) -> Result<(), TextError> {
@@ -845,6 +857,43 @@ mod tests {
             f.clipboard.now(),
             Some(Content::Text("what the user had".into())),
             "a failure must not cost the user their clipboard"
+        );
+    }
+
+    #[test]
+    fn a_failed_caret_move_still_puts_the_clipboard_back() {
+        let keys = Arc::new(FakeKeys {
+            permitted: true,
+            caret_fails: true,
+            ..Default::default()
+        });
+        let f = fixture(holding("what the user had"), keys);
+
+        let error = f.exchange.expand(2, "the snippet", Some(3)).unwrap_err();
+
+        assert!(matches!(error, TextError::TargetUnavailable(_)));
+        assert_eq!(
+            f.clipboard.now(),
+            Some(Content::Text("what the user had".into()))
+        );
+    }
+
+    #[test]
+    fn a_failed_copy_still_puts_the_clipboard_back() {
+        let keys = Arc::new(FakeKeys {
+            permitted: true,
+            copy_fails: true,
+            ..Default::default()
+        });
+        let f = fixture(holding("what the user had"), keys);
+
+        let error = f.exchange.selection().unwrap_err();
+
+        assert!(matches!(error, TextError::TargetUnavailable(_)));
+        assert_eq!(
+            f.clipboard.now(),
+            Some(Content::Text("what the user had".into())),
+            "the sentinel must not replace the user's clipboard"
         );
     }
 
