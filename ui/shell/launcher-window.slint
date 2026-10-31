@@ -66,8 +66,6 @@ export component LauncherWindow inherits Window {
         frame := Rectangle {
             background: Theme.background;
             border-radius: Theme.radius * 1.5;
-            border-width: 1px;
-            border-color: Theme.border;
             accessible-role: groupbox;
             accessible-label: "Dango";
             clip: true;
@@ -102,8 +100,13 @@ export component LauncherWindow inherits Window {
                 height: parent.body-height;
             }
 
+            // Rounded itself: the software renderer, which Windows falls back
+            // to without OpenGL 2, clips children to a square, not to the
+            // frame's corners.
             action-bar := ActionBar {
                 y: parent.height - Theme.action-bar-height;
+                border-bottom-left-radius: frame.border-radius;
+                border-bottom-right-radius: frame.border-radius;
             }
 
             // Swallows a press outside the open panel, so it never reaches the
@@ -120,6 +123,13 @@ export component LauncherWindow inherits Window {
                 height: min(self.content-height, parent.height - Theme.action-bar-height - 16px);
                 x: parent.width - self.width - 8px;
                 y: parent.height - Theme.action-bar-height - self.height - 8px;
+            }
+
+            // Drawn last so no region paints over the outline.
+            Rectangle {
+                border-radius: frame.border-radius;
+                border-width: 1px;
+                border-color: Theme.border;
             }
         }
     }

@@ -227,6 +227,9 @@ load and are not reliable.
 
 ## Build and verification facts
 
+- The software renderer clips children to a square and ignores the clipping
+  element's `border-radius`. A child that fills a rounded corner, such as the
+  ActionBar's background, rounds that corner itself.
 - Slint's `ElementHandle` test API finds nothing without debug info in the
   generated code, so `build.rs` turns it on for the debug profile.
 - The Slint tray links Common Controls 6. A Windows binary without the
