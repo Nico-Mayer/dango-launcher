@@ -38,8 +38,14 @@ impl Writer {
             self.revision = Some(form.revision);
             return;
         }
-        for (index, field) in fields.into_iter().enumerate() {
-            if self.fields.row_data(index).as_ref() != Some(&field) {
+        for (index, mut field) in fields.into_iter().enumerate() {
+            let Some(old) = self.fields.row_data(index) else {
+                continue;
+            };
+            // Options change only with a revision, and a `ModelRc` compares
+            // by pointer, so keeping the old one lets an unchanged row match.
+            field.options = old.options.clone();
+            if old != field {
                 self.fields.set_row_data(index, field);
             }
         }
