@@ -13,7 +13,7 @@
 ## 3. Hand checks
 
 - [ ] 3.1 Windows: set `launcher.hotkey` to `f13` in a scratch `DANGO_CONFIG_DIR`, run a debug build, press F13 with `scripts/send-keys.ps1`, confirm the launcher shows (`scripts/screenshot.ps1`). Then set it to `space`, confirm the tray notice and that Alt+Space summons the launcher.
-- [ ] 3.2 macOS: same as 3.1 with `f13` and `space`, Option+Space as the default. Leave open until a session on the Mac.
+- [ ] 3.2 macOS: same as 3.1 with `f13` and `space`, Option+Space as the default. Also bind `f18` with the hyperkey on and check whether it fires (see design, Risks); decide refuse or document. Leave open until a session on the Mac.
 
 ## 4. Review
 

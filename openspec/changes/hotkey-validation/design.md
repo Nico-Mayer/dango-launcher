@@ -89,6 +89,10 @@ touched.
 
 ## Risks / Trade-offs
 
+- [On macOS the hyperkey remaps CapsLock to F18 through `hidutil`, and its event
+  tap consumes F18, so an `f18` hotkey likely never fires while the hyperkey is
+  on, with no notice] → Confirm in the macOS hand check (task 3.2), then either
+  refuse `f18` on macOS while the hyperkey is on, or document the clash.
 - [Windows reserves F12 for the debugger; `RegisterHotKey` may refuse a lone
   F12] → the existing refusal path surfaces it, as for any taken chord.
 - [On Mac laptops F1 to F12 send media keys unless Fn is held or the system
