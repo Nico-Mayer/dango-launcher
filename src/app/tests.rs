@@ -179,6 +179,65 @@ async fn a_dismiss_resets_at_once_and_drops_a_running_command() {
     assert_eq!(query(&shell), "");
 }
 
+fn shows_a_view(shell: &RecordingShell) -> bool {
+    matches!(shell.last_snapshot().screen, Screen::View(_))
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_held_launcher_keeps_a_commands_view_for_the_next_activation() {
+    let (core, shell) = core(r#"{ "launcher": { "reset-after": 5 } }"#);
+    core.toggle();
+    let work = start_work(&core);
+    core.toggle();
+    work.push_view(a_view());
+    settle().await;
+    assert_eq!(
+        shell.calls(),
+        [
+            Call::Show,
+            Call::Hide {
+                restore_focus: true
+            }
+        ]
+    );
+    core.toggle();
+    assert!(shows_a_view(&shell));
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_command_still_working_when_the_hold_runs_out_is_dropped() {
+    let (core, shell) = core(r#"{ "launcher": { "reset-after": 5 } }"#);
+    core.toggle();
+    let work = start_work(&core);
+    core.toggle();
+    tokio::time::sleep(Duration::from_secs(6)).await;
+    work.push_view(a_view());
+    settle().await;
+    core.toggle();
+    assert_eq!(query(&shell), "");
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_hide_for_work_comes_back_with_the_commands_view() {
+    let (core, shell) = core("{}");
+    core.toggle();
+    let work = start_work(&core);
+    core.hide_for_work();
+    work.push_view(a_view());
+    settle().await;
+    assert_eq!(
+        shell.calls(),
+        [
+            Call::Show,
+            Call::Hide {
+                restore_focus: false
+            },
+            Call::Show
+        ]
+    );
+    assert!(shows_a_view(&shell));
+}
+
 #[tokio::test]
 async fn focus_loss_hides_without_taking_focus_back() {
     let (core, shell) = core("{}");
