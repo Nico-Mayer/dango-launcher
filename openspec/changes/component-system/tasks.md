@@ -3,7 +3,7 @@
 - [x] 1.1 Add `ui/theme.slint` with the `Theme` global from design D5, deriving dark from std-widgets `Palette.color-scheme`; verify with a UI test in `src/slint_shell/tests.rs` that forces each scheme and reads the surface and muted roles
 - [ ] 1.2 Add Geist 400/500/600 and Geist Mono 400/500 to `ui/fonts/` with their OFL licence file, imported in `ui/theme.slint`; verify `cargo test` passes and a UI test reads `default-font-family` as Geist
 - [x] 1.3 Add `ui/atoms/` Icon, Kbd, Tag, Accessory, and Dot built only on `Theme`; verify UI tests find each by `accessible-label` and that a Kbd renders the platform chord from `keys.rs`
-- [ ] 1.4 Add a unit test that computes WCAG contrast for every text role against every background role in both themes, from values read off `Theme`; verify it passes at 4.5:1 and focus at 3:1
+- [x] 1.4 Add a unit test that computes WCAG contrast for every text role against every background role in both themes, from values read off `Theme`; verify it passes at 4.5:1 and focus at 3:1
 - [ ] 1.5 Move `ui/app.slint` from `Palette` to `Theme` and delete `Palette`; verify `cargo test` and `hk check` pass and `rg Palette ui` finds only the std-widgets import
 - [ ] 1.6 Remove tints: `Manifest.tint`, `ResultItem.tint`, `ExtensionHost::tints`, `tint_index`, `IconTile` tint, and the built-in manifests' tint fields; verify `cargo test` passes and `rg -w tint src ui` is empty
 - [ ] 1.7 Remove the development marker: `Snapshot.development`, the dev badge, the frame colour, and the tray's development tooltip; verify `cargo test` passes and `rg -i "development build" src ui` is empty

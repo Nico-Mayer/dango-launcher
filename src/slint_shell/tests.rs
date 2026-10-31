@@ -199,6 +199,76 @@ mod theme {
         assert_eq!(theme.get_surface(), Color::from_rgb_u8(0xff, 0xff, 0xff));
         assert_eq!(theme.get_muted(), Color::from_rgb_u8(0x6b, 0x6b, 0x72));
     }
+
+    fn luminance(color: Color) -> f64 {
+        let channel = |value: u8| {
+            let c = f64::from(value) / 255.0;
+            if c <= 0.03928 {
+                c / 12.92
+            } else {
+                ((c + 0.055) / 1.055).powf(2.4)
+            }
+        };
+        0.2126 * channel(color.red())
+            + 0.7152 * channel(color.green())
+            + 0.0722 * channel(color.blue())
+    }
+
+    fn contrast(a: Color, b: Color) -> f64 {
+        let (a, b) = (luminance(a), luminance(b));
+        (a.max(b) + 0.05) / (a.min(b) + 0.05)
+    }
+
+    fn over(top: Color, base: Color) -> Color {
+        let alpha = f64::from(top.alpha()) / 255.0;
+        let mix =
+            |t: u8, b: u8| (f64::from(t) * alpha + f64::from(b) * (1.0 - alpha)).round() as u8;
+        Color::from_rgb_u8(
+            mix(top.red(), base.red()),
+            mix(top.green(), base.green()),
+            mix(top.blue(), base.blue()),
+        )
+    }
+
+    #[test]
+    fn text_meets_contrast_in_both_themes() {
+        let h = Harness::new(false);
+        let palette = h.ui.global::<StdPalette>();
+        let theme = h.ui.global::<Theme>();
+        for scheme in [ColorScheme::Dark, ColorScheme::Light] {
+            palette.set_color_scheme(scheme);
+            let opaque = [
+                ("background", theme.get_background()),
+                ("surface", theme.get_surface()),
+                ("raised", theme.get_raised()),
+            ];
+            // Selection and hover fill rows, which never sit on raised.
+            let mut backgrounds = opaque.to_vec();
+            for (name, base) in &opaque[..2] {
+                backgrounds.push((name, over(theme.get_selection(), *base)));
+                backgrounds.push((name, over(theme.get_hover(), *base)));
+            }
+            let texts = [
+                ("text", theme.get_text()),
+                ("muted", theme.get_muted()),
+                ("accent", theme.get_accent()),
+                ("danger", theme.get_danger()),
+            ];
+            for (text, fg) in texts {
+                for (background, bg) in &backgrounds {
+                    let ratio = contrast(fg, *bg);
+                    assert!(
+                        ratio >= 4.5,
+                        "{scheme:?} {text} on {background}: {ratio:.2}"
+                    );
+                }
+            }
+            for (name, bg) in opaque {
+                let ratio = contrast(theme.get_accent(), bg);
+                assert!(ratio >= 3.0, "{scheme:?} focus on {name}: {ratio:.2}");
+            }
+        }
+    }
 }
 
 mod atoms {
