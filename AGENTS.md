@@ -28,9 +28,8 @@ spec.
 - Agents commit their own work as they go, without asking: atomic
   conventional commits, each one building and passing its tests. Pushing
   still waits for the author.
-- Run `hk check` before pushing: `cargo fmt`, `cargo clippy -D warnings`,
-  `svelte-check`. Rust tests: `cargo test`. Browser tests:
-  `npm run test:browser`.
+- Run `hk check` before pushing: `cargo fmt` and `cargo clippy -D warnings`,
+  which also compiles the `.slint` files. Tests, UI included: `cargo test`.
 - Work one platform at a time. Finish and verify on the machine at hand, and
   leave the other platform's hand checks open until a session on that
   machine. Do not switch back and forth within a session.
@@ -60,20 +59,20 @@ spend design on honouring old values.
 
 ## Tech stack
 
-- Rust + Tauri v2 for the shell, all OS integration, and all business logic.
-  Prefer official Tauri v2 plugins over hand-rolled equivalents.
-- Svelte 5 (runes) + TypeScript on plain Vite, not SvelteKit. The frontend is a
-  renderer of the launcher snapshot, not a place for logic.
-- Bits UI for interactive components, Tailwind v4 for styling, with the token
-  set in `src/app.css`. The root search is the Bits UI `Command` primitive with
-  its filtering disabled, since ranking happens in Rust.
-- Lucide (`@lucide/svelte`) behind one provider at `src/lib/Icon.svelte`. Never
-  import a Lucide icon elsewhere and never hand-roll an SVG: add it to that
-  component's registry and use it by name. Import icons individually, not as a
-  barrel. An extension names one as `icon:<name>`; a value without that prefix
-  is a path to an image file.
+- One Rust crate at the repo root: all OS integration, all business logic,
+  and the UI. Rust in `src/`, `.slint` files in `ui/`.
+- Slint draws the launcher and the tray in the Dango process, on the winit
+  backend with the Fluent style on both platforms. Build on `std-widgets.slint`
+  first. The UI is a renderer of the launcher snapshot, not a place for logic.
+- One palette, the `Palette` global in `ui/app.slint`. Every colour, radius,
+  and type size comes from it; Rust passes indexes into it, never colours.
+- Named icons come from `icondata_lu` behind one registry in
+  `src/slint_shell/icons.rs`. Never draw an icon elsewhere and never hand-roll
+  an SVG: add the name to that registry. An extension names one as
+  `icon:<name>`; a value without that prefix is a path to an image file.
 - SQLite for local persistence.
-- Node and the OpenSpec CLI are pinned via mise (`mise.toml`).
+- Node, the OpenSpec CLI, hk, git-cliff, and cargo-release are pinned via mise
+  (`mise.toml`). Node runs only the OpenSpec CLI and `scripts/*.mjs`.
 
 ### Off the shelf before hand-rolled
 
@@ -97,11 +96,20 @@ extension. Built-in features are extensions too. The contract is in
 - The launcher's interaction state lives in one Rust state machine,
   `src/ui/`: query, selection, the view stack, the action panel,
   Escape stages, and what each key does. It is a pure reducer, tested with
-  `cargo test` and no window. The renderer sends intents through one
-  `dispatch` command and draws the full snapshot from one `dango://state`
-  event. No interaction rule lives in a renderer. Keys reach the state machine
-  only through the snapshot's `bindings`, and a renderer keeps only hover,
-  focus placement, scroll-into-view, and exit transitions.
+  `cargo test` and no window. No interaction rule lives in the renderer.
+- `src/app/` holds `Core`: the state machine, the hold, the services, the
+  hotkeys, and the tray status. Window and tray work goes through the narrow
+  `Shell` trait (`src/shell.rs`), which `src/slint_shell/` implements and a
+  recording fake implements in tests.
+- The renderer (`src/slint_shell/render.rs`) turns each snapshot into Slint
+  models and properties, replacing everything. It sends intents to
+  `Core::dispatch` in order on the main thread. A root `FocusScope` asks Rust
+  through `capture-key-pressed` whether a chord is in the snapshot's
+  `bindings` before the focused control sees it. The renderer keeps only
+  hover, focus placement, and scroll-into-view.
+- Slint owns the main thread; a tokio runtime owned by the shell runs beside
+  it. Backend work reaches the UI through `Shell::on_main_thread`, which is
+  `slint::invoke_from_event_loop`.
 - Secrets live only in `auth.json` (see `openspec/specs/ai-providers`). The read
   sits behind one function, so the `keyring` crate can take it over later.
 
@@ -109,8 +117,9 @@ extension. Built-in features are extensions too. The contract is in
 
 Keep the UI snappy. Speed comes from structure, not from timing numbers:
 
-- The launcher window is created hidden at startup and only shown and hidden,
-  never created on demand.
+- The launcher component is built at startup and only shown and hidden after.
+  winit creates its native window on the first show, which costs that first
+  activation a little more.
 - Search never blocks. Providers are async, slow ones appear late, and each
   keystroke cancels the previous search instead of debouncing.
 - View updates replace the full tree. No reconciler, no diffing.
@@ -127,11 +136,12 @@ load and are not reliable.
   reasoning, a surprising constraint, or a subtle workaround.
 - Rust: borrow over clone, `Result` with typed errors over strings, small
   focused modules.
-- Svelte: runes only, no stores unless there is a concrete reason.
-- UI is built on Bits UI primitives with markup close to the documented
-  example. Keyboard navigation, focus, scroll-into-view, and accessibility come
-  from the primitive. Patch a primitive only for behaviour it lacks, such as
-  the launcher's two-stage Escape, and say why in the design.
+- UI is built on `std-widgets.slint` with markup close to the documented
+  example. Hand-roll a surface only where no widget fits, and say why in the
+  design. Interactive elements carry an `accessible-label`, which is also how
+  the UI tests find them.
+- UI tests run the real state machine against the component on
+  `i_slint_backend_testing` (`src/slint_shell/tests.rs`).
 - Any element that needs an icon uses one. A placeholder square only where the
   icon is genuinely unknown.
 - User-facing text is written with the `ux-writing` skill and against
@@ -156,10 +166,10 @@ load and are not reliable.
   `Win32::UI::WindowsAndMessaging`.
 - A non-elevated process cannot hook or manage elevated windows on Windows.
   Accept the limit.
-- On Windows, tao rewrites the extended window style on every visibility
-  change, so `WS_EX_TOOLWINDOW` must be re-applied after each show. Windows
-  positions in physical pixels, macOS in logical points. Do not share the
-  positioning code.
+- On Windows, `WS_EX_TOOLWINDOW` is re-applied after each show: tao rewrote
+  the extended style on every visibility change, and nobody has checked
+  whether winit does. Windows positions in physical pixels, macOS in logical
+  points. Do not share the positioning code.
 - macOS gates window management, paste, snippet expansion, and reading the
   selection behind Accessibility.
 - enigo's `Enigo::new` on macOS fails with `NoPermission` without
@@ -195,51 +205,34 @@ load and are not reliable.
 - The Slint tray links Common Controls 6. A Windows binary without the
   manifest that selects it fails to load (`STATUS_ENTRYPOINT_NOT_FOUND`), the
   test binary included, so `build.rs` has the linker embed it in every
-  artifact instead of letting tauri-build embed it in the app alone.
+  artifact.
 - A Slint `ListView` estimates its height from the rows it has built and
   clamps a scroll to that estimate, so scrolling to an unbuilt row stops
   short. The result list builds every row in a `ScrollView`; it holds at most
   50.
-
-- Windows cannot be cross-compiled from macOS here (the Tauri build script
-  needs `llvm-rc`). CI on `windows-latest` is the only Windows compile check.
-  Check Windows symbol names and module paths against the vendored crate
-  source under `~/.cargo/registry` before pushing.
+- Windows cannot be cross-compiled from macOS here. CI on `windows-latest` is
+  the only Windows compile check from the Mac. Check Windows symbol names and
+  module paths against the vendored crate source under `~/.cargo/registry`
+  before pushing; macOS code the same way from Windows.
+- Tauri used to switch on crate features for us. Without it, a missing
+  feature shows up as an item "configured out" (`windows`, `time`): add the
+  feature the compiler names.
 - CI runs `cargo clippy -- -D warnings`. Two lints that bite in platform code:
   an inner `unsafe` block inside an `unsafe fn` (`unused_unsafe`) and casting a
   value to its own type (`unnecessary_cast`, easy with `HWND`).
-- The shell is fish: `VAR=value cmd` is invalid. Use `env VAR=value cmd`.
-- Build release binaries with `npx tauri build --no-bundle`, never a bare
-  `cargo build --release`. Without the CLI's `custom-protocol` feature the
-  binary loads the Vite dev URL and shows a browser error page while the tray
-  and hotkey appear to work.
+- On the Mac the shell is fish: `VAR=value cmd` is invalid. Use
+  `env VAR=value cmd`.
 - `DANGO_MEASURE=1` enables activation timing logs (stderr) in a release build.
-- A Tauri command that calls `tokio::spawn` must be an `async fn`. From a sync
-  command it panics with no reactor. Release sets `panic = "abort"` and a
-  `windows_subsystem = "windows"` build has no stderr, so this shows only as a
-  silent crash (`0xC0000409`) in a release run.
-- `dispatch` is a sync Tauri command on purpose. Sync commands run on the main
-  thread in the order they were sent, and each search cancels the one before
-  it, so two keystrokes must not swap places. It enters the tokio runtime
-  explicitly before running effects that spawn.
-- Browser tests need the fixture server, a cargo example
-  (`src-tauri/examples/ui_fixture.rs`) that runs the real state machine.
-  Playwright starts it, and its first run compiles the app crate. A key press
-  is a round trip there, so a test waits with `expect` before reading state.
-- Serving cached files to the webview needs the `protocol-asset` Tauri
-  feature, `assetProtocol.enable` in `tauri.conf.json`, an `img-src` allowing
-  `asset:` and `http://asset.localhost`, and a runtime
-  `asset_protocol_scope().allow_directory(...)`. The frontend loads them with
-  `convertFileSrc`.
-- The updater plugin fails at startup without `plugins.updater.pubkey` in
-  `tauri.conf.json`, development builds included. Its 2.13 and later releases
-  need Tauri 2.12, so it is pinned with autostart.
-- tauri-action writes the `.msi` into `latest.json` unless
-  `updaterJsonPreferNsis: true` is set. Updates must go through NSIS.
-- A local `npx tauri build` with bundling fails at the end without
-  `TAURI_SIGNING_PRIVATE_KEY`, after the app bundle is already signed. Pass
-  `--config '{"bundle":{"createUpdaterArtifacts":false}}'` to skip the updater
-  artifacts.
-- A local macOS bundle without `APPLE_SIGNING_IDENTITY` in the environment is
+  A `windows_subsystem = "windows"` build shows stderr only when it is
+  redirected.
+- Release sets `panic = "abort"`, and a release build on Windows has no
+  console, so a panic there is a silent exit.
+- The Slint MCP server is for debug builds only, and never enabled in
+  `Cargo.toml`, so a release cannot open the port:
+  `env SLINT_MCP_PORT=9315 cargo run --features slint/mcp`. It starts
+  listening on the first window show; `.mcp.json` points `dango-ui` at it.
+- The updater and the release workflow are off until
+  `native-release-pipeline`. Builds are installed by hand.
+- A macOS bundle without `APPLE_SIGNING_IDENTITY` in the environment is
   ad-hoc signed and carries no entitlements. Set it to the identity from
   `security find-identity -v -p codesigning` to test a signed build.
