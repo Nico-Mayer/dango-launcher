@@ -61,7 +61,7 @@ jobs:
 
       - uses: swatinem/rust-cache@v2
         with:
-          workspaces: src-tauri
+          workspaces: .
 
       - run: npm ci
 

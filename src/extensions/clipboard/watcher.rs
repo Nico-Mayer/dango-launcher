@@ -433,11 +433,7 @@ mod tests {
     fn favicon_and_its_reencoding() -> (Vec<u8>, Vec<u8>) {
         use clipboard_rs::common::RustImage;
 
-        let png = std::fs::read(concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/../static/favicon.png"
-        ))
-        .unwrap();
+        let png = std::fs::read(concat!(env!("CARGO_MANIFEST_DIR"), "/icons/32x32.png")).unwrap();
         let reencoded = clipboard_rs::RustImageData::from_bytes(&png)
             .unwrap()
             .to_png()

@@ -50,7 +50,7 @@ Tauri app keeps working until group 6.
 
 ## 7. Layout
 
-- [ ] 7.1 `git mv` the crate to the repo root: `Cargo.toml`, `src/`, `ui/`, `build.rs`, `icons/`, and the plists. Fix paths in CI, `hk.pkl`, and docs. Verify `cargo test`, `hk check`, and CI pass from the root.
+- [x] 7.1 `git mv` the crate to the repo root: `Cargo.toml`, `src/`, `ui/`, `build.rs`, `icons/`, and the plists. Fix paths in CI, `hk.pkl`, and docs. Verify `cargo test`, `hk check`, and CI pass from the root.
 
 ## 8. Docs and tooling cleanup
 

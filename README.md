@@ -40,7 +40,7 @@ the key file is not.
 
 ## Versioning
 
-The application version lives in `src-tauri/Cargo.toml` and nowhere else.
+The application version lives in `Cargo.toml` and nowhere else.
 `tauri.conf.json` has no `version` field, so Tauri reads the crate version for
 the window, the bundle metadata, and the installer file names. The `version`
 in `package.json` is a placeholder the frontend build ignores; leave it alone.
@@ -60,7 +60,7 @@ bumps patch, `feat` bumps minor, a `!` after the type or a `BREAKING CHANGE`
 footer bumps major. Other types do not bump. If nothing since the last tag
 bumps, the command fails with "tag already exists" and writes nothing.
 
-To pick the version yourself, call cargo-release directly from `src-tauri`
+To pick the version yourself, call cargo-release directly from the repo root
 with a level or a version, for example `cargo release minor --execute` or
 `cargo release 1.0.0 --execute`. The rest of the release runs the same way.
 

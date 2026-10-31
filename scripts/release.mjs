@@ -12,7 +12,7 @@ if (cliff.status !== 0) process.exit(cliff.status ?? 1);
 
 const version = cliff.stdout.trim().replace(/^v/, "");
 const release = spawnSync("cargo", ["release", version, ...process.argv.slice(2)], {
-  cwd: `${root}src-tauri`,
+  cwd: root,
   stdio: "inherit",
 });
 process.exit(release.status ?? 1);

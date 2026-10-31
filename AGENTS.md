@@ -29,7 +29,7 @@ spec.
   conventional commits, each one building and passing its tests. Pushing
   still waits for the author.
 - Run `hk check` before pushing: `cargo fmt`, `cargo clippy -D warnings`,
-  `svelte-check`. Rust tests: `cargo test` in `src-tauri`. Browser tests:
+  `svelte-check`. Rust tests: `cargo test`. Browser tests:
   `npm run test:browser`.
 - Work one platform at a time. Finish and verify on the machine at hand, and
   leave the other platform's hand checks open until a session on that
@@ -95,7 +95,7 @@ extension. Built-in features are extensions too. The contract is in
 - The manifest and the view protocol are versioned contracts. A change that
   touches them says so in its design.
 - The launcher's interaction state lives in one Rust state machine,
-  `src-tauri/src/ui/`: query, selection, the view stack, the action panel,
+  `src/ui/`: query, selection, the view stack, the action panel,
   Escape stages, and what each key does. It is a pure reducer, tested with
   `cargo test` and no window. The renderer sends intents through one
   `dispatch` command and draws the full snapshot from one `dango://state`

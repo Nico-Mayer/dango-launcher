@@ -802,7 +802,7 @@ mod tests {
 
     #[test]
     fn the_settings_reference_is_current() {
-        let path = Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/../docs/config.md"));
+        let path = Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/docs/config.md"));
         let expected = reference(&schema());
         if std::env::var_os("DANGO_UPDATE_DOCS").is_some() {
             std::fs::write(path, &expected).expect("write docs/config.md");
