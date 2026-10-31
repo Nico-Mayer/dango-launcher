@@ -2,6 +2,62 @@
 
 All notable changes to Dango. Generated from commit history at release time.
 
+## [2.0.0] - 2026-10-31
+
+### Features
+
+- **updates:** [**breaking**] Remove the tray install item
+- **ui:** Add launcher state machine
+- **updates:** Add a disabled update source
+- **ui:** Add a Slint shell beside Tauri
+- [**breaking**] Make the Slint shell the dango binary
+- **updates:** Update from the GitHub releases
+
+### Fixes
+
+- **ui:** Build the macOS event loop with user events
+- **ui:** Hide on focus loss through a WinEvent hook
+- **ui:** Time activation paint on the redraw event
+
+### Refactoring
+
+- **ui:** Render launcher from Rust snapshots
+- Use global-hotkey types in the core
+- **snippets:** Use url crate instead of tauri
+- Run the app through Core and Shell
+- [**breaking**] Remove the Svelte frontend and npm toolchain
+- [**breaking**] Move the crate to the repo root
+
+### Documentation
+
+- **agents:** Let agents commit their own work
+- **agents:** Record Slint traps found on Windows
+- **agents:** Work one platform at a time
+- **agents:** Rewrite for the Slint stack
+- **readme:** Describe the Slint build and credit Slint
+- **agents:** Keep release test runs off the login entry
+- **agents:** Limit text input to English and German
+- Reword comments that relied on the webview
+- Describe packaging and releases
+
+### Maintenance
+
+- **browser:** Drop tests ported to cargo test
+- Add Slint docs and app MCP servers
+- Ignore local Claude settings
+- Add the Slint agent skill
+- **scripts:** Add screenshot and key scripts
+- **hk:** Drop svelte-check
+- Drop Node and the binding diff check
+- Switch off releases until native-release-pipeline
+- Drop the Tauri and Svelte agent tooling
+- Drop the Tauri bundle icons
+- Pin cargo-packager in mise
+- Configure cargo-packager in Cargo.toml
+- Release with cargo-packager
+- **updates:** Check the release key signature
+- Ignore the .design folder
+- Add the ponytail agent skills
 ## [1.0.0] - 2026-10-31
 
 ### Features
