@@ -5,40 +5,6 @@ import { AtomGallery } from "atoms/gallery.slint";
 
 export { AtomGallery, IconKind, StdPalette, Theme }
 
-/// The one built-in appearance. Every colour, radius, and type size on every
-/// surface comes from here.
-export global Palette {
-    in-out property <color> background: #202124;
-    in-out property <color> background-alt: #292a2d;
-    in-out property <color> foreground: #f2f3f5;
-    in-out property <color> foreground-alt: #c8cbd2;
-    in-out property <color> muted: #303236;
-    in-out property <color> muted-foreground: #b0b4bd;
-    in-out property <color> edge: #ffffff1a;
-    in-out property <color> selection: #293d59;
-    in-out property <color> selection-edge: #405777;
-    in-out property <color> hover: #282a2d;
-    in-out property <color> focus: #8cb9ff;
-    in-out property <color> destructive: #ff91a3;
-    in-out property <color> dev-edge: #f4af25;
-    in-out property <color> badge: #493908;
-    in-out property <color> badge-foreground: #fef7e1;
-    /// Extension tints: red, amber, green, blue, purple, pink.
-    in-out property <[color]> tints: [#490808, #493908, #084920, #082f49, #290849, #490829];
-    in-out property <[color]> tint-foregrounds: [#fee1e1, #fef7e1, #e1feec, #e1f3fe, #f0e1fe, #fee1f0];
-    in-out property <length> radius-shell: 14px;
-    in-out property <length> radius-overlay: 10px;
-    in-out property <length> radius-row: 8px;
-    in-out property <length> radius-tile: 6px;
-    in-out property <length> radius-keycap: 4px;
-    in-out property <length> text: 14px;
-    in-out property <length> text-small: 12px;
-    in-out property <length> header-height: 64px;
-    in-out property <length> row-height: 56px;
-    in-out property <length> heading-height: 28px;
-    in-out property <length> footer-height: 40px;
-}
-
 export struct RowData {
     /// A non-empty heading makes this a section heading rather than a result.
     heading: string,
@@ -77,8 +43,8 @@ export enum ScreenKind { error, root, list, detail, form }
 
 component Keycap inherits Rectangle {
     in property <string> label;
-    background: Palette.muted;
-    border-radius: Palette.radius-keycap;
+    background: Theme.raised;
+    border-radius: Theme.radius / 2;
     HorizontalLayout {
         padding-left: 6px;
         padding-right: 6px;
@@ -86,8 +52,8 @@ component Keycap inherits Rectangle {
         padding-bottom: 2px;
         Text {
             text: root.label;
-            color: Palette.muted-foreground;
-            font-size: Palette.text-small;
+            color: Theme.muted;
+            font-size: Theme.text-small;
             vertical-alignment: center;
         }
     }
@@ -100,17 +66,16 @@ component IconTile inherits Rectangle {
     in property <bool> content;
     width: 32px;
     height: 32px;
-    border-radius: Palette.radius-tile;
-    background: root.kind == IconKind.named ? (root.tint >= 0 ? Palette.tints[root.tint] : transparent)
-        : root.kind == IconKind.none ? Palette.muted : transparent;
+    border-radius: Theme.radius / 2;
+    background: root.kind == IconKind.none ? Theme.raised : transparent;
     border-width: root.content && root.kind == IconKind.file ? 1px : 0;
-    border-color: Palette.edge;
+    border-color: Theme.border;
     clip: true;
     if root.kind == IconKind.named: Image {
         width: 20px;
         height: 20px;
         source: root.icon;
-        colorize: root.tint >= 0 ? Palette.tint-foregrounds[root.tint] : Palette.foreground-alt;
+        colorize: Theme.muted;
     }
     if root.kind == IconKind.file: Image {
         width: root.width;
@@ -125,7 +90,7 @@ component ResultRow inherits Rectangle {
     in property <bool> pointer-resting;
     callback activate(id: string);
     callback pointer-moved();
-    height: Palette.row-height;
+    height: Theme.row-height;
     accessible-role: list-item;
     accessible-label: root.data.id;
     accessible-item-selected: root.data.selected;
@@ -133,11 +98,9 @@ component ResultRow inherits Rectangle {
     Rectangle {
         x: 8px;
         width: parent.width - 16px;
-        border-radius: Palette.radius-row;
-        background: root.data.selected ? Palette.selection
-            : touch.has-hover && !root.pointer-resting ? Palette.hover : transparent;
-        border-width: root.data.selected ? 1px : 0;
-        border-color: Palette.selection-edge;
+        border-radius: Theme.radius;
+        background: root.data.selected ? Theme.selection
+            : touch.has-hover && !root.pointer-resting ? Theme.hover : transparent;
 
         HorizontalLayout {
             padding-left: 12px;
@@ -162,8 +125,9 @@ component ResultRow inherits Rectangle {
                         x: 0;
                         width: parent.width;
                         text: root.data.title;
-                        default-color: Palette.foreground;
-                        default-font-size: Palette.text;
+                        default-color: Theme.text;
+                        default-font-size: Theme.text-body;
+    default-font-family: Theme.font;
                         max-lines: 1;
                         vertical-alignment: center;
                     }
@@ -172,8 +136,8 @@ component ResultRow inherits Rectangle {
                     horizontal-stretch: 0;
                     max-width: 240px;
                     text: root.data.subtitle;
-                    color: Palette.muted-foreground;
-                    font-size: Palette.text-small;
+                    color: Theme.muted;
+                    font-size: Theme.text-small;
                     overflow: elide;
                     vertical-alignment: center;
                 }
@@ -196,13 +160,13 @@ component ResultRow inherits Rectangle {
 
 component Heading inherits Rectangle {
     in property <string> text;
-    height: Palette.heading-height;
+    height: Theme.heading-height;
     HorizontalLayout {
         padding-left: 20px;
         Text {
             text: root.text;
-            color: Palette.muted-foreground;
-            font-size: Palette.text-small;
+            color: Theme.muted;
+            font-size: Theme.text-small;
             font-weight: 500;
             vertical-alignment: center;
         }
@@ -235,7 +199,7 @@ component Results inherits Rectangle {
         VerticalLayout {
             alignment: start;
             for row in root.rows: Rectangle {
-                height: row.heading != "" ? Palette.heading-height : Palette.row-height;
+                height: row.heading != "" ? Theme.heading-height : Theme.row-height;
                 if row.heading != "": Heading {
                     text: row.heading;
                 }
@@ -262,14 +226,14 @@ component Results inherits Rectangle {
         spacing: 4px;
         Text {
             text: root.empty;
-            color: Palette.muted-foreground;
-            font-size: Palette.text;
+            color: Theme.muted;
+            font-size: Theme.text-body;
             overflow: elide;
         }
         if root.empty-description != "": Text {
             text: root.empty-description;
-            color: Palette.muted-foreground;
-            font-size: Palette.text-small;
+            color: Theme.muted;
+            font-size: Theme.text-small;
             wrap: word-wrap;
         }
     }
@@ -278,7 +242,7 @@ component Results inherits Rectangle {
 component Prompt inherits Rectangle {
     in property <string> placeholder;
     callback edited(text: string);
-    height: Palette.header-height;
+    height: Theme.search-height;
 
     public function set-text(text: string) {
         input.text = text;
@@ -306,7 +270,7 @@ component Prompt inherits Rectangle {
     Rectangle {
         y: parent.height - 1px;
         height: 1px;
-        background: Palette.edge;
+        background: Theme.border;
     }
 }
 
@@ -319,12 +283,12 @@ component Footer inherits Rectangle {
     in property <string> panel-key;
     in property <bool> has-actions;
     callback toggle-panel();
-    height: Palette.footer-height;
+    height: Theme.action-bar-height;
 
     Rectangle {
         y: 0;
         height: 1px;
-        background: Palette.edge;
+        background: Theme.border;
     }
 
     HorizontalLayout {
@@ -337,16 +301,16 @@ component Footer inherits Rectangle {
             horizontal-stretch: 0;
             Text {
                 text: "Dango";
-                color: Palette.foreground-alt;
-                font-size: Palette.text-small;
+                color: Theme.text;
+                font-size: Theme.text-small;
                 font-weight: 500;
                 vertical-alignment: center;
             }
             if root.development: VerticalLayout {
                 alignment: center;
                 dev-badge := Rectangle {
-                    background: Palette.badge;
-                    border-radius: Palette.radius-keycap;
+                    background: Theme.raised;
+                    border-radius: Theme.radius / 2;
                     accessible-role: text;
                     accessible-label: "dev";
                     HorizontalLayout {
@@ -354,8 +318,8 @@ component Footer inherits Rectangle {
                         padding-right: 6px;
                         Text {
                             text: "dev";
-                            color: Palette.badge-foreground;
-                            font-size: Palette.text-small;
+                            color: Theme.text;
+                            font-size: Theme.text-small;
                             font-weight: 500;
                         }
                     }
@@ -372,15 +336,15 @@ component Footer inherits Rectangle {
                     width: 6px;
                     height: 6px;
                     border-radius: 3px;
-                    background: Palette.focus;
+                    background: Theme.accent;
                 }
             }
             Text {
                 text: root.hide-status ? "" : root.status;
                 accessible-role: text;
                 accessible-label: root.status;
-                color: Palette.muted-foreground;
-                font-size: Palette.text-small;
+                color: Theme.muted;
+                font-size: Theme.text-small;
                 overflow: elide;
                 vertical-alignment: center;
             }
@@ -390,8 +354,8 @@ component Footer inherits Rectangle {
             horizontal-stretch: 0;
             Text {
                 text: root.primary-label;
-                color: Palette.muted-foreground;
-                font-size: Palette.text-small;
+                color: Theme.muted;
+                font-size: Theme.text-small;
                 overflow: elide;
                 max-width: 160px;
                 vertical-alignment: center;
@@ -425,10 +389,10 @@ component ActionPanel inherits Rectangle {
     callback activate(id: string);
     callback pointer-moved();
     out property <length> content-height: scroller.preferred-height;
-    background: Palette.background-alt;
-    border-radius: Palette.radius-overlay;
+    background: Theme.surface;
+    border-radius: Theme.radius;
     border-width: 1px;
-    border-color: Palette.edge;
+    border-color: Theme.border;
     clip: true;
     accessible-role: list;
     accessible-label: "Actions";
@@ -452,24 +416,24 @@ component ActionPanel inherits Rectangle {
                 accessible-role: list-item;
                 accessible-label: action.title;
                 accessible-item-selected: action.selected;
-                background: action.selected ? Palette.selection
-                    : touch.has-hover && !root.pointer-resting ? Palette.hover : transparent;
+                background: action.selected ? Theme.selection
+                    : touch.has-hover && !root.pointer-resting ? Theme.hover : transparent;
                 HorizontalLayout {
                     padding-left: 12px;
                     padding-right: 12px;
                     spacing: 12px;
                     Text {
                         text: action.title;
-                        color: Palette.foreground-alt;
-                        font-size: Palette.text;
+                        color: Theme.text;
+                        font-size: Theme.text-body;
                         overflow: elide;
                         vertical-alignment: center;
                         horizontal-stretch: 1;
                     }
                     if action.shortcut != "": Text {
                         text: action.shortcut;
-                        color: Palette.muted-foreground;
-                        font-size: Palette.text-small;
+                        color: Theme.muted;
+                        font-size: Theme.text-small;
                         vertical-alignment: center;
                         horizontal-stretch: 0;
                     }
@@ -507,8 +471,8 @@ component FormView inherits Rectangle {
                 spacing: 6px;
                 if field.kind != FieldKind.toggle: Text {
                     text: field.label;
-                    color: Palette.foreground-alt;
-                    font-size: Palette.text-small;
+                    color: Theme.text;
+                    font-size: Theme.text-small;
                     font-weight: 500;
                 }
                 if field.kind == FieldKind.text || field.kind == FieldKind.password: LineEdit {
@@ -552,14 +516,14 @@ component FormView inherits Rectangle {
                 }
                 if field.error != "": Text {
                     text: field.error;
-                    color: Palette.destructive;
-                    font-size: Palette.text-small;
+                    color: Theme.danger;
+                    font-size: Theme.text-small;
                     wrap: word-wrap;
                 }
                 if field.error == "" && field.help != "": Text {
                     text: field.help;
-                    color: field.help-emphasized ? Palette.foreground-alt : Palette.muted-foreground;
-                    font-size: Palette.text-small;
+                    color: field.help-emphasized ? Theme.text : Theme.muted;
+                    font-size: Theme.text-small;
                     wrap: word-wrap;
                 }
             }
@@ -574,7 +538,8 @@ export component LauncherWindow inherits Window {
     title: "Dango";
     width: 720px;
     height: 400px;
-    default-font-size: Palette.text;
+    default-font-size: Theme.text-body;
+    default-font-family: Theme.font;
 
     in property <bool> development;
     in property <ScreenKind> screen: ScreenKind.root;
@@ -634,10 +599,10 @@ export component LauncherWindow inherits Window {
         }
 
         frame := Rectangle {
-            background: Palette.background;
-            border-radius: Palette.radius-shell;
+            background: Theme.background;
+            border-radius: Theme.radius * 1.5;
             border-width: 1px;
-            border-color: root.development ? Palette.dev-edge : Palette.edge;
+            border-color: root.development ? Theme.accent : Theme.border;
             accessible-role: groupbox;
             accessible-label: root.development ? "Dango (development build)" : "Dango";
             clip: true;
@@ -649,24 +614,24 @@ export component LauncherWindow inherits Window {
                 spacing: 8px;
                 Text {
                     text: "This view needs a newer version of Dango.";
-                    color: Palette.foreground;
-                    font-size: Palette.text;
+                    color: Theme.text;
+                    font-size: Theme.text-body;
                 }
                 Text {
                     text: "Press Escape to go back.";
-                    color: Palette.muted-foreground;
-                    font-size: Palette.text-small;
+                    color: Theme.muted;
+                    font-size: Theme.text-small;
                 }
             }
 
             property <bool> searching: root.screen == ScreenKind.root || root.screen == ScreenKind.list;
-            property <length> top: self.searching ? Palette.header-height : 0;
+            property <length> top: self.searching ? Theme.search-height : 0;
             property <length> banner-height: root.failure != "" ? banner.preferred-height : 0;
 
             body := Rectangle {
                 visible: root.screen != ScreenKind.error;
                 y: parent.top;
-                height: parent.height - parent.top - parent.banner-height - Palette.footer-height;
+                height: parent.height - parent.top - parent.banner-height - Theme.action-bar-height;
 
                 results := Results {
                     visible: frame.searching;
@@ -691,8 +656,8 @@ export component LauncherWindow inherits Window {
                         padding-bottom: 16px;
                         Text {
                             text: root.detail;
-                            color: Palette.foreground;
-                            font-size: Palette.text;
+                            color: Theme.text;
+                            font-size: Theme.text-body;
                             wrap: word-wrap;
                         }
                     }
@@ -710,12 +675,12 @@ export component LauncherWindow inherits Window {
 
             Rectangle {
                 visible: root.screen != ScreenKind.error && root.failure != "";
-                y: parent.height - Palette.footer-height - self.height;
+                y: parent.height - Theme.action-bar-height - self.height;
                 height: parent.banner-height;
                 Rectangle {
                     y: 0;
                     height: 1px;
-                    background: Palette.edge;
+                    background: Theme.border;
                 }
                 banner := HorizontalLayout {
                     padding-left: 20px;
@@ -724,8 +689,8 @@ export component LauncherWindow inherits Window {
                     padding-bottom: 8px;
                     Text {
                         text: root.failure;
-                        color: Palette.destructive;
-                        font-size: Palette.text;
+                        color: Theme.danger;
+                        font-size: Theme.text-body;
                         wrap: word-wrap;
                         accessible-role: text;
                     }
@@ -734,7 +699,7 @@ export component LauncherWindow inherits Window {
 
             Footer {
                 visible: root.screen != ScreenKind.error;
-                y: parent.height - Palette.footer-height;
+                y: parent.height - Theme.action-bar-height;
                 development: root.development;
                 primary-label: root.primary-label;
                 confirm-key: root.confirm-key;
@@ -767,9 +732,9 @@ export component LauncherWindow inherits Window {
             panel := ActionPanel {
                 visible: root.panel-open;
                 width: min(288px, parent.width - 16px);
-                height: min(self.content-height, parent.height - Palette.footer-height - 16px);
+                height: min(self.content-height, parent.height - Theme.action-bar-height - 16px);
                 x: parent.width - self.width - 8px;
-                y: parent.height - Palette.footer-height - self.height - 8px;
+                y: parent.height - Theme.action-bar-height - self.height - 8px;
                 actions: root.actions;
                 pointer-resting: root.pointer-resting;
                 activate(id) => {

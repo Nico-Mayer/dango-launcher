@@ -16,7 +16,7 @@ use crate::protocol::{self, ListItem};
 use crate::ui::snapshot::{Focus, Screen, Snapshot, ViewBody};
 use crate::ui::{Chord, Intent, ResultItem};
 
-const ROW_HEIGHT: f32 = 56.0;
+const ROW_HEIGHT: f32 = 40.0;
 const HEADING_HEIGHT: f32 = 28.0;
 
 #[derive(Default)]

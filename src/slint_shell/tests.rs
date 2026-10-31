@@ -17,7 +17,7 @@ use crate::protocol::{
 use crate::shell::{self, TrayStatus};
 use crate::ui::{Event, Input, Intent, Launcher, ResultItem, TemplateInspection};
 
-const LIST_TOP: f32 = 64.0 + 8.0;
+const LIST_TOP: f32 = 56.0 + 8.0;
 const LIST_BOTTOM: f32 = 400.0 - 40.0 - 8.0;
 
 struct Harness {
