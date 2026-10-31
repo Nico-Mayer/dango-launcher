@@ -1054,8 +1054,9 @@ fn ordered_actions(actions: &[Action]) -> Vec<&Action> {
 /// Marks a panel entry as a filter option rather than an action.
 pub(super) const FILTER_PREFIX: &str = "dango.filter:";
 
-/// Items in section order, narrowed by the query when the launcher filters,
-/// without the groups left empty. Items naming no declared section come first.
+/// Items in section order, narrowed by the query when the launcher filters and
+/// then cut to the item limit, without the groups left empty. Items naming no
+/// declared section come first.
 fn group<'a, T: Grouped>(
     items: &'a [T],
     sections: &'a [Section],
@@ -1073,7 +1074,7 @@ fn group<'a, T: Grouped>(
                 .any(|keyword| keyword.to_lowercase().contains(&needle))
     };
     let declared = |id: &str| sections.iter().any(|section| section.id == id);
-    let loose = items
+    let loose: Vec<_> = items
         .iter()
         .filter(|item| item.section().is_none_or(|id| !declared(id)))
         .filter(shown)
@@ -1086,6 +1087,11 @@ fn group<'a, T: Grouped>(
             .filter(shown)
             .collect();
         groups.push((Some(section), members));
+    }
+    let mut left = super::ITEM_LIMIT;
+    for (_, members) in &mut groups {
+        members.truncate(left);
+        left -= members.len();
     }
     groups.retain(|(_, members): &(_, Vec<_>)| !members.is_empty());
     groups

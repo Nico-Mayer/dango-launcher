@@ -4,7 +4,7 @@
 
 ## 2. Cap pushed lists and grids
 
-- [ ] 2.1 Make `group` in `src/ui/state.rs` stop after the limit, counting loose items first and then each section in order, after the query filter; verify with a `src/ui/tests.rs` test that a 500-item list shows the first 50 and that a query matching only the 300th item shows it
+- [x] 2.1 Make `group` in `src/ui/state.rs` stop after the limit, counting loose items first and then each section in order, after the query filter; verify with a `src/ui/tests.rs` test that a 500-item list shows the first 50 and that a query matching only the 300th item shows it
 - [ ] 2.2 Add a `src/ui/tests.rs` test for two sections of 40 items: all 40 of the first and the first 10 of the second are entries, and a section with no shown item is not drawn
 - [ ] 2.3 Add `src/ui/tests.rs` tests that a command-filtered list of 120 items and a grid of 80 tiles each show 50
 - [ ] 2.4 Add a `src/ui/tests.rs` test that Arrow Down on the 50th of 500 items keeps the 50th selected, and that the action panel opens for it

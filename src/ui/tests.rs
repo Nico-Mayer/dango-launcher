@@ -550,6 +550,26 @@ fn a_launcher_filtered_list_narrows_by_title_and_keeps_its_own_query() {
     assert_eq!(list.empty.unwrap().title, "No results for “nothing”");
 }
 
+fn shown_ids(list: &ListBody) -> Vec<String> {
+    list.sections
+        .iter()
+        .flat_map(|section| section.items.iter().map(|item| item.id.clone()))
+        .collect()
+}
+
+fn item_ids(range: std::ops::RangeInclusive<usize>) -> Vec<String> {
+    range.map(|n| format!("item-{n}")).collect()
+}
+
+#[test]
+fn a_long_list_shows_the_first_fifty_and_filtering_reaches_the_rest() {
+    let mut h = Harness::view(list_tree((1..=500).map(list_item).collect()));
+    assert_eq!(shown_ids(&h.list()), item_ids(1..=50));
+    h.typed("item 300");
+    assert_eq!(shown_ids(&h.list()), item_ids(300..=300));
+    assert_eq!(h.selected(), item_id(300));
+}
+
 impl Harness {
     fn root_screen_query(&self) -> String {
         self.launcher.query.clone()
