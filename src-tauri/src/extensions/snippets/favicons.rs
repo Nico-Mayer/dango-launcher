@@ -16,7 +16,7 @@ use std::sync::{Arc, RwLock};
 use std::time::{Duration, SystemTime};
 
 use reqwest::blocking::Client;
-use tauri::Url;
+use url::Url;
 
 use crate::extension::{ActivationResult, Service};
 use crate::templates::{Template, Values};

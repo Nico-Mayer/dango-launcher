@@ -140,7 +140,7 @@ impl Records {
         let template = Template::parse(body)?;
         if self.kind == Kind::Quicklink {
             let rendered = template.render_url(&Values::default())?;
-            tauri::Url::parse(&rendered.text).map_err(|_| RecordError::InvalidUrl)?;
+            url::Url::parse(&rendered.text).map_err(|_| RecordError::InvalidUrl)?;
         }
         Ok(())
     }

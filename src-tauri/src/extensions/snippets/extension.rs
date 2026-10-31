@@ -746,7 +746,7 @@ mod tests {
     struct NoSource;
 
     impl FaviconSource for NoSource {
-        fn fetch(&self, _site: &tauri::Url) -> Result<Image, FaviconError> {
+        fn fetch(&self, _site: &url::Url) -> Result<Image, FaviconError> {
             unreachable!("the icon is seeded, so nothing is fetched")
         }
     }
