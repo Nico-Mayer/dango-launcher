@@ -205,3 +205,17 @@ fn highlighted(title: &str, positions: &[usize]) -> StyledText {
     }
     StyledText::from_markdown(&markdown).unwrap_or_else(|_| StyledText::from_plain_text(title))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn punctuation_in_a_title_keeps_its_text_and_underlines() {
+        // StyledText exposes its text and spans only through Debug.
+        let title = format!("{:?}", highlighted("C++ (x)", &[0, 4]));
+        assert!(title.contains(r#"text: "C++ (x)""#), "{title}");
+        assert!(title.contains("range: 0..1, style: Underline"), "{title}");
+        assert!(title.contains("range: 4..5, style: Underline"), "{title}");
+    }
+}
