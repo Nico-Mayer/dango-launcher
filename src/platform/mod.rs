@@ -233,7 +233,8 @@ pub fn foreground_app() -> Option<String> {
 
 /// Whether keystrokes go to Dango's own window, where expansion must not act.
 /// Always false on macOS: the launcher panel never makes Dango frontmost, so
-/// the key monitor's tap checks the event's target process there instead.
+/// the check there has to happen in the key monitor's tap (keyword-rules task
+/// 3.1, still open).
 pub fn foreground_is_dango() -> bool {
     #[cfg(target_os = "windows")]
     {
