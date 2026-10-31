@@ -3,11 +3,12 @@ use std::time::Duration;
 
 use tokio::runtime::Handle;
 
-use super::{Core, Services, RESULT_LIMIT};
+use super::{Core, Services, ViewRunner, RESULT_LIMIT};
 use crate::config::{Config, FileConfig};
 use crate::extension::{ExtensionHost, HostResolver};
 use crate::hotkeys::{self, testing::FakeGrab, Registry};
-use crate::invocation::Invoker;
+use crate::invocation::{InvocationContext, Invoker, Runner};
+use crate::protocol::{ListView, View, ViewTree};
 use crate::ranking::{DangoRanker, FrecencyTable, InputHistory};
 use crate::search::{SearchPipeline, StaticCommandSource};
 use crate::shell::testing::{Call, RecordingShell};
@@ -64,6 +65,29 @@ fn query(shell: &RecordingShell) -> String {
 
 fn type_query(core: &Arc<Core>, text: &str) {
     core.dispatch(Intent::QueryChanged { text: text.into() });
+}
+
+fn escape(core: &Arc<Core>) {
+    core.dispatch(Intent::Key {
+        chord: Chord::plain("Escape"),
+    });
+}
+
+fn start_work(core: &Arc<Core>) -> Arc<InvocationContext> {
+    ViewRunner {
+        core: Arc::downgrade(core),
+        owner: "test",
+    }
+    .start()
+    .unwrap()
+}
+
+fn a_view() -> ViewTree {
+    ViewTree::new(View::List(ListView::default()))
+}
+
+async fn settle() {
+    tokio::time::sleep(Duration::from_millis(10)).await;
 }
 
 #[tokio::test]
@@ -139,6 +163,20 @@ async fn escape_on_an_empty_root_dismisses() {
             }
         ]
     );
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_dismiss_resets_at_once_and_drops_a_running_command() {
+    let (core, shell) = core("{}");
+    core.toggle();
+    type_query(&core, "fire");
+    let work = start_work(&core);
+    escape(&core);
+    escape(&core);
+    work.push_view(a_view());
+    settle().await;
+    core.toggle();
+    assert_eq!(query(&shell), "");
 }
 
 #[tokio::test]

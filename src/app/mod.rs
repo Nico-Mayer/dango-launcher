@@ -202,7 +202,7 @@ impl Core {
             ui::Effect::Dismiss => {
                 let core = self.clone();
                 self.on_main_thread(move || {
-                    if core.hide() {
+                    if core.hide(HideReason::Done) {
                         core.latency.note("dismissed by the renderer");
                     }
                 });
@@ -286,7 +286,7 @@ impl Core {
         let core = self.clone();
         self.on_main_thread(move || {
             if core.visible.load(Ordering::SeqCst) {
-                core.hide();
+                core.hide(HideReason::Interrupted);
             } else {
                 let probe = core.latency.start();
                 core.show(probe);
@@ -306,14 +306,14 @@ impl Core {
 
     /// Caller must already be on the main thread; `toggle` and `Dismiss` are
     /// what guarantee that. Returning a value is why this cannot marshal itself.
-    fn hide(self: &Arc<Self>) -> bool {
+    fn hide(self: &Arc<Self>, reason: HideReason) -> bool {
         // Hiding drops the renderer's focus, which can fire a second dismiss.
         // Nothing must happen twice for that.
         if !self.visible.swap(false, Ordering::SeqCst) {
             return false;
         }
         self.shell.hide(true);
-        self.settle_hide(HideReason::Interrupted);
+        self.settle_hide(reason);
         true
     }
 
