@@ -15,7 +15,7 @@ never reach.
 - `AGENTS.md` (this file) - how to work on the code: stack, architecture,
   conventions, platform traps, build facts.
 - `openspec/config.yaml` - rules for writing OpenSpec artifacts.
-- GitHub issues - open work and checks not yet run.
+- GitHub issues - open work.
 
 Do not duplicate a rule across these. If a spec already says it, link to the
 spec.
@@ -32,8 +32,9 @@ spec.
   `cargo clippy --all-targets -- -D warnings`, which also compiles the
   `.slint` files. Tests, UI included: `cargo test`.
 - Work one platform at a time. Finish and verify on the machine at hand, and
-  leave the other platform's hand checks open until a session on that
-  machine. Do not switch back and forth within a session.
+  leave the other platform's hand checks as open tasks in the change's
+  `tasks.md` until a session on that machine. Do not archive a change with
+  open hand checks. Do not switch back and forth within a session.
 - When you hit a platform trap or build fact not listed below, add it here in
   the same change.
 
