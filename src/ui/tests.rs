@@ -883,6 +883,18 @@ fn a_grid_outside_four_to_eight_columns_is_refused() {
 }
 
 #[test]
+fn an_action_answering_with_an_invalid_grid_is_refused() {
+    let mut h = Harness::view(list_tree((1..=3).map(list_item).collect()));
+    h.press("Enter");
+    let request = h.runs()[0].clone();
+    h.finish(request, ActionOutcome::Replaced(Box::new(grid_tree(2, 4))));
+    let Screen::Error(text) = h.snapshot().screen else {
+        panic!("expected the invalid view");
+    };
+    assert_eq!(text.title, "This view can't be shown");
+}
+
+#[test]
 fn a_five_column_grid_shows_its_tiles() {
     let h = Harness::view(grid_tree(5, 12));
     let ViewBody::Grid(grid) = h.view_body() else {

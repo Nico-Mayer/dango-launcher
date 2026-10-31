@@ -320,12 +320,7 @@ impl Launcher {
         }
         self.last_invocation = Some(invocation);
         self.working = None;
-        if tree.protocol_version != PROTOCOL_VERSION {
-            self.view_error = Some(ViewError::Unsupported);
-            return;
-        }
-        if matches!(&tree.view, View::Grid(grid) if !GRID_COLUMNS.contains(&grid.columns)) {
-            self.view_error = Some(ViewError::Invalid);
+        if self.refused(&tree) {
             return;
         }
         self.owner = Some(owner);
@@ -354,6 +349,9 @@ impl Launcher {
             // A root action that produces a view opens it. A snippet needing
             // arguments has to ask before it can do anything.
             (ActionOutcome::Replaced(tree), Origin::Root) => {
+                if self.refused(&tree) {
+                    return;
+                }
                 let context = self
                     .results
                     .iter()
@@ -372,6 +370,9 @@ impl Launcher {
                 fx.push(Effect::Search(self.query.clone()))
             }
             (ActionOutcome::Replaced(tree) | ActionOutcome::Removed(tree), Origin::View) => {
+                if self.refused(&tree) {
+                    return;
+                }
                 if self.stack.is_empty() {
                     self.push(*tree, Context::default(), fx);
                 } else {
@@ -382,6 +383,14 @@ impl Launcher {
             (ActionOutcome::Toast(text), _) => self.show_success(text, fx),
             (ActionOutcome::Failed(message), _) => self.show_failure(message),
         }
+    }
+
+    fn refused(&mut self, tree: &ViewTree) -> bool {
+        let Err(error) = check(tree) else {
+            return false;
+        };
+        self.view_error = Some(error);
+        true
     }
 
     fn show_failure(&mut self, text: String) {
@@ -1091,6 +1100,16 @@ fn group<'a, T: Grouped>(
     }
     groups.retain(|(_, members): &(_, Vec<_>)| !members.is_empty());
     groups
+}
+
+fn check(tree: &ViewTree) -> Result<(), ViewError> {
+    if tree.protocol_version != PROTOCOL_VERSION {
+        return Err(ViewError::Unsupported);
+    }
+    if matches!(&tree.view, View::Grid(grid) if !GRID_COLUMNS.contains(&grid.columns)) {
+        return Err(ViewError::Invalid);
+    }
+    Ok(())
 }
 
 /// What a field submits until the user changes it. A dropdown without a value
