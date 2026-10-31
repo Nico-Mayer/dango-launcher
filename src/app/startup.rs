@@ -7,8 +7,8 @@ use std::sync::{Arc, Mutex, Weak};
 use tokio::runtime::Handle;
 
 use super::{
-    aliased_candidates, apply_hyperkey, extension_contexts, AiParts, Core, HideLauncher,
-    OnMainThread,
+    aliased_candidates, apply_hyperkey, extension_contexts, load_problems, AiParts, Core,
+    HideLauncher, OnMainThread,
 };
 use super::{Services, ViewRunner, RESULT_LIMIT};
 use crate::config::{self, FileConfig};
@@ -65,7 +65,7 @@ pub fn start(startup: Startup) -> Arc<Core> {
     let (initial_config, config_error) = match config::Config::load(&config_path) {
         Ok(config) => (config, None),
         Err(error) => {
-            eprintln!("[dango] config file error, using defaults: {error}");
+            crate::log::append(&format!("config file error, using defaults: {error}"));
             (config::Config::default(), Some(error.to_string()))
         }
     };
@@ -102,9 +102,6 @@ pub fn start(startup: Startup) -> Arc<Core> {
     }
     core.shell.set_tray(&core.tray());
     core.watch_permissions();
-    if config_error.is_some() {
-        crate::log::append("config file did not parse at startup, using defaults");
-    }
     watch_config(&core);
     core
 }
@@ -138,8 +135,12 @@ fn open_store() -> Result<Opened, Box<dyn std::error::Error>> {
 fn register(host: &mut ExtensionHost, name: &str, extension: Arc<dyn extension::Extension>) {
     match host.register(extension) {
         Ok(report) if report.is_clean() => {}
-        Ok(report) => eprintln!("[dango] {name} loaded with issues: {report:?}"),
-        Err(error) => eprintln!("[dango] {name} failed to load: {error}"),
+        Ok(report) => {
+            for problem in load_problems(&report) {
+                crate::log::append(&format!("{name}: {problem}"));
+            }
+        }
+        Err(error) => crate::log::append(&format!("{name} failed to load: {error}")),
     }
 }
 
@@ -158,7 +159,10 @@ fn build_services(
             recovered_from,
         }) => {
             if let Some(aside) = recovered_from {
-                eprintln!("[dango] database was corrupt, moved to {}", aside.display());
+                crate::log::append(&format!(
+                    "database was corrupt, moved to {}",
+                    aside.display()
+                ));
                 notices.push("Database was reset, see dango.log".to_string());
             }
             eprintln!(
@@ -168,7 +172,7 @@ fn build_services(
             Some(Arc::new(store))
         }
         Err(error) => {
-            eprintln!("[dango] database unavailable: {error}");
+            crate::log::append(&format!("database unavailable: {error}"));
             notices.push("Database unavailable, see dango.log".to_string());
             None
         }
@@ -234,7 +238,7 @@ fn build_services(
     let exchange: Option<Arc<dyn text::TextTarget>> = match exchange {
         Some(exchange) => Some(exchange),
         None => {
-            eprintln!("[dango] no key injection or clipboard, so pasting is off");
+            crate::log::append("no key injection or clipboard, so pasting is off");
             notices.push("Pasting is off, see dango.log".to_string());
             None
         }
@@ -464,7 +468,7 @@ fn register_hotkeys(file_config: &Arc<FileConfig>, notices: &mut Vec<String>) ->
     let grab: Box<dyn Grab> = match SystemGrab::new() {
         Ok(grab) => Box::new(grab),
         Err(error) => {
-            eprintln!("[dango] global hotkeys are unavailable: {error}");
+            crate::log::append(&format!("global hotkeys are unavailable: {error}"));
             Box::new(NoGrab)
         }
     };
