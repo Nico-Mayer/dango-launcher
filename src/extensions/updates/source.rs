@@ -182,6 +182,25 @@ mod tests {
         minisign_verify::PublicKey::decode(std::str::from_utf8(&decoded).unwrap()).unwrap();
     }
 
+    /// The fixture was signed with `cargo packager signer sign` and the
+    /// release key. This repeats the updater's own check, which is private.
+    #[test]
+    fn the_release_key_signs_what_the_public_key_accepts() {
+        let decode = |text: &str| {
+            let bytes = base64::engine::general_purpose::STANDARD
+                .decode(text)
+                .unwrap();
+            String::from_utf8(bytes).unwrap()
+        };
+        let public_key = minisign_verify::PublicKey::decode(&decode(PUBLIC_KEY)).unwrap();
+        let signature =
+            minisign_verify::Signature::decode(&decode(include_str!("fixtures/key-check.txt.sig")))
+                .unwrap();
+        public_key
+            .verify(include_bytes!("fixtures/key-check.txt"), &signature, true)
+            .unwrap();
+    }
+
     #[test]
     fn the_updater_builds_with_the_running_version() {
         updater().unwrap();
