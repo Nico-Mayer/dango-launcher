@@ -114,9 +114,10 @@ impl Store {
     pub fn replace_apps(&self, apps: &[(String, String, Option<String>)]) -> rusqlite::Result<()> {
         let now = now_millis();
         self.with(|c| {
-            c.execute_batch("BEGIN; DELETE FROM local_app_index;")?;
+            let tx = c.unchecked_transaction()?;
+            tx.execute("DELETE FROM local_app_index", [])?;
             {
-                let mut stmt = c.prepare(
+                let mut stmt = tx.prepare(
                     "INSERT INTO local_app_index (app_id, name, target, indexed_at) \
                      VALUES (?1, ?2, ?3, ?4)",
                 )?;
@@ -124,8 +125,7 @@ impl Store {
                     stmt.execute(params![id, name, target, now])?;
                 }
             }
-            c.execute_batch("COMMIT;")?;
-            Ok(())
+            tx.commit()
         })
     }
 
@@ -345,6 +345,24 @@ mod tests {
             .map(|a| a.0)
             .collect();
         assert_eq!(ids, ["kept", "new"]);
+    }
+
+    #[test]
+    fn a_failed_reindex_rolls_back_and_frees_the_connection() {
+        let store = Store::in_memory().unwrap();
+        let app = |id: &str| (id.to_string(), id.to_uppercase(), None);
+        store.replace_apps(&[app("kept")]).unwrap();
+
+        assert!(store.replace_apps(&[app("dup"), app("dup")]).is_err());
+
+        assert!(store.with(|c| Ok(c.is_autocommit())).unwrap());
+        let ids: Vec<String> = store
+            .load_apps()
+            .unwrap()
+            .into_iter()
+            .map(|a| a.0)
+            .collect();
+        assert_eq!(ids, ["kept"]);
     }
 
     #[test]
