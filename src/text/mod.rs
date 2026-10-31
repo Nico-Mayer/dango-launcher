@@ -488,8 +488,8 @@ mod tests {
     }
 
     impl ClipboardSource for FakeClipboard {
-        fn formats(&self) -> Vec<String> {
-            vec![]
+        fn formats(&self) -> Option<Vec<String>> {
+            Some(vec![])
         }
         fn text(&self) -> Option<String> {
             let read = match self.content.lock().unwrap().clone() {

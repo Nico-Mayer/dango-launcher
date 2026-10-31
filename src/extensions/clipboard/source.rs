@@ -50,9 +50,10 @@ pub trait Attribution: Send + Sync {
 /// Reading and writing the clipboard. A trait so the watcher can be tested
 /// without a real one, not because there is a second implementation.
 pub trait ClipboardSource: Send + Sync {
-    /// The type identifiers currently on the clipboard. Asked before any
-    /// content is read, so excluded content never enters memory.
-    fn formats(&self) -> Vec<String>;
+    /// The type identifiers currently on the clipboard, or `None` when they
+    /// cannot be read. Asked before any content is read, so excluded content
+    /// never enters memory.
+    fn formats(&self) -> Option<Vec<String>>;
     fn text(&self) -> Option<String>;
     /// The contents as encoded PNG bytes, when there is an image.
     fn image(&self) -> Option<Vec<u8>>;
@@ -77,19 +78,16 @@ impl CrateClipboard {
 }
 
 impl ClipboardSource for CrateClipboard {
-    fn formats(&self) -> Vec<String> {
+    fn formats(&self) -> Option<Vec<String>> {
         until_free(
-            || {
-                let formats = self.context.available_formats().unwrap_or_default();
-                if formats.is_empty() && busy::holds_anything() {
-                    Err(())
-                } else {
-                    Ok(formats)
-                }
+            || match self.context.available_formats() {
+                Ok(formats) if formats.is_empty() && busy::holds_anything() => Err(()),
+                Ok(formats) => Ok(formats),
+                Err(_) => Err(()),
             },
             busy::holds_anything,
         )
-        .unwrap_or_default()
+        .ok()
     }
 
     fn text(&self) -> Option<String> {
@@ -223,6 +221,7 @@ mod tests {
         assert!(
             clipboard
                 .formats()
+                .unwrap_or_default()
                 .iter()
                 .any(|f| f.to_ascii_lowercase().contains("text")),
             "the format list is what the privacy check reads"

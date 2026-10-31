@@ -132,9 +132,12 @@ impl Watcher {
         }
     }
 
+    /// An unreadable format list counts as marked: the marker may be on it.
     fn is_marked_excluded(&self) -> bool {
-        self.source
-            .formats()
+        let Some(formats) = self.source.formats() else {
+            return true;
+        };
+        formats
             .iter()
             .any(|format| EXCLUDING_MARKERS.contains(&format.as_str()))
     }
@@ -302,6 +305,7 @@ mod tests {
     #[derive(Default)]
     struct FakeClipboard {
         formats: Mutex<Vec<String>>,
+        formats_unreadable: AtomicBool,
         text: Mutex<Option<String>>,
         image: Mutex<Option<Vec<u8>>>,
         /// Every read of content, so a test can prove excluded content was
@@ -331,8 +335,11 @@ mod tests {
     }
 
     impl ClipboardSource for FakeClipboard {
-        fn formats(&self) -> Vec<String> {
-            self.formats.lock().unwrap().clone()
+        fn formats(&self) -> Option<Vec<String>> {
+            if self.formats_unreadable.load(Ordering::SeqCst) {
+                return None;
+            }
+            Some(self.formats.lock().unwrap().clone())
         }
         fn text(&self) -> Option<String> {
             self.reads.lock().unwrap().push("text");
@@ -514,6 +521,17 @@ mod tests {
             f.clipboard.reads.lock().unwrap().is_empty(),
             "excluded content must not reach Dango's memory at all"
         );
+    }
+
+    #[test]
+    fn content_whose_formats_cannot_be_read_is_never_even_read() {
+        let f = setup();
+        f.clipboard.copy_text("maybe a password");
+        f.clipboard.formats_unreadable.store(true, Ordering::SeqCst);
+
+        assert!(!f.watcher.handle_change(1));
+        assert!(f.history.entries().unwrap().is_empty());
+        assert!(f.clipboard.reads.lock().unwrap().is_empty());
     }
 
     #[test]

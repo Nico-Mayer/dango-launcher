@@ -57,7 +57,7 @@ mod spike {
             self.last_event = arrived;
 
             let started = Instant::now();
-            let formats = self.clipboard.formats();
+            let formats = self.clipboard.formats().unwrap_or_default();
             let formats_took = started.elapsed();
             let marked = formats.iter().any(|f| MARKERS.contains(&f.as_str()));
 

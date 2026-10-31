@@ -376,8 +376,8 @@ mod tests {
     struct StubClipboard(Mutex<Option<Content>>);
 
     impl ClipboardSource for StubClipboard {
-        fn formats(&self) -> Vec<String> {
-            Vec::new()
+        fn formats(&self) -> Option<Vec<String>> {
+            Some(Vec::new())
         }
         fn text(&self) -> Option<String> {
             None
