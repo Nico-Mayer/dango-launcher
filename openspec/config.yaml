@@ -35,3 +35,5 @@ rules:
     - Platform-specific work gets separate tasks per platform, never one task covering both.
     - Verify with automated tests by default. A task's verify clause names the test that proves it (`cargo test`, including UI tests on the Slint testing backend), not a manual step in a running debug build.
     - Add manual verification tasks only for behaviour a test cannot observe on the real OS (focus, window placement, panels, hotkeys, permissions, native APIs), and only for the platforms whose code or behaviour the change touches. A platform-neutral change has no manual tasks.
+    - A manual check of a running UI uses the `dango-ui` Slint MCP server (see AGENTS.md for how to start it) to inspect and drive the launcher, with `scripts/send-keys.ps1` and `scripts/screenshot.ps1` on Windows for global hotkeys and what the MCP cannot see.
+    - The last task runs the `ponytail-review` skill in a fresh subagent on the change's commits, without the apply context. The review only reports findings; the author decides what to fix.
