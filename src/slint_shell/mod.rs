@@ -31,14 +31,13 @@ thread_local! {
     static RENDERER: RefCell<Option<Rc<RefCell<Renderer>>>> = const { RefCell::new(None) };
 }
 
+type Platform = Arc<Mutex<Option<Box<dyn PlatformWindow>>>>;
+
 struct SlintShell {
-    /// So a snapshot published from any thread is drawn through this shell's
-    /// own `set_launcher_height` once it reaches the main thread.
-    me: std::sync::Weak<SlintShell>,
     window: slint::Weak<LauncherWindow>,
     tray: slint::Weak<Tray>,
     /// Attached once the native window exists, which is after its first show.
-    platform: Mutex<Option<Box<dyn PlatformWindow>>>,
+    platform: Platform,
 }
 
 impl SlintShell {
@@ -58,15 +57,17 @@ impl SlintShell {
 impl Shell for SlintShell {
     fn publish(&self, snapshot: &ui::Snapshot) {
         let window = self.window.clone();
-        let me = self.me.clone();
+        let platform = self.platform.clone();
         let snapshot = snapshot.clone();
         let _ = slint::invoke_from_event_loop(move || {
-            let (Some(window), Some(shell)) = (window.upgrade(), me.upgrade()) else {
+            let Some(window) = window.upgrade() else {
                 return;
             };
             RENDERER.with(|renderer| {
                 if let Some(renderer) = renderer.borrow().as_ref() {
-                    render::publish(&*shell, &mut renderer.borrow_mut(), &window, snapshot);
+                    render::publish(&mut renderer.borrow_mut(), &window, snapshot, |height| {
+                        set_launcher_height(&window, &platform, height)
+                    });
                 }
             });
         });
@@ -128,29 +129,26 @@ impl Shell for SlintShell {
     fn quit(&self) {
         let _ = slint::quit_event_loop();
     }
+}
 
-    fn set_launcher_height(&self, height: f32) {
-        let Some(window) = self.window.upgrade() else {
-            return;
-        };
-        let shell = window.global::<generated::Shell>();
-        if shell.get_height() == height {
-            return;
-        }
-        let platform = self.platform.lock().unwrap();
-        let (Some(platform), Some(handle)) = (platform.as_ref(), Self::handle(&window)) else {
-            return;
-        };
-        // Slint resizes the window itself when the component's height changes,
-        // which on macOS moves the top edge, so only a platform that keeps it
-        // lets the component follow. The component goes first: a native resize
-        // to a height it does not allow is sized straight back.
-        if !platform.keeps_top_edge() {
-            return;
-        }
-        shell.set_height(height);
-        platform.set_height(handle, height.into());
+fn set_launcher_height(window: &LauncherWindow, platform: &Platform, height: f32) {
+    let shell = window.global::<generated::Shell>();
+    if shell.get_height() == height {
+        return;
     }
+    let platform = platform.lock().unwrap();
+    let (Some(platform), Some(handle)) = (platform.as_ref(), SlintShell::handle(window)) else {
+        return;
+    };
+    // Slint resizes the window itself when the component's height changes,
+    // which on macOS moves the top edge, so only a platform that keeps it
+    // lets the component follow. The component goes first: a native resize
+    // to a height it does not allow is sized straight back.
+    if !platform.keeps_top_edge() {
+        return;
+    }
+    shell.set_height(height);
+    platform.set_height(handle, height.into());
 }
 
 fn show_tray(component: &Tray, tray: &TrayStatus) {
@@ -205,11 +203,10 @@ pub fn run() {
     let renderer = Rc::new(RefCell::new(Renderer::new(&window)));
     RENDERER.with(|slot| *slot.borrow_mut() = Some(renderer.clone()));
 
-    let shell = Arc::new_cyclic(|me| SlintShell {
-        me: me.clone(),
+    let shell = Arc::new(SlintShell {
         window: window.as_weak(),
         tray: tray.as_weak(),
-        platform: Mutex::new(None),
+        platform: Arc::new(Mutex::new(None)),
     });
 
     // The hotkeys and the tray need the event loop running on this thread.

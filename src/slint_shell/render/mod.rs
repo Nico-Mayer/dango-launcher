@@ -20,7 +20,6 @@ use slint::{ComponentHandle, Image};
 use super::generated::{IconKind, Intents, LauncherWindow, ScreenKind};
 use super::icons::{Icon, Icons};
 use super::keys::{self, Held};
-use crate::shell::Shell;
 use crate::ui::snapshot::{Focus, Screen, Snapshot, ViewBody};
 use crate::ui::{Chord, Intent};
 
@@ -174,12 +173,12 @@ impl Renderer {
 /// Sizes the window for the snapshot, then draws it, in one main-thread turn
 /// so no frame shows the old size with the new content or the other way round.
 pub fn publish(
-    shell: &dyn Shell,
     renderer: &mut Renderer,
     ui: &LauncherWindow,
     snapshot: Snapshot,
+    resize: impl FnOnce(f32),
 ) {
-    shell.set_launcher_height(renderer.height(&snapshot));
+    resize(renderer.height(&snapshot));
     renderer.render(ui, snapshot);
 }
 

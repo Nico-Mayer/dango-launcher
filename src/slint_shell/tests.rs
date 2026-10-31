@@ -1,7 +1,7 @@
 //! The renderer mounted headless on Slint's testing backend, fed by the real
 //! state machine.
 
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
 use i_slint_backend_testing::ElementHandle;
@@ -14,7 +14,6 @@ use crate::protocol::{
     Action, DetailView, FieldKind, Filtering, FormField, FormView, ListItem, ListView, View,
     ViewTree,
 };
-use crate::shell::testing::{Call, RecordingShell};
 use crate::shell::TrayStatus;
 use crate::ui::{Context, Event, Input, Intent, Launcher, ResultItem, TemplateInspection};
 
@@ -29,7 +28,7 @@ struct Harness {
     /// Records intents without feeding them to the state machine, so what is
     /// on screen can only change through a snapshot.
     frozen: Rc<RefCell<bool>>,
-    recorder: Rc<RecordingShell>,
+    height: Rc<Cell<Option<f32>>>,
 }
 
 impl Harness {
@@ -42,9 +41,9 @@ impl Harness {
         let launcher = Rc::new(RefCell::new(Launcher::new()));
         let intents = Rc::new(RefCell::new(Vec::new()));
         let frozen = Rc::new(RefCell::new(false));
-        let recorder = Rc::new(RecordingShell::default());
+        let height = Rc::new(Cell::new(None));
         let dispatch = {
-            let recorder = recorder.clone();
+            let height = height.clone();
             let weak = ui.as_weak();
             let launcher = launcher.clone();
             let renderer = renderer.clone();
@@ -57,12 +56,9 @@ impl Harness {
                 }
                 launcher.borrow_mut().apply(Input::Intent(intent));
                 let snapshot = launcher.borrow().snapshot();
-                render::publish(
-                    &*recorder,
-                    &mut renderer.borrow_mut(),
-                    &weak.unwrap(),
-                    snapshot,
-                );
+                render::publish(&mut renderer.borrow_mut(), &weak.unwrap(), snapshot, |h| {
+                    height.set(Some(h))
+                });
             }) as Rc<dyn Fn(Intent)>
         };
         render::connect(&ui, renderer.clone(), dispatch);
@@ -72,7 +68,7 @@ impl Harness {
             renderer,
             intents,
             frozen,
-            recorder,
+            height,
         };
         harness.event(Event::Activated {
             held: false,
@@ -95,23 +91,15 @@ impl Harness {
         self.launcher.borrow_mut().apply(Input::Event(event));
         let snapshot = self.launcher.borrow().snapshot();
         render::publish(
-            &*self.recorder,
             &mut self.renderer.borrow_mut(),
             &self.ui,
             snapshot,
+            |height| self.height.set(Some(height)),
         );
     }
 
     fn height(&self) -> f32 {
-        self.recorder
-            .calls()
-            .into_iter()
-            .rev()
-            .find_map(|call| match call {
-                Call::Height(height) => Some(height),
-                _ => None,
-            })
-            .expect("a height was set")
+        self.height.get().expect("a height was set")
     }
 
     fn view(&self, tree: ViewTree) {
