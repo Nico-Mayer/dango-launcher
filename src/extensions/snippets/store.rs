@@ -12,6 +12,7 @@
 //! later feature adding, say, a keyword does not lose it.
 
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, RwLock};
 
 use serde_json::{Map, Value};
@@ -36,6 +37,8 @@ pub enum RecordError {
     KeywordNeedsPlainSnippet,
     #[error("Another snippet already uses that keyword")]
     KeywordTaken(String),
+    #[error("Fix the error in {0} first")]
+    FileBroken(&'static str),
 }
 
 /// One snippet or quicklink as the store hands it back.
@@ -88,6 +91,9 @@ pub struct Records {
     cache: RwLock<Vec<Map<String, Value>>>,
     /// The last text the app wrote, so the file watcher ignores its own write.
     own_write: Arc<Mutex<Option<String>>>,
+    /// The file failed to load, so the cache is not what the file holds and a
+    /// write would replace the user's records with it.
+    broken: AtomicBool,
 }
 
 impl Records {
@@ -104,6 +110,7 @@ impl Records {
         let store = Arc::new(Self {
             path,
             kind,
+            broken: AtomicBool::new(error.is_some()),
             cache: RwLock::new(records),
             own_write: Arc::new(Mutex::new(None)),
         });
@@ -125,8 +132,16 @@ impl Records {
     /// Reloads the cache from `text`, for the file watcher. On a parse failure
     /// the last good cache is kept and the error returned to be surfaced.
     pub fn reload(&self, text: &str) -> Result<(), RecordError> {
-        let records = parse(text)?;
+        let records = parse(text).inspect_err(|_| self.broken.store(true, Ordering::SeqCst))?;
         *self.cache.write().unwrap() = with_ids(records);
+        self.broken.store(false, Ordering::SeqCst);
+        Ok(())
+    }
+
+    fn writable(&self) -> Result<(), RecordError> {
+        if self.broken.load(Ordering::SeqCst) {
+            return Err(RecordError::FileBroken(self.kind.file_name()));
+        }
         Ok(())
     }
 
@@ -179,6 +194,7 @@ impl Records {
         body: &str,
         keyword: Option<&str>,
     ) -> Result<String, RecordError> {
+        self.writable()?;
         self.validate(name, body)?;
         let keyword = self.validate_keyword(keyword, body, None)?;
         let id = uuid::Uuid::new_v4().to_string();
@@ -204,6 +220,7 @@ impl Records {
         body: &str,
         keyword: Option<&str>,
     ) -> Result<(), RecordError> {
+        self.writable()?;
         self.validate(name, body)?;
         let keyword = self.validate_keyword(keyword, body, Some(id))?;
         {
@@ -232,6 +249,7 @@ impl Records {
     /// Removes the record's entry outright. There is no tombstone: git remembers
     /// what was deleted, so a hard delete does not come back.
     pub fn remove(&self, id: &str) -> Result<(), RecordError> {
+        self.writable()?;
         {
             let mut cache = self.cache.write().unwrap();
             let before = cache.len();
@@ -472,6 +490,40 @@ mod tests {
     }
 
     #[test]
+    fn a_file_that_failed_to_load_is_not_overwritten() {
+        let dir = std::env::temp_dir().join(format!("dango-records-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let broken = r#"[{ "name": "Hand", "template": "t" },"#;
+        std::fs::write(dir.join("snippets.json"), broken).unwrap();
+        let (records, error) = Records::open(&dir, Kind::Snippet);
+        assert!(error.is_some());
+
+        let refused = records.create("Signature", "Best", None).unwrap_err();
+        assert!(matches!(refused, RecordError::FileBroken("snippets.json")));
+        assert_eq!(std::fs::read_to_string(records.path()).unwrap(), broken);
+
+        records
+            .reload(r#"[{ "name": "Hand", "template": "t" }]"#)
+            .unwrap();
+        assert!(records.create("Signature", "Best", None).is_ok());
+    }
+
+    #[test]
+    fn a_bad_reload_refuses_writes_until_a_clean_one() {
+        let records = records(Kind::Snippet);
+        let id = records.create("Signature", "Best", None).unwrap();
+        records.reload("{ not an array").unwrap_err();
+        assert!(matches!(
+            records.update(&id, "Signature", "Regards", None),
+            Err(RecordError::FileBroken(_))
+        ));
+        assert!(matches!(
+            records.remove(&id),
+            Err(RecordError::FileBroken(_))
+        ));
+    }
+
+    #[test]
     fn a_snippet_needs_a_name() {
         let records = records(Kind::Snippet);
         assert!(matches!(
@@ -631,6 +683,7 @@ mod display_tests {
             RecordError::Gone,
             RecordError::KeywordNeedsPlainSnippet,
             RecordError::KeywordTaken("sig".into()),
+            RecordError::FileBroken(Kind::Snippet.file_name()),
         ];
         for error in errors {
             let text = error.to_string();
