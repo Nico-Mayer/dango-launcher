@@ -36,6 +36,8 @@ pub enum ActionOutcome {
     /// clearing several a chore.
     Replaced(Box<crate::protocol::ViewTree>),
     Removed(Box<crate::protocol::ViewTree>),
+    /// The action succeeded and the launcher stays open, saying so in one line.
+    Toast(String),
     Failed(String),
 }
 

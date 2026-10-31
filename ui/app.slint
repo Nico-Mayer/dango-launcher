@@ -274,7 +274,6 @@ component Footer inherits Rectangle {
     in property <string> primary-label;
     in property <string> confirm-key;
     in property <string> status;
-    in property <bool> hide-status;
     in property <string> panel-key;
     in property <bool> has-actions;
     callback toggle-panel();
@@ -316,7 +315,7 @@ component Footer inherits Rectangle {
                 }
             }
             Text {
-                text: root.hide-status ? "" : root.status;
+                text: root.status;
                 accessible-role: text;
                 accessible-label: root.status;
                 color: Theme.muted;
@@ -523,11 +522,9 @@ export component LauncherWindow inherits Window {
     in property <string> empty-description;
     in property <string> detail;
     in property <[FieldData]> fields;
-    in property <string> failure;
     in property <string> primary-label;
     in property <string> confirm-key;
     in property <string> status;
-    in property <bool> hide-status;
     in property <string> panel-key;
     in property <bool> has-actions;
     in property <bool> panel-open;
@@ -601,12 +598,11 @@ export component LauncherWindow inherits Window {
 
             property <bool> searching: root.screen == ScreenKind.root || root.screen == ScreenKind.list;
             property <length> top: self.searching ? Theme.search-height : 0;
-            property <length> banner-height: root.failure != "" ? banner.preferred-height : 0;
 
             body := Rectangle {
                 visible: root.screen != ScreenKind.error;
                 y: parent.top;
-                height: parent.height - parent.top - parent.banner-height - Theme.action-bar-height;
+                height: parent.height - parent.top - Theme.action-bar-height;
 
                 results := Results {
                     visible: frame.searching;
@@ -648,37 +644,12 @@ export component LauncherWindow inherits Window {
                 }
             }
 
-            Rectangle {
-                visible: root.screen != ScreenKind.error && root.failure != "";
-                y: parent.height - Theme.action-bar-height - self.height;
-                height: parent.banner-height;
-                Rectangle {
-                    y: 0;
-                    height: 1px;
-                    background: Theme.border;
-                }
-                banner := HorizontalLayout {
-                    padding-left: 20px;
-                    padding-right: 20px;
-                    padding-top: 8px;
-                    padding-bottom: 8px;
-                    Text {
-                        text: root.failure;
-                        color: Theme.danger;
-                        font-size: Theme.text-body;
-                        wrap: word-wrap;
-                        accessible-role: text;
-                    }
-                }
-            }
-
             Footer {
                 visible: root.screen != ScreenKind.error;
                 y: parent.height - Theme.action-bar-height;
                 primary-label: root.primary-label;
                 confirm-key: root.confirm-key;
                 status: root.status;
-                hide-status: root.hide-status;
                 panel-key: root.panel-key;
                 has-actions: root.has-actions;
                 toggle-panel => {

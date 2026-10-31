@@ -3,7 +3,7 @@ use serde::Serialize;
 use crate::protocol::{Action, FieldKind, ListItem, View};
 
 use super::input::{Chord, ResultItem};
-use super::state::{Launcher, Mode, PushedView};
+use super::state::{Launcher, Mode, PushedView, ToastStyle};
 
 macro_rules! snapshot_types {
     ($($item:item)*) => {
@@ -24,7 +24,7 @@ snapshot_types! {
         /// focused control.
         pub bindings: Vec<Binding>,
         pub screen: Screen,
-        pub failure: Option<String>,
+        pub toast: Option<Toast>,
         pub footer: Footer,
         pub panel: Panel,
     }
@@ -149,13 +149,18 @@ snapshot_types! {
     }
 
     #[serde(rename_all = "camelCase")]
+    pub struct Toast {
+        pub style: ToastStyle,
+        pub text: String,
+    }
+
+    #[serde(rename_all = "camelCase")]
     pub struct Footer {
-        pub primary_label: String,
+        /// What Enter runs. Nothing when there is nothing to confirm.
+        pub primary_label: Option<String>,
         /// The confirm key is Cmd or Ctrl with Enter, because Enter makes a
         /// newline in a template field.
         pub confirm_with_command: bool,
-        pub status: String,
-        pub hide_status: bool,
     }
 
     #[serde(rename_all = "camelCase")]
@@ -189,7 +194,7 @@ impl Launcher {
                 (false, None) => Screen::Root(self.root_screen()),
                 (false, Some(view)) => Screen::View(self.view_screen(view)),
             },
-            failure: self.failure.clone(),
+            toast: self.toast(),
             footer: self.footer(),
             panel: Panel {
                 actions: self.panel_actions().into_iter().cloned().collect(),
@@ -292,10 +297,9 @@ impl Launcher {
                         items: items.into_iter().cloned().collect(),
                     })
                     .collect();
-                let empty = sections.is_empty().then(|| {
-                    if list.loading {
-                        EmptyText::plain("Loading…")
-                    } else if !view.query.is_empty() {
+                // A loading list says so in its busy toast, not in its body.
+                let empty = (sections.is_empty() && !list.loading).then(|| {
+                    if !view.query.is_empty() {
                         EmptyText {
                             icon: list.empty_state.as_ref().and_then(|s| s.icon.clone()),
                             title: format!("No results for “{}”", view.query),
@@ -362,32 +366,48 @@ impl Launcher {
         }
     }
 
+    /// A held toast wins; otherwise the work in progress shows as busy.
+    fn toast(&self) -> Option<Toast> {
+        if let Some(toast) = &self.toast {
+            return Some(Toast {
+                style: toast.style,
+                text: toast.text.clone(),
+            });
+        }
+        let busy = |text: String| {
+            Some(Toast {
+                style: ToastStyle::Busy,
+                text,
+            })
+        };
+        if let Some(title) = &self.working {
+            return busy(format!("Running {title}…"));
+        }
+        match self.stack.last() {
+            Some(view) if is_busy(&view.tree.view) => busy("Loading…".to_string()),
+            _ => None,
+        }
+    }
+
     fn footer(&self) -> Footer {
         let Some(view) = self.stack.last() else {
+            // A command result carries no actions and is invoked instead.
             return Footer {
-                primary_label: "Open".to_string(),
+                primary_label: self.root_selected().map(|item| {
+                    item.actions
+                        .first()
+                        .map_or_else(|| "Open".to_string(), |action| action.title.clone())
+                }),
                 confirm_with_command: false,
-                status: self
-                    .working
-                    .as_ref()
-                    .map(|title| format!("Running {title}…"))
-                    .unwrap_or_default(),
-                hide_status: false,
             };
         };
         Footer {
             primary_label: self
                 .available_actions()
                 .first()
-                .map_or_else(|| "Select".to_string(), |action| action.title.clone()),
+                .map(|action| action.title.clone()),
             confirm_with_command: matches!(&view.tree.view, View::Form(form)
                 if form.fields.iter().any(|field| field.kind == FieldKind::Template)),
-            status: if is_busy(&view.tree.view) {
-                "Loading…".to_string()
-            } else {
-                String::new()
-            },
-            hide_status: matches!(view.tree.view, View::List(_)) && self.view_items().is_empty(),
         }
     }
 }

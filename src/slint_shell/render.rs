@@ -58,12 +58,17 @@ impl Renderer {
     }
 
     pub fn render(&mut self, ui: &LauncherWindow, snapshot: Snapshot) {
-        ui.set_failure(snapshot.failure.clone().unwrap_or_default().into());
         let footer = &snapshot.footer;
-        ui.set_primary_label(footer.primary_label.as_str().into());
+        ui.set_primary_label(footer.primary_label.clone().unwrap_or_default().into());
         ui.set_confirm_key(keys::confirm_label(footer.confirm_with_command).into());
-        ui.set_status(footer.status.as_str().into());
-        ui.set_hide_status(footer.hide_status);
+        ui.set_status(
+            snapshot
+                .toast
+                .as_ref()
+                .map(|toast| toast.text.as_str())
+                .unwrap_or("")
+                .into(),
+        );
         ui.set_panel_key(keys::panel_label().into());
         ui.set_has_actions(!snapshot.panel.actions.is_empty());
 

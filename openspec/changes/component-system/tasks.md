@@ -13,8 +13,8 @@
 - [x] 2.2 Add item sections, section titles and subtitles, accessories, and keywords; verify reducer tests for section order, hidden empty sections when filtering, Arrow Down crossing a section, and a keyword match
 - [x] 2.3 Add action `section` and `style`, ordering danger actions last; verify a reducer test with "Pin entry" and "Delete entry" under "Manage"
 - [x] 2.4 Add `EmptyState.icon` and `actions`, with Enter running the first; verify a reducer test that Enter on an empty view with "Search the web" emits its action
-- [ ] 2.5 Add `ActionOutcome::Toast` and the reducer toast state with `Effect::ExpireToast` and `Event::ToastExpired` per design D7; verify reducer tests for success expiry, a stale expiry ignored, and a failure cleared by a key
-- [ ] 2.6 Move `snapshot.failure` to failure toasts and running and loading status to busy toasts; verify the existing failure and status tests in `src/ui/tests.rs` pass against the toast
+- [x] 2.5 Add `ActionOutcome::Toast` and the reducer toast state with `Effect::ExpireToast` and `Event::ToastExpired` per design D7; verify reducer tests for success expiry, a stale expiry ignored, and a failure cleared by a key
+- [x] 2.6 Move `snapshot.failure` to failure toasts and running and loading status to busy toasts; verify the existing failure and status tests in `src/ui/tests.rs` pass against the toast
 - [ ] 2.7 Move every built-in extension to version 2 views; verify `cargo test` passes
 
 ## 3. Shell: globals, SearchBar, ActionBar, toast

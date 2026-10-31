@@ -113,6 +113,9 @@ pub enum Event {
         probe: Option<u64>,
     },
     Reset,
+    ToastExpired {
+        id: u64,
+    },
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]

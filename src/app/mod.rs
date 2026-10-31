@@ -35,6 +35,8 @@ const DEFAULT_RESET_AFTER_SECS: u32 = 60;
 
 const PERMISSION_POLL: Duration = Duration::from_secs(2);
 
+const TOAST_LIFETIME: Duration = Duration::from_secs(2);
+
 pub struct Core {
     shell: Arc<dyn Shell>,
     runtime: Handle,
@@ -226,6 +228,13 @@ impl Core {
                 });
             }
             ui::Effect::ReportPaint(probe) => self.latency.finish(probe),
+            ui::Effect::ExpireToast { id } => {
+                let core = self.clone();
+                self.runtime.spawn(async move {
+                    tokio::time::sleep(TOAST_LIFETIME).await;
+                    core.apply(ui::Input::Event(ui::Event::ToastExpired { id }));
+                });
+            }
         }
     }
 
@@ -580,6 +589,7 @@ impl Core {
                     core.report_problem(&format!("application \"{}\": {message}", target.name))
                 }
                 ActionOutcome::Started
+                | ActionOutcome::Toast(_)
                 | ActionOutcome::CopyToClipboard(_)
                 | ActionOutcome::Replaced(_)
                 | ActionOutcome::Removed(_) => {}

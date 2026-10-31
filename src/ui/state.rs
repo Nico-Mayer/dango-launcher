@@ -35,11 +35,28 @@ pub struct Launcher {
     /// or before the one abandoned.
     abandoned_invocation: Option<u64>,
     panel: Option<PanelState>,
-    pub(super) failure: Option<String>,
     /// The title of a command invoked from root that has neither finished nor
     /// shown a view yet.
     pub(super) working: Option<String>,
     pub(super) protocol_error: bool,
+    pub(super) toast: Option<HeldToast>,
+}
+
+/// A toast the launcher holds until it expires or is cleared. Busy toasts are
+/// not held: they follow the work that shows them.
+#[derive(Clone, Debug, PartialEq)]
+pub(super) struct HeldToast {
+    id: u64,
+    pub(super) style: ToastStyle,
+    pub(super) text: String,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub enum ToastStyle {
+    Busy,
+    Success,
+    Failure,
 }
 
 pub(super) struct PushedView {
@@ -89,6 +106,17 @@ impl Launcher {
     }
 
     fn intent(&mut self, intent: Intent, fx: &mut Vec<Effect>) {
+        if matches!(
+            intent,
+            Intent::QueryChanged { .. }
+                | Intent::FieldChanged { .. }
+                | Intent::Key { .. }
+                | Intent::Activate { .. }
+                | Intent::TogglePanel
+                | Intent::ClosePanel
+        ) {
+            self.clear_failure();
+        }
         match intent {
             Intent::Ready => {
                 fx.push(Effect::Search(self.query.clone()));
@@ -128,7 +156,7 @@ impl Launcher {
                 self.action_finished(request, outcome, fx)
             }
             Event::Failed(message) => {
-                self.failure = Some(message);
+                self.show_failure(message);
                 self.working = None;
             }
             Event::TemplateInspected {
@@ -150,6 +178,11 @@ impl Launcher {
                 }
             }
             Event::Reset => self.reset(fx),
+            Event::ToastExpired { id } => {
+                if self.toast.as_ref().is_some_and(|toast| toast.id == id) {
+                    self.toast = None;
+                }
+            }
         }
     }
 
@@ -232,8 +265,39 @@ impl Launcher {
                 }
                 self.shown_invocation = None;
             }
-            (ActionOutcome::Failed(message), _) => self.failure = Some(message),
+            (ActionOutcome::Toast(text), _) => self.show_success(text, fx),
+            (ActionOutcome::Failed(message), _) => self.show_failure(message),
         }
+    }
+
+    fn show_failure(&mut self, text: String) {
+        let id = self.next_revision();
+        self.toast = Some(HeldToast {
+            id,
+            style: ToastStyle::Failure,
+            text,
+        });
+    }
+
+    /// A failure stays until the next key press or click.
+    fn clear_failure(&mut self) {
+        if self
+            .toast
+            .as_ref()
+            .is_some_and(|toast| toast.style == ToastStyle::Failure)
+        {
+            self.toast = None;
+        }
+    }
+
+    fn show_success(&mut self, text: String, fx: &mut Vec<Effect>) {
+        let id = self.next_revision();
+        self.toast = Some(HeldToast {
+            id,
+            style: ToastStyle::Success,
+            text,
+        });
+        fx.push(Effect::ExpireToast { id });
     }
 
     fn push(&mut self, tree: ViewTree, fx: &mut Vec<Effect>) {
@@ -292,7 +356,7 @@ impl Launcher {
             None => {
                 self.query = text.clone();
                 self.picked = None;
-                self.failure = None;
+                self.clear_failure();
                 fx.push(Effect::Search(text));
             }
             Some(view) => {
@@ -391,7 +455,7 @@ impl Launcher {
     }
 
     fn escape(&mut self, fx: &mut Vec<Effect>) {
-        self.failure = None;
+        self.clear_failure();
         if !self.stack.is_empty() {
             // A command may still be working behind this view, and the user has
             // left it: stop it rather than paying for an answer nobody reads.
@@ -428,7 +492,7 @@ impl Launcher {
                 match item.actions.first() {
                     Some(action) => self.run_root_action(&item, &action.id, fx),
                     None => {
-                        self.failure = None;
+                        self.clear_failure();
                         self.panel = None;
                         self.working = Some(item.title.clone());
                         fx.push(Effect::InvokeCommand {
@@ -526,7 +590,7 @@ impl Launcher {
     }
 
     fn run_root_action(&mut self, item: &ResultItem, action: &str, fx: &mut Vec<Effect>) {
-        self.failure = None;
+        self.clear_failure();
         self.panel = None;
         fx.push(Effect::RunAction(ActionRequest {
             origin: Origin::Root,
@@ -550,7 +614,7 @@ impl Launcher {
         let Some(owner) = self.owner.clone() else {
             return;
         };
-        self.failure = None;
+        self.clear_failure();
         self.panel = None;
         fx.push(Effect::RunAction(ActionRequest {
             origin: Origin::View,

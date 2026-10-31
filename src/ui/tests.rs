@@ -183,6 +183,21 @@ impl Harness {
         self.launcher.snapshot()
     }
 
+    fn toast(&self, style: ToastStyle) -> Option<String> {
+        self.snapshot()
+            .toast
+            .filter(|toast| toast.style == style)
+            .map(|toast| toast.text)
+    }
+
+    fn failure(&self) -> Option<String> {
+        self.toast(ToastStyle::Failure)
+    }
+
+    fn status(&self) -> String {
+        self.toast(ToastStyle::Busy).unwrap_or_default()
+    }
+
     fn root_screen(&self) -> RootScreen {
         match self.snapshot().screen {
             Screen::Root(root) => root,
@@ -496,7 +511,6 @@ fn a_launcher_filtered_list_narrows_by_title_and_keeps_its_own_query() {
     h.typed("nothing");
     let list = h.list();
     assert_eq!(list.empty.unwrap().title, "No results for “nothing”");
-    assert!(h.snapshot().footer.hide_status);
 }
 
 impl Harness {
@@ -604,7 +618,7 @@ fn an_item_s_actions_win_over_the_view_s() {
     h.press("ArrowDown");
     let snapshot = h.snapshot();
     assert_eq!(snapshot.panel.actions.len(), 1);
-    assert_eq!(snapshot.footer.primary_label, "Only");
+    assert_eq!(snapshot.footer.primary_label.as_deref(), Some("Only"));
 }
 
 #[test]
@@ -627,7 +641,7 @@ fn enter_on_a_list_item_without_actions_does_nothing() {
     let mut h = Harness::view(list_tree(vec![item]));
     h.press("Enter");
     assert!(h.runs().is_empty());
-    assert_eq!(h.snapshot().footer.primary_label, "Select");
+    assert_eq!(h.snapshot().footer.primary_label, None);
 }
 
 #[test]
@@ -658,7 +672,10 @@ fn enter_on_an_empty_view_runs_its_first_action() {
     let mut h = Harness::view(tree);
     let list = h.list();
     assert_eq!(list.empty.unwrap().icon.as_deref(), Some("icon:sparkles"));
-    assert_eq!(h.snapshot().footer.primary_label, "Search the web");
+    assert_eq!(
+        h.snapshot().footer.primary_label.as_deref(),
+        Some("Search the web")
+    );
     h.press("Enter");
     let runs = h.runs();
     assert_eq!(runs.len(), 1);
@@ -672,7 +689,7 @@ fn enter_on_an_empty_view_runs_its_first_action() {
 fn enter_in_a_detail_view_runs_the_view_s_primary_action_on_no_item() {
     let mut h = Harness::view(detail_tree("Working…"));
     assert_eq!(h.snapshot().focus, Focus::Detail);
-    assert_eq!(h.snapshot().footer.status, "Loading…");
+    assert_eq!(h.status(), "Loading…");
     h.press("Enter");
     let runs = h.runs();
     assert_eq!(runs.len(), 1);
@@ -1112,10 +1129,7 @@ fn a_reset_while_the_panel_is_open_closes_it_and_the_next_open_starts_fresh() {
         });
         let snapshot = h.snapshot();
         assert!(!snapshot.panel.open);
-        assert_eq!(
-            snapshot.failure.as_deref(),
-            Some("Couldn't paste. Try again.")
-        );
+        assert_eq!(h.failure().as_deref(), Some("Couldn't paste. Try again."));
         assert_eq!(snapshot.focus, Focus::RootInput);
         h.command("k");
         assert_eq!(h.panel_selected().as_deref(), Some("open"));
@@ -1125,14 +1139,11 @@ fn a_reset_while_the_panel_is_open_closes_it_and_the_next_open_starts_fresh() {
 }
 
 #[test]
-fn the_panel_keeps_a_carried_failure() {
+fn opening_the_panel_clears_a_failure() {
     let mut h = Harness::root(18);
     h.event(Event::Failed("Couldn't paste. Try again.".into()));
     h.command("k");
-    h.press("Escape");
-    assert!(h.snapshot().failure.is_some());
-    h.typed("Result");
-    assert!(h.snapshot().failure.is_none());
+    assert!(h.failure().is_none());
 }
 
 // Escape, shortcuts, failures, status, bindings
@@ -1239,7 +1250,7 @@ fn a_failure_survives_reset_either_way_round_and_clears_on_typing_acting_or_esca
                 held: false,
                 probe: None,
             });
-            assert!(h.snapshot().failure.is_some());
+            assert!(h.failure().is_some());
             assert_eq!(h.snapshot().focus, Focus::RootInput);
             match clear {
                 "typing" => {
@@ -1252,13 +1263,13 @@ fn a_failure_survives_reset_either_way_round_and_clears_on_typing_acting_or_esca
                     h.press("Escape");
                 }
             }
-            assert!(h.snapshot().failure.is_none(), "{before_reset} {clear}");
+            assert!(h.failure().is_none(), "{before_reset} {clear}");
         }
     }
 }
 
 #[test]
-fn a_running_command_shows_in_the_footer_until_it_fails_or_resets() {
+fn a_running_command_shows_a_busy_toast_until_it_fails_or_resets() {
     let mut h = Harness::root(18);
     let mut command = result(1);
     command.title = "Clipboard History".into();
@@ -1272,18 +1283,17 @@ fn a_running_command_shows_in_the_footer_until_it_fails_or_resets() {
             query: String::new(),
         }]
     );
-    let snapshot = h.snapshot();
-    assert_eq!(snapshot.footer.status, "Running Clipboard History…");
+    assert_eq!(h.status(), "Running Clipboard History…");
     assert!(h.root_screen().busy);
     h.event(Event::Failed("Couldn't paste. Try again.".into()));
-    assert_eq!(h.snapshot().footer.status, "");
-    assert!(h.snapshot().failure.is_some());
+    assert_eq!(h.status(), "");
+    assert!(h.failure().is_some());
     h.press("Enter");
-    assert_eq!(h.snapshot().footer.status, "Running Clipboard History…");
+    assert_eq!(h.status(), "Running Clipboard History…");
     h.event(Event::Reset);
-    assert_eq!(h.snapshot().footer.status, "");
+    assert_eq!(h.status(), "");
     h.typed("Result");
-    assert_eq!(h.snapshot().footer.status, "");
+    assert_eq!(h.status(), "");
 }
 
 #[test]
@@ -1352,7 +1362,52 @@ fn a_failed_action_shows_its_message() {
     h.press("Enter");
     let request = h.runs()[0].clone();
     h.finish(request, ActionOutcome::Failed("Nope".into()));
-    assert_eq!(h.snapshot().failure.as_deref(), Some("Nope"));
+    assert_eq!(h.failure().as_deref(), Some("Nope"));
+}
+
+fn finish_with_toast(h: &mut Harness, text: &str) -> u64 {
+    h.press("Enter");
+    let request = h.runs().last().unwrap().clone();
+    let effects = h.finish(request, ActionOutcome::Toast(text.into()));
+    match effects.as_slice() {
+        [Effect::ExpireToast { id }] => *id,
+        other => panic!("expected one expiry, got {other:?}"),
+    }
+}
+
+#[test]
+fn a_success_toast_shows_until_it_expires() {
+    let mut h = Harness::view(list_tree((1..=3).map(list_item).collect()));
+    let id = finish_with_toast(&mut h, "Entry pinned");
+    assert_eq!(
+        h.toast(ToastStyle::Success).as_deref(),
+        Some("Entry pinned")
+    );
+    assert_eq!(h.launcher.stack.len(), 1);
+    h.event(Event::ToastExpired { id });
+    assert!(h.snapshot().toast.is_none());
+}
+
+#[test]
+fn a_stale_expiry_leaves_a_newer_toast() {
+    let mut h = Harness::view(list_tree((1..=3).map(list_item).collect()));
+    let first = finish_with_toast(&mut h, "Entry pinned");
+    finish_with_toast(&mut h, "Entry unpinned");
+    h.event(Event::ToastExpired { id: first });
+    assert_eq!(
+        h.toast(ToastStyle::Success).as_deref(),
+        Some("Entry unpinned")
+    );
+}
+
+#[test]
+fn a_failure_toast_stays_until_a_key() {
+    let mut h = Harness::view(list_tree((1..=3).map(list_item).collect()));
+    h.event(Event::Failed("Nope".into()));
+    h.event(Event::ToastExpired { id: u64::MAX });
+    assert_eq!(h.failure().as_deref(), Some("Nope"));
+    h.press("ArrowDown");
+    assert!(h.failure().is_none());
 }
 
 #[test]

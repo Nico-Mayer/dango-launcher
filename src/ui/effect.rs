@@ -6,13 +6,23 @@ use crate::extension::FormValues;
 pub enum Effect {
     Search(String),
     RunAction(ActionRequest),
-    InvokeCommand { command_id: String, query: String },
+    InvokeCommand {
+        command_id: String,
+        query: String,
+    },
     CancelInvocation,
     Dismiss,
     CopyText(String),
-    InspectTemplate { field: String, source: String },
+    InspectTemplate {
+        field: String,
+        source: String,
+    },
     FinishWarmup,
     ReportPaint(u64),
+    /// Answered with `Event::ToastExpired` after a success toast's time is up.
+    ExpireToast {
+        id: u64,
+    },
 }
 
 #[derive(Clone, Debug, PartialEq)]
