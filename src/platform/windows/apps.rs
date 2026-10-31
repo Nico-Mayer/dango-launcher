@@ -14,8 +14,7 @@ use windows::Win32::Storage::EnhancedStorage::{PKEY_AppUserModel_ID, PKEY_Link_T
 use windows::Win32::System::Com::StructuredStorage::{PropVariantClear, PropVariantToStringAlloc};
 use windows::Win32::System::Com::{CoInitializeEx, CoTaskMemFree, COINIT_APARTMENTTHREADED};
 use windows::Win32::System::Threading::{
-    AttachThreadInput, GetCurrentThreadId, OpenProcess, QueryFullProcessImageNameW,
-    PROCESS_NAME_WIN32, PROCESS_QUERY_LIMITED_INFORMATION,
+    OpenProcess, QueryFullProcessImageNameW, PROCESS_NAME_WIN32, PROCESS_QUERY_LIMITED_INFORMATION,
 };
 use windows::Win32::UI::Shell::PropertiesSystem::{IPropertyStore, SHGetPropertyStoreForWindow};
 use windows::Win32::UI::Shell::{
@@ -24,9 +23,8 @@ use windows::Win32::UI::Shell::{
     SIIGBF_BIGGERSIZEOK, SIIGBF_ICONONLY,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
-    AllowSetForegroundWindow, EnumWindows, GetForegroundWindow, GetWindow,
-    GetWindowThreadProcessId, IsIconic, IsWindowVisible, SetForegroundWindow, ShowWindow, GW_OWNER,
-    SW_RESTORE, SW_SHOWNORMAL,
+    EnumWindows, GetWindow, GetWindowThreadProcessId, IsIconic, IsWindowVisible, ShowWindow,
+    GW_OWNER, SW_RESTORE, SW_SHOWNORMAL,
 };
 
 use crate::extensions::applications::{AppIndexer, IconRgba, IndexedApp, LaunchError};
@@ -267,24 +265,11 @@ pub(super) unsafe fn process_image_path(pid: u32) -> Option<String> {
     Some(String::from_utf16_lossy(&buffer[..len as usize]))
 }
 
-/// Windows will not let a background process raise a window it does not own, so
-/// it borrows the foreground thread's input queue for the call, the same lift
-/// used by the launcher window itself.
 unsafe fn bring_to_foreground(hwnd: HWND) {
     if IsIconic(hwnd).as_bool() {
         let _ = ShowWindow(hwnd, SW_RESTORE);
     }
-    let foreground = GetForegroundWindow();
-    if foreground.0.is_null() {
-        let _ = SetForegroundWindow(hwnd);
-        return;
-    }
-    let current = GetCurrentThreadId();
-    let owner = GetWindowThreadProcessId(foreground, None);
-    let _ = AttachThreadInput(current, owner, true);
-    let _ = AllowSetForegroundWindow(u32::MAX);
-    let _ = SetForegroundWindow(hwnd);
-    let _ = AttachThreadInput(current, owner, false);
+    super::force_foreground(hwnd.0);
 }
 
 unsafe fn bitmap_to_rgba(hbitmap: HBITMAP) -> Option<IconRgba> {
