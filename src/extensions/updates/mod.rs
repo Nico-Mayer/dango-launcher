@@ -12,7 +12,8 @@ use bytesize::ByteSize;
 use tokio::runtime::Handle;
 
 use crate::extension::{
-    ActionOutcome, CommandDecl, Extension, FormValues, InvocationMode, Manifest, NAMED_ICON,
+    ActionOutcome, ActivationResult, CommandDecl, Extension, FormValues, InvocationMode, Manifest,
+    Service, NAMED_ICON,
 };
 use crate::invocation::{Command, InvocationContext, Runner};
 use crate::protocol::{Action, DetailView, View, ViewTree};
@@ -52,7 +53,7 @@ pub(crate) fn manifest() -> Manifest {
         }],
         preferences: vec![],
         root_items: true,
-        services: false,
+        services: true,
     }
 }
 
@@ -99,35 +100,56 @@ impl UpdatesExtension {
             }),
         }
     }
+}
 
-    /// Checks shortly after startup and then every few hours. Starts nothing
-    /// in a development build, and says whether it started.
-    pub fn schedule(&self) -> bool {
+/// Checks shortly after activation and then every few hours, until stopped.
+/// Starts nothing in a development build.
+struct Schedule {
+    inner: Arc<Inner>,
+    stopped: Arc<AtomicBool>,
+}
+
+impl Service for Schedule {
+    fn start(&self) -> ActivationResult {
         if !self.inner.enabled {
-            return false;
+            return Ok(());
         }
         let inner = self.inner.clone();
+        let stopped = self.stopped.clone();
         self.inner.runtime.spawn(async move {
             tokio::time::sleep(FIRST_CHECK_AFTER).await;
-            loop {
+            while !stopped.load(Ordering::SeqCst) {
                 if let Err(error) = inner.check().await {
                     crate::log::append(&format!("updates: {}", error.detail()));
                 }
                 // Measured on the wall clock, because a monotonic sleep stops
                 // while the machine sleeps and would push the next check back.
                 let checked = SystemTime::now();
-                while checked.elapsed().is_ok_and(|elapsed| elapsed < CHECK_EVERY) {
+                while !stopped.load(Ordering::SeqCst)
+                    && checked.elapsed().is_ok_and(|elapsed| elapsed < CHECK_EVERY)
+                {
                     tokio::time::sleep(WAKE_EVERY).await;
                 }
             }
         });
-        true
+        Ok(())
+    }
+
+    fn stop(&self) {
+        self.stopped.store(true, Ordering::SeqCst);
     }
 }
 
 impl Extension for UpdatesExtension {
     fn manifest(&self) -> &Manifest {
         &self.manifest
+    }
+
+    fn services(&self) -> Vec<Arc<dyn Service>> {
+        vec![Arc::new(Schedule {
+            inner: self.inner.clone(),
+            stopped: Arc::new(AtomicBool::new(false)),
+        })]
     }
 
     fn root_provider(&self) -> Option<Arc<dyn RootProvider>> {
@@ -664,10 +686,27 @@ mod tests {
         );
     }
 
-    #[tokio::test]
+    #[tokio::test(start_paused = true)]
+    async fn the_schedule_checks_until_stopped() {
+        let fixture = fixture(FakeSource::default());
+        let service = fixture.extension.services().remove(0);
+        service.start().unwrap();
+        tokio::time::sleep(FIRST_CHECK_AFTER * 2).await;
+        assert_eq!(fixture.source.checks(), 1);
+        service.stop();
+
+        let service = fixture.extension.services().remove(0);
+        service.start().unwrap();
+        service.stop();
+        tokio::time::sleep(FIRST_CHECK_AFTER * 2).await;
+        assert_eq!(fixture.source.checks(), 1);
+    }
+
+    #[tokio::test(start_paused = true)]
     async fn a_development_build_never_asks() {
         let fixture = build(FakeSource::finding("0.5.0"), false);
-        assert!(!fixture.extension.schedule());
+        fixture.extension.services()[0].start().unwrap();
+        tokio::time::sleep(FIRST_CHECK_AFTER * 2).await;
         assert_eq!(
             fixture.check_view().await.last().markdown,
             "Updates are off in development builds"

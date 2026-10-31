@@ -286,8 +286,7 @@ fn build_services(
             owner: updates::EXTENSION_ID,
         })),
     ));
-    register(&mut host, "updates", updates.clone());
-    updates.schedule();
+    register(&mut host, "updates", updates);
 
     let window_management = Arc::new(WindowManagementExtension::new(platform::window_manager(
         Arc::new(OnMainThread(startup.shell.clone())),
