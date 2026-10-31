@@ -439,7 +439,7 @@ impl Core {
     /// Runs an action through the extension that contributed the item. Success
     /// hides the launcher; anything else goes back to the state machine.
     fn run_action(self: &Arc<Self>, request: &ui::ActionRequest) -> ActionOutcome {
-        let outcome = self.services.host.lock().unwrap().perform_action(
+        let outcome = self.perform_action(
             &request.extension_id,
             &request.item_id,
             &request.action_id,
@@ -452,6 +452,22 @@ impl Core {
             self.hide_after_launch();
         }
         outcome
+    }
+
+    /// The host is locked only to find the extension: a paste or a launch can
+    /// take a while, and the main thread locks the host too.
+    fn perform_action(
+        &self,
+        extension_id: &str,
+        item_id: &str,
+        action_id: &str,
+        values: &FormValues,
+    ) -> ActionOutcome {
+        let extension = self.services.host.lock().unwrap().extension(extension_id);
+        match extension {
+            Some(extension) => extension.perform_action(item_id, action_id, values),
+            None => ActionOutcome::Failed("That extension is turned off".into()),
+        }
     }
 
     /// Credits a use of a result and, when the launcher knows what was typed to
@@ -606,7 +622,7 @@ impl Core {
         // Off the shortcut handler's thread, as a result's launch runs off the
         // command thread: the launch may wait on the operating system.
         std::thread::spawn(move || {
-            let outcome = core.services.host.lock().unwrap().perform_action(
+            let outcome = core.perform_action(
                 extensions::applications::EXTENSION_ID,
                 &target.id,
                 extensions::applications::ACTION_LAUNCH,

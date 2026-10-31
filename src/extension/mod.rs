@@ -172,22 +172,13 @@ impl ExtensionHost {
         })
     }
 
-    /// Runs an action through the extension that contributed the result. No
-    /// extension is the default handler.
-    pub fn perform_action(
-        &self,
-        extension_id: &str,
-        item_id: &str,
-        action_id: &str,
-        values: &FormValues,
-    ) -> ActionOutcome {
+    /// An enabled extension, to run an action on a result it contributed
+    /// without holding the host while the action works.
+    pub fn extension(&self, extension_id: &str) -> Option<Arc<dyn Extension>> {
         if !self.is_active(extension_id) {
-            return ActionOutcome::Failed("That extension is turned off".into());
+            return None;
         }
-        match self.extensions.get(extension_id) {
-            Some(extension) => extension.perform_action(item_id, action_id, values),
-            None => ActionOutcome::Failed("That extension is turned off".into()),
-        }
+        self.extensions.get(extension_id).cloned()
     }
 
     /// Every registered command as a search candidate.
@@ -627,7 +618,9 @@ mod tests {
             ("city".to_string(), "Berlin".to_string()),
         ]);
         assert_eq!(
-            host.perform_action("alpha", "", "save", &values),
+            host.extension("alpha")
+                .unwrap()
+                .perform_action("", "save", &values),
             ActionOutcome::CopyToClipboard("alpha::save:[city=Berlin,name=Nico]".into())
         );
     }
@@ -637,7 +630,9 @@ mod tests {
         let mut host = host();
         host.register(Arc::new(Owner("alpha"))).unwrap();
         assert_eq!(
-            host.perform_action("alpha", "item", "go", &FormValues::new()),
+            host.extension("alpha")
+                .unwrap()
+                .perform_action("item", "go", &FormValues::new()),
             ActionOutcome::CopyToClipboard("alpha:item:go:[]".into())
         );
     }
@@ -649,24 +644,25 @@ mod tests {
         host.register(Arc::new(Owner("beta"))).unwrap();
 
         assert_eq!(
-            host.perform_action("alpha", "item", "go", &FormValues::new()),
+            host.extension("alpha")
+                .unwrap()
+                .perform_action("item", "go", &FormValues::new()),
             ActionOutcome::CopyToClipboard("alpha:item:go:[]".into())
         );
         assert_eq!(
-            host.perform_action("beta", "item", "go", &FormValues::new()),
+            host.extension("beta")
+                .unwrap()
+                .perform_action("item", "go", &FormValues::new()),
             ActionOutcome::CopyToClipboard("beta:item:go:[]".into())
         );
     }
 
     #[test]
-    fn an_action_for_a_disabled_extension_fails_rather_than_running() {
+    fn a_disabled_extension_is_not_handed_out_for_an_action() {
         let mut host = host();
         host.register(Arc::new(Owner("alpha"))).unwrap();
         host.set_enabled("alpha", false);
-        assert!(matches!(
-            host.perform_action("alpha", "item", "go", &FormValues::new()),
-            ActionOutcome::Failed(_)
-        ));
+        assert!(host.extension("alpha").is_none());
     }
 
     #[test]
