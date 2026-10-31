@@ -16,7 +16,7 @@ pub use hyperkey::MacHyperkey;
 pub use icons::icon_for;
 pub use keymonitor::MacKeyMonitor;
 pub use permissions::MacPermissions;
-pub use system::MacSystemControl;
+pub use system::{relaunch, MacSystemControl};
 pub use text::{MacHandoff, MacKeys, MacSelection};
 pub use window::MacWindowManager;
 

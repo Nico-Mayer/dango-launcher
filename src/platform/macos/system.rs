@@ -6,6 +6,19 @@ use super::{RunningApp, SystemControl, SystemError};
 
 pub struct MacSystemControl;
 
+/// Through `open` so the bundle starts with its own identity, and `-n` because
+/// this instance has not exited yet.
+pub fn relaunch(app: &std::path::Path) {
+    match std::process::Command::new("open")
+        .arg("-n")
+        .arg(app)
+        .spawn()
+    {
+        Ok(_) => std::process::exit(0),
+        Err(error) => eprintln!("[dango] couldn't start the updated Dango: {error}"),
+    }
+}
+
 impl SystemControl for MacSystemControl {
     /// `CGSession -suspend`, the classic route, stopped shipping. This is what
     /// the system's own lock menu item calls. It is private, so it is looked up

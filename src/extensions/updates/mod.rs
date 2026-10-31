@@ -18,7 +18,7 @@ use crate::invocation::{Command, InvocationContext, Runner};
 use crate::protocol::{Action, DetailView, View, ViewTree};
 use crate::search::{Candidate, RootProvider, Source};
 
-pub use source::{DisabledSource, UpdateError, UpdateSource};
+pub use source::{production, DisabledSource, UpdateError, UpdateSource};
 
 pub const EXTENSION_ID: &str = "dango.updates";
 

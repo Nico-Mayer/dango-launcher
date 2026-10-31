@@ -19,7 +19,7 @@ use slint::winit_030::{winit, EventResult, WinitWindowAccessor};
 use slint::{ComponentHandle, ModelRc, SharedString, VecModel};
 
 use crate::app::{self, Core, Startup};
-use crate::extensions::updates::DisabledSource;
+use crate::extensions::updates;
 use crate::platform::{self, LauncherWindow as PlatformWindow, Permission, RawWindowHandle};
 use crate::shell::{self, Shell, TrayCommand, TrayStatus};
 use crate::ui::{self, Intent};
@@ -154,12 +154,15 @@ fn select_backend() -> Result<(), slint::PlatformError> {
 }
 
 pub fn run() {
-    let Some(_instance) = instance::claim() else {
+    let Some(instance) = instance::claim() else {
         if let Err(error) = instance::signal(instance::NAME) {
             eprintln!("[dango] another Dango runs but did not answer: {error}");
         }
         return;
     };
+    // Released before a restart into an update, or the new Dango would find
+    // this one still running and exit.
+    let instance = Arc::new(Mutex::new(Some(instance)));
 
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
@@ -183,13 +186,17 @@ pub fn run() {
 
     // The hotkeys and the tray need the event loop running on this thread.
     let handle = runtime.handle().clone();
+    let held = instance.clone();
     let weak_window = window.as_weak();
     let weak_tray = tray.as_weak();
     slint::Timer::single_shot(std::time::Duration::ZERO, move || {
         let core = app::start(Startup {
             shell: shell.clone(),
             runtime: handle,
-            updates: Arc::new(DisabledSource),
+            updates: updates::production(Box::new(move |app| {
+                held.lock().unwrap().take();
+                platform::relaunch(app);
+            })),
         });
         let (Some(window), Some(tray)) = (weak_window.upgrade(), weak_tray.upgrade()) else {
             return;

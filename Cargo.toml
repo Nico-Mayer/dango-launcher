@@ -78,10 +78,13 @@ favicon-picker = { version = "1.1.0", features = ["blocking"] }
 reqwest = { version = "0.13", default-features = false, features = ["blocking", "rustls"] }
 nucleo-matcher = "0.3.1"
 bytesize = "2.7.0"
+cargo-packager-updater = "0.2.3"
 
 [dev-dependencies]
+base64 = "0.22"
 i-slint-backend-testing = "=1.18.1"
 jsonschema = { version = "0.26", default-features = false }
+minisign-verify = "0.2"
 tokio = { version = "1.53.1", default-features = false, features = ["test-util"] }
 
 [target.'cfg(target_os = "windows")'.dependencies]

@@ -232,6 +232,20 @@ pub fn note_insertion_target() {
     // application, which is already the target.
 }
 
+/// Starts Dango again from the application at `app` and exits. Only a macOS
+/// update gets here: on Windows the update installer exits Dango and starts it
+/// again itself.
+pub fn relaunch(app: &std::path::Path) {
+    #[cfg(target_os = "macos")]
+    {
+        macos::relaunch(app);
+    }
+    #[cfg(target_os = "windows")]
+    {
+        let _ = app;
+    }
+}
+
 /// Held for as long as Dango is injecting keystrokes, so the key monitor does
 /// not observe its own output. Windows marks its injected events instead and
 /// needs no guard; on macOS the paste goes through enigo, which cannot mark
