@@ -888,10 +888,63 @@ fn an_action_answering_with_an_invalid_grid_is_refused() {
     h.press("Enter");
     let request = h.runs()[0].clone();
     h.finish(request, ActionOutcome::Replaced(Box::new(grid_tree(2, 4))));
+    assert_refused(&h);
+}
+
+fn shortcut_action(key: &str, modifiers: Vec<Modifier>) -> Action {
+    Action {
+        id: "shortcut".into(),
+        title: "Shortcut".into(),
+        shortcut: Some(Shortcut {
+            key: key.into(),
+            modifiers,
+        }),
+        ..Default::default()
+    }
+}
+
+fn assert_refused(h: &Harness) {
     let Screen::Error(text) = h.snapshot().screen else {
         panic!("expected the invalid view");
     };
     assert_eq!(text.title, "This view can't be shown");
+}
+
+#[test]
+fn a_shift_shortcut_on_a_digit_is_refused() {
+    let mut item = list_item(1);
+    item.actions = vec![shortcut_action("1", vec![Modifier::Shift])];
+    assert_refused(&Harness::view(list_tree(vec![item])));
+}
+
+#[test]
+fn an_alt_shortcut_on_a_symbol_is_refused() {
+    let tree = ViewTree::new(View::List(ListView {
+        empty_state: Some(crate::protocol::EmptyState {
+            title: "Nothing".into(),
+            description: None,
+            icon: None,
+            actions: vec![shortcut_action("/", vec![Modifier::Alt])],
+        }),
+        ..Default::default()
+    }));
+    assert_refused(&Harness::view(tree));
+}
+
+#[test]
+fn a_ctrl_shift_shortcut_on_a_letter_runs() {
+    let mut h = Harness::view(ViewTree::new(View::Detail(DetailView {
+        markdown: "x".into(),
+        actions: vec![shortcut_action("P", vec![Modifier::Ctrl, Modifier::Shift])],
+        ..Default::default()
+    })));
+    h.key(Chord {
+        key: "p".into(),
+        command: true,
+        alt: false,
+        shift: true,
+    });
+    assert_eq!(h.runs()[0].action_id, "shortcut");
 }
 
 #[test]

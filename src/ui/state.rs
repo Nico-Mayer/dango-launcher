@@ -2,8 +2,8 @@ use std::collections::HashMap;
 
 use crate::extension::{ActionOutcome, FormValues};
 use crate::protocol::{
-    Action, ActionStyle, FieldKind, Filter, FormField, GridItem, GridView, ListItem, Section, View,
-    ViewTree, FILTER_ACTION, GRID_COLUMNS, PROTOCOL_VERSION,
+    Action, ActionStyle, FieldKind, Filter, FormField, GridItem, GridView, ListItem, Modifier,
+    Section, Shortcut, View, ViewTree, FILTER_ACTION, GRID_COLUMNS, PROTOCOL_VERSION,
 };
 
 use super::effect::{ActionRequest, Effect, Origin};
@@ -1109,7 +1109,43 @@ fn check(tree: &ViewTree) -> Result<(), ViewError> {
     if matches!(&tree.view, View::Grid(grid) if !GRID_COLUMNS.contains(&grid.columns)) {
         return Err(ViewError::Invalid);
     }
+    let mut shortcuts = tree_actions(&tree.view)
+        .into_iter()
+        .filter_map(|action| action.shortcut.as_ref());
+    if !shortcuts.all(fires) {
+        return Err(ViewError::Invalid);
+    }
     Ok(())
+}
+
+fn tree_actions(view: &View) -> Vec<&Action> {
+    match view {
+        View::List(list) => list
+            .items
+            .iter()
+            .flat_map(|item| &item.actions)
+            .chain(list.empty_state.iter().flat_map(|state| &state.actions))
+            .collect(),
+        View::Grid(grid) => grid
+            .items
+            .iter()
+            .flat_map(|item| &item.actions)
+            .chain(grid.empty_state.iter().flat_map(|state| &state.actions))
+            .collect(),
+        View::Detail(detail) => detail.actions.iter().collect(),
+        View::Form(form) => form.actions.iter().collect(),
+    }
+}
+
+/// Key events carry the character a key produced, so Shift or Alt with
+/// anything but a letter never matches its declared key.
+fn fires(shortcut: &Shortcut) -> bool {
+    let shifted = shortcut
+        .modifiers
+        .iter()
+        .any(|modifier| matches!(modifier, Modifier::Shift | Modifier::Alt));
+    let letter = shortcut.key.len() == 1 && shortcut.key.as_bytes()[0].is_ascii_alphabetic();
+    !shifted || letter
 }
 
 /// What a field submits until the user changes it. A dropdown without a value

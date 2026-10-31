@@ -7,7 +7,7 @@
 ## 2. Refuse Shift or Alt shortcuts on other keys
 
 - [x] 2.1 Move the version and column checks out of `Launcher::rendered` into one tree check in `src/ui/state.rs`, and call it from `rendered` and from the `Replaced` and `Removed` view outcomes in `action_finished`; verify with a new test in `src/ui/tests.rs` that an action returning a grid of two columns shows "This view can't be shown"
-- [ ] 2.2 Add the shortcut rule to that check: a Shift or Alt shortcut whose key is not one ASCII letter makes the tree `ViewError::Invalid`, covering view, item, and empty state actions; verify with tests in `src/ui/tests.rs` that Shift+1 and Alt+/ are refused and that Ctrl+Shift+P runs its action
+- [x] 2.2 Add the shortcut rule to that check: a Shift or Alt shortcut whose key is not one ASCII letter makes the tree `ViewError::Invalid`, covering view, item, and empty state actions; verify with tests in `src/ui/tests.rs` that Shift+1 and Alt+/ are refused and that Ctrl+Shift+P runs its action
 - [ ] 2.3 Document the letter rule on `Shortcut` in `src/protocol.rs` and reword the `PROTOCOL_VERSION` comment as the design says; verify `cargo clippy --all-targets -- -D warnings` passes
 
 ## 3. Review
