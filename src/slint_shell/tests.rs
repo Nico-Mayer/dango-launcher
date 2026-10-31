@@ -730,6 +730,39 @@ mod list_view {
     }
 }
 
+mod detail {
+    use super::*;
+    use crate::protocol::Metadata;
+
+    #[test]
+    fn metadata_follows_the_body_in_order() {
+        let h = Harness::root(results(1));
+        let mut tree = detail_tree("Some **copied** text");
+        if let View::Detail(detail) = &mut tree.view {
+            detail.metadata = vec![
+                Metadata {
+                    label: "Source".into(),
+                    value: "Terminal".into(),
+                },
+                Metadata {
+                    label: "Copied".into(),
+                    value: "Today, 14:31".into(),
+                },
+            ];
+        }
+        h.view(tree);
+        let y = |label: &str| {
+            h.find(label)
+                .unwrap_or_else(|| panic!("{label} is drawn"))
+                .absolute_position()
+                .y
+        };
+        assert!(y("Some **copied** text") < y("Source"));
+        assert!(y("Source") < y("Copied"));
+        assert!(h.find("Today, 14:31").is_some());
+    }
+}
+
 mod action_panel {
     use super::*;
 

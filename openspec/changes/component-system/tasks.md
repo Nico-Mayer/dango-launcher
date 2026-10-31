@@ -42,8 +42,8 @@
 
 ## 6. Detail view
 
-- [ ] 6.1 Render the detail body with `StyledText` from markdown and metadata as label and value pairs below it; verify a UI test with "Source" and "Copied" in order
-- [ ] 6.2 Use the same detail component in the list's pane; verify the 4.4 test still passes
+- [x] 6.1 Render the detail body with `StyledText` from markdown and metadata as label and value pairs below it; verify a UI test with "Source" and "Copied" in order
+- [x] 6.2 Use the same detail component in the list's pane; verify the 4.4 test still passes
 
 ## 7. Form view
 

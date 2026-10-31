@@ -28,7 +28,10 @@ impl Writer {
             return;
         };
         let detail = ui.global::<DetailData>();
-        detail.set_body(StyledText::from_plain_text(&body.markdown));
+        detail.set_body(
+            StyledText::from_markdown(&body.markdown)
+                .unwrap_or_else(|_| StyledText::from_plain_text(&body.markdown)),
+        );
         detail.set_text(body.markdown.as_str().into());
         let metadata = body.metadata.iter().map(|pair| MetaData {
             label: pair.label.as_str().into(),
