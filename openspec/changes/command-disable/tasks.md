@@ -6,7 +6,7 @@
 
 ## 2. Hotkeys skip disabled commands
 
-- [ ] 2.1 Skip commands with `enabled: false` in `hotkeys::bindings`, keeping `disabled_with_hotkey`; verify with `cargo test` in `src/hotkeys.rs` that a disabled command gets no binding, and that a disabled and an enabled command on one chord give the enabled one the chord with no conflict
+- [x] 2.1 Skip commands with `enabled: false` in `hotkeys::bindings`, keeping `disabled_with_hotkey`; verify with `cargo test` in `src/hotkeys.rs` that a disabled command gets no binding, and that a disabled and an enabled command on one chord give the enabled one the chord with no conflict
 
 ## 3. Wire-up and checks
 

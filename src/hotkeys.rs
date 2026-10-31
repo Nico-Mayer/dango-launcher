@@ -56,6 +56,9 @@ pub fn bindings(config: &Config, launcher: HotKey) -> Bindings {
 
     for (extension_id, extension) in &config.extensions {
         for (command_id, command) in &extension.commands {
+            if command.enabled == Some(false) {
+                continue;
+            }
             if let Some(hotkey) = &command.hotkey {
                 table.claim(
                     Target::Command(format!("{extension_id}.{command_id}")),
@@ -511,6 +514,32 @@ mod tests {
             super::launcher(&config(r#"{ "launcher": { "hotkey": "ctrl+nope" } }"#));
         assert_eq!(chord, launcher());
         assert!(problem.is_some());
+    }
+
+    #[test]
+    fn a_disabled_command_gets_no_binding() {
+        let c = config(
+            r#"{ "extensions": { "x": { "commands": {
+                "a": { "hotkey": "ctrl+alt+j", "enabled": false }
+            } } } }"#,
+        );
+        let result = bindings(&c, launcher());
+        assert!(result.bindings.is_empty());
+        assert!(result.conflicts.is_empty());
+    }
+
+    #[test]
+    fn a_disabled_command_leaves_its_chord_to_an_enabled_one() {
+        let c = config(
+            r#"{ "extensions": { "x": { "commands": {
+                "alpha": { "hotkey": "ctrl+alt+j", "enabled": false },
+                "beta": { "hotkey": "ctrl+alt+j" }
+            } } } }"#,
+        );
+        let result = bindings(&c, launcher());
+        assert_eq!(result.bindings.len(), 1);
+        assert_eq!(result.bindings[0].target, Target::Command("x.beta".into()));
+        assert!(result.conflicts.is_empty());
     }
 
     #[test]
