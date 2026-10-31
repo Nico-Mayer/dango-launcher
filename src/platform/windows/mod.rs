@@ -9,7 +9,9 @@ mod text;
 mod window;
 
 pub use apps::{icon_for, WindowsAppIndexer};
-pub use clipboard::WindowsAttribution;
+pub use clipboard::{
+    clipboard_holds_anything, clipboard_holds_image, clipboard_holds_text, WindowsAttribution,
+};
 pub use hyperkey::WindowsHyperkey;
 pub use keymonitor::WindowsKeyMonitor;
 pub use permissions::WindowsPermissions;

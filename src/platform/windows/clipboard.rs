@@ -17,6 +17,7 @@ use std::time::Duration;
 use windows::Win32::Foundation::{LPARAM, WPARAM};
 use windows::Win32::System::DataExchange::GetClipboardOwner;
 use windows::Win32::UI::WindowsAndMessaging::{SendMessageTimeoutW, SMTO_ABORTIFHUNG, WM_NULL};
+use windows_sys::Win32::System::Ole::{CF_BITMAP, CF_DIB, CF_DIBV5, CF_UNICODETEXT};
 
 use super::apps::init_com;
 use super::system::{identify, owning_pid};
@@ -76,6 +77,24 @@ unsafe fn owner_name() -> Option<String> {
     let pid = owning_pid(owner)?;
     init_com();
     identify(owner, pid).map(|identity| identity.name)
+}
+
+pub fn clipboard_holds_anything() -> bool {
+    unsafe { windows_sys::Win32::System::DataExchange::CountClipboardFormats() > 0 }
+}
+
+pub fn clipboard_holds_text() -> bool {
+    holds(&[CF_UNICODETEXT])
+}
+
+pub fn clipboard_holds_image() -> bool {
+    holds(&[CF_BITMAP, CF_DIB, CF_DIBV5])
+}
+
+fn holds(formats: &[u16]) -> bool {
+    formats.iter().any(|format| unsafe {
+        windows_sys::Win32::System::DataExchange::IsClipboardFormatAvailable(u32::from(*format))
+    } != 0)
 }
 
 #[cfg(test)]

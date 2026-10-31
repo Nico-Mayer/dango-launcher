@@ -363,6 +363,37 @@ pub fn attribution() -> std::sync::Arc<dyn crate::extensions::clipboard::Attribu
     }
 }
 
+/// Whether a failed clipboard call can be the clipboard being held by another
+/// window. These ask without opening the clipboard, so they answer while it is
+/// held. The macOS pasteboard has no exclusive open, so there a failure is
+/// never "busy".
+pub mod clipboard_busy {
+    #[cfg(target_os = "windows")]
+    pub use super::windows::{
+        clipboard_holds_anything as holds_anything, clipboard_holds_image as holds_image,
+        clipboard_holds_text as holds_text,
+    };
+
+    pub fn possible() -> bool {
+        cfg!(target_os = "windows")
+    }
+
+    #[cfg(target_os = "macos")]
+    pub fn holds_anything() -> bool {
+        false
+    }
+
+    #[cfg(target_os = "macos")]
+    pub fn holds_text() -> bool {
+        false
+    }
+
+    #[cfg(target_os = "macos")]
+    pub fn holds_image() -> bool {
+        false
+    }
+}
+
 /// Text with the line breaks the system clipboard expects. Windows expects
 /// CRLF, and classic edit controls show a bare LF as no break at all.
 pub fn text_to_clipboard(text: &str) -> Cow<'_, str> {

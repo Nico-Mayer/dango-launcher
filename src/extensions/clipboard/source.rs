@@ -14,6 +14,7 @@ use clipboard_rs::{Clipboard, ClipboardContent, ClipboardContext, ContentFormat,
 
 use super::history::Content;
 use crate::platform;
+use crate::platform::clipboard_busy as busy;
 
 /// How long to wait for another process to let go of the clipboard.
 ///
@@ -288,59 +289,6 @@ fn until_free<T, E>(
             }
             Err(error) => return Err(error),
         }
-    }
-}
-
-/// Whether a failed clipboard call can be the clipboard being held by another
-/// window. These ask without opening the clipboard, so they answer while it
-/// is held.
-#[cfg(target_os = "windows")]
-mod busy {
-    use windows_sys::Win32::System::DataExchange::{
-        CountClipboardFormats, IsClipboardFormatAvailable,
-    };
-    use windows_sys::Win32::System::Ole::{CF_BITMAP, CF_DIB, CF_DIBV5, CF_UNICODETEXT};
-
-    pub fn possible() -> bool {
-        true
-    }
-
-    pub fn holds_anything() -> bool {
-        unsafe { CountClipboardFormats() > 0 }
-    }
-
-    pub fn holds_text() -> bool {
-        holds(&[CF_UNICODETEXT])
-    }
-
-    pub fn holds_image() -> bool {
-        holds(&[CF_BITMAP, CF_DIB, CF_DIBV5])
-    }
-
-    fn holds(formats: &[u16]) -> bool {
-        formats
-            .iter()
-            .any(|format| unsafe { IsClipboardFormatAvailable(u32::from(*format)) } != 0)
-    }
-}
-
-/// The macOS pasteboard has no exclusive open, so a failure is never "busy".
-#[cfg(not(target_os = "windows"))]
-mod busy {
-    pub fn possible() -> bool {
-        false
-    }
-
-    pub fn holds_anything() -> bool {
-        false
-    }
-
-    pub fn holds_text() -> bool {
-        false
-    }
-
-    pub fn holds_image() -> bool {
-        false
     }
 }
 
