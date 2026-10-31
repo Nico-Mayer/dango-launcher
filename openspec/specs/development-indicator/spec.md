@@ -57,16 +57,16 @@ surface: root search, pushed views, and the protocol error screen.
 
 ### Requirement: The marker does not cost activation time
 
-The renderer SHALL learn whether it runs in a development build once, while
-the window is still warming up, and SHALL NOT ask again on activation. The
-answer SHALL come from the application, not from how the frontend was served.
+The renderer SHALL learn whether it runs in a development build from the
+launcher state it already receives, and SHALL NOT make a separate request for
+it, on activation or otherwise. The answer SHALL come from the application,
+not from how the frontend was served.
 
 #### Scenario: Asked once at mount
 
-- **WHEN** the frontend mounts
-- **THEN** it asks the application once whether this is a development build
-- **AND** showing and hiding the launcher afterwards sends no further request
-  for it
+- **WHEN** startup completes and the launcher has not been shown yet
+- **THEN** the renderer already knows whether this is a development build
+- **AND** showing and hiding the launcher afterwards sends no request for it
 
 #### Scenario: Activation latency is unchanged
 

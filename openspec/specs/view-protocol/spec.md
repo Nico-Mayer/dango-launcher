@@ -10,9 +10,10 @@ otherwise, without knowing anything about it.
 
 ### Requirement: Versioned protocol
 
-The view protocol SHALL carry a `protocolVersion`. The frontend SHALL reject a
-view tree whose version it does not support and SHALL show an error rather than
-rendering partially.
+The view protocol SHALL carry a `protocolVersion`. Dango SHALL reject a view
+tree whose version it does not support and SHALL show an error rather than
+rendering partially. The check SHALL happen before the tree reaches the
+renderer, so every renderer shows the same error for the same tree.
 
 #### Scenario: Unsupported protocol version
 
@@ -44,7 +45,7 @@ panel.
 ### Requirement: Full-tree replace
 
 A command SHALL communicate a change by emitting a complete new view tree. The
-protocol SHALL NOT define partial updates, patches, or diffs. The frontend SHALL
+protocol SHALL NOT define partial updates, patches, or diffs. Dango SHALL
 identify list items by their identifier so that replacing a tree does not lose
 selection or cause visible flicker.
 
