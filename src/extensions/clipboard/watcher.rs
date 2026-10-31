@@ -236,11 +236,36 @@ impl Watcher {
 /// activation path. Stops when the extension is disabled.
 pub struct WatchService {
     watcher: Arc<Watcher>,
+    session: Session,
 }
 
 impl WatchService {
     pub fn new(watcher: Arc<Watcher>) -> Self {
-        Self { watcher }
+        Self {
+            watcher,
+            session: Session::default(),
+        }
+    }
+}
+
+/// One stop flag per start. A shared flag lets a stop and a start inside one
+/// poll of the stopper keep the old watch alive beside the new one.
+#[derive(Default)]
+struct Session(Mutex<Option<Arc<AtomicBool>>>);
+
+impl Session {
+    fn begin(&self) -> Arc<AtomicBool> {
+        let stopped = Arc::new(AtomicBool::new(false));
+        if let Some(previous) = self.0.lock().unwrap().replace(stopped.clone()) {
+            previous.store(true, Ordering::SeqCst);
+        }
+        stopped
+    }
+
+    fn end(&self) {
+        if let Some(current) = self.0.lock().unwrap().take() {
+            current.store(true, Ordering::SeqCst);
+        }
     }
 }
 
@@ -259,6 +284,7 @@ impl crate::extension::Service for WatchService {
 
         self.watcher.start();
         let watcher = self.watcher.clone();
+        let stopped = self.session.begin();
         std::thread::spawn(move || {
             let mut context = match clipboard_rs::ClipboardWatcherContext::new() {
                 Ok(context) => context,
@@ -272,9 +298,9 @@ impl crate::extension::Service for WatchService {
                 .get_shutdown_channel();
 
             // The crate's watch loop blocks, so stopping is a second thread
-            // waiting on the flag the extension clears when it is disabled.
+            // waiting on the flag the extension sets when it is disabled.
             std::thread::spawn(move || {
-                while watcher.running() {
+                while !stopped.load(Ordering::SeqCst) {
                     std::thread::sleep(std::time::Duration::from_millis(200));
                 }
                 shutdown.stop();
@@ -286,6 +312,7 @@ impl crate::extension::Service for WatchService {
     }
 
     fn stop(&self) {
+        self.session.end();
         self.watcher.stop();
     }
 }
@@ -716,6 +743,16 @@ mod tests {
         f.clipboard.copy_text("   \n  ");
         assert!(!f.watcher.handle_change(1));
         assert!(f.history.entries().unwrap().is_empty());
+    }
+
+    #[test]
+    fn a_quick_stop_and_start_still_stops_the_first_watch() {
+        let session = Session::default();
+        let first = session.begin();
+        session.end();
+        let second = session.begin();
+        assert!(first.load(Ordering::SeqCst));
+        assert!(!second.load(Ordering::SeqCst));
     }
 
     #[test]
