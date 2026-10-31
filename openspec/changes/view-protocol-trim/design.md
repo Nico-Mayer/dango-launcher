@@ -43,8 +43,12 @@ for each keystroke that nobody would exercise.
 
 ### Refuse a bad shortcut as an invalid tree
 
-A Shift or Alt shortcut whose key is not one ASCII letter, compared case
-blind, makes the tree invalid. The check covers every action in the tree: the
+A Shift or Alt shortcut whose key is neither one ASCII letter nor a named key,
+compared case blind, makes the tree invalid. The named keys are the ones
+`src/slint_shell/keys.rs` reports by name: Backspace, Tab, Enter, Escape,
+Delete, ArrowUp, ArrowDown, ArrowLeft, ArrowRight, Home, End, PageUp, and
+PageDown. They keep their name with Shift or Alt held, so a shortcut on one
+matches. The check covers every action in the tree: the
 view's actions, each list or grid item's actions, and the empty state's
 actions. It reuses `ViewError::Invalid`, so the user sees the same "This view
 can't be shown" error as for grid columns out of range. No new text.

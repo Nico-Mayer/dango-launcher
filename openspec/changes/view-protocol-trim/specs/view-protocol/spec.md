@@ -13,12 +13,15 @@ hand filtering to its command.
 - **THEN** the visible items are narrowed without the command being invoked
   again
 
-### Requirement: A Shift or Alt shortcut names a letter key
+### Requirement: A Shift or Alt shortcut names a letter or a named key
 
-An action shortcut that includes Shift or Alt SHALL name a letter key, A to Z.
-Dango SHALL refuse a view tree in which any action declares Shift or Alt with
-any other key, and SHALL show an error in place of the view, as for any other
-invalid tree. A shortcut without Shift or Alt MAY name any key.
+An action shortcut that includes Shift or Alt SHALL name a letter key, A to Z,
+or a named key: Backspace, Tab, Enter, Escape, Delete, ArrowUp, ArrowDown,
+ArrowLeft, ArrowRight, Home, End, PageUp, or PageDown. Dango SHALL refuse a
+view tree in which any action declares Shift or Alt with any other key, such as
+a digit, symbol, or punctuation key, and SHALL show an error in place of the
+view, as for any other invalid tree. A shortcut without Shift or Alt MAY name
+any key.
 
 On macOS, Option with a letter and without Cmd or Ctrl types a composed
 character, so a shortcut of Alt and a letter alone SHALL NOT be expected to
@@ -28,6 +31,18 @@ run there.
 
 - **WHEN** a view declares an action with the shortcut Ctrl+Shift+P and the
   user presses Ctrl+Shift+P
+- **THEN** that action runs
+
+#### Scenario: A Shift shortcut on a named key runs
+
+- **WHEN** a view declares an action with the shortcut Shift+Enter and the
+  user presses Shift+Enter
+- **THEN** that action runs
+
+#### Scenario: An Alt shortcut on a named key runs
+
+- **WHEN** a view declares an action with the shortcut Alt+ArrowUp and the
+  user presses Alt+ArrowUp
 - **THEN** that action runs
 
 #### Scenario: A Shift shortcut on a digit is refused
