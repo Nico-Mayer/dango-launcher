@@ -56,10 +56,6 @@ impl ApplicationsExtension {
         }
     }
 
-    pub fn provider(&self) -> Arc<dyn RootProvider> {
-        self.provider.clone()
-    }
-
     pub fn find_by_name(&self, name: &str) -> Vec<IndexedApp> {
         self.index.find_by_name(name)
     }
@@ -298,7 +294,7 @@ mod tests {
     #[tokio::test]
     async fn the_provider_returns_indexed_apps() {
         let (ext, _) = extension();
-        let items = ext.provider().items(String::new()).await;
+        let items = ext.root_provider().unwrap().items(String::new()).await;
         assert_eq!(items.len(), 1);
         assert_eq!(items[0].title, "VS Code");
         assert_eq!(items[0].subtitle.as_deref(), Some("/a/code"));
