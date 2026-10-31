@@ -37,8 +37,8 @@ use windows_sys::Win32::UI::WindowsAndMessaging::{
     AllowSetForegroundWindow, BringWindowToTop, GetCursorPos, GetForegroundWindow,
     GetWindowLongPtrW, GetWindowRect, GetWindowThreadProcessId, SetForegroundWindow,
     SetWindowLongPtrW, SetWindowPos, SystemParametersInfoW, EVENT_SYSTEM_FOREGROUND, GWL_EXSTYLE,
-    HWND_TOPMOST, SPIF_SENDCHANGE, SPI_GETFOREGROUNDLOCKTIMEOUT, SPI_SETFOREGROUNDLOCKTIMEOUT,
-    SWP_FRAMECHANGED, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SWP_NOZORDER, WINEVENT_OUTOFCONTEXT,
+    HWND_TOPMOST, SPI_GETFOREGROUNDLOCKTIMEOUT, SPI_SETFOREGROUNDLOCKTIMEOUT, SWP_FRAMECHANGED,
+    SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SWP_NOZORDER, WINEVENT_OUTOFCONTEXT,
     WINEVENT_SKIPOWNPROCESS, WS_EX_APPWINDOW, WS_EX_TOOLWINDOW, WS_EX_TOPMOST,
 };
 
@@ -247,18 +247,15 @@ pub(super) unsafe fn force_foreground(target: HWND) {
     // the attach trick alone did not cover, and the reason a paste sometimes
     // reported that the previous window would not come forward.
     let mut previous_timeout: u32 = 0;
-    SystemParametersInfoW(
+    let relaxed = SystemParametersInfoW(
         SPI_GETFOREGROUNDLOCKTIMEOUT,
         0,
         (&mut previous_timeout as *mut u32).cast(),
         0,
-    );
-    SystemParametersInfoW(
-        SPI_SETFOREGROUNDLOCKTIMEOUT,
-        0,
-        std::ptr::null_mut(),
-        SPIF_SENDCHANGE,
-    );
+    ) != 0;
+    if relaxed {
+        SystemParametersInfoW(SPI_SETFOREGROUNDLOCKTIMEOUT, 0, std::ptr::null_mut(), 0);
+    }
 
     // Share an input queue with both the window losing the foreground and the
     // one gaining it. Attaching to the target's thread is what lets the focus
@@ -293,12 +290,14 @@ pub(super) unsafe fn force_foreground(target: HWND) {
         AttachThreadInput(current, foreground_thread, FALSE);
     }
 
-    SystemParametersInfoW(
-        SPI_SETFOREGROUNDLOCKTIMEOUT,
-        0,
-        previous_timeout as usize as *mut _,
-        SPIF_SENDCHANGE,
-    );
+    if relaxed {
+        SystemParametersInfoW(
+            SPI_SETFOREGROUNDLOCKTIMEOUT,
+            0,
+            previous_timeout as usize as *mut _,
+            0,
+        );
+    }
 }
 
 fn hwnd(window: RawWindowHandle) -> Option<HWND> {
