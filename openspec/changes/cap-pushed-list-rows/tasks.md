@@ -12,5 +12,5 @@
 
 ## 3. Docs
 
-- [ ] 3.1 Update the ListView note in AGENTS.md ("it holds at most 50") to say every list holds at most 50, root and pushed; verify by reading the note
-- [ ] 3.2 Run `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, and `cargo test`; verify all pass
+- [x] 3.1 Update the ListView note in AGENTS.md ("it holds at most 50") to say every list holds at most 50, root and pushed; verify by reading the note
+- [x] 3.2 Run `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, and `cargo test`; verify all pass

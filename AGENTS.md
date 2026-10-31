@@ -242,8 +242,8 @@ load and are not reliable.
   artifact.
 - A Slint `ListView` estimates its height from the rows it has built and
   clamps a scroll to that estimate, so scrolling to an unbuilt row stops
-  short. The result list builds every row in a `ScrollView`; it holds at most
-  50.
+  short. Every list, root and pushed, builds every row in a `ScrollView`; it
+  holds at most 50 items (`ui::ITEM_LIMIT`).
 - Windows cannot be cross-compiled from macOS here. CI on `windows-latest` is
   the only Windows compile check from the Mac. Check Windows symbol names and
   module paths against the vendored crate source under `~/.cargo/registry`
