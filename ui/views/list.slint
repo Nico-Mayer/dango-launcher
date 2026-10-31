@@ -36,6 +36,8 @@ component Heading inherits Rectangle {
 
 component Row inherits Rectangle {
     in property <RowData> data;
+    /// Room kept free on the right, for the scrollbar when there is one.
+    in property <length> right-inset: 6px;
     height: Theme.row-height;
     accessible-role: list-item;
     accessible-label: root.data.id;
@@ -43,7 +45,7 @@ component Row inherits Rectangle {
 
     fill := Rectangle {
         x: 6px;
-        width: parent.width - 12px;
+        width: parent.width - 6px - root.right-inset;
         border-radius: Theme.radius;
         background: root.data.selected ? Theme.selection
             : touch.has-hover && !Shell.pointer-resting ? Theme.hover : transparent;
@@ -127,7 +129,7 @@ export component List inherits Rectangle {
         width: ListData.detail-pane ? parent.width * 2 / 5 : parent.width;
         height: parent.height - 12px;
         accessible-role: AccessibleRole.list;
-        VerticalLayout {
+        rows := VerticalLayout {
             alignment: start;
             for row in ListData.rows: Rectangle {
                 height: row.heading != "" ? Theme.heading-height : Theme.row-height;
@@ -137,6 +139,8 @@ export component List inherits Rectangle {
                 }
                 if row.heading == "": Row {
                     data: row;
+                    // The scrollbar's thumb takes the rightmost 12px.
+                    right-inset: rows.preferred-height > scroller.visible-height ? 16px : 6px;
                 }
             }
         }
