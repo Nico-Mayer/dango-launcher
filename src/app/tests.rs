@@ -303,6 +303,13 @@ async fn a_refused_launcher_hotkey_on_reload_keeps_the_old_one_and_reports_it() 
     assert!(core.tray().config_error);
 }
 
+#[tokio::test]
+async fn a_hotkey_for_a_missing_command_is_reported() {
+    let (core, _) = core("{}");
+    core.dispatch_command("x.missing");
+    assert!(core.tray().config_error);
+}
+
 mod inspect_tests {
     use super::super::inspect_template;
 

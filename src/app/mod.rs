@@ -583,13 +583,13 @@ impl Core {
 
         if shows_view {
             self.show(None);
-            let _ = self.run_command(command_id);
-            return;
+        } else {
+            // The launcher never showed to record the window the press acts on.
+            platform::note_insertion_target();
         }
-
-        // The launcher never showed to record the window the press acts on.
-        platform::note_insertion_target();
-        let _ = self.run_command(command_id);
+        if let Err(error) = self.run_command(command_id) {
+            self.report_problem(&format!("{command_id}: {error}"));
+        }
     }
 
     /// Launches an application from its hotkey: the same launch action Enter
