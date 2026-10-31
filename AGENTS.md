@@ -25,6 +25,9 @@ spec.
 - A change to behaviour goes through OpenSpec: `/opsx:propose`, then
   `/opsx:apply`, then `/opsx:archive`. Use `/opsx:explore` to think first.
 - A fix that does not change specified behaviour can be done directly.
+- Agents commit their own work as they go, without asking: atomic
+  conventional commits, each one building and passing its tests. Pushing
+  still waits for the author.
 - Run `hk check` before pushing: `cargo fmt`, `cargo clippy -D warnings`,
   `svelte-check`. Rust tests: `cargo test` in `src-tauri`. Browser tests:
   `npm run test:browser`.
