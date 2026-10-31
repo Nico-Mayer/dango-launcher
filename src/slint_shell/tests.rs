@@ -176,6 +176,31 @@ fn detail_tree(markdown: &str) -> ViewTree {
     }))
 }
 
+mod theme {
+    use slint::language::ColorScheme;
+    use slint::Color;
+
+    use super::super::generated::{StdPalette, Theme};
+    use super::*;
+
+    #[test]
+    fn the_scheme_picks_the_theme() {
+        let h = Harness::new(false);
+        let palette = h.ui.global::<StdPalette>();
+        let theme = h.ui.global::<Theme>();
+
+        palette.set_color_scheme(ColorScheme::Dark);
+        assert!(theme.get_dark());
+        assert_eq!(theme.get_surface(), Color::from_rgb_u8(0x1e, 0x1e, 0x21));
+        assert_eq!(theme.get_muted(), Color::from_rgb_u8(0x9a, 0x9a, 0xa2));
+
+        palette.set_color_scheme(ColorScheme::Light);
+        assert!(!theme.get_dark());
+        assert_eq!(theme.get_surface(), Color::from_rgb_u8(0xff, 0xff, 0xff));
+        assert_eq!(theme.get_muted(), Color::from_rgb_u8(0x6b, 0x6b, 0x72));
+    }
+}
+
 mod development_indicator {
     use super::*;
 
