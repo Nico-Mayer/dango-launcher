@@ -8,13 +8,12 @@
 use std::collections::HashSet;
 use std::time::Duration;
 
-use windows::core::{Interface, HSTRING, PCWSTR, PWSTR};
+use windows::core::{Interface, HSTRING, PCWSTR};
 use windows::Win32::Foundation::{
-    CloseHandle, ERROR_SUCCESS, E_UNEXPECTED, FALSE, HWND, LPARAM, STILL_ACTIVE, TRUE, WPARAM,
+    CloseHandle, E_UNEXPECTED, FALSE, HWND, LPARAM, STILL_ACTIVE, TRUE, WPARAM,
 };
 use windows::Win32::Graphics::Dwm::{DwmGetWindowAttribute, DWMWA_CLOAKED};
 use windows::Win32::Storage::EnhancedStorage::PKEY_FileDescription;
-use windows::Win32::Storage::Packaging::Appx::GetApplicationUserModelId;
 use windows::Win32::System::Power::SetSuspendState;
 use windows::Win32::System::Shutdown::LockWorkStation;
 use windows::Win32::System::Threading::{
@@ -30,7 +29,7 @@ use windows::Win32::UI::WindowsAndMessaging::{
     GW_OWNER, WM_CLOSE, WS_EX_APPWINDOW, WS_EX_TOOLWINDOW,
 };
 
-use super::apps::{init_com, process_image_path, take_pwstr, window_aumid};
+use super::apps::{init_com, process_aumid, process_image_path, take_pwstr, window_aumid};
 use super::{RunningApp, SystemControl, SystemError};
 
 /// How long a refused suspend takes to come back. A refusal is answered within
@@ -186,18 +185,6 @@ pub(super) unsafe fn identify(hwnd: HWND, pid: u32) -> Option<Identity> {
         name,
         locator: path,
     })
-}
-
-unsafe fn process_aumid(pid: u32) -> Option<String> {
-    let process = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid).ok()?;
-    let mut buffer = [0u16; 256];
-    let mut len = buffer.len() as u32;
-    let status = GetApplicationUserModelId(process, &mut len, Some(PWSTR(buffer.as_mut_ptr())));
-    let _ = CloseHandle(process);
-    if status != ERROR_SUCCESS || len < 2 {
-        return None;
-    }
-    Some(String::from_utf16_lossy(&buffer[..len as usize - 1]))
 }
 
 unsafe fn shell_item(parsing_name: &str) -> Option<IShellItem> {

@@ -256,7 +256,7 @@ unsafe fn window_pid(hwnd: HWND) -> Option<u32> {
     (pid != 0).then_some(pid)
 }
 
-unsafe fn process_aumid(pid: u32) -> Option<String> {
+pub(super) unsafe fn process_aumid(pid: u32) -> Option<String> {
     let process = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid).ok()?;
     let mut buffer = [0u16; 256];
     let mut len = buffer.len() as u32;
