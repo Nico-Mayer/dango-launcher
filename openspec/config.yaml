@@ -25,7 +25,7 @@ rules:
   design:
     - Record the alternatives that were rejected and why. Future sessions need the reasoning, not just the conclusion.
     - Call out anything that locks in the extension manifest or view protocol, since those are versioned contracts.
-    - A change that adds or reworks UI names the design-system component each surface uses (`openspec/specs/design-system`, `ui/atoms/`, `ui/shell/`, `ui/views/`). A new component states which part of the design it is and why no existing one fits.
+    - A change that adds or reworks UI names the design-system component each surface uses (`openspec/specs/design-system`, until `component-system` is archived `openspec/changes/component-system/specs/design-system`, `ui/atoms/`, `ui/shell/`, `ui/views/`). A new component states which part of the design it is and why no existing one fits.
     - A change that hand-rolls a general job names the crates or packages evaluated and what they could not do.
     - Skip the design artifact for changes that introduce no new architectural decision.
     - A change that adds or edits text the user can see quotes every new or changed string, written with the ux-writing skill and checked against openspec/specs/interface-copy/spec.md.

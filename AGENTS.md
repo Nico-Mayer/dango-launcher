@@ -65,7 +65,9 @@ spend design on honouring old values.
   and the UI. Rust in `src/`, `.slint` files in `ui/`.
 - Slint draws the launcher and the tray in the Dango process, on the winit
   backend. The UI is a renderer of the launcher snapshot, not a place for
-  logic. The look is the design system in `openspec/specs/design-system`.
+  logic. The look is the design system in `openspec/specs/design-system`
+  (until `component-system` is archived:
+  `openspec/changes/component-system/specs/design-system`).
 - One theme, the `Theme` global in `ui/theme.slint`. Every colour, radius,
   size, and type face comes from it, in a dark and a light value. It reads the
   operating system's scheme through std-widgets' `Palette.color-scheme`, which

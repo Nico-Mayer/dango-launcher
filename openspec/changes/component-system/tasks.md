@@ -80,3 +80,4 @@
 
 - [x] 12.1 Rewrite the UI parts of `AGENTS.md`: the `Theme` global, the `ui/` layout, own inputs on `TextInput` instead of Fluent and std-widgets first, the globals, and the macOS resize trap from design D8; verify `rg -n "Fluent|Palette|std-widgets.slint first" AGENTS.md` finds nothing outdated
 - [x] 12.2 Update the design rule in `openspec/config.yaml` to name the design-system component each surface uses instead of a std-widgets widget; verify `openspec validate component-system --strict` passes
+- [ ] 12.3 Last step before archiving, drop the interim `openspec/changes/component-system/specs/design-system` pointers from `AGENTS.md` and `openspec/config.yaml`; verify `rg -n "changes/component-system" AGENTS.md openspec/config.yaml` finds nothing
