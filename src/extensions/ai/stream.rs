@@ -39,6 +39,7 @@ pub fn drive(
 ) -> Ended {
     let started = Instant::now();
     let mut answer = String::new();
+    let mut heard = false;
     let mut last_update: Option<Instant> = None;
 
     loop {
@@ -46,7 +47,9 @@ pub fn drive(
             return Ended::Cancelled;
         }
         match chunks.next(POLL) {
+            Next::Text(fragment) if fragment.is_empty() => heard = true,
             Next::Text(fragment) => {
+                heard = true;
                 answer.push_str(&fragment);
                 let due = last_update.is_none_or(|at| at.elapsed() >= COALESCE);
                 if due {
@@ -55,7 +58,7 @@ pub fn drive(
                 }
             }
             Next::Idle => {
-                if answer.is_empty() && started.elapsed() >= first_fragment_timeout {
+                if !heard && started.elapsed() >= first_fragment_timeout {
                     return Ended::Failed(AiError::Timeout);
                 }
             }
@@ -146,6 +149,26 @@ mod tests {
             panic!("expected a timeout");
         };
         assert_eq!(error.to_string(), "The model didn't answer in time");
+    }
+
+    #[test]
+    fn a_model_that_is_still_thinking_does_not_time_out() {
+        let (sender, receiver) = std::sync::mpsc::channel();
+        sender.send(Ok(String::new())).unwrap();
+        let chunks = Chunks::new(receiver);
+        let started = Instant::now();
+        let mut updates = Vec::new();
+
+        let ended = drive(
+            &chunks,
+            Duration::from_millis(60),
+            &|| started.elapsed() >= Duration::from_millis(200),
+            &mut |so_far| updates.push(so_far.to_string()),
+        );
+
+        assert_eq!(ended, Ended::Cancelled);
+        assert!(updates.is_empty(), "thinking was drawn as text");
+        drop(sender);
     }
 
     #[test]

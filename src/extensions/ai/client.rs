@@ -19,6 +19,7 @@ use genai::resolver::{AuthData, Endpoint, ServiceTargetResolver};
 use genai::{Client, ModelIden, ServiceTarget};
 
 use super::provider::{AiError, Chunks, Completions, ProviderKind, Request, Thinking};
+use super::stream::FIRST_FRAGMENT_TIMEOUT;
 
 const ANTHROPIC_BASE_URL: &str = "https://api.anthropic.com/v1/";
 const OPENAI_BASE_URL: &str = "https://api.openai.com/v1/";
@@ -42,36 +43,60 @@ impl Completions for GenAiClient {
     }
 }
 
+/// Gives up at the same moment `drive` stops waiting for a first fragment, so a
+/// silent model does not keep its connection open behind it.
 async fn run(request: Request, sender: mpsc::Sender<Result<String, AiError>>) {
+    let deadline = tokio::time::Instant::now() + FIRST_FRAGMENT_TIMEOUT;
     let client = build(&request);
 
     let chat = ChatRequest::default().append_message(ChatMessage::user(request.prompt.clone()));
     let options = options(&request);
 
-    let started = match client
-        .exec_chat_stream(&request.model, chat, Some(&options))
-        .await
+    let started = match tokio::time::timeout_at(
+        deadline,
+        client.exec_chat_stream(&request.model, chat, Some(&options)),
+    )
+    .await
     {
-        Ok(started) => started,
-        Err(error) => {
+        Ok(Ok(started)) => started,
+        Ok(Err(error)) => {
             let _ = sender.send(Err(translate(&request, &error)));
+            return;
+        }
+        Err(_) => {
+            let _ = sender.send(Err(AiError::Timeout));
             return;
         }
     };
 
     let mut stream = started.stream;
-    while let Some(event) = stream.next().await {
-        match event {
-            Ok(ChatStreamEvent::Chunk(chunk)) => {
-                if sender.send(Ok(chunk.content)).is_err() {
+    let mut heard = false;
+    loop {
+        let event = if heard {
+            stream.next().await
+        } else {
+            match tokio::time::timeout_at(deadline, stream.next()).await {
+                Ok(event) => event,
+                Err(_) => {
+                    let _ = sender.send(Err(AiError::Timeout));
                     return;
                 }
             }
-            Ok(_) => {}
-            Err(error) => {
+        };
+        let fragment = match event {
+            None => return,
+            Some(Ok(ChatStreamEvent::Chunk(chunk))) => chunk.content,
+            // Sent empty, so a model that thinks for long counts as answering.
+            Some(Ok(ChatStreamEvent::ReasoningChunk(_))) => String::new(),
+            Some(Ok(_)) => continue,
+            Some(Err(error)) => {
                 let _ = sender.send(Err(translate(&request, &error)));
                 return;
             }
+        };
+        heard = true;
+        if sender.send(Ok(fragment)).is_err() {
+            return;
         }
     }
 }
