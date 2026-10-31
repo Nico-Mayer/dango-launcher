@@ -22,31 +22,25 @@ pub enum Hotkey {
 
 /// One value per platform. A missing side means no value there.
 #[derive(Debug, Clone, Default, Serialize, Deserialize, JsonSchema)]
-pub struct PerPlatform<T = String> {
+pub struct PerPlatform {
     /// The value on macOS.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub macos: Option<T>,
+    pub macos: Option<String>,
     /// The value on Windows.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub windows: Option<T>,
-}
-
-impl<T> PerPlatform<T> {
-    pub fn for_this_platform(&self) -> Option<&T> {
-        #[cfg(target_os = "macos")]
-        {
-            self.macos.as_ref()
-        }
-        #[cfg(not(target_os = "macos"))]
-        {
-            self.windows.as_ref()
-        }
-    }
+    pub windows: Option<String>,
 }
 
 impl PerPlatform {
     pub fn for_platform(&self) -> Option<&str> {
-        self.for_this_platform().map(String::as_str)
+        #[cfg(target_os = "macos")]
+        {
+            self.macos.as_deref()
+        }
+        #[cfg(not(target_os = "macos"))]
+        {
+            self.windows.as_deref()
+        }
     }
 }
 
