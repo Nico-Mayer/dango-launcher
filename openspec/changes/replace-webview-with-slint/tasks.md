@@ -1,5 +1,5 @@
 Each numbered group is one git-spice branch stacked on the previous one, and
-leaves a runnable app.
+leaves a runnable app. Groups 4 and 5 shared one branch.
 
 ## 1. Agent workflow first
 
@@ -27,7 +27,7 @@ Tauri app keeps working until group 6.
 - [x] 4.1 Add `slint` and `slint-build`, a `build.rs`, and `ui/app.slint` with the hidden borderless transparent window, and the `dango-slint` binary that starts `Core`, the Slint event loop, and the tokio runtime. Verify `cargo build --bin dango-slint`.
 - [x] 4.2 Tray via `SystemTrayIcon` with the toggle, quit, and notice items and the development tooltip. Verify with a `cargo test` that the tray model lists the notices and the tooltip reads "Dango (development build)" in a debug build.
 - [x] 4.3 Global hotkey via `global-hotkey`, registered on the main thread after the event loop starts, toggling through `Shell`. Verify `cargo test hotkeys::`.
-- [x] 4.4 Windows window: raw handle from `WinitWindowAccessor`, `WS_EX_TOOLWINDOW` after each show, positioning, foreground-lock hand-off. Verify by hand on Windows: the hotkey shows the window over a maximized app, the window takes typing, Alt+Tab does not list it.
+- [x] 4.4 Windows window: raw handle from Slint's `Window::window_handle()`, `WS_EX_TOOLWINDOW` after each show, positioning, foreground-lock hand-off. Verify by hand on Windows: the hotkey shows the window over a maximized app, the window takes typing, Alt+Tab does not list it.
 - [ ] 4.5 macOS window: accessory activation policy through the winit event loop builder, NSPanel reclass or the fallback from the design risks, level and collection behaviour. Verify by hand on macOS: no dock icon, the window appears over a fullscreen app without switching spaces, and takes typing.
 - [x] 4.6 Single instance with `single-instance` and an `interprocess` local socket that shows the running launcher. Verify with a `cargo test` that a second instance's message reaches the first.
 - [x] 4.7 Autostart through `auto-launch` and opening URLs and paths through `open`. Verify `cargo test autostart::` and the snippets opener tests.
@@ -38,9 +38,9 @@ Tauri app keeps working until group 6.
 - [x] 5.1 Palette global with the dark values, frame, footer, dev marker, and busy indicator. Verify the two `development-indicator` tests (dev state shows marker and badge, release state shows neither) with `i_slint_backend_testing`.
 - [x] 5.2 Root search: prompt with the revision rule, sections, 56 px rows with icon, tint, title highlight, and subtitle, empty message, scroll-into-view, hover with the resting-pointer rule. Verify the ported "slint" tests from `navigation.spec.ts` (hover never selects, clicking keeps the typed query, a later group's first row scrolls into view) with `cargo test`.
 - [x] 5.3 Pushed list, detail, and form views, including the template field and its error. Verify with `cargo test` that each view kind renders from a snapshot and the form error is the field's accessible description.
-- [x] 5.4 Action panel on `PopupWindow` with auto-close off, its own list, and shortcuts shown. Verify with `cargo test` that the panel opens and closes only from the snapshot and a click outside does not reach the parent.
+- [x] 5.4 Action panel as an in-window overlay that catches clicks outside, its own list, and shortcuts shown. Verify with `cargo test` that the panel opens and closes only from the snapshot and a click outside does not reach the parent.
 - [x] 5.5 Protocol error screen and the dev marker on every surface. Verify the third `development-indicator` test (error screen keeps the edge) with `cargo test`.
-- [x] 5.6 Latency notifier with `set_rendering_notifier`, so `DANGO_MEASURE=1` prints hotkey-to-paint times. Verify by hand in a release build on Windows.
+- [x] 5.6 Latency timed on `RedrawRequested`, so `DANGO_MEASURE=1` prints hotkey-to-paint times. Verify by hand in a release build on Windows.
 
 ## 6. Switch and delete
 

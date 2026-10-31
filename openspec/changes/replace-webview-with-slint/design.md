@@ -52,14 +52,22 @@ narrow trait:
 
 ```
 trait Shell: Send + Sync {
-    fn publish(&self, snapshot: Snapshot);
-    fn show(&self, activation: Activation);
-    fn hide(&self);
+    fn publish(&self, snapshot: &Snapshot);
+    fn show(&self);
+    fn hide(&self, restore_focus: bool);
     fn on_main_thread(&self, work: Box<dyn FnOnce() + Send>);
-    fn set_tray_notices(&self, notices: Vec<String>);
+    fn set_tray(&self, tray: &TrayStatus);
     fn quit(&self);
+    fn finish_warmup(&self) {}
 }
 ```
+
+`TrayStatus` holds the notices, the config status line, and the missing
+permissions, and builds the menu items, so both shells draw the same tray.
+`finish_warmup` only mattered to the webview's offscreen warm-up.
+
+Autostart (`auto-launch`) and opening URLs (`open`) moved into this group
+rather than group 4, because `Core` must not need an `AppHandle`.
 
 Tauri implements it first, so the refactor lands while the webview still
 renders. The Slint shell implements it next, and both shells run off the same
@@ -101,22 +109,27 @@ forced on both platforms so the look is the same):
 | Surface | Built on | Patched or hand-rolled, and why |
 | --- | --- | --- |
 | Root prompt, list filter | `LineEdit` | Key events go through the bindings callback first |
-| Result list, pushed list, action list | `ListView` with a hand-made 56 px row | `StandardListView` has no icon, subtitle, tint, or highlight slots |
-| Section headings | Plain `Text` rows in the same `ListView` | No grouped list widget exists |
-| Action panel | `PopupWindow` | Opened and closed from the snapshot, not by click-outside |
+| Result list, pushed list | `ScrollView` building every 56 px row | `StandardListView` has no icon, subtitle, tint, or highlight slots, and `ListView` clamps a scroll to its estimate of rows it has not built |
+| Section headings | Plain `Text` rows in the same list | No grouped list widget exists |
+| Action panel | In-window overlay with a `ScrollView`, over a full-window `TouchArea` | Opened and closed from the snapshot only |
 | Detail | `ScrollView` + `Text` with wrapping | Same as today: the markdown is shown as plain text |
 | Form fields | `LineEdit`, `TextEdit` (template), `CheckBox` | None |
 | Actions button | `Button` | None |
 | Footer, frame, dev marker, busy indicator | Plain `Rectangle`, `Text`, `Image` | Static, nothing to reuse |
 
-The `PopupWindow` patch: its own close-on-click-outside is turned off
-(`close-policy: no-auto-close`), because the state machine decides when the
-panel closes. Otherwise a click could close it without the state machine
-knowing, and the overlay keyboard-ownership rule would break.
+The action panel is drawn in the launcher window rather than in a
+`PopupWindow`. In panel mode every key is bound to the state machine, so the
+panel never needs focus of its own, and a popup's separate item tree would
+bypass the root key capture. A full-window `TouchArea` under the panel turns
+a click outside into `ClosePanel`, so it never reaches the view underneath.
 
 Scroll-into-view: rows have fixed heights (56 px rows, fixed heading
 height), so the renderer computes the selected row's offset and sets the
-`ListView`'s `viewport-y` only when the row is outside the visible range.
+`ScrollView`'s `content-y` only when the row is outside the visible range.
+A group's first row brings its heading into view with it.
+
+Highlight: matched characters are underlined through `StyledText`. Emphasis
+markers stop working next to spaces and punctuation; a tag does not.
 
 Hover: rows paint hover from a `TouchArea`'s `has-hover`. A key press sets a
 `pointer-resting` flag that hides hover until the pointer moves again, the
@@ -132,11 +145,14 @@ Rejected:
 
 ### 4. Window and platform
 
-- The window is created hidden at startup with `no-frame`, transparent
-  background, `always-on-top`, fixed size, and the same 720 x 400 size.
-- `LauncherWindow` and the Windows and macOS implementations take a
+- The component is built at startup with `no-frame`, transparent
+  background, `always-on-top`, and the same 720 x 400 size. winit creates the
+  native window on the first show; the platform side attaches then.
+- `LauncherWindow` becomes `will_show`, `did_show`,
+  `position_on_active_display`, and `restore_previous_focus`, on a
   `raw_window_handle::RawWindowHandle` instead of a `WebviewWindow`. The
-  handle comes from `i_slint_backend_winit::WinitWindowAccessor`. On macOS
+  shell shows and hides the window; the platform does what the toolkit
+  cannot. The handle comes from Slint's `Window::window_handle()`. On macOS
   the NSView's `window` gives the NSWindow, which is reclassed as an NSPanel
   as today.
 - macOS activation policy: set to accessory through
@@ -147,14 +163,19 @@ Rejected:
   assuming it.
 - Focus: the spike's window did not take focus. The existing foreground-lock
   hand-off (`AttachThreadInput`, `AllowSetForegroundWindow`) runs on the HWND
-  after show, then the renderer focuses the input from `snapshot.focus`.
+  after show, then the renderer focuses the input from `snapshot.focus`. That
+  works, but winit never reports focus for this window on Windows, so focus
+  loss is watched with `SetWinEventHook(EVENT_SYSTEM_FOREGROUND)` in
+  `platform/windows`. macOS keeps winit's `Focused` event.
 - Positioning stays in `platform/`, physical pixels on Windows, logical
-  points on macOS, now applied through winit's `set_outer_position`.
-- Renderer: Slint's default (femtovg on OpenGL). The software renderer is the
-  fallback if transparency or startup misbehaves on a machine. Both are
-  compiled in, so `SLINT_BACKEND=winit-software` switches without a rebuild.
-- Latency: `Window::set_rendering_notifier` with `AfterRendering` replaces
-  `report_paint`, so `DANGO_MEASURE=1` keeps working.
+  points on macOS, applied natively (`SetWindowPos`, `setFrameOrigin`), as
+  winit has no global cursor position to pick the display from.
+- Renderer: Slint's default (femtovg on OpenGL). Slint falls back to the
+  software renderer on its own where OpenGL 2 is missing, as on the author's
+  Windows machine. Both are compiled in.
+- Latency: measured on the window's `RedrawRequested`, replacing
+  `report_paint`, so `DANGO_MEASURE=1` keeps working. The software renderer
+  has no `set_rendering_notifier`.
 
 ### 5. Plugin replacements
 
@@ -171,16 +192,13 @@ Rejected:
 
 ### 6. Icons
 
-Lucide SVGs for every name in today's `Icon.svelte` registry are vendored
-under `ui/icons/` and embedded with `include_bytes!`. One Rust registry maps
-`icon:<name>` to an `Image` built with `Image::load_from_svg_data`, cached on
-first use. Tints become a `colorize` colour on the `Image`. Paths still load
-with `Image::load_from_path`, cached the same way, which replaces the asset
-protocol.
-
-Candidates checked during apply before vendoring (off the shelf first):
-`icondata_lu` or another crate shipping Lucide SVG data. Vendoring wins
-unless a crate gives the raw SVG for one icon without pulling a UI framework.
+Every name in today's `Icon.svelte` registry comes from `icondata_lu`, which
+ships each Lucide icon's SVG data and depends only on the small
+`icondata_core`. Nothing is vendored. One Rust registry maps `icon:<name>` to
+an `Image` built with `Image::load_from_svg_data`, cached on first use. Tints
+are indexes into the palette's tint list and become a `colorize` colour in
+`.slint`. Paths still load with `Image::load_from_path`, cached the same way,
+which replaces the asset protocol.
 
 ### 7. Layout
 
@@ -199,6 +217,11 @@ left `src/`, so the two never share a directory. `git mv` keeps history.
   `development-indicator`).
 - Everything marked "dies" is deleted with Playwright, the fixtures, the
   `ui_fixture` example, and `tiny_http`.
+
+Facts found while porting: the testing API finds elements only through Slint
+debug info, which `build.rs` turns on for the debug profile; and a Windows
+test binary needs the Common Controls 6 manifest, which the linker embeds in
+every artifact.
 
 ### 9. Agent workflow
 

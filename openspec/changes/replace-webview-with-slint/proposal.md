@@ -21,7 +21,7 @@ renderer no longer touches any interaction rule.
 - Port the platform window code to the Slint window: NSPanel and accessory
   activation policy on macOS, `WS_EX_TOOLWINDOW` and focus hand-off on
   Windows, positioning on both.
-- Icons come from vendored Lucide SVGs behind one Rust icon registry.
+- Icons come from `icondata_lu` behind one Rust icon registry.
 - **BREAKING** Minimal styling: one dark palette, no light palette, no
   motion, no acrylic or vibrancy. Row and header heights stay the same.
 - **BREAKING** The project layout changes: one crate at the repo root, Rust in
@@ -92,7 +92,7 @@ None.
   (Svelte). `tests/browser`, `tests/fixtures`, `src-tauri/examples`.
 - Dependencies: remove `tauri`, its 6 plugins, `ts-rs`, `tiny_http`, and all
   npm packages. Add `slint`, `slint-build`, `i-slint-backend-testing`,
-  `i-slint-backend-winit`, `global-hotkey`, `auto-launch`, `single-instance`,
+  `icondata_lu`, `icondata_core`, `winresource`, `global-hotkey`, `auto-launch`, `single-instance`,
   `interprocess`, `open`, `url`, `raw-window-handle`.
 - Tooling: `hk.pkl`, `.github/workflows/ci.yml`, `release.yml` (disabled),
   `mise.toml`, `package.json` (removed, unless the OpenSpec CLI needs Node
