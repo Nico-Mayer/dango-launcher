@@ -35,9 +35,6 @@ const CHECKING: &str = "Checking for updates";
 const UP_TO_DATE: &str = "You have the latest version";
 const DEVELOPMENT: &str = "Updates are off in development builds.";
 
-/// Told the newly available version, or `None` once there is none.
-pub type Listener = Arc<dyn Fn(Option<&str>) + Send + Sync>;
-
 pub(crate) fn manifest() -> Manifest {
     Manifest {
         manifest_version: 1,
@@ -73,7 +70,6 @@ struct Inner {
     runtime: Handle,
     runner: Option<Arc<dyn Runner>>,
     available: Mutex<Option<String>>,
-    listener: Mutex<Option<Listener>>,
     installing: AtomicBool,
     /// Where the install shows its progress. Replaced when the user starts the
     /// install again while it runs, so reopening it finds the download.
@@ -98,16 +94,11 @@ impl UpdatesExtension {
                 runtime,
                 runner,
                 available: Mutex::new(None),
-                listener: Mutex::new(None),
                 installing: AtomicBool::new(false),
                 view: Mutex::new(None),
                 shown: Mutex::new(None),
             }),
         }
-    }
-
-    pub fn set_listener(&self, listener: Listener) {
-        *self.inner.listener.lock().unwrap() = Some(listener);
     }
 
     /// Checks shortly after startup and then every few hours. Starts nothing
@@ -132,11 +123,6 @@ impl UpdatesExtension {
             }
         });
         true
-    }
-
-    /// Starts the install, as "Install and restart" does.
-    pub fn install(&self) -> ActionOutcome {
-        self.inner.start_install()
     }
 }
 
@@ -173,18 +159,7 @@ impl Inner {
 
     async fn check(&self) -> Result<Option<String>, UpdateError> {
         let found = self.source.check().await?;
-        let changed = {
-            let mut available = self.available.lock().unwrap();
-            let changed = *available != found;
-            available.clone_from(&found);
-            changed
-        };
-        if changed {
-            let listener = self.listener.lock().unwrap().clone();
-            if let Some(listener) = listener {
-                listener(found.as_deref());
-            }
-        }
+        self.available.lock().unwrap().clone_from(&found);
         Ok(found)
     }
 
@@ -529,25 +504,6 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn the_listener_hears_an_update_appear_and_go() {
-        let fixture = fixture(FakeSource::finding("0.5.0"));
-        let heard = Arc::new(Mutex::new(Vec::new()));
-        let log = heard.clone();
-        fixture
-            .extension
-            .set_listener(Arc::new(move |version: Option<&str>| {
-                log.lock().unwrap().push(version.map(str::to_string));
-            }));
-
-        fixture.extension.inner.check().await.unwrap();
-        fixture.extension.inner.check().await.unwrap();
-        fixture.source.found.lock().unwrap().take();
-        fixture.extension.inner.check().await.unwrap();
-
-        assert_eq!(*heard.lock().unwrap(), [Some("0.5.0".into()), None]);
-    }
-
-    #[tokio::test]
     async fn a_failed_check_keeps_what_was_found_before() {
         let fixture = fixture(FakeSource::finding("0.5.0"));
         fixture.extension.inner.check().await.unwrap();
@@ -586,7 +542,7 @@ mod tests {
             Some(Arc::new(DismissedRunner)),
         );
         extension.inner.check().await.unwrap();
-        extension.install();
+        extension.inner.start_install();
         while extension.inner.installing.load(Ordering::SeqCst) {
             tokio::task::yield_now().await;
         }

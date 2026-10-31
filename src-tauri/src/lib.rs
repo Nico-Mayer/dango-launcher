@@ -970,31 +970,6 @@ fn grant_from_tray(app: &tauri::AppHandle, permission: platform::Permission) {
     }
 }
 
-const UPDATE_MENU_ID: &str = "install-update";
-
-struct UpdateTray {
-    menu: Menu<tauri::Wry>,
-    item: MenuItem<tauri::Wry>,
-}
-
-fn sync_update_tray(tray: &UpdateTray, version: Option<&str>) {
-    let _ = tray.menu.remove(&tray.item);
-    if let Some(version) = version {
-        let _ = tray.item.set_text(format!("Install Dango {version}"));
-        let _ = tray.menu.insert(&tray.item, 0);
-    }
-}
-
-fn install_from_tray(app: &tauri::AppHandle) {
-    let Some(updates) = app.try_state::<Arc<UpdatesExtension>>() else {
-        return;
-    };
-    show(app, None);
-    if let ActionOutcome::Failed(message) = updates.install() {
-        log_config(&format!("updates: {message}"));
-    }
-}
-
 /// Keeps the tray in step with the permissions. A grant or revoke happens in
 /// System Settings, where Dango cannot see it, so polling is the only signal.
 fn watch_permissions(app: tauri::AppHandle, permissions: Arc<dyn platform::Permissions>) {
@@ -1754,22 +1729,6 @@ pub fn run() {
             app.manage(tray);
             watch_permissions(app.handle().clone(), permissions);
 
-            app.manage(UpdateTray {
-                menu: menu.clone(),
-                item: MenuItem::with_id(app, UPDATE_MENU_ID, "", true, None::<&str>)?,
-            });
-            {
-                let handle = app.handle().clone();
-                updates.set_listener(Arc::new(move |version| {
-                    let version = version.map(str::to_string);
-                    let app = handle.clone();
-                    let _ = handle.run_on_main_thread(move || {
-                        if let Some(tray) = app.try_state::<UpdateTray>() {
-                            sync_update_tray(&tray, version.as_deref());
-                        }
-                    });
-                }));
-            }
             updates.schedule();
             app.manage(updates);
             if config_error.is_some() {
@@ -1820,7 +1779,6 @@ pub fn run() {
                 .show_menu_on_left_click(true)
                 .on_menu_event(|app, event| match event.id().as_ref() {
                     "toggle" => toggle(app),
-                    UPDATE_MENU_ID => install_from_tray(app),
                     "grant-accessibility" => {
                         grant_from_tray(app, platform::Permission::Accessibility)
                     }
