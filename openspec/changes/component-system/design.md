@@ -82,7 +82,7 @@ but flat rows keep scrolling and selection maths in one place.
 ```
 ui/
   theme.slint             Theme global, dark and light values
-  fonts/                  Geist 400/500/600, Geist Mono 400/500 (OFL)
+  fonts/                  Geist and Geist Mono variable fonts (OFL)
   atoms/   icon, kbd, tag, accessory, dot, text-field, text-area,
            checkbox, dropdown, separator
   shell/   launcher-window, search-bar, action-bar, toast, action-panel,

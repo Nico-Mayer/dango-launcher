@@ -270,6 +270,23 @@ mod atoms {
         }
     }
 
+    /// Only the bundled Geist Mono makes these two the same width; a system
+    /// fallback would be proportional.
+    #[test]
+    fn key_chords_are_set_in_the_bundled_mono_face() {
+        i_slint_backend_testing::init_no_event_loop();
+        let width = |keys: &str| {
+            let gallery = AtomGallery::new().unwrap();
+            gallery.set_chord(keys.into());
+            gallery.show().unwrap();
+            let kbd = ElementHandle::find_by_accessible_label(&gallery, keys)
+                .next()
+                .expect("the kbd");
+            kbd.size().width
+        };
+        assert_eq!(width("iiii"), width("WWWW"));
+    }
+
     #[test]
     fn a_kbd_shows_the_platform_chord() {
         i_slint_backend_testing::init_no_event_loop();
