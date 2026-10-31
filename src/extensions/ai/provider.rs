@@ -12,7 +12,7 @@ pub use crate::config::Thinking;
 
 /// One resolved request: which service, which model, what to ask, and the key
 /// to ask with. Built fresh per invocation, so no key is held between them.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Request {
     /// The name the user gave this provider. Only for the messages they read.
     pub provider: String,
@@ -22,6 +22,20 @@ pub struct Request {
     pub thinking: Thinking,
     pub prompt: String,
     pub key: Option<String>,
+}
+
+impl std::fmt::Debug for Request {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Request")
+            .field("provider", &self.provider)
+            .field("kind", &self.kind)
+            .field("base_url", &self.base_url)
+            .field("model", &self.model)
+            .field("thinking", &self.thinking)
+            .field("prompt", &self.prompt)
+            .field("key", &self.key.as_ref().map(|_| "<redacted>"))
+            .finish()
+    }
 }
 
 impl Request {
@@ -187,6 +201,19 @@ mod tests {
         let (_tx, rx) = std::sync::mpsc::channel::<Result<String, AiError>>();
         let chunks = Chunks::new(rx);
         assert_eq!(chunks.next(Duration::from_millis(10)), Next::Idle);
+    }
+
+    #[test]
+    fn debug_output_never_shows_the_key() {
+        let shown = format!(
+            "{:?}",
+            Request {
+                key: Some("sk-secret".into()),
+                ..request()
+            }
+        );
+        assert!(!shown.contains("sk-secret"), "{shown}");
+        assert!(shown.contains("<redacted>"), "{shown}");
     }
 
     #[test]
