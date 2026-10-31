@@ -298,8 +298,11 @@ impl Core {
         let core = self.clone();
         self.on_main_thread(move || {
             let held = core.clear_hold();
-            core.shell.show();
-            core.visible.store(true, Ordering::SeqCst);
+            // Showing again would record the launcher itself as the window
+            // to paste into and give focus back to.
+            if !core.visible.swap(true, Ordering::SeqCst) {
+                core.shell.show();
+            }
             core.apply(ui::Input::Event(ui::Event::Activated { held, probe }));
         });
     }

@@ -250,6 +250,14 @@ async fn a_hide_for_work_while_hidden_keeps_the_held_query() {
 }
 
 #[tokio::test]
+async fn showing_a_visible_launcher_does_not_show_it_again() {
+    let (core, shell) = core("{}");
+    core.toggle();
+    core.show(None);
+    assert_eq!(shell.calls(), [Call::Show]);
+}
+
+#[tokio::test]
 async fn focus_loss_hides_without_taking_focus_back() {
     let (core, shell) = core("{}");
     core.toggle();
