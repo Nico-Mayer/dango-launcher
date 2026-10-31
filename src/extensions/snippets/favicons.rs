@@ -167,6 +167,19 @@ impl FaviconCache {
         }
     }
 
+    /// Restarts the refresh age of a host's icon after a failed refetch, so an
+    /// offline sweep keeps the old icon rather than replacing it with a miss.
+    /// `false` for a host with no icon.
+    fn keep_icon(&self, host: &str) -> bool {
+        let Some(path) = self.index.read().unwrap().get(&key(host)).cloned() else {
+            return false;
+        };
+        if let Ok(file) = std::fs::File::options().write(true).open(&path) {
+            let _ = file.set_modified(SystemTime::now());
+        }
+        true
+    }
+
     fn miss_file(&self, host: &str) -> PathBuf {
         self.dir.join(format!("{}.{MISS_EXTENSION}", key(host)))
     }
@@ -387,7 +400,9 @@ impl FaviconService {
                     }
                 }
                 Err(error) => {
-                    self.cache.store_miss(&host);
+                    if !self.cache.keep_icon(&host) {
+                        self.cache.store_miss(&host);
+                    }
                     crate::log::append(&format!("no favicon for {host}: {error}"));
                 }
             }
@@ -734,6 +749,23 @@ mod tests {
         );
         service.sweep();
         assert_eq!(source.asked().len(), 2);
+    }
+
+    #[test]
+    fn a_failed_refetch_keeps_the_old_icon() {
+        let (service, records) = service(FakeSource::failing(), true);
+        records
+            .create("Docs", "https://example.com/", None)
+            .unwrap();
+        service.cache.seed("example.com");
+        age_file(
+            &service.cache.dir.join("example.com.png"),
+            ICON_MAX_AGE + Duration::from_secs(60),
+        );
+        service.sweep();
+        assert!(service.cache.path("example.com").is_some());
+        assert!(!service.cache.miss_file("example.com").exists());
+        assert!(!service.cache.needs_fetch("example.com"));
     }
 
     #[test]
