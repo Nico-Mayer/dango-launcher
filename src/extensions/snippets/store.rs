@@ -39,6 +39,8 @@ pub enum RecordError {
     KeywordTaken(String),
     #[error("Fix the error in {0} first")]
     FileBroken(&'static str),
+    #[error("Couldn't save, check that {0} isn't read-only")]
+    Write(&'static str),
 }
 
 /// One snippet or quicklink as the store hands it back.
@@ -208,8 +210,10 @@ impl Records {
         if let Some(keyword) = keyword {
             record.insert("keyword".into(), Value::String(keyword));
         }
-        self.cache.write().unwrap().push(record);
-        self.persist();
+        self.change(|cache| {
+            cache.push(record);
+            Ok(())
+        })?;
         Ok(id)
     }
 
@@ -223,8 +227,7 @@ impl Records {
         self.writable()?;
         self.validate(name, body)?;
         let keyword = self.validate_keyword(keyword, body, Some(id))?;
-        {
-            let mut cache = self.cache.write().unwrap();
+        self.change(|cache| {
             let Some(record) = cache.iter_mut().find(|r| record_id(r) == Some(id)) else {
                 return Err(RecordError::Gone);
             };
@@ -241,24 +244,38 @@ impl Records {
                     record.remove("keyword");
                 }
             }
-        }
-        self.persist();
-        Ok(())
+            Ok(())
+        })
     }
 
     /// Removes the record's entry outright. There is no tombstone: git remembers
     /// what was deleted, so a hard delete does not come back.
     pub fn remove(&self, id: &str) -> Result<(), RecordError> {
         self.writable()?;
-        {
-            let mut cache = self.cache.write().unwrap();
+        self.change(|cache| {
             let before = cache.len();
             cache.retain(|r| record_id(r) != Some(id));
             if cache.len() == before {
                 return Err(RecordError::Gone);
             }
+            Ok(())
+        })
+    }
+
+    /// Applies `edit` to a copy of the set and keeps it only once the file
+    /// holds it, so a failed write leaves the cache as the file has it.
+    fn change(
+        &self,
+        edit: impl FnOnce(&mut Vec<Map<String, Value>>) -> Result<(), RecordError>,
+    ) -> Result<(), RecordError> {
+        let mut cache = self.cache.write().unwrap();
+        let mut next = cache.clone();
+        edit(&mut next)?;
+        if let Err(error) = self.persist(&next) {
+            crate::log::append(&format!("could not write {}: {error}", self.path.display()));
+            return Err(RecordError::Write(self.kind.file_name()));
         }
-        self.persist();
+        *cache = next;
         Ok(())
     }
 
@@ -314,18 +331,13 @@ impl Records {
         })
     }
 
-    fn persist(&self) {
-        let text = {
-            let cache = self.cache.read().unwrap();
-            serde_json::to_string_pretty(&*cache).unwrap_or_else(|_| "[]".to_string())
-        };
-        *self.own_write.lock().unwrap() = Some(text.clone());
+    fn persist(&self, records: &[Map<String, Value>]) -> std::io::Result<()> {
+        let text = serde_json::to_string_pretty(records)?;
         if let Some(parent) = self.path.parent() {
-            let _ = std::fs::create_dir_all(parent);
+            std::fs::create_dir_all(parent)?;
         }
-        if let Err(error) = std::fs::write(&self.path, text) {
-            eprintln!("[dango] could not write {}: {error}", self.path.display());
-        }
+        *self.own_write.lock().unwrap() = Some(text.clone());
+        std::fs::write(&self.path, text).inspect_err(|_| *self.own_write.lock().unwrap() = None)
     }
 }
 
@@ -509,6 +521,19 @@ mod tests {
     }
 
     #[test]
+    fn a_failed_write_is_reported_and_not_kept() {
+        let dir = std::env::temp_dir().join(format!("dango-records-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let records = Records::open(&dir, Kind::Snippet).0;
+        // A directory where the file should be makes every write fail.
+        std::fs::create_dir(records.path()).unwrap();
+
+        let error = records.create("Signature", "Best", None).unwrap_err();
+        assert!(matches!(error, RecordError::Write("snippets.json")));
+        assert!(records.all().unwrap().is_empty());
+    }
+
+    #[test]
     fn a_bad_reload_refuses_writes_until_a_clean_one() {
         let records = records(Kind::Snippet);
         let id = records.create("Signature", "Best", None).unwrap();
@@ -684,6 +709,7 @@ mod display_tests {
             RecordError::KeywordNeedsPlainSnippet,
             RecordError::KeywordTaken("sig".into()),
             RecordError::FileBroken(Kind::Snippet.file_name()),
+            RecordError::Write(Kind::Snippet.file_name()),
         ];
         for error in errors {
             let text = error.to_string();
