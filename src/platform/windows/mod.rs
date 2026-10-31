@@ -44,22 +44,12 @@ use windows_sys::Win32::UI::WindowsAndMessaging::{
 
 use super::{LauncherWindow, RunningApp, SystemControl, SystemError};
 
+#[derive(Default)]
 pub struct WindowsLauncherWindow {
     /// Captured before the launcher takes the foreground, because Windows has
     /// no non-activating equivalent of an NSPanel and focus must be handed back
     /// explicitly on dismiss.
     previous_foreground: Option<isize>,
-}
-
-impl WindowsLauncherWindow {
-    pub fn new(window: RawWindowHandle) -> Self {
-        if let Some(hwnd) = hwnd(window) {
-            unsafe { apply_tool_window_style(hwnd) };
-        }
-        Self {
-            previous_foreground: None,
-        }
-    }
 }
 
 impl LauncherWindow for WindowsLauncherWindow {

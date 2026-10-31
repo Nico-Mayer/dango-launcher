@@ -118,8 +118,8 @@ const NS_POPUP_MENU_WINDOW_LEVEL: isize = 101;
 
 pub struct MacLauncherWindow;
 
-impl MacLauncherWindow {
-    pub fn new(window: RawWindowHandle) -> Self {
+impl LauncherWindow for MacLauncherWindow {
+    fn attach(&mut self, window: RawWindowHandle) {
         if let Some(ns_window) = ns_window(window) {
             reclass_as_panel(&ns_window);
 
@@ -134,11 +134,8 @@ impl MacLauncherWindow {
             ns_window.setLevel(NS_POPUP_MENU_WINDOW_LEVEL);
             ns_window.setHidesOnDeactivate(false);
         }
-        Self
     }
-}
 
-impl LauncherWindow for MacLauncherWindow {
     fn will_show(&mut self) {}
 
     fn did_show(&mut self, window: RawWindowHandle) {

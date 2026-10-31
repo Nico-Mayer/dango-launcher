@@ -16,6 +16,8 @@ compile_error!("Dango targets macOS and Windows only. Linux is out of scope.");
 /// The platform half of showing the launcher. The shell shows and hides the
 /// window itself; this does what its toolkit cannot.
 pub trait LauncherWindow: Send {
+    /// Once, after the first show has created the native window.
+    fn attach(&mut self, _window: RawWindowHandle) {}
     /// Before the shell shows the window.
     fn will_show(&mut self);
     /// After the shell has shown the window: takes the keyboard.
@@ -50,11 +52,11 @@ pub fn watch_focus_loss(lost: Box<dyn Fn()>) {
     drop(lost);
 }
 
-pub fn launcher_window(window: RawWindowHandle) -> Box<dyn LauncherWindow> {
+pub fn launcher_window() -> Box<dyn LauncherWindow> {
     #[cfg(target_os = "macos")]
-    return Box::new(macos::MacLauncherWindow::new(window));
+    return Box::new(macos::MacLauncherWindow);
     #[cfg(target_os = "windows")]
-    return Box::new(windows::WindowsLauncherWindow::new(window));
+    return Box::new(windows::WindowsLauncherWindow::default());
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

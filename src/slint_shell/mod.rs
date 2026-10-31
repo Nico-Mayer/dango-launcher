@@ -31,12 +31,11 @@ thread_local! {
     static RENDERER: RefCell<Option<Rc<RefCell<Renderer>>>> = const { RefCell::new(None) };
 }
 
-type Platform = Arc<Mutex<Option<Box<dyn PlatformWindow>>>>;
+type Platform = Arc<Mutex<Box<dyn PlatformWindow>>>;
 
 struct SlintShell {
     window: slint::Weak<LauncherWindow>,
     tray: slint::Weak<Tray>,
-    /// Attached once the native window exists, which is after its first show.
     platform: Platform,
 }
 
@@ -78,11 +77,11 @@ impl Shell for SlintShell {
             return;
         };
         let mut platform = self.platform.lock().unwrap();
-        if let Some(platform) = platform.as_mut() {
-            platform.will_show();
-            if let Some(handle) = Self::handle(&window) {
-                platform.position_on_active_display(handle);
-            }
+        platform.will_show();
+        // winit creates the native window on the first show.
+        let existing = Self::handle(&window);
+        if let Some(handle) = existing {
+            platform.position_on_active_display(handle);
         }
         if let Err(error) = window.show() {
             eprintln!("[dango] could not show the launcher: {error}");
@@ -91,12 +90,11 @@ impl Shell for SlintShell {
         let Some(handle) = Self::handle(&window) else {
             return;
         };
-        let attached = platform.get_or_insert_with(|| {
-            let attached = platform::launcher_window(handle);
-            attached.position_on_active_display(handle);
-            attached
-        });
-        attached.did_show(handle);
+        if existing.is_none() {
+            platform.attach(handle);
+            platform.position_on_active_display(handle);
+        }
+        platform.did_show(handle);
     }
 
     fn hide(&self, restore_focus: bool) {
@@ -104,9 +102,7 @@ impl Shell for SlintShell {
             let _ = window.hide();
         }
         if restore_focus {
-            if let Some(platform) = self.platform.lock().unwrap().as_mut() {
-                platform.restore_previous_focus();
-            }
+            self.platform.lock().unwrap().restore_previous_focus();
         }
     }
 
@@ -137,7 +133,7 @@ fn set_launcher_height(window: &LauncherWindow, platform: &Platform, height: f32
         return;
     }
     let platform = platform.lock().unwrap();
-    let (Some(platform), Some(handle)) = (platform.as_ref(), SlintShell::handle(window)) else {
+    let Some(handle) = SlintShell::handle(window) else {
         return;
     };
     // Slint resizes the window itself when the component's height changes,
@@ -206,7 +202,7 @@ pub fn run() {
     let shell = Arc::new(SlintShell {
         window: window.as_weak(),
         tray: tray.as_weak(),
-        platform: Arc::new(Mutex::new(None)),
+        platform: Arc::new(Mutex::new(platform::launcher_window())),
     });
 
     // The hotkeys and the tray need the event loop running on this thread.
