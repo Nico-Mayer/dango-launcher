@@ -105,6 +105,17 @@ async fn the_hotkey_shows_the_launcher_and_activates_it() {
 }
 
 #[tokio::test]
+async fn an_action_without_an_item_records_no_use() {
+    let (core, _) = core("{}");
+    core.record_use("dango.snippets", "", Some("sig"));
+    core.record_use("dango.snippets", "sig", None);
+
+    let now = crate::ranking::now_millis();
+    assert_eq!(core.services.frecency.score("dango.snippets", "", now), 0.0);
+    assert!(core.services.frecency.score("dango.snippets", "sig", now) > 0.0);
+}
+
+#[tokio::test]
 async fn the_hotkey_again_hides_and_hands_focus_back() {
     let (core, shell) = core("{}");
     core.toggle();

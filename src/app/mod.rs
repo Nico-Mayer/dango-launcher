@@ -480,6 +480,9 @@ impl Core {
     /// press never gets here, because a chord says nothing about what the user
     /// types to find an item.
     fn record_use(&self, extension_id: &str, item_id: &str, query: Option<&str>) {
+        if item_id.is_empty() {
+            return;
+        }
         let now = now_millis();
         self.services
             .frecency
