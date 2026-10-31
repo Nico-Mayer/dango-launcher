@@ -748,7 +748,7 @@ impl Core {
 
         {
             let mut host = self.services.host.lock().unwrap();
-            host.reload_enabled();
+            conflicts.extend(load_problems(&host.reload_enabled()));
             // The AI extension's commands are in the file, so an edit means a new
             // instance. Done before the candidates and the hotkeys are rebuilt, so
             // both see the command set the file now describes.
@@ -761,8 +761,9 @@ impl Core {
                 for problem in &problems {
                     crate::log::append(problem);
                 }
-                if let Err(error) = host.replace(extension) {
-                    crate::log::append(&format!("ai: {error}"));
+                match host.replace(extension) {
+                    Ok(report) => conflicts.extend(load_problems(&report)),
+                    Err(error) => conflicts.push(format!("ai: {error}")),
                 }
             }
             let candidates = aliased_candidates(&host, &self.config);
@@ -850,6 +851,20 @@ fn inspect_template(source: &str) -> ui::TemplateInspection {
             error: Some(error.to_string()),
         },
     }
+}
+
+fn load_problems(report: &extension::LoadReport) -> Vec<String> {
+    let activations = report
+        .activation_errors
+        .iter()
+        .map(|(id, error)| format!("{id}: could not activate, {error}"));
+    let collisions = report.collisions.iter().map(|collision| {
+        format!(
+            "{}: {} already has a command with this id, so the one from {} is skipped",
+            collision.qualified_id, collision.existing_extension, collision.rejected_extension
+        )
+    });
+    activations.chain(collisions).collect()
 }
 
 /// Each extension's name and icon. Names never change at runtime, so the

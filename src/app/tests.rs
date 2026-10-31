@@ -319,6 +319,22 @@ async fn a_clean_reload_keeps_a_reported_problem_on_the_tray() {
     assert!(core.tray().config_error);
 }
 
+#[test]
+fn every_load_problem_gets_a_line() {
+    let report = crate::extension::LoadReport {
+        activation_errors: vec![("x".into(), "boom".into())],
+        collisions: vec![crate::extension::Collision {
+            qualified_id: "x.a".into(),
+            existing_extension: "x".into(),
+            rejected_extension: "y".into(),
+        }],
+    };
+    let lines = super::load_problems(&report);
+    assert_eq!(lines.len(), 2);
+    assert!(lines[0].contains("boom"));
+    assert!(lines[1].contains("x.a"));
+}
+
 mod inspect_tests {
     use super::super::inspect_template;
 
