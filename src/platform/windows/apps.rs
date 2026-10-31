@@ -5,12 +5,13 @@
 use std::path::Path;
 
 use windows::core::{Interface, HSTRING, PCWSTR, PWSTR};
-use windows::Win32::Foundation::{CloseHandle, HANDLE, HWND, LPARAM, SIZE, TRUE};
+use windows::Win32::Foundation::{CloseHandle, ERROR_SUCCESS, HANDLE, HWND, LPARAM, SIZE, TRUE};
 use windows::Win32::Graphics::Gdi::{
     CreateCompatibleDC, DeleteDC, DeleteObject, GetDIBits, GetObjectW, BITMAP, BITMAPINFO,
     BITMAPINFOHEADER, BI_RGB, DIB_RGB_COLORS, HBITMAP,
 };
 use windows::Win32::Storage::EnhancedStorage::{PKEY_AppUserModel_ID, PKEY_Link_TargetParsingPath};
+use windows::Win32::Storage::Packaging::Appx::GetApplicationUserModelId;
 use windows::Win32::System::Com::StructuredStorage::{PropVariantClear, PropVariantToStringAlloc};
 use windows::Win32::System::Com::{CoInitializeEx, CoTaskMemFree, COINIT_APARTMENTTHREADED};
 use windows::Win32::System::Threading::{
@@ -211,26 +212,34 @@ unsafe extern "system" fn collect(hwnd: HWND, lparam: LPARAM) -> windows::core::
 unsafe fn find_running_window(app: &IndexedApp) -> Option<HWND> {
     let mut collector = Collector { hwnds: Vec::new() };
     let _ = EnumWindows(Some(collect), LPARAM(&mut collector as *mut _ as isize));
+    let hwnds = collector.hwnds;
 
-    let packaged = app.id.contains('!');
+    if app.id.contains('!') {
+        let is_app = |aumid: Option<String>| aumid.is_some_and(|a| a.eq_ignore_ascii_case(&app.id));
+        // Some packaged apps, such as Paint, never set a window AppUserModelID,
+        // so only their process carries it.
+        return hwnds
+            .iter()
+            .copied()
+            .find(|&hwnd| is_app(window_aumid(hwnd)))
+            .or_else(|| {
+                hwnds
+                    .iter()
+                    .copied()
+                    .find(|&hwnd| is_app(window_pid(hwnd).and_then(|pid| process_aumid(pid))))
+            });
+    }
+
     let target = app
         .target
         .as_deref()
         .map(str::to_lowercase)
-        .filter(|t| t.ends_with(".exe"));
-
-    for hwnd in collector.hwnds {
-        if packaged {
-            if window_aumid(hwnd).is_some_and(|a| a.eq_ignore_ascii_case(&app.id)) {
-                return Some(hwnd);
-            }
-        } else if let Some(target) = &target {
-            if window_process_path(hwnd).is_some_and(|p| p.to_lowercase() == *target) {
-                return Some(hwnd);
-            }
-        }
-    }
-    None
+        .filter(|t| t.ends_with(".exe"))?;
+    hwnds.into_iter().find(|&hwnd| {
+        window_pid(hwnd)
+            .and_then(|pid| process_image_path(pid))
+            .is_some_and(|p| p.to_lowercase() == target)
+    })
 }
 
 pub(super) unsafe fn window_aumid(hwnd: HWND) -> Option<String> {
@@ -241,13 +250,22 @@ pub(super) unsafe fn window_aumid(hwnd: HWND) -> Option<String> {
     text.filter(|s| !s.is_empty())
 }
 
-unsafe fn window_process_path(hwnd: HWND) -> Option<String> {
+unsafe fn window_pid(hwnd: HWND) -> Option<u32> {
     let mut pid = 0u32;
     GetWindowThreadProcessId(hwnd, Some(&mut pid));
-    if pid == 0 {
+    (pid != 0).then_some(pid)
+}
+
+unsafe fn process_aumid(pid: u32) -> Option<String> {
+    let process = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid).ok()?;
+    let mut buffer = [0u16; 256];
+    let mut len = buffer.len() as u32;
+    let status = GetApplicationUserModelId(process, &mut len, Some(PWSTR(buffer.as_mut_ptr())));
+    let _ = CloseHandle(process);
+    if status != ERROR_SUCCESS || len < 2 {
         return None;
     }
-    process_image_path(pid)
+    Some(String::from_utf16_lossy(&buffer[..len as usize - 1]))
 }
 
 pub(super) unsafe fn process_image_path(pid: u32) -> Option<String> {
