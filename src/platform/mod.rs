@@ -403,6 +403,37 @@ pub mod clipboard_busy {
     }
 }
 
+/// A name or key symbol that differs between macOS and Windows.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Label {
+    FileManager,
+    EmptyTrash,
+    /// The default launcher hotkey.
+    LauncherShortcut,
+    CommandKey,
+    AltKey,
+    ShiftKey,
+    /// What joins the parts of a displayed chord.
+    ChordSeparator,
+}
+
+pub fn label(label: Label) -> &'static str {
+    let (macos, windows) = match label {
+        Label::FileManager => ("Finder", "File Explorer"),
+        Label::EmptyTrash => ("Empty Trash", "Empty Recycle Bin"),
+        Label::LauncherShortcut => ("Option+Space", "Alt+Space"),
+        Label::CommandKey => ("⌘", "Ctrl"),
+        Label::AltKey => ("⌥", "Alt"),
+        Label::ShiftKey => ("⇧", "Shift"),
+        Label::ChordSeparator => ("", "+"),
+    };
+    if cfg!(target_os = "macos") {
+        macos
+    } else {
+        windows
+    }
+}
+
 /// Text with the line breaks the system clipboard expects. Windows expects
 /// CRLF, and classic edit controls show a bare LF as no break at all.
 pub fn text_to_clipboard(text: &str) -> Cow<'_, str> {

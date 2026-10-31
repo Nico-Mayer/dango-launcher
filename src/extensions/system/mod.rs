@@ -11,7 +11,7 @@ use crate::extension::{
 };
 use crate::extensions::applications::{IconCache, ICON_SIZE};
 use crate::invocation::{Command, InvocationContext};
-use crate::platform::{SystemControl, SystemError};
+use crate::platform::{self, Label, SystemControl, SystemError};
 use crate::protocol::{
     Action, DetailView, Filtering, ListItem, ListView, View, ViewTree, PROTOCOL_VERSION,
 };
@@ -129,7 +129,7 @@ pub(crate) fn manifest() -> Manifest {
             ),
             command(
                 COMMAND_EMPTY_TRASH,
-                empty_trash_title(),
+                platform::label(Label::EmptyTrash),
                 "trash-2",
                 InvocationMode::View,
                 &["trash", "bin", "delete", "empty", "recycle"],
@@ -163,15 +163,6 @@ pub(crate) fn manifest() -> Manifest {
         root_items: false,
         services: false,
     }
-}
-
-#[cfg(target_os = "macos")]
-fn empty_trash_title() -> &'static str {
-    "Empty Trash"
-}
-#[cfg(not(target_os = "macos"))]
-fn empty_trash_title() -> &'static str {
-    "Empty Recycle Bin"
 }
 
 fn command(

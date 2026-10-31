@@ -27,7 +27,7 @@ use crate::extensions::{self};
 use crate::hotkeys::{self, Grab, Registry, SystemGrab};
 use crate::invocation::Invoker;
 use crate::opener::SystemOpener;
-use crate::platform;
+use crate::platform::{self, Label};
 use crate::ranking::{DangoRanker, FrecencyTable, InputHistory};
 use crate::search::{SearchPipeline, StaticCommandSource};
 use crate::shell::{Shell, TrayStatus};
@@ -35,11 +35,6 @@ use crate::store::{Opened, Store};
 use crate::text;
 
 const IDENTIFIER: &str = "com.nimayer.dango";
-
-#[cfg(target_os = "macos")]
-const SHORTCUT_LABEL: &str = "Option+Space";
-#[cfg(not(target_os = "macos"))]
-const SHORTCUT_LABEL: &str = "Alt+Space";
 
 pub struct Startup {
     pub shell: Arc<dyn Shell>,
@@ -463,11 +458,12 @@ fn register_snippets(
 fn register_hotkeys(file_config: &Arc<FileConfig>, notices: &mut Vec<String>) -> Registry {
     let config = file_config.shared();
     let config = config.read().unwrap();
+    let shortcut = platform::label(Label::LauncherShortcut);
     let (launcher, launcher_problem) = hotkeys::launcher(&config);
     if let Some(problem) = launcher_problem {
         crate::log::append(&problem);
         notices.push(format!(
-            "Invalid launcher.hotkey, using {SHORTCUT_LABEL}, see dango.log"
+            "Invalid launcher.hotkey, using {shortcut}, see dango.log"
         ));
     }
     let grab: Box<dyn Grab> = match SystemGrab::new() {
@@ -480,7 +476,7 @@ fn register_hotkeys(file_config: &Arc<FileConfig>, notices: &mut Vec<String>) ->
     let registry = Registry::new(grab, launcher);
     if let Err(error) = registry.register_launcher() {
         eprintln!("[dango] could not register the launcher hotkey: {error}");
-        notices.push(format!("{SHORTCUT_LABEL} is in use, set launcher.hotkey"));
+        notices.push(format!("{shortcut} is in use, set launcher.hotkey"));
     }
     let conflicts = registry.apply(&config);
     if !conflicts.is_empty() {

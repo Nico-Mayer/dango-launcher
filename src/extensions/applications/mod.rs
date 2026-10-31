@@ -13,6 +13,7 @@ use std::sync::Arc;
 use async_trait::async_trait;
 
 use crate::extension::{ActionOutcome, Extension, FormValues, Manifest, Service};
+use crate::platform::{self, Label};
 use crate::protocol::{Action, Modifier, Shortcut};
 use crate::search::{Candidate, RootProvider, Source};
 
@@ -96,7 +97,11 @@ impl ApplicationsExtension {
                 Ok(()) => ActionOutcome::Done,
                 Err(error) => {
                     eprintln!("[dango] could not reveal {}: {error}", app.name);
-                    ActionOutcome::Failed(format!("Couldn't show {} in {FILE_MANAGER}", app.name))
+                    ActionOutcome::Failed(format!(
+                        "Couldn't show {} in {}",
+                        app.name,
+                        platform::label(Label::FileManager)
+                    ))
                 }
             },
             ACTION_COPY_PATH => match app.target {
@@ -171,11 +176,6 @@ impl RootProvider for AppProvider {
     }
 }
 
-#[cfg(target_os = "macos")]
-const FILE_MANAGER: &str = "Finder";
-#[cfg(not(target_os = "macos"))]
-const FILE_MANAGER: &str = "File Explorer";
-
 /// The action panel for an application result. Launch is primary; reveal and
 /// copy are offered only when the app has a filesystem path.
 fn app_actions(has_path: bool) -> Vec<Action> {
@@ -188,7 +188,7 @@ fn app_actions(has_path: bool) -> Vec<Action> {
     if has_path {
         actions.push(Action {
             id: ACTION_REVEAL.into(),
-            title: format!("Show in {FILE_MANAGER}"),
+            title: format!("Show in {}", platform::label(Label::FileManager)),
             shortcut: Some(Shortcut {
                 key: "r".into(),
                 modifiers: vec![Modifier::Ctrl],

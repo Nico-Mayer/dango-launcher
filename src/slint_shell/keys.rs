@@ -1,18 +1,13 @@
 //! Slint's key events in the terms the launcher's bindings use, which are the
 //! web's key names, lowercased.
 
+use crate::platform::{self, Label};
 use crate::protocol::{Modifier, Shortcut};
 use crate::ui::snapshot::Binding;
 use crate::ui::Chord;
 
-const MAC: bool = cfg!(target_os = "macos");
-
 fn command_label() -> &'static str {
-    if MAC {
-        "⌘"
-    } else {
-        "Ctrl"
-    }
+    platform::label(Label::CommandKey)
 }
 
 /// The confirm key shown in the footer.
@@ -36,16 +31,14 @@ pub fn shortcut_label(shortcut: &Shortcut) -> String {
         .map(|modifier| {
             match modifier {
                 Modifier::Cmd | Modifier::Ctrl => command_label(),
-                Modifier::Alt if MAC => "⌥",
-                Modifier::Alt => "Alt",
-                Modifier::Shift if MAC => "⇧",
-                Modifier::Shift => "Shift",
+                Modifier::Alt => platform::label(Label::AltKey),
+                Modifier::Shift => platform::label(Label::ShiftKey),
             }
             .to_string()
         })
         .collect();
     parts.push(shortcut.key.to_uppercase());
-    parts.join(if MAC { "" } else { "+" })
+    parts.join(platform::label(Label::ChordSeparator))
 }
 
 /// The modifiers held with a key. `control` and `meta` both count as the
