@@ -1,0 +1,16 @@
+import { Theme } from "../theme.slint";
+
+export enum ToastStyle { busy, success, failure }
+
+/// Static: a busy state is shown, never animated.
+export component Dot inherits Rectangle {
+    in property <ToastStyle> style;
+    in property <string> label;
+    width: 6px;
+    height: 6px;
+    border-radius: 3px;
+    accessible-role: image;
+    accessible-label: root.label;
+    background: root.style == ToastStyle.failure ? Theme.danger
+        : root.style == ToastStyle.success ? Theme.accent : Theme.muted;
+}

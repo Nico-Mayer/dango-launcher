@@ -1,0 +1,25 @@
+import { Theme } from "../theme.slint";
+
+export enum TagRole { accent, muted, danger }
+
+export component Tag inherits Rectangle {
+    in property <string> text;
+    in property <TagRole> role;
+    property <color> tone: root.role == TagRole.accent ? Theme.accent
+        : root.role == TagRole.danger ? Theme.danger : Theme.muted;
+    border-width: 1px;
+    border-color: root.tone;
+    border-radius: Theme.radius / 2;
+    accessible-role: AccessibleRole.text;
+    accessible-label: root.text;
+    HorizontalLayout {
+        padding-left: 6px;
+        padding-right: 6px;
+        Text {
+            text: root.text;
+            color: root.tone;
+            font-size: Theme.text-small;
+            vertical-alignment: center;
+        }
+    }
+}

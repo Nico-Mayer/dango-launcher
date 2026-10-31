@@ -1,0 +1,30 @@
+import { Icon, IconKind } from "icon.slint";
+import { Kbd } from "kbd.slint";
+import { Tag, TagRole } from "tag.slint";
+import { Accessory, AccessoryKind } from "accessory.slint";
+import { Dot, ToastStyle } from "dot.slint";
+
+/// Every atom on its own, for the UI tests.
+export component AtomGallery inherits Window {
+    in property <string> chord;
+    VerticalLayout {
+        alignment: start;
+        Icon {
+            label: "Icon";
+        }
+        Kbd {
+            keys: root.chord;
+        }
+        Tag {
+            text: "Link";
+            role: TagRole.accent;
+        }
+        Accessory {
+            data: { kind: AccessoryKind.text, text: "2m" };
+        }
+        Dot {
+            style: ToastStyle.busy;
+            label: "Busy";
+        }
+    }
+}

@@ -1,0 +1,36 @@
+import { Theme } from "../theme.slint";
+
+export enum IconKind { none, named, file }
+
+/// A named icon is drawn in a theme role. A file keeps its own colours and
+/// aspect ratio; as content, such as a copied image, it fills a bordered frame.
+export component Icon inherits Rectangle {
+    in property <image> source;
+    in property <IconKind> kind;
+    in property <bool> content;
+    in property <bool> round;
+    in property <color> role: Theme.muted;
+    in property <string> label;
+    width: Theme.icon-size;
+    height: Theme.icon-size;
+    border-radius: root.round ? self.width / 2 : Theme.radius / 2;
+    background: root.kind == IconKind.none ? Theme.raised : transparent;
+    border-width: root.content && root.kind == IconKind.file ? 1px : 0;
+    border-color: Theme.border;
+    clip: true;
+    accessible-role: image;
+    accessible-label: root.label;
+
+    if root.kind == IconKind.named: Image {
+        width: parent.width;
+        height: parent.height;
+        source: root.source;
+        colorize: root.role;
+    }
+    if root.kind == IconKind.file: Image {
+        width: parent.width;
+        height: parent.height;
+        source: root.source;
+        image-fit: root.content ? ImageFit.cover : ImageFit.contain;
+    }
+}

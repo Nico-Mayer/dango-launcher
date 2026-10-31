@@ -201,6 +201,44 @@ mod theme {
     }
 }
 
+mod atoms {
+    use super::super::generated::AtomGallery;
+    use super::super::keys;
+    use super::*;
+
+    #[test]
+    fn every_atom_is_found_by_its_label() {
+        i_slint_backend_testing::init_no_event_loop();
+        let gallery = AtomGallery::new().unwrap();
+        gallery.set_chord(keys::panel_label().into());
+        gallery.show().unwrap();
+        for label in ["Icon", "Link", "2m", "Busy", keys::panel_label().as_str()] {
+            assert!(
+                ElementHandle::find_by_accessible_label(&gallery, label)
+                    .next()
+                    .is_some(),
+                "{label} is drawn"
+            );
+        }
+    }
+
+    #[test]
+    fn a_kbd_shows_the_platform_chord() {
+        i_slint_backend_testing::init_no_event_loop();
+        let gallery = AtomGallery::new().unwrap();
+        gallery.set_chord(keys::panel_label().into());
+        gallery.show().unwrap();
+        let expected = if cfg!(target_os = "macos") {
+            "⌘ K"
+        } else {
+            "Ctrl K"
+        };
+        assert!(ElementHandle::find_by_accessible_label(&gallery, expected)
+            .next()
+            .is_some());
+    }
+}
+
 mod development_indicator {
     use super::*;
 

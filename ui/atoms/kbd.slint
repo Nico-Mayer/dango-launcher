@@ -1,0 +1,22 @@
+import { Theme } from "../theme.slint";
+
+/// A key chord, already in the platform's names.
+export component Kbd inherits Rectangle {
+    in property <string> keys;
+    border-width: 1px;
+    border-color: Theme.border;
+    border-radius: Theme.radius / 2;
+    accessible-role: AccessibleRole.text;
+    accessible-label: root.keys;
+    HorizontalLayout {
+        padding-left: 5px;
+        padding-right: 5px;
+        Text {
+            text: root.keys;
+            color: Theme.muted;
+            font-family: Theme.mono;
+            font-size: Theme.text-small;
+            vertical-alignment: center;
+        }
+    }
+}

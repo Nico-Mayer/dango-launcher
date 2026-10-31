@@ -1,0 +1,48 @@
+import { Theme } from "../theme.slint";
+import { Icon, IconKind } from "icon.slint";
+import { Kbd } from "kbd.slint";
+import { Tag, TagRole } from "tag.slint";
+
+export enum AccessoryKind { text, icon, tag, kbd }
+
+export struct AccessoryData {
+    kind: AccessoryKind,
+    text: string,
+    icon: image,
+    icon-kind: IconKind,
+    role: TagRole,
+}
+
+export component Accessory inherits HorizontalLayout {
+    in property <AccessoryData> data;
+    alignment: center;
+    if root.data.kind == AccessoryKind.text: Text {
+        text: root.data.text;
+        color: Theme.muted;
+        font-size: Theme.text-small;
+        vertical-alignment: center;
+        accessible-role: AccessibleRole.text;
+        accessible-label: root.data.text;
+    }
+    if root.data.kind == AccessoryKind.icon: VerticalLayout {
+        alignment: center;
+        Icon {
+            source: root.data.icon;
+            kind: root.data.icon-kind;
+            label: root.data.text;
+        }
+    }
+    if root.data.kind == AccessoryKind.tag: VerticalLayout {
+        alignment: center;
+        Tag {
+            text: root.data.text;
+            role: root.data.role;
+        }
+    }
+    if root.data.kind == AccessoryKind.kbd: VerticalLayout {
+        alignment: center;
+        Kbd {
+            keys: root.data.text;
+        }
+    }
+}

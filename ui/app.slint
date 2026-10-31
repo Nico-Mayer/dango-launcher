@@ -1,7 +1,9 @@
 import { Button, CheckBox, LineEdit, Palette as StdPalette, ScrollView, TextEdit } from "std-widgets.slint";
 import { Theme } from "theme.slint";
+import { IconKind } from "atoms/icon.slint";
+import { AtomGallery } from "atoms/gallery.slint";
 
-export { StdPalette, Theme }
+export { AtomGallery, IconKind, StdPalette, Theme }
 
 /// The one built-in appearance. Every colour, radius, and type size on every
 /// surface comes from here.
@@ -36,8 +38,6 @@ export global Palette {
     in-out property <length> heading-height: 28px;
     in-out property <length> footer-height: 40px;
 }
-
-export enum IconKind { none, named, file }
 
 export struct RowData {
     /// A non-empty heading makes this a section heading rather than a result.
