@@ -11,3 +11,6 @@ vite.config.ts.timestamp-*
 .agents/skills
 .playwright-cli/
 test-results/
+
+# Machine-specific agent permissions
+.claude/settings.local.json
