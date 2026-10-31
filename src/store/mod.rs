@@ -28,6 +28,9 @@ pub enum StoreError {
     },
 }
 
+/// Input, extension id, item id, use count, last used at.
+pub type InputHistoryRow = (String, String, String, u32, i64);
+
 pub struct Store {
     connection: Mutex<Connection>,
 }
@@ -129,53 +132,11 @@ impl Store {
         })
     }
 
-    pub fn load_frecency(&self) -> rusqlite::Result<Vec<(String, u32, i64)>> {
+    pub fn load_frecency(&self) -> rusqlite::Result<Vec<(String, String, u32, i64)>> {
         self.with(|c| {
             let mut stmt = c.prepare(
-                "SELECT item_id, launch_count, last_launched_at \
+                "SELECT extension_id, item_id, launch_count, last_launched_at \
                  FROM frecency WHERE deleted_at IS NULL",
-            )?;
-            let rows = stmt.query_map([], |row| {
-                Ok((
-                    row.get::<_, String>(0)?,
-                    row.get::<_, i64>(1)? as u32,
-                    row.get::<_, i64>(2)?,
-                ))
-            })?;
-            rows.collect()
-        })
-    }
-
-    pub fn save_frecency(
-        &self,
-        item_id: &str,
-        launch_count: u32,
-        last_launched_at: i64,
-    ) -> rusqlite::Result<()> {
-        let now = now_millis();
-        self.with(|c| {
-            c.execute(
-                "INSERT INTO frecency \
-                 (id, item_id, launch_count, last_launched_at, updated_at) \
-                 VALUES (?1, ?2, ?3, ?4, ?5) \
-                 ON CONFLICT(item_id) DO UPDATE SET \
-                 launch_count = ?3, last_launched_at = ?4, updated_at = ?5, deleted_at = NULL",
-                params![
-                    uuid::Uuid::new_v4().to_string(),
-                    item_id,
-                    launch_count as i64,
-                    last_launched_at,
-                    now
-                ],
-            )?;
-            Ok(())
-        })
-    }
-
-    pub fn load_input_history(&self) -> rusqlite::Result<Vec<(String, String, u32, i64)>> {
-        self.with(|c| {
-            let mut stmt = c.prepare(
-                "SELECT input, item_id, use_count, last_used_at                  FROM input_history WHERE deleted_at IS NULL",
             )?;
             let rows = stmt.query_map([], |row| {
                 Ok((
@@ -189,9 +150,57 @@ impl Store {
         })
     }
 
+    pub fn save_frecency(
+        &self,
+        extension_id: &str,
+        item_id: &str,
+        launch_count: u32,
+        last_launched_at: i64,
+    ) -> rusqlite::Result<()> {
+        let now = now_millis();
+        self.with(|c| {
+            c.execute(
+                "INSERT INTO frecency \
+                 (id, extension_id, item_id, launch_count, last_launched_at, updated_at) \
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6) \
+                 ON CONFLICT(extension_id, item_id) DO UPDATE SET \
+                 launch_count = ?4, last_launched_at = ?5, updated_at = ?6, deleted_at = NULL",
+                params![
+                    uuid::Uuid::new_v4().to_string(),
+                    extension_id,
+                    item_id,
+                    launch_count as i64,
+                    last_launched_at,
+                    now
+                ],
+            )?;
+            Ok(())
+        })
+    }
+
+    pub fn load_input_history(&self) -> rusqlite::Result<Vec<InputHistoryRow>> {
+        self.with(|c| {
+            let mut stmt = c.prepare(
+                "SELECT input, extension_id, item_id, use_count, last_used_at \
+                 FROM input_history WHERE deleted_at IS NULL",
+            )?;
+            let rows = stmt.query_map([], |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, String>(2)?,
+                    row.get::<_, i64>(3)? as u32,
+                    row.get::<_, i64>(4)?,
+                ))
+            })?;
+            rows.collect()
+        })
+    }
+
     pub fn save_input_history(
         &self,
         input: &str,
+        extension_id: &str,
         item_id: &str,
         use_count: u32,
         last_used_at: i64,
@@ -199,10 +208,15 @@ impl Store {
         let now = now_millis();
         self.with(|c| {
             c.execute(
-                "INSERT INTO input_history                  (id, input, item_id, use_count, last_used_at, updated_at)                  VALUES (?1, ?2, ?3, ?4, ?5, ?6)                  ON CONFLICT(input, item_id) DO UPDATE SET                  use_count = ?4, last_used_at = ?5, updated_at = ?6, deleted_at = NULL",
+                "INSERT INTO input_history \
+                 (id, input, extension_id, item_id, use_count, last_used_at, updated_at) \
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7) \
+                 ON CONFLICT(input, extension_id, item_id) DO UPDATE SET \
+                 use_count = ?5, last_used_at = ?6, updated_at = ?7, deleted_at = NULL",
                 params![
                     uuid::Uuid::new_v4().to_string(),
                     input,
+                    extension_id,
                     item_id,
                     use_count as i64,
                     last_used_at,
@@ -299,19 +313,27 @@ mod tests {
     #[test]
     fn input_history_pairs_round_trip_and_update_in_place() {
         let store = Store::in_memory().unwrap();
-        store.save_input_history("cal", "calendar", 1, 10).unwrap();
         store
-            .save_input_history("cal", "calculator", 1, 11)
+            .save_input_history("cal", "apps", "calendar", 1, 10)
             .unwrap();
-        store.save_input_history("cal", "calendar", 2, 12).unwrap();
+        store
+            .save_input_history("cal", "apps", "calculator", 1, 11)
+            .unwrap();
+        store
+            .save_input_history("cal", "other", "calendar", 1, 12)
+            .unwrap();
+        store
+            .save_input_history("cal", "apps", "calendar", 2, 13)
+            .unwrap();
 
         let mut loaded = store.load_input_history().unwrap();
         loaded.sort();
         assert_eq!(
             loaded,
             vec![
-                ("cal".into(), "calculator".into(), 1, 11),
-                ("cal".into(), "calendar".into(), 2, 12),
+                ("cal".into(), "apps".into(), "calculator".into(), 1, 11),
+                ("cal".into(), "apps".into(), "calendar".into(), 2, 13),
+                ("cal".into(), "other".into(), "calendar".into(), 1, 12),
             ]
         );
     }
@@ -319,15 +341,20 @@ mod tests {
     #[test]
     fn frecency_round_trips_and_updates_in_place() {
         let store = Store::in_memory().unwrap();
-        store.save_frecency("calendar", 1, 10).unwrap();
-        store.save_frecency("safari", 4, 11).unwrap();
-        store.save_frecency("calendar", 2, 12).unwrap();
+        store.save_frecency("apps", "calendar", 1, 10).unwrap();
+        store.save_frecency("apps", "safari", 4, 11).unwrap();
+        store.save_frecency("other", "calendar", 3, 12).unwrap();
+        store.save_frecency("apps", "calendar", 2, 13).unwrap();
 
         let mut loaded = store.load_frecency().unwrap();
         loaded.sort();
         assert_eq!(
             loaded,
-            vec![("calendar".into(), 2, 12), ("safari".into(), 4, 11)]
+            vec![
+                ("apps".into(), "calendar".into(), 2, 13),
+                ("apps".into(), "safari".into(), 4, 11),
+                ("other".into(), "calendar".into(), 3, 12),
+            ]
         );
     }
 

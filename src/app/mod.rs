@@ -202,7 +202,7 @@ impl Core {
             }
             ui::Effect::InvokeCommand { command_id, query } => {
                 match self.run_command(&command_id) {
-                    Ok(()) => self.record_use(&command_id, Some(&query)),
+                    Ok(owner) => self.record_use(&owner, &command_id, Some(&query)),
                     Err(error) => {
                         self.apply(ui::Input::Event(ui::Event::Failed(error.to_string())))
                     }
@@ -448,7 +448,11 @@ impl Core {
         if outcome == ActionOutcome::Done {
             // Any successful action counts as use. Revealing an application is
             // reaching for it just as much as launching it is.
-            self.record_use(&request.item_id, request.query.as_deref());
+            self.record_use(
+                &request.extension_id,
+                &request.item_id,
+                request.query.as_deref(),
+            );
             self.hide_after_launch();
         }
         outcome
@@ -475,17 +479,22 @@ impl Core {
     /// call this: an action inside a pushed view passes no text, and a hotkey
     /// press never gets here, because a chord says nothing about what the user
     /// types to find an item.
-    fn record_use(&self, item_id: &str, query: Option<&str>) {
+    fn record_use(&self, extension_id: &str, item_id: &str, query: Option<&str>) {
         let now = now_millis();
-        self.services.frecency.record_launch(item_id, now);
+        self.services
+            .frecency
+            .record_launch(extension_id, item_id, now);
         if let Some(query) = query {
-            self.services.learned.record(query, item_id, now);
+            self.services
+                .learned
+                .record(query, extension_id, item_id, now);
         }
     }
 
     /// Runs a command through the invoker and streams its output the same way
-    /// for a launcher selection and a hotkey press.
-    fn run_command(self: &Arc<Self>, command_id: &str) -> Result<(), InvokeError> {
+    /// for a launcher selection and a hotkey press. Returns the extension that
+    /// owns the command.
+    fn run_command(self: &Arc<Self>, command_id: &str) -> Result<String, InvokeError> {
         let (owner, title, icon) = self
             .services
             .host
@@ -502,8 +511,8 @@ impl Core {
             .ok_or(InvokeError::Unavailable)?;
         let running = self.services.invoker.invoke(command_id)?;
         let icon = icon.or_else(|| self.context(&owner).icon);
-        self.pump(owner, ui::Context { title, icon }, running);
-        Ok(())
+        self.pump(owner.clone(), ui::Context { title, icon }, running);
+        Ok(owner)
     }
 
     fn context(&self, extension_id: &str) -> ui::Context {

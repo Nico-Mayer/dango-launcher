@@ -7,6 +7,7 @@ pub const MIGRATIONS: &[&str] = &[
     include_str!("migrations/0004_drop_config_tables.sql"),
     include_str!("migrations/0005_drop_records_tables.sql"),
     include_str!("migrations/0006_input_history.sql"),
+    include_str!("migrations/0007_rank_by_extension.sql"),
 ];
 
 #[derive(Debug, thiserror::Error)]
@@ -94,8 +95,7 @@ mod tests {
         run_all(&mut connection, &MIGRATIONS[..1]).unwrap();
         connection
             .execute(
-                "INSERT INTO frecency (id, item_id, launch_count, last_launched_at, updated_at) \
-                 VALUES ('a', 'ext.cmd', 5, 1, 1)",
+                "INSERT INTO local_app_index (app_id, name, indexed_at) VALUES ('app', 'App', 5)",
                 [],
             )
             .unwrap();
@@ -106,7 +106,7 @@ mod tests {
         assert!(table_exists(&connection, "local_clipboard_history"));
         let kept: i64 = connection
             .query_row(
-                "SELECT launch_count FROM frecency WHERE item_id = 'ext.cmd'",
+                "SELECT indexed_at FROM local_app_index WHERE app_id = 'app'",
                 [],
                 |r| r.get(0),
             )

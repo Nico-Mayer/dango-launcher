@@ -15,29 +15,56 @@ pub struct Record {
 }
 
 pub trait InputHistoryPersistence: Send + Sync {
-    fn load_all(&self) -> Vec<(String, String, Record)>;
-    fn save(&self, input: &str, item_id: &str, record: Record);
+    fn load_all(&self) -> Vec<(String, String, String, Record)>;
+    fn save(&self, input: &str, extension_id: &str, item_id: &str, record: Record);
 }
 
-/// What the learned pairs say about one typed text, per item id.
+/// Weights keyed by extension id, then item id.
+type ByItem = HashMap<String, HashMap<String, f64>>;
+
+/// What the learned pairs say about one typed text, per item.
 #[derive(Default)]
 pub struct Learned {
     /// The text was typed exactly before and this item chosen for it.
-    pub exact: HashMap<String, f64>,
+    exact: ByItem,
     /// Summed weight of every stored input that starts with the text.
-    pub prefix: HashMap<String, f64>,
+    prefix: ByItem,
+}
+
+impl Learned {
+    pub fn exact(&self, extension_id: &str, item_id: &str) -> Option<f64> {
+        get(&self.exact, extension_id, item_id)
+    }
+
+    pub fn prefix(&self, extension_id: &str, item_id: &str) -> Option<f64> {
+        get(&self.prefix, extension_id, item_id)
+    }
+}
+
+fn get(weights: &ByItem, extension_id: &str, item_id: &str) -> Option<f64> {
+    weights.get(extension_id)?.get(item_id).copied()
+}
+
+struct Pair {
+    extension_id: String,
+    item_id: String,
+    record: Record,
 }
 
 pub struct InputHistory {
-    pairs: Mutex<BTreeMap<String, Vec<(String, Record)>>>,
+    pairs: Mutex<BTreeMap<String, Vec<Pair>>>,
     persistence: Option<Box<dyn InputHistoryPersistence>>,
 }
 
 impl InputHistory {
     pub fn load(persistence: Box<dyn InputHistoryPersistence>) -> Self {
-        let mut pairs: BTreeMap<String, Vec<(String, Record)>> = BTreeMap::new();
-        for (input, item_id, record) in persistence.load_all() {
-            pairs.entry(input).or_default().push((item_id, record));
+        let mut pairs: BTreeMap<String, Vec<Pair>> = BTreeMap::new();
+        for (input, extension_id, item_id, record) in persistence.load_all() {
+            pairs.entry(input).or_default().push(Pair {
+                extension_id,
+                item_id,
+                record,
+            });
         }
         Self {
             pairs: Mutex::new(pairs),
@@ -52,7 +79,7 @@ impl InputHistory {
         }
     }
 
-    pub fn record(&self, input: &str, item_id: &str, now: i64) {
+    pub fn record(&self, input: &str, extension_id: &str, item_id: &str, now: i64) {
         let input = normalise(input);
         if input.is_empty() {
             return;
@@ -60,26 +87,30 @@ impl InputHistory {
         let record = {
             let mut pairs = self.pairs.lock().unwrap();
             let items = pairs.entry(input.clone()).or_default();
-            let position = match items.iter().position(|(id, _)| id == item_id) {
+            let position = match items
+                .iter()
+                .position(|pair| pair.extension_id == extension_id && pair.item_id == item_id)
+            {
                 Some(position) => position,
                 None => {
-                    items.push((
-                        item_id.to_string(),
-                        Record {
+                    items.push(Pair {
+                        extension_id: extension_id.to_string(),
+                        item_id: item_id.to_string(),
+                        record: Record {
                             use_count: 0,
                             last_used_at: now,
                         },
-                    ));
+                    });
                     items.len() - 1
                 }
             };
-            let record = &mut items[position].1;
+            let record = &mut items[position].record;
             record.use_count += 1;
             record.last_used_at = now;
             *record
         };
         if let Some(persistence) = &self.persistence {
-            persistence.save(&input, item_id, record);
+            persistence.save(&input, extension_id, item_id, record);
         }
     }
 
@@ -94,11 +125,20 @@ impl InputHistory {
             if !input.starts_with(&query) {
                 break;
             }
-            for (item_id, record) in items {
-                let weight = decayed(record, now);
-                *learned.prefix.entry(item_id.clone()).or_default() += weight;
+            for pair in items {
+                let weight = decayed(&pair.record, now);
+                *learned
+                    .prefix
+                    .entry(pair.extension_id.clone())
+                    .or_default()
+                    .entry(pair.item_id.clone())
+                    .or_default() += weight;
                 if *input == query {
-                    learned.exact.insert(item_id.clone(), weight);
+                    learned
+                        .exact
+                        .entry(pair.extension_id.clone())
+                        .or_default()
+                        .insert(pair.item_id.clone(), weight);
                 }
             }
         }
@@ -116,13 +156,14 @@ fn decayed(record: &Record, now: i64) -> f64 {
 }
 
 impl InputHistoryPersistence for std::sync::Arc<crate::store::Store> {
-    fn load_all(&self) -> Vec<(String, String, Record)> {
+    fn load_all(&self) -> Vec<(String, String, String, Record)> {
         self.load_input_history()
             .unwrap_or_default()
             .into_iter()
-            .map(|(input, item_id, use_count, last_used_at)| {
+            .map(|(input, extension_id, item_id, use_count, last_used_at)| {
                 (
                     input,
+                    extension_id,
                     item_id,
                     Record {
                         use_count,
@@ -133,10 +174,14 @@ impl InputHistoryPersistence for std::sync::Arc<crate::store::Store> {
             .collect()
     }
 
-    fn save(&self, input: &str, item_id: &str, record: Record) {
-        if let Err(error) =
-            self.save_input_history(input, item_id, record.use_count, record.last_used_at)
-        {
+    fn save(&self, input: &str, extension_id: &str, item_id: &str, record: Record) {
+        if let Err(error) = self.save_input_history(
+            input,
+            extension_id,
+            item_id,
+            record.use_count,
+            record.last_used_at,
+        ) {
             eprintln!("[dango] could not persist the input history for {item_id}: {error}");
         }
     }
@@ -151,19 +196,22 @@ mod tests {
     fn case_and_whitespace_fold_into_one_input() {
         let history = InputHistory::in_memory();
         let now = now_millis();
-        history.record("Cal", "calendar", now);
-        history.record(" cal", "calendar", now);
+        history.record("Cal", "ext", "calendar", now);
+        history.record(" cal", "ext", "calendar", now);
         let learned = history.lookup("cal", now);
-        assert_eq!(learned.exact["calendar"], 2.0);
-        assert!(history.lookup("CAL ", now).exact.contains_key("calendar"));
+        assert_eq!(learned.exact("ext", "calendar").unwrap(), 2.0);
+        assert!(history
+            .lookup("CAL ", now)
+            .exact("ext", "calendar")
+            .is_some());
     }
 
     #[test]
     fn an_empty_input_records_nothing_and_matches_nothing() {
         let history = InputHistory::in_memory();
         let now = now_millis();
-        history.record("   ", "calendar", now);
-        history.record("cal", "calendar", now);
+        history.record("   ", "ext", "calendar", now);
+        history.record("cal", "ext", "calendar", now);
         assert!(history.lookup("", now).prefix.is_empty());
         assert_eq!(history.pairs.lock().unwrap().len(), 1);
     }
@@ -172,22 +220,22 @@ mod tests {
     fn a_shorter_query_sees_the_pair_as_a_prefix_not_an_exact() {
         let history = InputHistory::in_memory();
         let now = now_millis();
-        history.record("cal", "calendar", now);
+        history.record("cal", "ext", "calendar", now);
 
         let exact = history.lookup("cal", now);
-        assert_eq!(exact.exact["calendar"], 1.0);
-        assert_eq!(exact.prefix["calendar"], 1.0);
+        assert_eq!(exact.exact("ext", "calendar").unwrap(), 1.0);
+        assert_eq!(exact.prefix("ext", "calendar").unwrap(), 1.0);
 
         let prefix = history.lookup("c", now);
         assert!(prefix.exact.is_empty());
-        assert_eq!(prefix.prefix["calendar"], 1.0);
+        assert_eq!(prefix.prefix("ext", "calendar").unwrap(), 1.0);
     }
 
     #[test]
     fn typing_past_the_stored_input_releases_it() {
         let history = InputHistory::in_memory();
         let now = now_millis();
-        history.record("cal", "calendar", now);
+        history.record("cal", "ext", "calendar", now);
         let learned = history.lookup("calc", now);
         assert!(learned.exact.is_empty());
         assert!(learned.prefix.is_empty());
@@ -197,21 +245,35 @@ mod tests {
     fn only_inputs_starting_with_the_query_count() {
         let history = InputHistory::in_memory();
         let now = now_millis();
-        history.record("cal", "calendar", now);
-        history.record("chrome", "chrome", now);
-        history.record("dal", "other", now);
+        history.record("cal", "ext", "calendar", now);
+        history.record("chrome", "ext", "chrome", now);
+        history.record("dal", "ext", "other", now);
         let learned = history.lookup("c", now);
-        assert_eq!(learned.prefix.len(), 2);
-        assert!(!learned.prefix.contains_key("other"));
+        assert_eq!(learned.prefix["ext"].len(), 2);
+        assert!(learned.prefix("ext", "other").is_none());
+    }
+
+    #[test]
+    fn the_same_item_id_in_two_extensions_learns_apart() {
+        let history = InputHistory::in_memory();
+        let now = now_millis();
+        history.record("cal", "one", "item", now);
+        let learned = history.lookup("cal", now);
+        assert!(learned.exact("one", "item").is_some());
+        assert!(learned.exact("two", "item").is_none());
+        assert!(learned.prefix("two", "item").is_none());
     }
 
     #[test]
     fn several_longer_inputs_add_up_for_one_item() {
         let history = InputHistory::in_memory();
         let now = now_millis();
-        history.record("cal", "calendar", now);
-        history.record("calen", "calendar", now);
-        assert_eq!(history.lookup("c", now).prefix["calendar"], 2.0);
+        history.record("cal", "ext", "calendar", now);
+        history.record("calen", "ext", "calendar", now);
+        assert_eq!(
+            history.lookup("c", now).prefix("ext", "calendar").unwrap(),
+            2.0
+        );
     }
 
     #[test]
@@ -220,11 +282,11 @@ mod tests {
         let now = now_millis();
         let month = 30 * 24 * 60 * 60 * 1000;
         for _ in 0..3 {
-            history.record("cal", "stale", now - 6 * month);
+            history.record("cal", "ext", "stale", now - 6 * month);
         }
-        history.record("cal", "fresh", now);
+        history.record("cal", "ext", "fresh", now);
         let learned = history.lookup("cal", now);
-        assert!(learned.exact["fresh"] > learned.exact["stale"]);
+        assert!(learned.exact("ext", "fresh").unwrap() > learned.exact("ext", "stale").unwrap());
     }
 
     #[test]
@@ -232,11 +294,12 @@ mod tests {
         use std::sync::Arc;
         const NOW: i64 = 1_700_000_000_000;
         #[derive(Default)]
-        struct Spy(Mutex<Vec<(String, String, u32)>>);
+        struct Spy(Mutex<Vec<(String, String, String, u32)>>);
         impl InputHistoryPersistence for Arc<Spy> {
-            fn load_all(&self) -> Vec<(String, String, Record)> {
+            fn load_all(&self) -> Vec<(String, String, String, Record)> {
                 vec![(
                     "seed".into(),
+                    "ext".into(),
                     "item".into(),
                     Record {
                         use_count: 2,
@@ -244,20 +307,25 @@ mod tests {
                     },
                 )]
             }
-            fn save(&self, input: &str, item_id: &str, record: Record) {
-                self.0
-                    .lock()
-                    .unwrap()
-                    .push((input.into(), item_id.into(), record.use_count));
+            fn save(&self, input: &str, extension_id: &str, item_id: &str, record: Record) {
+                self.0.lock().unwrap().push((
+                    input.into(),
+                    extension_id.into(),
+                    item_id.into(),
+                    record.use_count,
+                ));
             }
         }
         let spy = Arc::new(Spy::default());
         let history = InputHistory::load(Box::new(spy.clone()));
-        assert_eq!(history.lookup("seed", NOW).exact["item"], 2.0);
-        history.record("Seed", "item", NOW);
+        assert_eq!(
+            history.lookup("seed", NOW).exact("ext", "item").unwrap(),
+            2.0
+        );
+        history.record("Seed", "ext", "item", NOW);
         assert_eq!(
             spy.0.lock().unwrap().as_slice(),
-            &[("seed".to_string(), "item".to_string(), 3)]
+            &[("seed".to_string(), "ext".to_string(), "item".to_string(), 3)]
         );
     }
 }

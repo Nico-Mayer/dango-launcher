@@ -71,14 +71,14 @@ impl Ranker for DangoRanker {
 
             // A text the user already resolved to this item needs no textual
             // argument: it ranks on how established that choice is.
-            if let Some(weight) = learned.exact.get(&candidate.id) {
+            if let Some(weight) = learned.exact(&candidate.extension_id, &candidate.id) {
                 candidate.match_positions = best_field_match(&mut matcher, &candidate)
                     .map(|best| best.title_positions)
                     .unwrap_or_default();
                 scored.push(Scored {
                     candidate,
                     tier: Tier::LearnedExact,
-                    score: *weight,
+                    score: weight,
                 });
                 continue;
             }
@@ -87,8 +87,12 @@ impl Ranker for DangoRanker {
                 continue;
             };
             candidate.match_positions = best.title_positions;
-            let frecency = self.frecency.score(&candidate.id, now);
-            let prefix = learned.prefix.get(&candidate.id).copied().unwrap_or(0.0);
+            let frecency = self
+                .frecency
+                .score(&candidate.extension_id, &candidate.id, now);
+            let prefix = learned
+                .prefix(&candidate.extension_id, &candidate.id)
+                .unwrap_or(0.0);
             scored.push(Scored {
                 candidate,
                 tier: Tier::Match,
@@ -121,7 +125,7 @@ fn rank_empty_query(
     let mut scored: Vec<(Candidate, f64)> = rest
         .into_iter()
         .map(|c| {
-            let score = frecency.score(&c.id, now);
+            let score = frecency.score(&c.extension_id, &c.id, now);
             (c, score)
         })
         .collect();
@@ -227,7 +231,7 @@ mod tests {
         let frecency = Arc::new(FrecencyTable::in_memory());
         let now = frecency::now_millis();
         for _ in 0..10 {
-            frecency.record_launch("b", now);
+            frecency.record_launch("test", "b", now);
         }
         let ranker = ranker_with(frecency, Arc::new(InputHistory::in_memory()));
 
@@ -244,8 +248,8 @@ mod tests {
         let frecency = Arc::new(FrecencyTable::in_memory());
         let now = frecency::now_millis();
         let month = 30 * 24 * 60 * 60 * 1000;
-        frecency.record_launch("stale", now - 6 * month);
-        frecency.record_launch("fresh", now);
+        frecency.record_launch("test", "stale", now - 6 * month);
+        frecency.record_launch("test", "fresh", now);
         let ranker = ranker_with(frecency, Arc::new(InputHistory::in_memory()));
 
         let ranked = ranker.rank(
@@ -325,6 +329,23 @@ mod tests {
     }
 
     #[test]
+    fn frecency_counts_only_for_the_extension_that_was_used() {
+        let frecency = Arc::new(FrecencyTable::in_memory());
+        let now = frecency::now_millis();
+        for _ in 0..10 {
+            frecency.record_launch("other", "b", now);
+        }
+        let ranker = ranker_with(frecency, Arc::new(InputHistory::in_memory()));
+
+        let ranked = ranker.rank(
+            "app",
+            vec![candidate("a", "Apple"), candidate("b", "Apple")],
+            10,
+        );
+        assert_eq!(ranked[0].id, "a");
+    }
+
+    #[test]
     fn non_matching_candidates_are_dropped() {
         let ranker = ranker();
         let ranked = ranker.rank("zzz", vec![candidate("a", "Apple")], 10);
@@ -335,7 +356,7 @@ mod tests {
     fn empty_query_orders_by_frecency() {
         let frecency = Arc::new(FrecencyTable::in_memory());
         let now = frecency::now_millis();
-        frecency.record_launch("used", now);
+        frecency.record_launch("test", "used", now);
         let ranker = ranker_with(frecency, Arc::new(InputHistory::in_memory()));
         let ranked = ranker.rank(
             "",
@@ -360,7 +381,7 @@ mod tests {
     #[test]
     fn empty_query_marks_launched_items_as_suggestions() {
         let frecency = Arc::new(FrecencyTable::in_memory());
-        frecency.record_launch("used", frecency::now_millis());
+        frecency.record_launch("test", "used", frecency::now_millis());
         let ranker = ranker_with(frecency, Arc::new(InputHistory::in_memory()));
         let ranked = ranker.rank(
             "",
@@ -380,7 +401,7 @@ mod tests {
             .collect();
         for (i, c) in candidates.iter().enumerate() {
             for _ in 0..(8 - i) {
-                frecency.record_launch(&c.id, now);
+                frecency.record_launch("test", &c.id, now);
             }
         }
         candidates.push(candidate("aaa", "Aaa Never Launched"));
@@ -405,7 +426,7 @@ mod tests {
     #[test]
     fn pinned_items_lead_an_empty_query_in_provider_order() {
         let frecency = Arc::new(FrecencyTable::in_memory());
-        frecency.record_launch("used", frecency::now_millis());
+        frecency.record_launch("test", "used", frecency::now_millis());
         let ranker = ranker_with(frecency, Arc::new(InputHistory::in_memory()));
         let mut second = candidate("pin-b", "Zeta");
         second.pinned = true;
@@ -435,7 +456,7 @@ mod tests {
     #[test]
     fn a_query_marks_nothing_as_suggested() {
         let frecency = Arc::new(FrecencyTable::in_memory());
-        frecency.record_launch("used", frecency::now_millis());
+        frecency.record_launch("test", "used", frecency::now_millis());
         let ranker = ranker_with(frecency, Arc::new(InputHistory::in_memory()));
         let ranked = ranker.rank("use", vec![candidate("used", "Used")], 10);
         assert!(!ranked[0].suggested);
@@ -447,9 +468,9 @@ mod tests {
         let learned = Arc::new(InputHistory::in_memory());
         let now = frecency::now_millis();
         for _ in 0..20 {
-            frecency.record_launch("calc", now);
+            frecency.record_launch("test", "calc", now);
         }
-        learned.record("cal", "calendar", now);
+        learned.record("cal", "test", "calendar", now);
         let ranker = ranker_with(frecency, learned);
 
         let ranked = ranker.rank(
@@ -466,7 +487,7 @@ mod tests {
     #[test]
     fn a_learned_prefix_boosts_over_a_slightly_better_match() {
         let learned = Arc::new(InputHistory::in_memory());
-        learned.record("cal", "calendar", frecency::now_millis());
+        learned.record("cal", "test", "calendar", frecency::now_millis());
         let ranker = learned_ranker(learned);
 
         let ranked = ranker.rank(
@@ -487,9 +508,9 @@ mod tests {
         let learned = Arc::new(InputHistory::in_memory());
         let now = frecency::now_millis();
         for _ in 0..10 {
-            frecency.record_launch("chrome", now);
+            frecency.record_launch("test", "chrome", now);
         }
-        learned.record("cal", "calendar", now);
+        learned.record("cal", "test", "calendar", now);
         let ranker = ranker_with(frecency, learned);
 
         let ranked = ranker.rank(
@@ -506,7 +527,7 @@ mod tests {
     #[test]
     fn typing_past_a_learned_input_releases_it() {
         let learned = Arc::new(InputHistory::in_memory());
-        learned.record("cal", "calendar", frecency::now_millis());
+        learned.record("cal", "test", "calendar", frecency::now_millis());
         let ranker = learned_ranker(learned);
 
         let ranked = ranker.rank(
@@ -524,9 +545,9 @@ mod tests {
     fn a_repeated_correction_wins() {
         let learned = Arc::new(InputHistory::in_memory());
         let now = frecency::now_millis();
-        learned.record("cal", "calendar", now);
+        learned.record("cal", "test", "calendar", now);
         for _ in 0..3 {
-            learned.record("cal", "calc", now);
+            learned.record("cal", "test", "calc", now);
         }
         let ranker = learned_ranker(learned);
 
@@ -546,9 +567,9 @@ mod tests {
         let learned = Arc::new(InputHistory::in_memory());
         let now = frecency::now_millis();
         for _ in 0..10 {
-            learned.record("cal", "calendar", now);
+            learned.record("cal", "test", "calendar", now);
         }
-        learned.record("cal", "calc", now);
+        learned.record("cal", "test", "calc", now);
         let ranker = learned_ranker(learned);
 
         let ranked = ranker.rank(
@@ -568,9 +589,9 @@ mod tests {
         let now = frecency::now_millis();
         let month = 30 * 24 * 60 * 60 * 1000;
         for _ in 0..3 {
-            learned.record("cal", "calendar", now - 6 * month);
+            learned.record("cal", "test", "calendar", now - 6 * month);
         }
-        learned.record("cal", "calc", now);
+        learned.record("cal", "test", "calc", now);
         let ranker = learned_ranker(learned);
 
         let ranked = ranker.rank(
@@ -587,7 +608,7 @@ mod tests {
     #[test]
     fn an_alias_still_beats_a_learned_input() {
         let learned = Arc::new(InputHistory::in_memory());
-        learned.record("gm", "game", frecency::now_millis());
+        learned.record("gm", "test", "game", frecency::now_millis());
         let ranker = learned_ranker(learned);
         let mut mail = candidate("mail", "Mail");
         mail.alias = Some("gm".into());
@@ -602,9 +623,9 @@ mod tests {
         let frecency = Arc::new(FrecencyTable::in_memory());
         let learned = Arc::new(InputHistory::in_memory());
         let now = frecency::now_millis();
-        frecency.record_launch("used", now);
+        frecency.record_launch("test", "used", now);
         for _ in 0..5 {
-            learned.record("c", "cold", now);
+            learned.record("c", "test", "cold", now);
         }
         let ranker = ranker_with(frecency, learned);
 
