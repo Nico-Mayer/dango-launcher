@@ -112,7 +112,7 @@ pub enum HistoryError {
 
 impl From<rusqlite::Error> for HistoryError {
     fn from(error: rusqlite::Error) -> Self {
-        eprintln!("[dango] clipboard history: {error}");
+        crate::log::append(&format!("clipboard history: {error}"));
         HistoryError::Failed(error.to_string())
     }
 }
@@ -152,7 +152,7 @@ impl History {
             Content::Image(image) => {
                 let path = self.images.join(format!("{id}.png"));
                 std::fs::write(&path, image).map_err(|error| {
-                    eprintln!("[dango] clipboard history image: {error}");
+                    crate::log::append(&format!("clipboard history image: {error}"));
                     HistoryError::Failed(error.to_string())
                 })?;
                 (Kind::Image, None, Some(path.to_string_lossy().into_owned()))

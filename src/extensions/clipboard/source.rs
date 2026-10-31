@@ -69,7 +69,7 @@ impl CrateClipboard {
         match ClipboardContext::new() {
             Ok(context) => Some(Arc::new(Self { context })),
             Err(error) => {
-                eprintln!("[dango] no clipboard available: {error}");
+                crate::log::append(&format!("no clipboard available: {error}"));
                 None
             }
         }
@@ -104,7 +104,9 @@ impl ClipboardSource for CrateClipboard {
     fn set_text(&self, text: &str) {
         let written = until_free(|| self.context.set_text(text.to_string()), busy::possible);
         if let Err(error) = written {
-            eprintln!("[dango] could not put text back on the clipboard: {error}");
+            crate::log::append(&format!(
+                "could not put text back on the clipboard: {error}"
+            ));
         }
     }
 
@@ -112,7 +114,7 @@ impl ClipboardSource for CrateClipboard {
         let mut decoded = match RustImageData::from_bytes(png) {
             Ok(image) => Some(image),
             Err(error) => {
-                eprintln!("[dango] could not decode a stored image: {error}");
+                crate::log::append(&format!("could not decode a stored image: {error}"));
                 return;
             }
         };
@@ -127,7 +129,9 @@ impl ClipboardSource for CrateClipboard {
             busy::possible,
         );
         if let Err(error) = written {
-            eprintln!("[dango] could not put an image back on the clipboard: {error}");
+            crate::log::append(&format!(
+                "could not put an image back on the clipboard: {error}"
+            ));
         }
     }
 }

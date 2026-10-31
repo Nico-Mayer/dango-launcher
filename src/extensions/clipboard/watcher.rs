@@ -126,7 +126,7 @@ impl Watcher {
         match self.history.record(content, self.policy.bounds(), now) {
             Ok(()) => true,
             Err(error) => {
-                eprintln!("[dango] could not record what was copied: {error}");
+                crate::log::append(&format!("could not record what was copied: {error}"));
                 false
             }
         }
@@ -260,7 +260,7 @@ impl crate::extension::Service for WatchService {
             let mut context = match clipboard_rs::ClipboardWatcherContext::new() {
                 Ok(context) => context,
                 Err(error) => {
-                    eprintln!("[dango] could not watch the clipboard: {error}");
+                    crate::log::append(&format!("could not watch the clipboard: {error}"));
                     return;
                 }
             };

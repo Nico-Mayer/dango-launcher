@@ -65,7 +65,7 @@ impl ClipboardExtension {
         match self.history.entries() {
             Ok(entries) => history_view(&entries, primary_action(&self.preferences)),
             Err(error) => {
-                eprintln!("[dango] could not read the clipboard history: {error}");
+                crate::log::append(&format!("could not read the clipboard history: {error}"));
                 history_view(&[], primary_action(&self.preferences))
             }
         }
