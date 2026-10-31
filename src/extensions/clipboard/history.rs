@@ -10,6 +10,8 @@ use std::hash::{DefaultHasher, Hash, Hasher};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
+use rusqlite::OptionalExtension;
+
 use crate::store::Store;
 
 /// What was copied.
@@ -52,7 +54,8 @@ impl Content {
 pub struct Entry {
     pub id: String,
     pub kind: Kind,
-    /// The copied text, or `None` for an image.
+    /// The copied text, or `None` for an image. From `entries`, only the
+    /// first `LISTED_CHARS` characters.
     pub text: Option<String>,
     /// Where the image is, or `None` for text.
     pub path: Option<String>,
@@ -116,6 +119,10 @@ impl From<rusqlite::Error> for HistoryError {
         HistoryError::Failed(error.to_string())
     }
 }
+
+/// Enough of each text for a one-line preview, so listing the history never
+/// loads every copied text in full.
+const LISTED_CHARS: usize = 2000;
 
 pub struct History {
     store: Arc<Store>,
@@ -183,29 +190,27 @@ impl History {
     /// Newest first, which is the order the history is always read in.
     pub fn entries(&self) -> Result<Vec<Entry>, HistoryError> {
         let entries = self.store.with(|c| {
-            let mut stmt = c.prepare(
-                "SELECT entry_id, kind, text, path, copied_at FROM local_clipboard_history \
-                 ORDER BY copied_at DESC, rowid DESC",
-            )?;
-            let rows = stmt.query_map([], |row| {
-                Ok(Entry {
-                    id: row.get(0)?,
-                    kind: Kind::parse(&row.get::<_, String>(1)?),
-                    text: row.get(2)?,
-                    path: row.get(3)?,
-                    copied_at: row.get(4)?,
-                })
-            })?;
+            let mut stmt = c.prepare(&format!(
+                "SELECT entry_id, kind, substr(text, 1, {LISTED_CHARS}), path, copied_at \
+                 FROM local_clipboard_history ORDER BY copied_at DESC, rowid DESC"
+            ))?;
+            let rows = stmt.query_map([], entry)?;
             rows.collect::<rusqlite::Result<Vec<_>>>()
         })?;
         Ok(entries)
     }
 
     pub fn get(&self, id: &str) -> Result<Entry, HistoryError> {
-        self.entries()?
-            .into_iter()
-            .find(|entry| entry.id == id)
-            .ok_or(HistoryError::Gone)
+        let found = self.store.with(|c| {
+            c.query_row(
+                "SELECT entry_id, kind, text, path, copied_at FROM local_clipboard_history \
+                 WHERE entry_id = ?1",
+                [id],
+                entry,
+            )
+            .optional()
+        })?;
+        found.ok_or(HistoryError::Gone)
     }
 
     /// The content of an entry, ready to go back on the clipboard. An image
@@ -293,6 +298,16 @@ impl History {
         }
         Ok(())
     }
+}
+
+fn entry(row: &rusqlite::Row) -> rusqlite::Result<Entry> {
+    Ok(Entry {
+        id: row.get(0)?,
+        kind: Kind::parse(&row.get::<_, String>(1)?),
+        text: row.get(2)?,
+        path: row.get(3)?,
+        copied_at: row.get(4)?,
+    })
 }
 
 /// Discarding an image has to actually reclaim its space, or the size bound
@@ -503,6 +518,17 @@ mod tests {
 
         assert_eq!(history.content(&entries[1].id).unwrap(), text("hello"));
         assert_eq!(history.content(&entries[0].id).unwrap(), image(16));
+    }
+
+    #[test]
+    fn the_list_holds_a_preview_and_the_content_is_whole() {
+        let history = history();
+        let long = "x".repeat(LISTED_CHARS + 10);
+        history.record(text(&long), Bounds::default(), 1).unwrap();
+        let entry = history.entries().unwrap().remove(0);
+
+        assert_eq!(entry.text.unwrap().len(), LISTED_CHARS);
+        assert_eq!(history.content(&entry.id).unwrap(), text(&long));
     }
 
     #[test]
