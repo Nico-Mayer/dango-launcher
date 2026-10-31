@@ -5,7 +5,6 @@
 //! the search pipeline uses, because a command that streams has to be able to
 //! replace its view repeatedly while it is still working.
 
-use std::collections::HashMap;
 use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
@@ -101,40 +100,12 @@ pub trait CommandResolver: Send + Sync {
     fn resolve(&self, qualified_id: &str) -> Option<Resolved>;
 }
 
-/// Who actually executes a command. Every invocation goes through one, so the
-/// sandboxed host M8 adds slots in without changing a caller.
-pub trait CommandHost: Send + Sync {
-    fn run(&self, command: Arc<dyn Command>, ctx: InvocationContext);
-}
-
-/// The native host: built-ins are Rust, so running one is calling it, off the
-/// caller's thread because a command may block on the operating system.
-pub struct BuiltinHost;
-
-impl CommandHost for BuiltinHost {
-    fn run(&self, command: Arc<dyn Command>, ctx: InvocationContext) {
-        std::thread::spawn(move || {
-            // Only catches an unwind, which a release build does not do because
-            // the profile aborts. It still keeps a debug session alive.
-            if catch_unwind(AssertUnwindSafe(|| command.invoke(&ctx))).is_err() {
-                ctx.fail("That command stopped unexpectedly");
-            }
-        });
-    }
-}
-
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
 pub enum InvokeError {
     #[error("That command is no longer available")]
     Unavailable,
-    #[error("That command isn't available on this platform")]
-    HostUnavailable,
 }
 
-/// Starts invocations and keeps at most one of them relevant. Superseding does
-/// not interrupt the running command, which may be mid-way through an operating
-/// system call that cannot be abandoned safely; it stops its output being
-/// delivered, which is what the user can observe.
 /// A started invocation: the identity the launcher uses to tell one
 /// invocation's trees from another's, and the channel they arrive on.
 pub struct Running {
@@ -142,41 +113,31 @@ pub struct Running {
     pub output: mpsc::UnboundedReceiver<Output>,
 }
 
+/// Starts invocations and keeps at most one of them relevant. Superseding does
+/// not interrupt the running command, which may be mid-way through an operating
+/// system call that cannot be abandoned safely; it stops its output being
+/// delivered, which is what the user can observe.
 pub struct Invoker {
     resolver: Arc<dyn CommandResolver>,
-    hosts: HashMap<Host, Arc<dyn CommandHost>>,
     generation: Arc<AtomicU64>,
 }
 
 impl Invoker {
     pub fn new(resolver: Arc<dyn CommandResolver>) -> Self {
-        Self::with_hosts(
-            resolver,
-            [(Host::Builtin, Arc::new(BuiltinHost) as Arc<dyn CommandHost>)].into(),
-        )
-    }
-
-    pub fn with_hosts(
-        resolver: Arc<dyn CommandResolver>,
-        hosts: HashMap<Host, Arc<dyn CommandHost>>,
-    ) -> Self {
         Self {
             resolver,
-            hosts,
             generation: Arc::new(AtomicU64::new(0)),
         }
     }
 
+    /// Built-ins are Rust, so running one is calling it, off the caller's
+    /// thread because a command may block on the operating system.
     pub fn invoke(&self, qualified_id: &str) -> Result<Running, InvokeError> {
-        let resolved = self
+        let command = self
             .resolver
             .resolve(qualified_id)
-            .ok_or(InvokeError::Unavailable)?;
-        let host = self
-            .hosts
-            .get(&resolved.host)
-            .cloned()
-            .ok_or(InvokeError::HostUnavailable)?;
+            .ok_or(InvokeError::Unavailable)?
+            .command;
 
         let generation = self.generation.fetch_add(1, Ordering::SeqCst) + 1;
         let (tx, rx) = mpsc::unbounded_channel();
@@ -188,7 +149,13 @@ impl Invoker {
                 tx,
             }),
         };
-        host.run(resolved.command, ctx);
+        std::thread::spawn(move || {
+            // Only catches an unwind, which a release build does not do because
+            // the profile aborts. It still keeps a debug session alive.
+            if catch_unwind(AssertUnwindSafe(|| command.invoke(&ctx))).is_err() {
+                ctx.fail("That command stopped unexpectedly");
+            }
+        });
         Ok(Running {
             invocation: generation,
             output: rx,
@@ -259,6 +226,7 @@ impl Sink for ChannelSink {
 mod tests {
     use super::*;
     use crate::protocol::{Filtering, ListView, View};
+    use std::collections::HashMap;
     use std::sync::Mutex;
 
     fn tree() -> ViewTree {
@@ -374,18 +342,6 @@ mod tests {
         assert!(matches!(rx.recv().await, Some(Output::View(_))));
         assert!(matches!(rx.recv().await, Some(Output::View(_))));
         assert!(matches!(rx.recv().await, Some(Output::Finished(_))));
-    }
-
-    #[test]
-    fn a_command_naming_a_host_this_build_lacks_is_refused() {
-        let invoker = Invoker::with_hosts(
-            Fixed::new(vec![("sys.lock", Arc::new(Succeeds), Host::Builtin)]),
-            HashMap::new(),
-        );
-        assert_eq!(
-            invoker.invoke("sys.lock").err(),
-            Some(InvokeError::HostUnavailable)
-        );
     }
 
     #[tokio::test]
@@ -537,10 +493,8 @@ mod display_tests {
 
     #[test]
     fn every_message_is_a_sentence() {
-        for error in [InvokeError::Unavailable, InvokeError::HostUnavailable] {
-            let text = error.to_string();
-            assert!(text.starts_with(char::is_uppercase), "{text}");
-            assert!(!text.ends_with('.') && !text.contains(". "), "{text}");
-        }
+        let text = InvokeError::Unavailable.to_string();
+        assert!(text.starts_with(char::is_uppercase), "{text}");
+        assert!(!text.ends_with('.') && !text.contains(". "), "{text}");
     }
 }
