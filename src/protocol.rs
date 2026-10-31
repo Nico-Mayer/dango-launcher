@@ -303,19 +303,6 @@ protocol_types! {
         Alt,
         Shift,
     }
-
-    /// The result of a `no-view` command. On success the launcher hides; on
-    /// failure it stays open and shows the message.
-    #[serde(tag = "status", rename_all = "camelCase")]
-    pub enum CommandOutcome {
-        Success {
-            #[serde(default)]
-            message: Option<String>,
-        },
-        Failure {
-            message: String,
-        },
-    }
 }
 
 fn square() -> f32 {
