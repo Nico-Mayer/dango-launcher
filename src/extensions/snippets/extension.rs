@@ -403,21 +403,25 @@ fn item_actions(kind: Kind) -> Vec<Action> {
             id: ACTION_INSERT.into(),
             title: primary.into(),
             shortcut: None,
+            ..Default::default()
         },
         Action {
             id: ACTION_COPY.into(),
             title: "Copy".into(),
             shortcut: None,
+            ..Default::default()
         },
         Action {
             id: ACTION_EDIT.into(),
             title: "Edit".into(),
             shortcut: None,
+            ..Default::default()
         },
         Action {
             id: ACTION_REMOVE.into(),
             title: "Delete".into(),
             shortcut: None,
+            ..Default::default()
         },
     ]
 }
@@ -491,6 +495,7 @@ fn form_tree(record: Option<&Record>, kind: Kind) -> ViewTree {
                 id: ACTION_SAVE.into(),
                 title: save_title.into(),
                 shortcut: None,
+                ..Default::default()
             }],
         }),
     }
@@ -515,6 +520,7 @@ fn argument_tree(record: &Record, template: &Template, action_id: &str) -> ViewT
                 id: action_id.into(),
                 title: record.name.clone(),
                 shortcut: None,
+                ..Default::default()
             }],
         }),
     }

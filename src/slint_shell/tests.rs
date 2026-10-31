@@ -156,6 +156,7 @@ fn result(n: usize) -> ResultItem {
             id: "open".into(),
             title: "Open".into(),
             shortcut: None,
+            ..Default::default()
         }],
         match_positions: Vec::new(),
         suggested: false,
@@ -376,6 +377,7 @@ mod views {
                 id: "save".into(),
                 title: "Save".into(),
                 shortcut: None,
+                ..Default::default()
             }],
         }))
     }
@@ -480,6 +482,7 @@ mod action_panel {
                 key: "c".into(),
                 modifiers: vec![crate::protocol::Modifier::Ctrl],
             }),
+            ..Default::default()
         });
         let h = Harness::root(vec![item]);
         actions_button(&h).mock_single_click(PointerEventButton::Left);

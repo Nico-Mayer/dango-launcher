@@ -187,6 +187,7 @@ fn app_actions(has_path: bool) -> Vec<Action> {
         id: ACTION_LAUNCH.into(),
         title: "Open".into(),
         shortcut: None,
+        ..Default::default()
     }];
     if has_path {
         actions.push(Action {
@@ -196,6 +197,7 @@ fn app_actions(has_path: bool) -> Vec<Action> {
                 key: "r".into(),
                 modifiers: vec![Modifier::Ctrl],
             }),
+            ..Default::default()
         });
         actions.push(Action {
             id: ACTION_COPY_PATH.into(),
@@ -204,6 +206,7 @@ fn app_actions(has_path: bool) -> Vec<Action> {
                 key: "c".into(),
                 modifiers: vec![Modifier::Ctrl],
             }),
+            ..Default::default()
         });
     }
     actions

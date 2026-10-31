@@ -254,6 +254,7 @@ fn install_action() -> Action {
         id: ACTION_INSTALL.into(),
         title: "Install and restart".into(),
         shortcut: None,
+        ..Default::default()
     }
 }
 

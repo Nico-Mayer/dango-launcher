@@ -155,12 +155,27 @@ protocol_types! {
 
     /// The first action in a view's list is primary and runs on Enter. Others
     /// are reached through the action panel. Each may declare a shortcut.
+    #[derive(Default)]
     #[serde(rename_all = "camelCase")]
     pub struct Action {
         pub id: String,
         pub title: String,
         #[serde(default)]
         pub shortcut: Option<Shortcut>,
+        /// The heading it is listed under in the action panel.
+        #[serde(default)]
+        pub section: Option<String>,
+        #[serde(default)]
+        pub style: ActionStyle,
+    }
+
+    /// A danger action is listed after all others, in the danger role.
+    #[derive(Default)]
+    #[serde(rename_all = "camelCase")]
+    pub enum ActionStyle {
+        #[default]
+        Normal,
+        Danger,
     }
 
     #[serde(rename_all = "camelCase")]

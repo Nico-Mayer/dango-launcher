@@ -339,11 +339,13 @@ fn detail_tree(markdown: &str, loading: bool, actionable: bool) -> ViewTree {
                 id: ACTION_PASTE.into(),
                 title: "Paste".into(),
                 shortcut: None,
+                ..Default::default()
             },
             Action {
                 id: ACTION_COPY.into(),
                 title: "Copy".into(),
                 shortcut: None,
+                ..Default::default()
             },
         ],
         false => Vec::new(),
@@ -377,6 +379,7 @@ fn argument_tree(command: &AiCommand, template: &Template) -> ViewTree {
                 id: ACTION_RUN.into(),
                 title: command.title.clone(),
                 shortcut: None,
+                ..Default::default()
             }],
         }),
     }

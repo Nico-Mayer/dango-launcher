@@ -13,6 +13,7 @@ fn actions() -> Vec<Action> {
             id: "open".into(),
             title: "Open".into(),
             shortcut: None,
+            ..Default::default()
         },
         Action {
             id: "copy".into(),
@@ -21,6 +22,7 @@ fn actions() -> Vec<Action> {
                 key: "c".into(),
                 modifiers: vec![Modifier::Ctrl],
             }),
+            ..Default::default()
         },
     ]
 }
@@ -86,6 +88,7 @@ fn form_tree(fields: Vec<FormField>) -> ViewTree {
         id: "save".into(),
         title: "Save".into(),
         shortcut: None,
+        ..Default::default()
     }];
     form_actions.extend(actions());
     ViewTree::new(View::Form(FormView {
@@ -595,6 +598,7 @@ fn an_item_s_actions_win_over_the_view_s() {
         id: "only".into(),
         title: "Only".into(),
         shortcut: None,
+        ..Default::default()
     }];
     let mut h = Harness::view(list_tree(items));
     h.press("ArrowDown");
@@ -929,6 +933,37 @@ fn the_panel_binds_only_its_own_keys() {
 }
 
 #[test]
+fn danger_actions_come_last_under_their_section() {
+    let manage = |id: &str, title: &str, style| Action {
+        id: id.into(),
+        title: title.into(),
+        section: Some("Manage".into()),
+        style,
+        ..Default::default()
+    };
+    let mut item = result(1);
+    item.actions = vec![
+        actions().remove(0),
+        manage(
+            "delete",
+            "Delete entry",
+            crate::protocol::ActionStyle::Danger,
+        ),
+        manage("pin", "Pin entry", crate::protocol::ActionStyle::Normal),
+    ];
+    let mut h = Harness::new();
+    h.results("", vec![item]);
+    h.command("k");
+    let panel = h.snapshot().panel;
+    let titles: Vec<&str> = panel.actions.iter().map(|a| a.title.as_str()).collect();
+    assert_eq!(titles, ["Open", "Pin entry", "Delete entry"]);
+    assert_eq!(panel.actions[2].section.as_deref(), Some("Manage"));
+    h.press("ArrowDown");
+    h.press("ArrowDown");
+    assert_eq!(h.snapshot().panel.selected.as_deref(), Some("delete"));
+}
+
+#[test]
 fn a_click_on_a_panel_action_runs_it() {
     let mut h = Harness::root(3);
     h.intent(Intent::TogglePanel);
@@ -1008,6 +1043,7 @@ fn panel_selection_survives_replacement_of_unchanged_actions() {
             id: format!("action-{n}"),
             title: format!("Open action {n}"),
             shortcut: None,
+            ..Default::default()
         })
         .collect();
     let items: Vec<_> = results(18)
@@ -1133,6 +1169,7 @@ fn bindings_hold_the_shortcuts_of_the_current_selection() {
             key: "P".into(),
             modifiers: vec![Modifier::Cmd, Modifier::Shift],
         }),
+        ..Default::default()
     }];
     let mut h = Harness::new();
     h.results("", items);

@@ -206,11 +206,13 @@ fn confirmation(count: usize) -> ViewTree {
                     id: ACTION_CANCEL.into(),
                     title: "Cancel".into(),
                     shortcut: None,
+                    ..Default::default()
                 },
                 Action {
                     id: ACTION_CONFIRM.into(),
                     title: format!("Delete {count} {noun}"),
                     shortcut: None,
+                    ..Default::default()
                 },
             ],
         }),
@@ -249,6 +251,7 @@ fn running_list(apps: Vec<crate::platform::RunningApp>, icons: &IconCache) -> Vi
                         id: ACTION_QUIT.into(),
                         title: "Quit".into(),
                         shortcut: None,
+                        ..Default::default()
                     }],
                     ..Default::default()
                 })

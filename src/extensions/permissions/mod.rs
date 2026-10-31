@@ -151,6 +151,7 @@ fn warning(permission: Permission) -> Candidate {
             id: ACTION_GRANT.into(),
             title: "Grant access".into(),
             shortcut: None,
+            ..Default::default()
         }],
         match_positions: vec![],
         suggested: false,

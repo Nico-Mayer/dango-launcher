@@ -191,7 +191,7 @@ impl Launcher {
             failure: self.failure.clone(),
             footer: self.footer(),
             panel: Panel {
-                actions: self.available_actions().to_vec(),
+                actions: self.panel_actions().into_iter().cloned().collect(),
                 open: self.panel_open(),
                 selected: self.panel_selected(),
             },

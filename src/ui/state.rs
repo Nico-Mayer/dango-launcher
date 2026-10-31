@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use crate::extension::{ActionOutcome, FormValues};
 use crate::protocol::{
-    Action, FieldKind, Filtering, ListItem, Section, View, ViewTree, PROTOCOL_VERSION,
+    Action, ActionStyle, FieldKind, Filtering, ListItem, Section, View, ViewTree, PROTOCOL_VERSION,
 };
 
 use super::effect::{ActionRequest, Effect, Origin};
@@ -338,8 +338,12 @@ impl Launcher {
                 if escape {
                     self.panel = None;
                 } else if up || down {
-                    let ids = self.available_actions().iter().map(|a| a.id.as_str());
-                    let next = step(ids, self.panel_selected(), down);
+                    let actions = self.panel_actions();
+                    let next = step(
+                        actions.iter().map(|a| a.id.as_str()),
+                        self.panel_selected(),
+                        down,
+                    );
                     if let Some(panel) = self.panel.as_mut() {
                         panel.picked = next;
                     }
@@ -672,9 +676,30 @@ impl Launcher {
         }
     }
 
+    /// The actions in the order the panel lists them: grouped by section in
+    /// the order sections first appear, with danger actions after all others.
+    pub(super) fn panel_actions(&self) -> Vec<&Action> {
+        let actions = self.available_actions();
+        let mut sections: Vec<Option<&str>> = Vec::new();
+        for action in actions {
+            if !sections.contains(&action.section.as_deref()) {
+                sections.push(action.section.as_deref());
+            }
+        }
+        let pass = |danger: bool| {
+            sections.iter().flat_map(move |section| {
+                actions.iter().filter(move |action| {
+                    action.section.as_deref() == *section
+                        && (action.style == ActionStyle::Danger) == danger
+                })
+            })
+        };
+        pass(false).chain(pass(true)).collect()
+    }
+
     pub(super) fn panel_selected(&self) -> Option<String> {
         let panel = self.panel.as_ref()?;
-        let actions = self.available_actions();
+        let actions = self.panel_actions();
         panel
             .picked
             .as_deref()

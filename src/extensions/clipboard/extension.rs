@@ -306,11 +306,13 @@ fn item(entry: &Entry, primary: PrimaryAction) -> ListItem {
         id: ACTION_INSERT.into(),
         title: "Paste".into(),
         shortcut: None,
+        ..Default::default()
     };
     let copy = Action {
         id: ACTION_RESTORE.into(),
         title: "Copy".into(),
         shortcut: None,
+        ..Default::default()
     };
     let remove = Action {
         id: ACTION_REMOVE.into(),
@@ -319,6 +321,7 @@ fn item(entry: &Entry, primary: PrimaryAction) -> ListItem {
             key: "x".into(),
             modifiers: vec![Modifier::Ctrl],
         }),
+        ..Default::default()
     };
     let actions = match primary {
         PrimaryAction::Paste => vec![paste, copy, remove],
