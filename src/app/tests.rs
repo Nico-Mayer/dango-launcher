@@ -47,6 +47,7 @@ fn core_with_grab(config_json: &str, grab: FakeGrab) -> (Arc<Core>, Arc<Recordin
         contexts,
         applications: None,
         ai: None,
+        clipboard: None,
         hotkeys: Registry::new(Box::new(grab), launcher),
         hyperkey: Mutex::new(None),
     };

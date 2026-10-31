@@ -380,6 +380,7 @@ fn build_services(
         contexts,
         applications: Some(applications),
         ai: Some(ai),
+        clipboard: clipboard.map(|clipboard| clipboard as Arc<dyn ClipboardSource>),
         hotkeys,
         hyperkey,
     }

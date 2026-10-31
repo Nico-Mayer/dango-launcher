@@ -66,6 +66,7 @@ pub struct Services {
     pub contexts: HashMap<String, ui::Context>,
     pub applications: Option<Arc<ApplicationsExtension>>,
     pub ai: Option<AiParts>,
+    pub clipboard: Option<Arc<dyn ClipboardSource>>,
     pub hotkeys: Registry,
     pub hyperkey: Mutex<Option<Box<dyn platform::Hyperkey>>>,
 }
@@ -210,14 +211,13 @@ impl Core {
                     }
                 });
             }
-            ui::Effect::CopyText(text) => self.on_main_thread(move || {
-                use clipboard_rs::Clipboard;
-                let copied = clipboard_rs::ClipboardContext::new()
-                    .and_then(|clipboard| clipboard.set_text(text));
-                if let Err(error) = copied {
-                    eprintln!("[dango] could not copy to the clipboard: {error}");
+            ui::Effect::CopyText(text) => match self.services.clipboard.clone() {
+                Some(clipboard) => {
+                    self.runtime
+                        .spawn_blocking(move || clipboard.set_text(&text));
                 }
-            }),
+                None => eprintln!("[dango] no clipboard available, so nothing was copied"),
+            },
             ui::Effect::InspectTemplate { field, source } => {
                 let inspection = inspect_template(&source);
                 self.apply(ui::Input::Event(ui::Event::TemplateInspected {
