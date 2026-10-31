@@ -11,6 +11,7 @@
 //! the file is the durable form. Unknown fields on a record are preserved, so a
 //! later feature adding, say, a keyword does not lose it.
 
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, RwLock};
@@ -19,6 +20,7 @@ use serde_json::{Map, Value};
 
 use crate::templates::{Template, TemplateError, Values};
 
+use super::favicons::site_of;
 use super::matcher::KeywordEntry;
 
 #[derive(Debug, thiserror::Error)]
@@ -98,6 +100,9 @@ pub struct Records {
     /// The file failed to load, so the cache is not what the file holds and a
     /// write would replace the user's records with it.
     broken: AtomicBool,
+    /// Each quicklink's host by id, worked out when the set changes so root
+    /// search does not parse every template on each keystroke.
+    hosts: RwLock<HashMap<String, String>>,
 }
 
 impl Records {
@@ -115,9 +120,12 @@ impl Records {
             path,
             kind,
             broken: AtomicBool::new(error.is_some()),
-            cache: RwLock::new(records),
+            cache: RwLock::new(Vec::new()),
             own_write: Arc::new(Mutex::new(None)),
+            hosts: RwLock::new(HashMap::new()),
         });
+        store.set_hosts(&records);
+        *store.cache.write().unwrap() = records;
         (store, error)
     }
 
@@ -137,9 +145,31 @@ impl Records {
     /// the last good cache is kept and the error returned to be surfaced.
     pub fn reload(&self, text: &str) -> Result<(), RecordError> {
         let records = parse(text).inspect_err(|_| self.broken.store(true, Ordering::SeqCst))?;
-        *self.cache.write().unwrap() = with_ids(records);
+        let records = with_ids(records);
+        self.set_hosts(&records);
+        *self.cache.write().unwrap() = records;
         self.broken.store(false, Ordering::SeqCst);
         Ok(())
+    }
+
+    fn set_hosts(&self, records: &[Map<String, Value>]) {
+        if self.kind != Kind::Quicklink {
+            return;
+        }
+        let hosts = records
+            .iter()
+            .filter_map(|record| self.project(record))
+            .filter_map(|record| {
+                let (host, _) = site_of(&record)?;
+                Some((record.id, host))
+            })
+            .collect();
+        *self.hosts.write().unwrap() = hosts;
+    }
+
+    /// The host a quicklink opens, if its template resolves to a web URL.
+    pub fn host(&self, id: &str) -> Option<String> {
+        self.hosts.read().unwrap().get(id).cloned()
     }
 
     fn writable(&self) -> Result<(), RecordError> {
@@ -277,6 +307,7 @@ impl Records {
             crate::log::append(&format!("could not write {}: {error}", self.path.display()));
             return Err(RecordError::Write(self.kind.file_name()));
         }
+        self.set_hosts(&next);
         *cache = next;
         Ok(())
     }
@@ -660,6 +691,24 @@ mod tests {
         // The quicklink file uses "url" as its body key.
         let on_disk = std::fs::read_to_string(quicklinks.path()).unwrap();
         assert!(on_disk.contains("\"url\""), "quicklink body key: {on_disk}");
+    }
+
+    #[test]
+    fn a_quicklink_host_follows_its_url() {
+        let records = records(Kind::Quicklink);
+        let id = records
+            .create("Search", "https://example.com?q={{ query }}", None)
+            .unwrap();
+        assert_eq!(records.host(&id).as_deref(), Some("example.com"));
+        records
+            .update(
+                &id,
+                "Search",
+                "https://github.com/search?q={{ query }}",
+                None,
+            )
+            .unwrap();
+        assert_eq!(records.host(&id).as_deref(), Some("github.com"));
     }
 
     #[test]

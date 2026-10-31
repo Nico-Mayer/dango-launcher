@@ -22,7 +22,7 @@ use crate::search::{Candidate, RootProvider, Source};
 use crate::templates::{Rendered, Template, Values};
 use crate::text::{TextError, TextTarget};
 
-use super::favicons::{site_of, FaviconCache, FaviconService, FaviconSource, FaviconsEnabled};
+use super::favicons::{FaviconCache, FaviconService, FaviconSource, FaviconsEnabled};
 use super::service::{ExcludedApps, KeywordExpansion};
 use super::store::{Kind, Record, Records};
 
@@ -210,7 +210,7 @@ impl SnippetsExtension {
             Ok(records) => records,
             Err(error) => return failure_tree(&error.to_string(), self.records.kind()),
         };
-        list_tree(&items, &self.icons.sheet(self.kind()))
+        list_tree(&items, &self.icons.sheet(&self.records))
     }
 }
 
@@ -325,10 +325,11 @@ struct Icons {
 impl Icons {
     /// Fixes what is in play for one list. The preference is read here rather
     /// than per record, because it is read from the config file.
-    fn sheet(&self, kind: Kind) -> Sheet<'_> {
+    fn sheet<'a>(&'a self, records: &'a Records) -> Sheet<'a> {
         let wanted = self.enabled.as_ref().is_none_or(|enabled| enabled());
         Sheet {
-            kind,
+            kind: records.kind(),
+            records,
             favicons: wanted.then_some(self.favicons.as_deref()).flatten(),
         }
     }
@@ -338,16 +339,14 @@ impl Icons {
 /// run on the search path.
 struct Sheet<'a> {
     kind: Kind,
+    records: &'a Records,
     favicons: Option<&'a FaviconCache>,
 }
 
 impl Sheet<'_> {
     fn of(&self, record: &Record) -> String {
         self.favicons
-            .and_then(|cache| {
-                let (host, _) = site_of(record)?;
-                cache.path(&host)
-            })
+            .and_then(|cache| cache.path(&self.records.host(&record.id)?))
             .unwrap_or_else(|| icon(self.kind))
     }
 }
@@ -361,7 +360,7 @@ struct SnippetProvider {
 #[async_trait]
 impl RootProvider for SnippetProvider {
     async fn items(&self, _query: String) -> Vec<Candidate> {
-        let sheet = self.icons.sheet(self.kind);
+        let sheet = self.icons.sheet(&self.records);
         self.records
             .all()
             .unwrap_or_default()
@@ -442,7 +441,7 @@ struct ShowList(Arc<Records>, Icons);
 impl Command for ShowList {
     fn invoke(&self, ctx: &InvocationContext) {
         match self.0.all() {
-            Ok(records) => ctx.push_view(list_tree(&records, &self.1.sheet(self.0.kind()))),
+            Ok(records) => ctx.push_view(list_tree(&records, &self.1.sheet(&self.0))),
             Err(error) => ctx.fail(error.to_string()),
         }
     }
