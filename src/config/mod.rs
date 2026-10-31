@@ -323,9 +323,6 @@ pub struct CommandSettings {
     /// A short alias that matches this command in root search.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub alias: Option<String>,
-    /// Preference values scoped to this command.
-    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
-    pub preferences: BTreeMap<String, Value>,
     /// Whether the command is offered. Absent means yes; false removes a
     /// command the extension ships.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -392,19 +389,9 @@ impl Config {
 
     /// A preference value the file sets, as the string the reader expects.
     /// Typed JSON is rendered to the string form: a number to its digits, a
-    /// boolean to `true`/`false`, a string to itself. `command` scopes it to a
-    /// command's own preferences; `None` is the extension-level value.
-    pub fn preference(
-        &self,
-        extension_id: &str,
-        command: Option<&str>,
-        key: &str,
-    ) -> Option<String> {
-        let extension = self.extensions.get(extension_id)?;
-        let value = match command {
-            Some(command_id) => extension.commands.get(command_id)?.preferences.get(key)?,
-            None => extension.preferences.get(key)?,
-        };
+    /// boolean to `true`/`false`, a string to itself.
+    pub fn preference(&self, extension_id: &str, key: &str) -> Option<String> {
+        let value = self.extensions.get(extension_id)?.preferences.get(key)?;
         Some(match value {
             Value::String(text) => text.clone(),
             other => other.to_string(),
@@ -453,7 +440,7 @@ mod tests {
         assert_eq!(config.version, Some(1));
         assert_eq!(config.enabled("dango.clipboard"), Some(false));
         assert_eq!(
-            config.preference("dango.clipboard", None, "max_entries"),
+            config.preference("dango.clipboard", "max_entries"),
             Some("200".to_string())
         );
         assert_eq!(
@@ -526,7 +513,7 @@ mod tests {
         let config = Config::parse("{}").unwrap();
         assert_eq!(config.version, None);
         assert_eq!(config.enabled("anything"), None);
-        assert_eq!(config.preference("anything", None, "key"), None);
+        assert_eq!(config.preference("anything", "key"), None);
         assert!(config.launcher.hotkey.is_none());
     }
 

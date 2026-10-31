@@ -239,7 +239,7 @@ fn extensions(manifests: &[Manifest], base: &Value) -> Value {
 
 fn preferences(declarations: &[PreferenceDecl], description: Value) -> Value {
     let mut properties = Map::new();
-    for decl in declarations.iter().filter(|d| d.command_id.is_none()) {
+    for decl in declarations {
         let mut property = json!({
             "type": kind_name(decl.kind),
             "description": decl.description

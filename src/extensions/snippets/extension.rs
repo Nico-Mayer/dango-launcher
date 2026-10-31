@@ -616,7 +616,6 @@ pub(crate) fn manifest(kind: Kind) -> Manifest {
         ],
         preferences: match kind {
             Kind::Quicklink => vec![PreferenceDecl {
-                command_id: None,
                 key: PREF_FAVICONS.into(),
                 kind: PreferenceKind::Boolean,
                 default: Some(true.into()),

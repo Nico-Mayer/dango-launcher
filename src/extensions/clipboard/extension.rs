@@ -163,7 +163,6 @@ pub(crate) fn manifest() -> Manifest {
                 "The most the whole history may use, in megabytes.",
             ),
             PreferenceDecl {
-                command_id: None,
                 key: PREF_EXCLUDED.into(),
                 kind: PreferenceKind::String,
                 default: Some(DEFAULT_EXCLUDED_APPLICATIONS.join(", ").into()),
@@ -172,7 +171,6 @@ pub(crate) fn manifest() -> Manifest {
                 values: vec![],
             },
             PreferenceDecl {
-                command_id: None,
                 key: PREF_PRIMARY_ACTION.into(),
                 kind: PreferenceKind::String,
                 default: Some("paste".into()),
@@ -189,7 +187,6 @@ pub(crate) fn manifest() -> Manifest {
 
 fn number(key: &str, default: f64, description: &str) -> PreferenceDecl {
     PreferenceDecl {
-        command_id: None,
         key: key.into(),
         kind: PreferenceKind::Number,
         default: Some(default.into()),
@@ -359,10 +356,10 @@ mod tests {
     struct MemoryPreferences(Mutex<HashMap<String, String>>);
 
     impl PreferenceStore for MemoryPreferences {
-        fn get(&self, _extension_id: &str, _command_id: Option<&str>, key: &str) -> Option<String> {
+        fn get(&self, _extension_id: &str, key: &str) -> Option<String> {
             self.0.lock().unwrap().get(key).cloned()
         }
-        fn set(&self, _extension_id: &str, _command_id: Option<&str>, key: &str, value: &str) {
+        fn set(&self, _extension_id: &str, key: &str, value: &str) {
             self.0.lock().unwrap().insert(key.into(), value.into());
         }
     }
@@ -541,8 +538,8 @@ mod tests {
         assert_eq!(bounds.entry_bytes, 16 * 1024 * 1024);
         assert_eq!(bounds.total_bytes, 256 * 1024 * 1024);
 
-        store.set(EXTENSION_ID, None, PREF_ENTRIES, "20");
-        store.set(EXTENSION_ID, None, PREF_TOTAL_MEGABYTES, "8");
+        store.set(EXTENSION_ID, PREF_ENTRIES, "20");
+        store.set(EXTENSION_ID, PREF_TOTAL_MEGABYTES, "8");
         let bounds = policy.bounds();
         assert_eq!(bounds.entries, 20);
         assert_eq!(bounds.total_bytes, 8 * 1024 * 1024);
@@ -560,7 +557,7 @@ mod tests {
     fn the_exclusion_list_is_parsed_from_a_written_value() {
         let store = Arc::new(MemoryPreferences::default());
         let policy = policy(store.clone());
-        store.set(EXTENSION_ID, None, PREF_EXCLUDED, " Proton Pass ,, Notes ");
+        store.set(EXTENSION_ID, PREF_EXCLUDED, " Proton Pass ,, Notes ");
         assert_eq!(
             policy.excluded_applications(),
             ["Proton Pass".to_string(), "Notes".to_string()],
@@ -635,15 +632,14 @@ mod tests {
             [ACTION_INSERT, ACTION_RESTORE, ACTION_REMOVE]
         );
 
-        f.store.set(EXTENSION_ID, None, PREF_PRIMARY_ACTION, "copy");
+        f.store.set(EXTENSION_ID, PREF_PRIMARY_ACTION, "copy");
         assert_eq!(
             action_ids(&f.extension),
             [ACTION_RESTORE, ACTION_INSERT, ACTION_REMOVE],
             "read on every list build, so a config edit applies next time"
         );
 
-        f.store
-            .set(EXTENSION_ID, None, PREF_PRIMARY_ACTION, "teleport");
+        f.store.set(EXTENSION_ID, PREF_PRIMARY_ACTION, "teleport");
         assert_eq!(
             action_ids(&f.extension),
             [ACTION_INSERT, ACTION_RESTORE, ACTION_REMOVE],
@@ -655,7 +651,7 @@ mod tests {
     fn the_command_builds_its_view_with_the_same_order() {
         let f = build(Some(Arc::new(FakeTarget::default())));
         record_text(&f.history, "hello");
-        f.store.set(EXTENSION_ID, None, PREF_PRIMARY_ACTION, "copy");
+        f.store.set(EXTENSION_ID, PREF_PRIMARY_ACTION, "copy");
 
         let sink = Arc::new(RecordingSink::default());
         let command = f.extension.command(COMMAND_HISTORY).unwrap();

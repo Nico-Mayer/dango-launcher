@@ -411,7 +411,6 @@ pub(crate) fn manifest(commands: &[AiCommand]) -> Manifest {
             .collect(),
         preferences: vec![
             PreferenceDecl {
-                command_id: None,
                 key: PREF_PROVIDER.into(),
                 kind: PreferenceKind::String,
                 default: None,
@@ -419,7 +418,6 @@ pub(crate) fn manifest(commands: &[AiCommand]) -> Manifest {
                 values: vec![],
             },
             PreferenceDecl {
-                command_id: None,
                 key: PREF_THINKING.into(),
                 kind: PreferenceKind::String,
                 default: Some("off".into()),

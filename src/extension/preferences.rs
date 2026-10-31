@@ -12,8 +12,8 @@ use super::manifest::{PreferenceDecl, PreferenceKind};
 /// Where preference values are kept. Abstracted so the reader is testable
 /// without a database, the same way the enabled state is.
 pub trait PreferenceStore: Send + Sync {
-    fn get(&self, extension_id: &str, command_id: Option<&str>, key: &str) -> Option<String>;
-    fn set(&self, extension_id: &str, command_id: Option<&str>, key: &str, value: &str);
+    fn get(&self, extension_id: &str, key: &str) -> Option<String>;
+    fn set(&self, extension_id: &str, key: &str, value: &str);
 }
 
 /// One extension's view of its own preferences.
@@ -37,17 +37,15 @@ impl Preferences {
     }
 
     pub fn string(&self, key: &str) -> Option<String> {
-        self.read(None, key, PreferenceKind::String, |raw| {
-            Some(raw.to_string())
-        })
+        self.read(key, PreferenceKind::String, |raw| Some(raw.to_string()))
     }
 
     pub fn number(&self, key: &str) -> Option<f64> {
-        self.read(None, key, PreferenceKind::Number, |raw| raw.parse().ok())
+        self.read(key, PreferenceKind::Number, |raw| raw.parse().ok())
     }
 
     pub fn boolean(&self, key: &str) -> Option<bool> {
-        self.read(None, key, PreferenceKind::Boolean, |raw| raw.parse().ok())
+        self.read(key, PreferenceKind::Boolean, |raw| raw.parse().ok())
     }
 
     /// A number read as a count, which is what every bound in practice is.
@@ -58,17 +56,15 @@ impl Preferences {
     }
 
     pub fn set_string(&self, key: &str, value: &str) {
-        self.store.set(&self.extension_id, None, key, value);
+        self.store.set(&self.extension_id, key, value);
     }
 
     pub fn set_number(&self, key: &str, value: f64) {
-        self.store
-            .set(&self.extension_id, None, key, &value.to_string());
+        self.store.set(&self.extension_id, key, &value.to_string());
     }
 
     pub fn set_boolean(&self, key: &str, value: bool) {
-        self.store
-            .set(&self.extension_id, None, key, &value.to_string());
+        self.store.set(&self.extension_id, key, &value.to_string());
     }
 
     /// The stored value when it parses as the declared type, the declared
@@ -77,18 +73,17 @@ impl Preferences {
     /// schema change that invalidated it.
     fn read<T>(
         &self,
-        command_id: Option<&str>,
         key: &str,
         kind: PreferenceKind,
         parse: impl Fn(&str) -> Option<T>,
     ) -> Option<T> {
-        let declaration = self.declaration(command_id, key)?;
+        let declaration = self.declaration(key)?;
         if declaration.kind != kind {
             return None;
         }
         let stored = self
             .store
-            .get(&self.extension_id, command_id, key)
+            .get(&self.extension_id, key)
             .filter(|raw| declaration.accepts(raw))
             .and_then(|raw| parse(&raw));
         stored.or_else(|| {
@@ -99,10 +94,8 @@ impl Preferences {
         })
     }
 
-    fn declaration(&self, command_id: Option<&str>, key: &str) -> Option<&PreferenceDecl> {
-        self.declarations
-            .iter()
-            .find(|d| d.key == key && d.command_id.as_deref() == command_id)
+    fn declaration(&self, key: &str) -> Option<&PreferenceDecl> {
+        self.declarations.iter().find(|d| d.key == key)
     }
 }
 
@@ -125,35 +118,29 @@ mod tests {
     struct MemoryStore(Mutex<HashMap<String, String>>);
 
     impl MemoryStore {
-        fn key(extension_id: &str, command_id: Option<&str>, key: &str) -> String {
-            format!("{extension_id}/{}/{key}", command_id.unwrap_or_default())
+        fn key(extension_id: &str, key: &str) -> String {
+            format!("{extension_id}/{key}")
         }
     }
 
     impl PreferenceStore for MemoryStore {
-        fn get(&self, extension_id: &str, command_id: Option<&str>, key: &str) -> Option<String> {
+        fn get(&self, extension_id: &str, key: &str) -> Option<String> {
             self.0
                 .lock()
                 .unwrap()
-                .get(&Self::key(extension_id, command_id, key))
+                .get(&Self::key(extension_id, key))
                 .cloned()
         }
-        fn set(&self, extension_id: &str, command_id: Option<&str>, key: &str, value: &str) {
+        fn set(&self, extension_id: &str, key: &str, value: &str) {
             self.0
                 .lock()
                 .unwrap()
-                .insert(Self::key(extension_id, command_id, key), value.to_string());
+                .insert(Self::key(extension_id, key), value.to_string());
         }
     }
 
-    fn decl(
-        command_id: Option<&str>,
-        key: &str,
-        kind: PreferenceKind,
-        default: Option<serde_json::Value>,
-    ) -> PreferenceDecl {
+    fn decl(key: &str, kind: PreferenceKind, default: Option<serde_json::Value>) -> PreferenceDecl {
         PreferenceDecl {
-            command_id: command_id.map(str::to_string),
             key: key.into(),
             kind,
             default,
@@ -165,12 +152,12 @@ mod tests {
     #[test]
     fn a_string_outside_the_declared_set_reads_as_the_default() {
         let store = Arc::new(MemoryStore::default());
-        store.set("x", None, "action", "speak");
-        let mut declaration = decl(None, "action", PreferenceKind::String, Some("paste".into()));
+        store.set("x", "action", "speak");
+        let mut declaration = decl("action", PreferenceKind::String, Some("paste".into()));
         declaration.values = vec!["paste".into(), "copy".into()];
         let preferences = Preferences::new("x", vec![declaration], store.clone());
         assert_eq!(preferences.string("action").as_deref(), Some("paste"));
-        store.set("x", None, "action", "copy");
+        store.set("x", "action", "copy");
         assert_eq!(preferences.string("action").as_deref(), Some("copy"));
     }
 
@@ -178,10 +165,10 @@ mod tests {
         Preferences::new(
             "dango.clipboard",
             vec![
-                decl(None, "entries", PreferenceKind::Number, Some(500.into())),
-                decl(None, "excluded", PreferenceKind::String, Some("".into())),
-                decl(None, "enabled", PreferenceKind::Boolean, Some(true.into())),
-                decl(None, "no-default", PreferenceKind::Number, None),
+                decl("entries", PreferenceKind::Number, Some(500.into())),
+                decl("excluded", PreferenceKind::String, Some("".into())),
+                decl("enabled", PreferenceKind::Boolean, Some(true.into())),
+                decl("no-default", PreferenceKind::Number, None),
             ],
             store,
         )
@@ -206,7 +193,7 @@ mod tests {
     #[test]
     fn a_value_that_no_longer_parses_falls_back_to_the_default() {
         let store = Arc::new(MemoryStore::default());
-        store.set("dango.clipboard", None, "entries", "not a number");
+        store.set("dango.clipboard", "entries", "not a number");
         let prefs = preferences(store);
         assert_eq!(
             prefs.count("entries"),
@@ -235,44 +222,9 @@ mod tests {
     }
 
     #[test]
-    fn extension_and_command_scopes_with_one_key_stay_apart() {
-        let store = Arc::new(MemoryStore::default());
-        let prefs = Preferences::new(
-            "dango.clipboard",
-            vec![
-                decl(None, "limit", PreferenceKind::Number, Some(1.into())),
-                decl(
-                    Some("history"),
-                    "limit",
-                    PreferenceKind::Number,
-                    Some(2.into()),
-                ),
-            ],
-            store.clone(),
-        );
-        assert_eq!(prefs.count("limit"), Some(1));
-        assert_eq!(
-            prefs.read(Some("history"), "limit", PreferenceKind::Number, |raw| raw
-                .parse::<f64>()
-                .ok()),
-            Some(2.0)
-        );
-
-        prefs.set_number("limit", 9.0);
-        assert_eq!(prefs.count("limit"), Some(9));
-        assert_eq!(
-            prefs.read(Some("history"), "limit", PreferenceKind::Number, |raw| raw
-                .parse::<f64>()
-                .ok()),
-            Some(2.0),
-            "setting the extension-level value must not touch the command-level one"
-        );
-    }
-
-    #[test]
     fn an_extension_only_reads_its_own_values() {
         let store = Arc::new(MemoryStore::default());
-        store.set("dango.applications", None, "entries", "7");
+        store.set("dango.applications", "entries", "7");
         let prefs = preferences(store);
         assert_eq!(
             prefs.count("entries"),

@@ -269,7 +269,6 @@ Per-command settings, keyed by command id.
 | `hotkey` | [Hotkey](#hotkey) |  |  | A global hotkey that runs this command from anywhere. A no-view command runs without showing the launcher; a view command shows its view. |
 | `model` | string |  |  | The model this command uses. Absent falls back to the provider's model. |
 | `output` | [Output](#output) |  |  | What becomes of the answer: shown in the launcher, pasted into the previous app, or copied. Default view. |
-| `preferences` | object |  |  | Preference values scoped to this command. |
 | `prompt` | string |  |  | What the model is asked, as a template. Placeholders: {{ selection }}, {{ clipboard }}, and any other name, which the launcher asks for. |
 | `provider` | string |  |  | The provider this command uses, by its name under providers. Absent falls back to the extension's default provider. |
 | `thinking` | string |  | `off`, `low`, `medium`, `high` | How hard the model thinks before answering. Absent falls back to the extension's default level. |
@@ -289,7 +288,6 @@ Per-command settings, keyed by command id.
 | `alias` | string |  |  | A short alias that matches this command in root search. |
 | `enabled` | boolean |  |  | Whether the command is offered. Absent means yes; false removes a command the extension ships. |
 | `hotkey` | [Hotkey](#hotkey) |  |  | A global hotkey that runs this command from anywhere. A no-view command runs without showing the launcher; a view command shows its view. |
-| `preferences` | object |  |  | Preference values scoped to this command. |
 
 ## Hotkey
 

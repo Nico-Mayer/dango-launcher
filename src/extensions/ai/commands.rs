@@ -217,12 +217,12 @@ impl Providers {
             return Self::default();
         };
         let default_thinking = config
-            .preference(EXTENSION_ID, None, PREF_THINKING)
+            .preference(EXTENSION_ID, PREF_THINKING)
             .and_then(|text| Thinking::parse(&text))
             .unwrap_or_default();
         Self {
             entries: extension.providers.clone(),
-            default_provider: config.preference(EXTENSION_ID, None, PREF_PROVIDER),
+            default_provider: config.preference(EXTENSION_ID, PREF_PROVIDER),
             default_thinking,
         }
     }

@@ -83,31 +83,19 @@ impl FileConfig {
 }
 
 impl PreferenceStore for FileConfig {
-    fn get(&self, extension_id: &str, command_id: Option<&str>, key: &str) -> Option<String> {
-        self.config
-            .read()
-            .unwrap()
-            .preference(extension_id, command_id, key)
+    fn get(&self, extension_id: &str, key: &str) -> Option<String> {
+        self.config.read().unwrap().preference(extension_id, key)
     }
 
-    fn set(&self, extension_id: &str, command_id: Option<&str>, key: &str, value: &str) {
+    fn set(&self, extension_id: &str, key: &str, value: &str) {
         {
             let mut config = self.config.write().unwrap();
-            let extension = config
+            config
                 .extensions
                 .entry(extension_id.to_string())
-                .or_default();
-            let preferences = match command_id {
-                Some(command) => {
-                    &mut extension
-                        .commands
-                        .entry(command.to_string())
-                        .or_default()
-                        .preferences
-                }
-                None => &mut extension.preferences,
-            };
-            preferences.insert(key.to_string(), Value::String(value.to_string()));
+                .or_default()
+                .preferences
+                .insert(key.to_string(), Value::String(value.to_string()));
         }
         self.persist();
     }
@@ -150,10 +138,10 @@ mod tests {
             r#"{ "extensions": { "dango.clipboard": { "preferences": { "max_entries": 200 } } } }"#;
         let store = FileConfig::new(temp_path("pref"), Config::parse(text).unwrap());
         assert_eq!(
-            store.get("dango.clipboard", None, "max_entries"),
+            store.get("dango.clipboard", "max_entries"),
             Some("200".to_string())
         );
-        assert_eq!(store.get("dango.clipboard", None, "unset"), None);
+        assert_eq!(store.get("dango.clipboard", "unset"), None);
     }
 
     #[test]

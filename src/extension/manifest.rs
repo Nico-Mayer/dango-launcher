@@ -44,9 +44,6 @@ pub enum InvocationMode {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct PreferenceDecl {
-    /// `None` scopes the preference to the whole extension; `Some(command_id)`
-    /// scopes it to one command.
-    pub command_id: Option<String>,
     pub key: String,
     pub kind: PreferenceKind,
     pub default: Option<serde_json::Value>,
@@ -213,7 +210,6 @@ mod tests {
 
     fn preference() -> PreferenceDecl {
         PreferenceDecl {
-            command_id: None,
             key: "token".into(),
             kind: PreferenceKind::String,
             default: None,
