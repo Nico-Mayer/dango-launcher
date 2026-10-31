@@ -6,6 +6,7 @@
 //! make the size ceiling a `VACUUM` problem in the file that also holds
 //! preferences and frecency.
 
+use std::collections::HashSet;
 use std::hash::{DefaultHasher, Hash, Hasher};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -132,7 +133,33 @@ pub struct History {
 impl History {
     pub fn new(store: Arc<Store>, images: PathBuf) -> Self {
         let _ = std::fs::create_dir_all(&images);
-        Self { store, images }
+        let history = Self { store, images };
+        history.delete_orphaned_images();
+        history
+    }
+
+    /// An image whose row is gone, after a failed insert or a database set
+    /// aside as corrupt, would otherwise stay on disk outside every bound.
+    fn delete_orphaned_images(&self) {
+        let paths = self.store.with(|c| {
+            let mut stmt =
+                c.prepare("SELECT path FROM local_clipboard_history WHERE path IS NOT NULL")?;
+            let rows = stmt.query_map([], |row| row.get::<_, String>(0))?;
+            rows.collect::<rusqlite::Result<HashSet<_>>>()
+        });
+        let Ok(paths) = paths else {
+            return;
+        };
+        let Ok(files) = std::fs::read_dir(&self.images) else {
+            return;
+        };
+        for file in files.flatten() {
+            let path = file.path();
+            let is_png = path.extension().is_some_and(|ext| ext == "png");
+            if is_png && !paths.contains(path.to_string_lossy().as_ref()) {
+                let _ = std::fs::remove_file(&path);
+            }
+        }
     }
 
     /// Records what was copied and trims the history back inside its bounds.
@@ -518,6 +545,22 @@ mod tests {
 
         assert_eq!(history.content(&entries[1].id).unwrap(), text("hello"));
         assert_eq!(history.content(&entries[0].id).unwrap(), image(16));
+    }
+
+    #[test]
+    fn an_image_without_a_row_is_deleted_on_start() {
+        let store = Arc::new(Store::in_memory().unwrap());
+        let dir = std::env::temp_dir().join(format!("dango-clip-{}", uuid::Uuid::new_v4()));
+        let history = History::new(store.clone(), dir.clone());
+        history.record(image(32), Bounds::default(), 1).unwrap();
+        let kept = history.entries().unwrap()[0].path.clone().unwrap();
+        let orphan = dir.join("orphan.png");
+        std::fs::write(&orphan, [1, 2, 3]).unwrap();
+
+        History::new(store, dir);
+
+        assert!(!orphan.exists());
+        assert!(Path::new(&kept).exists());
     }
 
     #[test]
