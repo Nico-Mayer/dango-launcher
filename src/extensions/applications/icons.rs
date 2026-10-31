@@ -1,6 +1,7 @@
+use std::collections::HashSet;
 use std::io::BufWriter;
 use std::path::PathBuf;
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 
 use super::index::IconRgba;
 
@@ -12,38 +13,51 @@ pub const ICON_SIZE: u32 = 64;
 /// stays without a file so the frontend renders a placeholder.
 pub struct IconCache {
     dir: PathBuf,
+    cached: RwLock<HashSet<String>>,
 }
 
 impl IconCache {
     pub fn new(dir: PathBuf) -> Arc<Self> {
         let _ = std::fs::create_dir_all(&dir);
-        Arc::new(Self { dir })
+        let cached = std::fs::read_dir(&dir)
+            .into_iter()
+            .flatten()
+            .filter_map(|entry| entry.ok()?.file_name().into_string().ok())
+            .filter(|name| name.ends_with(".png"))
+            .collect();
+        Arc::new(Self {
+            dir,
+            cached: RwLock::new(cached),
+        })
     }
 
     /// The cached icon path for an app, or `None` when nothing is cached yet.
     pub fn path(&self, app_id: &str) -> Option<String> {
-        let path = self.file_for(app_id);
-        path.exists().then(|| path.to_string_lossy().into_owned())
+        let name = file_name(app_id);
+        self.cached
+            .read()
+            .unwrap()
+            .contains(&name)
+            .then(|| self.dir.join(name).to_string_lossy().into_owned())
     }
 
     /// Writes the icon if it is missing, rendering it only then. The renderer
     /// is passed in rather than held, so the same cache serves anything with an
     /// icon without knowing where it came from.
     pub fn ensure_with(&self, key: &str, render: impl FnOnce() -> Option<IconRgba>) {
-        let path = self.file_for(key);
-        if path.exists() {
+        let name = file_name(key);
+        if self.cached.read().unwrap().contains(&name) {
             return;
         }
         let Some(icon) = render() else {
             return;
         };
-        if let Err(error) = write_png(&path, &icon.rgba, icon.width, icon.height) {
-            eprintln!("[dango] could not cache icon for {key}: {error}");
+        match write_png(&self.dir.join(&name), &icon.rgba, icon.width, icon.height) {
+            Ok(()) => {
+                self.cached.write().unwrap().insert(name);
+            }
+            Err(error) => eprintln!("[dango] could not cache icon for {key}: {error}"),
         }
-    }
-
-    fn file_for(&self, app_id: &str) -> PathBuf {
-        self.dir.join(format!("{}.png", sanitize(app_id)))
     }
 
     #[cfg(test)]
@@ -53,11 +67,12 @@ impl IconCache {
     }
 }
 
-fn sanitize(app_id: &str) -> String {
-    app_id
+fn file_name(app_id: &str) -> String {
+    let stem: String = app_id
         .chars()
         .map(|c| if c.is_alphanumeric() { c } else { '_' })
-        .collect()
+        .collect();
+    format!("{stem}.png")
 }
 
 fn write_png(path: &std::path::Path, rgba: &[u8], width: u32, height: u32) -> std::io::Result<()> {
@@ -115,6 +130,14 @@ mod tests {
             .map(|entry| entry.unwrap().file_name())
             .collect();
         assert_eq!(names, ["code.png"]);
+    }
+
+    #[test]
+    fn icons_cached_by_an_earlier_run_are_found() {
+        let cache = IconCache::in_temp();
+        cache.ensure_with("code", blue);
+        let reopened = IconCache::new(cache.dir.clone());
+        assert_eq!(reopened.path("code"), cache.path("code"));
     }
 
     #[test]
