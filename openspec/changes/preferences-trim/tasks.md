@@ -10,5 +10,5 @@
 
 ## 3. Wrap up
 
-- [ ] 3.1 Run `hk check` and `cargo test`. Verify: both pass.
-- [ ] 3.2 Run the `ponytail-review` skill in a fresh subagent on this change's commits, without the apply context. The review only reports findings; the author decides what to fix.
+- [x] 3.1 Run `hk check` and `cargo test`. Verify: both pass.
+- [x] 3.2 Run the `ponytail-review` skill in a fresh subagent on this change's commits, without the apply context. The review only reports findings; the author decides what to fix.
