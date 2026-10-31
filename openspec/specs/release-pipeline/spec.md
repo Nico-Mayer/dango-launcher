@@ -126,6 +126,10 @@ manifest SHALL point at the NSIS installer. The updater key and the macOS
 signing certificate SHALL come from repository secrets and MUST NOT be checked
 in.
 
+The Windows release SHALL carry exactly one installer, an NSIS `.exe` that
+installs Dango for the current user without administrator rights. No `.msi`
+SHALL be produced.
+
 The macOS application SHALL be signed with the same code signing identity in
 every release, so its designated requirement stays the same from one version
 to the next.
@@ -133,7 +137,13 @@ to the next.
 #### Scenario: Windows assets
 
 - **WHEN** the tag `v0.3.0` is pushed and the workflow completes
-- **THEN** the release `v0.3.0` contains a Windows `.msi` and an NSIS `.exe` installer, both installing an application that reports version `0.3.0`
+- **THEN** the release `v0.3.0` contains one Windows installer, an NSIS `.exe`, installing an application that reports version `0.3.0`
+- **AND** the release contains no `.msi`
+
+#### Scenario: Windows install needs no administrator
+
+- **WHEN** a standard user without administrator rights runs the NSIS installer of `v0.3.0`
+- **THEN** Dango installs for that user without an elevation prompt and starts
 
 #### Scenario: macOS assets
 
