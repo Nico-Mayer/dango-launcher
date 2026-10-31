@@ -43,6 +43,9 @@ None.
 - `extension-model`: "Typed preferences" is removed and replaced by "Extension
   preferences" (extension-level, optional values). OpenSpec cannot drop a
   scenario through MODIFIED, so this is a remove plus add.
+- `local-store`: "Preference values are stored and read back" loses its command
+  scope and the "Extension and command scopes are separate" scenario, again as
+  a remove plus add.
 
 ## Impact
 
