@@ -271,6 +271,13 @@ load and are not reliable.
   `Cargo.toml`, so a release cannot open the port:
   `env SLINT_MCP_PORT=9315 cargo run --features slint/mcp`. It starts
   listening on the first window show; `.mcp.json` points `dango-ui` at it.
+  A session started before the app shows `dango-ui` as failed: reconnect it
+  with `/mcp`.
+- For hand checks on Windows, an agent can press keys with
+  `scripts/send-keys.ps1` (for example `alt+space 'text:fire' escape`) and
+  capture every display with `scripts/screenshot.ps1`, which prints the PNG
+  path. Run both with
+  `powershell.exe -NoProfile -ExecutionPolicy Bypass -File`.
 - Packaging is `cargo-packager`, configured in `[package.metadata.packager]`
   in `Cargo.toml` with camelCase keys. Windows packages with
   `cargo packager --release --formats nsis`, macOS with `--formats app,dmg`.
