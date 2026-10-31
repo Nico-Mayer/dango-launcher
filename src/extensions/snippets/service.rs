@@ -176,7 +176,12 @@ fn run(
                 }
                 expander.set_keywords(records.keywords());
                 if let Some(hit) = expander.observe_char(c) {
-                    expand(&records, text.as_ref(), &hit);
+                    expand(
+                        &records,
+                        text.as_ref(),
+                        &hit,
+                        &platform::note_insertion_target,
+                    );
                 }
             }
             Ok(KeyStroke::Clear) => expander.clear(),
@@ -193,13 +198,17 @@ fn is_excluded(app: Option<&str>, excluded: &ExcludedApps) -> bool {
     excluded().iter().any(|name| name.eq_ignore_ascii_case(app))
 }
 
-fn expand(records: &Records, text: &dyn TextTarget, hit: &Hit) {
+/// `note_target` runs before the selection is read: on Windows that read
+/// brings the last launcher window forward, which is then not the app the user
+/// is typing in.
+fn expand(records: &Records, text: &dyn TextTarget, hit: &Hit, note_target: &dyn Fn()) {
     let Ok(record) = records.get(&hit.id) else {
         return;
     };
     let Ok(template) = Template::parse(&record.body) else {
         return;
     };
+    note_target();
     let mut values = Values::default();
     if template.uses("clipboard") {
         values.clipboard = text.clipboard_text();
@@ -210,7 +219,6 @@ fn expand(records: &Records, text: &dyn TextTarget, hit: &Hit) {
     let Ok(rendered) = template.render(&values) else {
         return;
     };
-    platform::note_insertion_target();
     // Held across the whole injection: the monitor must not observe the
     // backspaces and the paste it is about to send.
     let _injecting = platform::injection_guard();
@@ -227,6 +235,7 @@ mod tests {
     #[derive(Default)]
     struct Recorder {
         expanded: Mutex<Vec<(usize, String, Option<usize>)>>,
+        calls: Mutex<Vec<&'static str>>,
         clipboard: Option<String>,
         selection: Option<String>,
     }
@@ -251,6 +260,7 @@ mod tests {
             unreachable!("expansion never pastes clipboard content")
         }
         fn selection(&self) -> Result<Option<String>, TextError> {
+            self.calls.lock().unwrap().push("selection");
             Ok(self.selection.clone())
         }
         fn clipboard_text(&self) -> Option<String> {
@@ -287,7 +297,7 @@ mod tests {
             ..Default::default()
         };
 
-        expand(&records, &target, &hit(&id, ";hi"));
+        expand(&records, &target, &hit(&id, ";hi"), &|| ());
 
         assert_eq!(
             *target.expanded.lock().unwrap(),
@@ -299,8 +309,23 @@ mod tests {
     fn a_snippet_gone_since_the_match_types_nothing() {
         let records = snippets();
         let target = Recorder::default();
-        expand(&records, &target, &hit("deleted", "sig"));
+        expand(&records, &target, &hit("deleted", "sig"), &|| ());
         assert!(target.expanded.lock().unwrap().is_empty());
+    }
+
+    #[test]
+    fn the_target_is_noted_before_the_selection_is_read() {
+        let records = snippets();
+        let id = records
+            .create("Quote", "> {{ selection }}", Some(";q"))
+            .unwrap();
+        let target = Recorder::default();
+
+        expand(&records, &target, &hit(&id, ";q"), &|| {
+            target.calls.lock().unwrap().push("target")
+        });
+
+        assert_eq!(*target.calls.lock().unwrap(), ["target", "selection"]);
     }
 
     #[test]
