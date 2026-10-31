@@ -103,11 +103,17 @@ impl AppIndex {
         let apps = self.indexer.index();
         // An empty result from a machine that had applications is a failed
         // enumeration, not an empty machine.
-        if apps.is_empty() && !self.apps.read().unwrap().is_empty() {
-            eprintln!(
-                "[dango] application enumeration returned nothing; keeping the current index"
-            );
-            return;
+        {
+            let current = self.apps.read().unwrap();
+            if apps.is_empty() && !current.is_empty() {
+                eprintln!(
+                    "[dango] application enumeration returned nothing; keeping the current index"
+                );
+                return;
+            }
+            if *current == apps {
+                return;
+            }
         }
         self.persist(&apps);
         *self.apps.write().unwrap() = apps;
