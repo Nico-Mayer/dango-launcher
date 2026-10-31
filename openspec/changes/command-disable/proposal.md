@@ -44,6 +44,8 @@ None.
 - `extension-model`: the "Enable and disable is the unit of control"
   requirement allows one command to be turned off, and a new requirement
   defines what a disabled command does in search, hotkeys, and invocation.
+- `command-hotkeys`: a disabled command's hotkey is not registered and takes
+  part in no conflict.
 
 ## Impact
 
