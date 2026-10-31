@@ -159,10 +159,6 @@ impl Keys for MacKeys {
     fn permitted(&self) -> bool {
         super::accessibility_trusted()
     }
-
-    fn request_permission(&self) {
-        super::prompt_for_accessibility();
-    }
 }
 
 /// The launcher is a non-activating panel, so the application the user was in

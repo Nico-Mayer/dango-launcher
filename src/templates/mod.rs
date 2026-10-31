@@ -42,6 +42,7 @@ pub struct Values {
     pub arguments: HashMap<String, String>,
 }
 
+#[cfg(test)]
 impl Values {
     pub fn with_arguments(arguments: HashMap<String, String>) -> Self {
         Self {
@@ -86,10 +87,6 @@ impl Template {
             referenced,
             arguments,
         })
-    }
-
-    pub fn source(&self) -> &str {
-        &self.source
     }
 
     /// Names with no source but the user, in the order the template uses them.

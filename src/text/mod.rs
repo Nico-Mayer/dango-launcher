@@ -58,7 +58,6 @@ pub trait Keys: Send + Sync {
     /// macOS gates all of this behind Accessibility. Windows has no equivalent
     /// and always answers true.
     fn permitted(&self) -> bool;
-    fn request_permission(&self);
 }
 
 /// Getting the launcher out of the way and handing focus back. The two
@@ -226,14 +225,6 @@ impl TextExchange {
             launcher,
             refuses,
         }
-    }
-
-    pub fn permitted(&self) -> bool {
-        self.keys.permitted()
-    }
-
-    pub fn request_permission(&self) {
-        self.keys.request_permission();
     }
 
     /// The clipboard's text, for a template that asks for it. Reading is free
@@ -602,7 +593,6 @@ mod tests {
         fn permitted(&self) -> bool {
             self.permitted
         }
-        fn request_permission(&self) {}
     }
 
     #[derive(Default)]

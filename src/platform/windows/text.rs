@@ -127,8 +127,6 @@ impl Keys for WindowsKeys {
     fn permitted(&self) -> bool {
         true
     }
-
-    fn request_permission(&self) {}
 }
 
 pub struct WindowsHandoff;
