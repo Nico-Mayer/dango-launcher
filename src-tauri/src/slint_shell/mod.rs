@@ -171,7 +171,8 @@ fn select_backend() -> Result<(), slint::PlatformError> {
     #[cfg(target_os = "macos")]
     let selector = selector.with_winit_event_loop_builder({
         use winit::platform::macos::{ActivationPolicy, EventLoopBuilderExtMacOS};
-        let mut builder = slint::winit_030::EventLoopBuilder::default();
+        let mut builder =
+            winit::event_loop::EventLoop::<slint::winit_030::SlintEvent>::with_user_event();
         builder.with_activation_policy(ActivationPolicy::Accessory);
         builder
     });
