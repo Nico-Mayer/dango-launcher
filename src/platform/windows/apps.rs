@@ -25,7 +25,7 @@ use windows::Win32::UI::Shell::{
 };
 use windows::Win32::UI::WindowsAndMessaging::{
     AllowSetForegroundWindow, EnumWindows, GetForegroundWindow, GetWindow,
-    GetWindowThreadProcessId, IsWindowVisible, SetForegroundWindow, ShowWindow, GW_OWNER,
+    GetWindowThreadProcessId, IsIconic, IsWindowVisible, SetForegroundWindow, ShowWindow, GW_OWNER,
     SW_RESTORE, SW_SHOWNORMAL,
 };
 
@@ -271,7 +271,9 @@ pub(super) unsafe fn process_image_path(pid: u32) -> Option<String> {
 /// it borrows the foreground thread's input queue for the call, the same lift
 /// used by the launcher window itself.
 unsafe fn bring_to_foreground(hwnd: HWND) {
-    let _ = ShowWindow(hwnd, SW_RESTORE);
+    if IsIconic(hwnd).as_bool() {
+        let _ = ShowWindow(hwnd, SW_RESTORE);
+    }
     let foreground = GetForegroundWindow();
     if foreground.0.is_null() {
         let _ = SetForegroundWindow(hwnd);
@@ -283,7 +285,6 @@ unsafe fn bring_to_foreground(hwnd: HWND) {
     let _ = AllowSetForegroundWindow(u32::MAX);
     let _ = SetForegroundWindow(hwnd);
     let _ = AttachThreadInput(current, owner, false);
-    let _ = TRUE;
 }
 
 unsafe fn bitmap_to_rgba(hbitmap: HBITMAP) -> Option<IconRgba> {
