@@ -25,7 +25,7 @@ rules:
   design:
     - Record the alternatives that were rejected and why. Future sessions need the reasoning, not just the conclusion.
     - Call out anything that locks in the extension manifest or view protocol, since those are versioned contracts.
-    - A change that adds or reworks UI names the Bits UI primitive each surface is built on. If a primitive is patched or a surface is hand-rolled, state what the primitive lacked and why.
+    - A change that adds or reworks UI names the Slint widget each surface is built on (`std-widgets.slint` first). If a widget is patched or a surface is hand-rolled, state what the widget lacked and why.
     - A change that hand-rolls a general job names the crates or packages evaluated and what they could not do.
     - Skip the design artifact for changes that introduce no new architectural decision.
     - A change that adds or edits text the user can see quotes every new or changed string, written with the ux-writing skill and checked against openspec/specs/interface-copy/spec.md.
@@ -33,5 +33,5 @@ rules:
   tasks:
     - Group tasks so that each group leaves the app in a runnable state.
     - Platform-specific work gets separate tasks per platform, never one task covering both.
-    - Verify with automated tests by default. A task's verify clause names the test that proves it (`cargo test`, `npm run test:browser`), not a manual step in `tauri dev`.
+    - Verify with automated tests by default. A task's verify clause names the test that proves it (`cargo test`, including UI tests on the Slint testing backend), not a manual step in a running debug build.
     - Add manual verification tasks only for behaviour a test cannot observe on the real OS (focus, window placement, panels, hotkeys, permissions, native APIs), and only for the platforms whose code or behaviour the change touches. A platform-neutral change has no manual tasks.
