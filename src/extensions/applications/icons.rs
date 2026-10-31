@@ -61,6 +61,16 @@ fn sanitize(app_id: &str) -> String {
 }
 
 fn write_png(path: &std::path::Path, rgba: &[u8], width: u32, height: u32) -> std::io::Result<()> {
+    let partial = path.with_extension(format!("{}.tmp", uuid::Uuid::new_v4()));
+    let written =
+        encode_png(&partial, rgba, width, height).and_then(|()| std::fs::rename(&partial, path));
+    if written.is_err() {
+        let _ = std::fs::remove_file(&partial);
+    }
+    written
+}
+
+fn encode_png(path: &std::path::Path, rgba: &[u8], width: u32, height: u32) -> std::io::Result<()> {
     let file = std::fs::File::create(path)?;
     let mut encoder = png::Encoder::new(BufWriter::new(file), width, height);
     encoder.set_color(png::ColorType::Rgba);
@@ -94,6 +104,17 @@ mod tests {
         let cache = IconCache::in_temp();
         cache.ensure_with("code", blue);
         assert!(cache.path("code").is_some());
+    }
+
+    #[test]
+    fn caching_leaves_only_the_finished_icon() {
+        let cache = IconCache::in_temp();
+        cache.ensure_with("code", blue);
+        let names: Vec<_> = std::fs::read_dir(&cache.dir)
+            .unwrap()
+            .map(|entry| entry.unwrap().file_name())
+            .collect();
+        assert_eq!(names, ["code.png"]);
     }
 
     #[test]
