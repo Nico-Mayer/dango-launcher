@@ -109,8 +109,9 @@ impl SystemControl for WindowsSystemControl {
             let Some(identity) = (unsafe { identify(hwnd, pid) }) else {
                 continue;
             };
+            let path = unsafe { process_image_path(pid) }.unwrap_or_default();
             apps.push(RunningApp {
-                id: pid.to_string(),
+                id: format!("{pid}:{path}"),
                 name: identity.name,
                 icon: Some(identity.locator),
             });
@@ -120,11 +121,16 @@ impl SystemControl for WindowsSystemControl {
 
     /// `WM_CLOSE` to each of its switcher windows, which is what the close
     /// button sends. The application decides what to do with it, so one
-    /// holding unsaved work prompts instead of dying.
+    /// holding unsaved work prompts instead of dying. The id carries the image
+    /// path because Windows reuses a PID soon after its process exits.
     fn quit(&self, app_id: &str) -> Result<(), SystemError> {
-        let pid: u32 = app_id
-            .parse()
-            .map_err(|_| SystemError::Failed("That isn't an app Dango can quit".into()))?;
+        let (pid, path) = app_id
+            .split_once(':')
+            .and_then(|(pid, path)| Some((pid.parse::<u32>().ok()?, path)))
+            .ok_or_else(|| SystemError::Failed("That isn't an app Dango can quit".into()))?;
+        if unsafe { process_image_path(pid) }.unwrap_or_default() != path {
+            return Err(SystemError::Gone);
+        }
         let windows: Vec<HWND> = unsafe { switcher_windows() }
             .into_iter()
             .filter(|hwnd| unsafe { owning_pid(*hwnd) } == Some(pid))
@@ -337,8 +343,8 @@ mod tests {
         fn running_applications_are_listed_without_ourselves() {
             let apps = WindowsSystemControl.running_apps();
             assert!(!apps.is_empty(), "something must be running");
-            let ours = std::process::id().to_string();
-            assert!(apps.iter().all(|app| app.id != ours));
+            let ours = format!("{}:", std::process::id());
+            assert!(apps.iter().all(|app| !app.id.starts_with(&ours)));
             assert!(apps
                 .iter()
                 .all(|app| !app.id.is_empty() && !app.name.is_empty()));
@@ -424,22 +430,22 @@ mod tests {
                 .args(["-NoProfile", "-WindowStyle", "Hidden", "-Command", &script])
                 .spawn()
                 .unwrap();
-            let id = probe.id().to_string();
+            let pid = format!("{}:", probe.id());
 
-            let mut listed = false;
+            let mut listed = None;
             for _ in 0..40 {
                 std::thread::sleep(Duration::from_millis(250));
                 listed = WindowsSystemControl
                     .running_apps()
-                    .iter()
-                    .any(|app| app.id == id);
-                if listed {
+                    .into_iter()
+                    .find(|app| app.id.starts_with(&pid));
+                if listed.is_some() {
                     break;
                 }
             }
-            assert!(listed, "the probe window must be listed as running");
+            let app = listed.expect("the probe window must be listed as running");
 
-            assert!(WindowsSystemControl.quit(&id).is_ok());
+            assert!(WindowsSystemControl.quit(&app.id).is_ok());
             std::thread::sleep(Duration::from_millis(1500));
             assert!(
                 probe.try_wait().unwrap().is_none(),
@@ -536,7 +542,7 @@ mod tests {
         #[ignore]
         fn quitting_something_that_is_not_running_reports_it_as_gone() {
             assert!(matches!(
-                WindowsSystemControl.quit("4000000"),
+                WindowsSystemControl.quit(r"4000000:C:\gone.exe"),
                 Err(SystemError::Gone)
             ));
         }
