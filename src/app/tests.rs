@@ -49,7 +49,7 @@ fn core_with_grab(config_json: &str, grab: FakeGrab) -> (Arc<Core>, Arc<Recordin
         ai: None,
         clipboard: None,
         hotkeys: Registry::new(Box::new(grab), launcher),
-        hyperkey: Mutex::new(None),
+        hyperkey: Mutex::default(),
     };
     let shell = Arc::new(RecordingShell::default());
     let core = Arc::new(Core::new(

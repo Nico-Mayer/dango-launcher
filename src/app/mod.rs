@@ -68,8 +68,18 @@ pub struct Services {
     pub ai: Option<AiParts>,
     pub clipboard: Option<Arc<dyn ClipboardSource>>,
     pub hotkeys: Registry,
-    pub hyperkey: Mutex<Option<Box<dyn platform::Hyperkey>>>,
+    pub hyperkey: Mutex<HyperkeySlot>,
 }
+
+/// The running hyperkey and the settings it was started from, so a reload that
+/// leaves them alone does not restart it.
+#[derive(Default)]
+pub struct HyperkeySlot {
+    running: Option<Box<dyn platform::Hyperkey>>,
+    settings: Option<HyperkeySettings>,
+}
+
+type HyperkeySettings = (String, bool, Option<String>);
 
 struct UiState {
     launcher: ui::Launcher,
@@ -720,7 +730,7 @@ impl Core {
     /// launcher hotkey if it changed, brings enabled state and search in line,
     /// and updates the tray. A parse failure keeps the running config and is
     /// surfaced.
-    fn apply_config_reload(&self, result: Result<config::Config, config::ConfigError>) {
+    fn apply_config_reload(self: &Arc<Self>, result: Result<config::Config, config::ConfigError>) {
         let config = match result {
             Ok(config) => config,
             Err(error) => {
@@ -777,9 +787,6 @@ impl Core {
             let config = self.config.shared();
             let config = config.read().unwrap();
             conflicts.extend(self.services.hotkeys.apply(&config));
-            if let Some(message) = apply_hyperkey(&config, &self.services.hyperkey) {
-                conflicts.push(message);
-            }
             if autostart_changed {
                 if let Err(message) = crate::autostart::apply(autostart) {
                     conflicts.push(message);
@@ -790,6 +797,15 @@ impl Core {
             crate::log::append(conflict);
         }
         self.set_config_status(!conflicts.is_empty());
+
+        // Stopping the macOS hyperkey waits on its event tap thread.
+        let core = self.clone();
+        self.runtime.spawn_blocking(move || {
+            if let Some(message) = apply_hyperkey(&core.config, &core.services.hyperkey) {
+                crate::log::append(&message);
+                core.set_config_status(true);
+            }
+        });
     }
 }
 
@@ -899,16 +915,26 @@ fn aliased_candidates(host: &ExtensionHost, file_config: &FileConfig) -> Vec<Can
         .collect()
 }
 
-/// (Re)starts the hyperkey from a config: drops the current one, which stops its
-/// hook and releases any modifiers it holds, then starts a fresh one if the
-/// config asks for it. Returns a message to surface when a configured hyperkey
-/// could not start.
-fn apply_hyperkey(
-    config: &config::Config,
-    handle: &Mutex<Option<Box<dyn platform::Hyperkey>>>,
-) -> Option<String> {
-    let mut current = handle.lock().unwrap();
-    *current = None;
+/// Brings the hyperkey in line with the config: when its settings changed, or a
+/// configured one is not running, drops the current one, which stops its hook
+/// and releases any modifiers it holds, then starts a fresh one if the config
+/// asks for it. Returns a message to surface when a configured hyperkey could
+/// not start.
+fn apply_hyperkey(file_config: &FileConfig, slot: &Mutex<HyperkeySlot>) -> Option<String> {
+    // Locked before the config is read, so of two quick reloads the later
+    // settings win.
+    let mut slot = slot.lock().unwrap();
+    let shared = file_config.shared();
+    let config = shared.read().unwrap();
+    let settings = config
+        .hyperkey
+        .as_ref()
+        .map(|h| (h.key.clone(), h.shift, h.tap.clone()));
+    if slot.settings == settings && (settings.is_none() || slot.running.is_some()) {
+        return None;
+    }
+    slot.running = None;
+    slot.settings = settings;
 
     let hyperkey = config.hyperkey.as_ref()?;
     let Some(trigger) = platform::HyperkeyTrigger::from_key(&hyperkey.key) else {
@@ -930,7 +956,7 @@ fn apply_hyperkey(
     };
     match platform::start_hyperkey(spec) {
         Some(running) => {
-            *current = Some(running);
+            slot.running = Some(running);
             None
         }
         None if platform::permissions()

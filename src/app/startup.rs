@@ -355,14 +355,14 @@ fn build_services(
     let invoker = Arc::new(Invoker::new(Arc::new(HostResolver(host.clone()))));
 
     let hotkeys = register_hotkeys(file_config, notices);
-    let hyperkey = Mutex::new(None);
+    let hyperkey = Mutex::default();
+    if let Some(message) = apply_hyperkey(file_config, &hyperkey) {
+        crate::log::append(&message);
+        notices.push("Hyperkey didn't start, see dango.log".to_string());
+    }
     {
         let config = file_config.shared();
         let config = config.read().unwrap();
-        if let Some(message) = apply_hyperkey(&config, &hyperkey) {
-            crate::log::append(&message);
-            notices.push("Hyperkey didn't start, see dango.log".to_string());
-        }
         // The defaults stand in for a config that failed to parse, and their
         // unset autostart would remove the user's login entry.
         if !config_broken {
