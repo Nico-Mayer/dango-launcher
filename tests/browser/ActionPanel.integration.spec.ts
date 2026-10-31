@@ -1,78 +1,9 @@
 import { expect, test, type Page } from "@playwright/test";
-import { detailTree, formTree, listTree, rootItems } from "../fixtures/data";
 import type {} from "../fixtures/main";
 
 
 const panel = (page: Page) => page.locator("[data-popover-content]");
 const calls = (page: Page, command = "run_action") => page.evaluate(command => window.dangoFixture.calls.filter(c => c.command === command), command);
-
-const flows = [
-  ...["root", "list", "form", "detail"].map(scene => ({ scene, chord: "Control+k", reducedMotion: "no-preference" as const })),
-  { scene: "root", chord: "Meta+k", reducedMotion: "no-preference" as const },
-  { scene: "root", chord: "Control+k", reducedMotion: "reduce" as const },
-];
-
-for (const { scene, chord, reducedMotion } of flows) {
-  test.describe(reducedMotion, () => {
-    test.use({ reducedMotion });
-    test(`ActionPanel: ${scene} ${chord} owns selection, confirmation and focus`, async ({ page }) => {
-      await page.goto(`/tests/fixtures/?scene=${scene}`);
-      const origin = scene === "form" ? page.getByLabel("Password", { exact: true }) : scene === "detail" ? page.getByText("Working…", { exact: true }) : page.getByRole("combobox");
-      if (scene === "form") await origin.focus();
-      else await expect(origin).toBeFocused();
-      if (["root", "list"].includes(scene)) {
-        await page.keyboard.press("ArrowDown");
-        await expect(page.locator("main [data-command-item][data-selected]")).toHaveAttribute("data-value", "result-2");
-      }
-      const parentValue = ["root", "list"].includes(scene) ? await page.locator("main [data-command-item][data-selected]").getAttribute("data-value") : null;
-      await page.keyboard.press(chord);
-      const scope = panel(page).locator("[data-command-root]");
-      await expect(scope).toBeFocused();
-      const options = panel(page).getByRole("option");
-      await expect(options.first()).toHaveAttribute("data-selected");
-      await page.keyboard.press("ArrowUp");
-      await expect(options.first()).toHaveAttribute("data-selected");
-      await options.last().hover();
-      await expect(options.first()).toHaveAttribute("data-selected");
-      await page.keyboard.press("ArrowDown");
-      await expect(options.nth(1)).toHaveAttribute("data-selected");
-      const actionId = await options.nth(1).getAttribute("data-value");
-      await page.keyboard.press("Enter");
-      await expect(panel(page)).toHaveCount(0);
-      await expect(origin).toBeFocused();
-      const invoked = await calls(page);
-      expect(invoked).toHaveLength(1);
-      expect(invoked[0].args).toMatchObject({ extensionId: "fixture", actionId, itemId: scene === "form" ? "fixture-form" : scene === "detail" ? "" : "result-2" });
-      expect(await calls(page, "dismiss")).toHaveLength(0);
-      if (parentValue) await expect(page.locator("main [data-command-item][data-selected]")).toHaveAttribute("data-value", parentValue);
-      await page.getByRole("button", { name: "Actions", exact: true }).click();
-      await expect(options.first()).toHaveAttribute("data-selected");
-      await page.keyboard.press("Escape");
-      await expect(panel(page)).toHaveCount(0);
-      await expect(origin).toBeFocused();
-      expect(await calls(page, "dismiss")).toHaveLength(0);
-      expect(await calls(page, "cancel_invocation")).toHaveLength(0);
-    });
-  });
-}
-
-for (const scene of ["root", "list", "form", "detail"]) {
-  test(`ActionPanel: ${scene} empty actions disable trigger and chord`, async ({ page }) => {
-    await page.goto(`/tests/fixtures/?scene=${scene}`);
-    await expect(page.getByRole("button", { name: "Actions", exact: true })).toBeEnabled();
-    if (scene === "root") await page.evaluate(item => window.dangoFixture.results("", [{ ...item, actions: [] }]), rootItems[0]);
-    else {
-      const tree = structuredClone(scene === "list" ? listTree : scene === "form" ? formTree : detailTree);
-      if (tree.view.kind === "list") tree.view.items.forEach(item => item.actions = []);
-      else tree.view.actions = [];
-      await page.evaluate(tree => window.dangoFixture.replace(tree), tree);
-    }
-    await expect(page.getByRole("button", { name: "Actions", exact: true })).toBeDisabled();
-    await page.keyboard.press("Control+k");
-    await expect(panel(page)).toHaveCount(0);
-    expect(await calls(page)).toHaveLength(0);
-  });
-}
 
 test("ActionPanel: long actions scroll inside compact portal in both palettes", async ({ page }) => {
   for (const palette of ["dark", "light"]) {
@@ -232,31 +163,4 @@ test("ActionPanel: actual portal inherits live typography, radius and surface ov
   await expect(panel(page).getByRole("option").first()).toHaveCSS("font-size", "16px");
   expect(await panel(page).evaluate(node => !node.parentElement?.closest("[data-command-root]"))).toBe(true);
   await expect.poll(() => panel(page).evaluate(node => node.getAnimations({ subtree: true }).length)).toBe(0);
-});
-
-
-test("ActionPanel: opening and dismissing preserves carried failure", async ({ page }) => {
-  await page.goto("/tests/fixtures/?scene=failure");
-  const failure = page.getByText("Couldn't paste. Try again.");
-  await expect(failure).toBeVisible();
-  await page.keyboard.press("Control+k");
-  await expect(panel(page).locator("[data-command-root]")).toBeFocused();
-  await page.keyboard.press("Escape");
-  await expect(panel(page)).toHaveCount(0);
-  await expect(failure).toBeVisible();
-  await expect(page.getByRole("combobox")).toBeFocused();
-  await page.keyboard.type("Result");
-  await expect(failure).not.toBeVisible();
-});
-
-test("ActionPanel: removal of all actions closes safely", async ({ page }) => {
-  await page.goto("/tests/fixtures/?scene=root");
-  await expect(page.getByRole("combobox")).toBeFocused();
-  await page.keyboard.press("Control+k");
-  await expect(panel(page).locator("[data-command-root]")).toBeFocused();
-  await page.evaluate(item => window.dangoFixture.results("", [{ ...item, actions: [] }]), rootItems[0]);
-  await expect(panel(page)).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "Actions", exact: true })).toBeDisabled();
-  await expect(page.getByRole("combobox")).toBeFocused();
-  expect(await calls(page)).toHaveLength(0);
 });

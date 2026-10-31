@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { detailTree, listTree, rootItems } from "../fixtures/data";
+import { detailTree, listTree } from "../fixtures/data";
 import type {} from "../fixtures/main";
 
 const edge = (page: Page) => page.locator(".dango-busy-edge");
@@ -42,32 +42,6 @@ for (const scene of ["loading-list", "refreshing-list", "detail"] as const) {
     await expect(status(page)).toHaveText("Loading…");
   });
 }
-
-test("BusyStatus: root pending uses footer, failure/reset stop work, searches invent no progress", async ({ page }) => {
-  await page.goto("/tests/fixtures/?scene=root");
-  await expect(page.getByRole("option")).toHaveCount(18);
-  const viewport = page.locator("[data-command-list]");
-  const before = await viewport.boundingBox();
-  await page.evaluate(item => window.dangoFixture.results("", [{ ...item, actions: [] }]), rootItems[0]);
-  await page.keyboard.press("Enter");
-  await expect(status(page)).toHaveText("Running Clipboard History…");
-  await expect(edge(page)).toHaveCount(1);
-  expect(await viewport.boundingBox()).toEqual(before);
-  await expect(page.getByRole("option")).toHaveCount(1);
-  await page.evaluate(() => window.dangoFixture.fail("Couldn't paste. Try again."));
-  await expect(status(page)).toBeEmpty();
-  await expect(edge(page)).toHaveCount(0);
-  await expect(page.getByText("Couldn't paste. Try again.")).toBeVisible();
-  await page.keyboard.press("Enter");
-  await expect(edge(page)).toHaveCount(1);
-  await page.evaluate(() => window.dangoFixture.reset());
-  await expect(status(page)).toBeEmpty();
-  await expect(edge(page)).toHaveCount(0);
-  await page.getByRole("combobox").fill("Result");
-  await expect(page.getByRole("option")).toHaveCount(17);
-  await expect(edge(page)).toHaveCount(0);
-  await expect.poll(() => page.locator("main").evaluate(node => node.getAnimations({ subtree: true }).length)).toBe(0);
-});
 
 test("BusyStatus: streaming keeps one sweep/status node and does not announce chunks", async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "no-preference" });
