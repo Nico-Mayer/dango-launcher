@@ -73,7 +73,13 @@ pub fn start(startup: Startup) -> Arc<Core> {
 
     let core = Arc::new_cyclic(|weak: &Weak<Core>| {
         let mut notices = Vec::new();
-        let services = build_services(&startup, &file_config, weak, &mut notices);
+        let services = build_services(
+            &startup,
+            &file_config,
+            config_error.is_some(),
+            weak,
+            &mut notices,
+        );
         let tray = TrayStatus {
             notices,
             config_error: config_error.is_some(),
@@ -142,6 +148,7 @@ fn register(host: &mut ExtensionHost, name: &str, extension: Arc<dyn extension::
 fn build_services(
     startup: &Startup,
     file_config: &Arc<FileConfig>,
+    config_broken: bool,
     core: &Weak<Core>,
     notices: &mut Vec<String>,
 ) -> Services {
@@ -352,9 +359,15 @@ fn build_services(
             crate::log::append(&message);
             notices.push("Hyperkey didn't start, see dango.log".to_string());
         }
-        if let Err(message) = crate::autostart::apply(config.launcher.autostart.unwrap_or(false)) {
-            crate::log::append(&message);
-            notices.push("Autostart couldn't be applied, see dango.log".to_string());
+        // The defaults stand in for a config that failed to parse, and their
+        // unset autostart would remove the user's login entry.
+        if !config_broken {
+            if let Err(message) =
+                crate::autostart::apply(config.launcher.autostart.unwrap_or(false))
+            {
+                crate::log::append(&message);
+                notices.push("Autostart couldn't be applied, see dango.log".to_string());
+            }
         }
     }
 
