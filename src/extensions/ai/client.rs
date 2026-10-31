@@ -161,6 +161,9 @@ fn translate(request: &Request, error: &genai::Error) -> AiError {
         Some(429) => AiError::RateLimited {
             provider: request.provider.clone(),
         },
+        Some(400..) => AiError::Refused {
+            provider: request.provider.clone(),
+        },
         _ if needs_key(error) => AiError::MissingKey {
             provider: request.provider.clone(),
         },
@@ -313,12 +316,29 @@ mod tests {
             ),
             (
                 &anthropic,
+                http(400),
+                AiError::Refused {
+                    provider: provider(),
+                },
+            ),
+            (
+                &ollama,
                 http(503),
+                AiError::Refused {
+                    provider: provider(),
+                },
+            ),
+            (
+                &anthropic,
+                genai::Error::WebStream {
+                    model_iden: ModelIden::new(AdapterKind::Anthropic, "some-model"),
+                    cause: "error sending request".into(),
+                    error: "error sending request".into(),
+                },
                 AiError::Unreachable {
                     provider: provider(),
                 },
             ),
-            (&ollama, http(503), AiError::LocalUnreachable),
             // What Ollama does for a model it has not pulled: the request is
             // accepted, then the stream fails with a 404.
             (
