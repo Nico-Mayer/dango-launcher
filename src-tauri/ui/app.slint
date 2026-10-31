@@ -1,0 +1,825 @@
+import { Button, CheckBox, LineEdit, ScrollView, TextEdit } from "std-widgets.slint";
+
+/// The one built-in appearance. Every colour, radius, and type size on every
+/// surface comes from here.
+export global Palette {
+    in-out property <color> background: #202124;
+    in-out property <color> background-alt: #292a2d;
+    in-out property <color> foreground: #f2f3f5;
+    in-out property <color> foreground-alt: #c8cbd2;
+    in-out property <color> muted: #303236;
+    in-out property <color> muted-foreground: #b0b4bd;
+    in-out property <color> edge: #ffffff1a;
+    in-out property <color> selection: #293d59;
+    in-out property <color> selection-edge: #405777;
+    in-out property <color> hover: #282a2d;
+    in-out property <color> focus: #8cb9ff;
+    in-out property <color> destructive: #ff91a3;
+    in-out property <color> dev-edge: #f4af25;
+    in-out property <color> badge: #493908;
+    in-out property <color> badge-foreground: #fef7e1;
+    /// Extension tints: red, amber, green, blue, purple, pink.
+    in-out property <[color]> tints: [#490808, #493908, #084920, #082f49, #290849, #490829];
+    in-out property <[color]> tint-foregrounds: [#fee1e1, #fef7e1, #e1feec, #e1f3fe, #f0e1fe, #fee1f0];
+    in-out property <length> radius-shell: 14px;
+    in-out property <length> radius-overlay: 10px;
+    in-out property <length> radius-row: 8px;
+    in-out property <length> radius-tile: 6px;
+    in-out property <length> radius-keycap: 4px;
+    in-out property <length> text: 14px;
+    in-out property <length> text-small: 12px;
+    in-out property <length> header-height: 64px;
+    in-out property <length> row-height: 56px;
+    in-out property <length> heading-height: 28px;
+    in-out property <length> footer-height: 40px;
+}
+
+export enum IconKind { none, named, file }
+
+export struct RowData {
+    /// A non-empty heading makes this a section heading rather than a result.
+    heading: string,
+    id: string,
+    title: styled-text,
+    subtitle: string,
+    icon: image,
+    icon-kind: IconKind,
+    /// An index into the palette's tints, or -1 for none.
+    tint: int,
+    /// The icon is content in its own right, as a copied image is.
+    content: bool,
+    selected: bool,
+}
+
+export struct ActionData {
+    id: string,
+    title: string,
+    shortcut: string,
+    selected: bool,
+}
+
+export enum FieldKind { text, password, toggle, template }
+
+export struct FieldData {
+    id: string,
+    label: string,
+    kind: FieldKind,
+    value: string,
+    help: string,
+    help-emphasized: bool,
+    error: string,
+}
+
+export enum ScreenKind { error, root, list, detail, form }
+
+component Keycap inherits Rectangle {
+    in property <string> label;
+    background: Palette.muted;
+    border-radius: Palette.radius-keycap;
+    HorizontalLayout {
+        padding-left: 6px;
+        padding-right: 6px;
+        padding-top: 2px;
+        padding-bottom: 2px;
+        Text {
+            text: root.label;
+            color: Palette.muted-foreground;
+            font-size: Palette.text-small;
+            vertical-alignment: center;
+        }
+    }
+}
+
+component IconTile inherits Rectangle {
+    in property <image> icon;
+    in property <IconKind> kind;
+    in property <int> tint: -1;
+    in property <bool> content;
+    width: 32px;
+    height: 32px;
+    border-radius: Palette.radius-tile;
+    background: root.kind == IconKind.named ? (root.tint >= 0 ? Palette.tints[root.tint] : transparent)
+        : root.kind == IconKind.none ? Palette.muted : transparent;
+    border-width: root.content && root.kind == IconKind.file ? 1px : 0;
+    border-color: Palette.edge;
+    clip: true;
+    if root.kind == IconKind.named: Image {
+        width: 20px;
+        height: 20px;
+        source: root.icon;
+        colorize: root.tint >= 0 ? Palette.tint-foregrounds[root.tint] : Palette.foreground-alt;
+    }
+    if root.kind == IconKind.file: Image {
+        width: root.width;
+        height: root.height;
+        source: root.icon;
+        image-fit: root.content ? ImageFit.cover : ImageFit.contain;
+    }
+}
+
+component ResultRow inherits Rectangle {
+    in property <RowData> data;
+    in property <bool> pointer-resting;
+    callback activate(id: string);
+    callback pointer-moved();
+    height: Palette.row-height;
+    accessible-role: list-item;
+    accessible-label: root.data.id;
+    accessible-item-selected: root.data.selected;
+
+    Rectangle {
+        x: 8px;
+        width: parent.width - 16px;
+        border-radius: Palette.radius-row;
+        background: root.data.selected ? Palette.selection
+            : touch.has-hover && !root.pointer-resting ? Palette.hover : transparent;
+        border-width: root.data.selected ? 1px : 0;
+        border-color: Palette.selection-edge;
+
+        HorizontalLayout {
+            padding-left: 12px;
+            padding-right: 12px;
+            spacing: 12px;
+            alignment: stretch;
+            VerticalLayout {
+                alignment: center;
+                IconTile {
+                    icon: root.data.icon;
+                    kind: root.data.icon-kind;
+                    tint: root.data.tint;
+                    content: root.data.content;
+                }
+            }
+            HorizontalLayout {
+                spacing: 8px;
+                Rectangle {
+                    horizontal-stretch: 1;
+                    clip: true;
+                    StyledText {
+                        x: 0;
+                        width: parent.width;
+                        text: root.data.title;
+                        default-color: Palette.foreground;
+                        default-font-size: Palette.text;
+                        max-lines: 1;
+                        vertical-alignment: center;
+                    }
+                }
+                if root.data.subtitle != "": Text {
+                    horizontal-stretch: 0;
+                    max-width: 240px;
+                    text: root.data.subtitle;
+                    color: Palette.muted-foreground;
+                    font-size: Palette.text-small;
+                    overflow: elide;
+                    vertical-alignment: center;
+                }
+            }
+        }
+    }
+
+    touch := TouchArea {
+        clicked => {
+            root.activate(root.data.id);
+        }
+        changed mouse-x => {
+            root.pointer-moved();
+        }
+        changed mouse-y => {
+            root.pointer-moved();
+        }
+    }
+}
+
+component Heading inherits Rectangle {
+    in property <string> text;
+    height: Palette.heading-height;
+    HorizontalLayout {
+        padding-left: 20px;
+        Text {
+            text: root.text;
+            color: Palette.muted-foreground;
+            font-size: Palette.text-small;
+            font-weight: 500;
+            vertical-alignment: center;
+        }
+    }
+}
+
+component Results inherits Rectangle {
+    in property <[RowData]> rows;
+    in property <bool> pointer-resting;
+    in property <string> empty;
+    in property <string> empty-description;
+    callback activate(id: string);
+    callback pointer-moved();
+
+    public function reveal(top: length, height: length) {
+        if top + list.content-y < 0 {
+            list.content-y = -top;
+        } else if top + height + list.content-y > list.visible-height {
+            list.content-y = list.visible-height - top - height;
+        }
+    }
+
+    // Every row is built: a ListView estimates its height from the rows it
+    // has built, and would clamp a scroll to one it has not.
+    list := ScrollView {
+        x: 0;
+        y: 8px;
+        height: parent.height - 16px;
+        accessible-role: AccessibleRole.list;
+        VerticalLayout {
+            alignment: start;
+            for row in root.rows: Rectangle {
+                height: row.heading != "" ? Palette.heading-height : Palette.row-height;
+                if row.heading != "": Heading {
+                    text: row.heading;
+                }
+                if row.heading == "": ResultRow {
+                    data: row;
+                    pointer-resting: root.pointer-resting;
+                    activate(id) => {
+                        root.activate(id);
+                    }
+                    pointer-moved => {
+                        root.pointer-moved();
+                    }
+                }
+            }
+        }
+    }
+
+    if root.empty != "": VerticalLayout {
+        y: 8px;
+        height: self.preferred-height;
+        padding-left: 20px;
+        padding-right: 20px;
+        padding-top: 16px;
+        spacing: 4px;
+        Text {
+            text: root.empty;
+            color: Palette.muted-foreground;
+            font-size: Palette.text;
+            overflow: elide;
+        }
+        if root.empty-description != "": Text {
+            text: root.empty-description;
+            color: Palette.muted-foreground;
+            font-size: Palette.text-small;
+            wrap: word-wrap;
+        }
+    }
+}
+
+component Prompt inherits Rectangle {
+    in property <string> placeholder;
+    callback edited(text: string);
+    height: Palette.header-height;
+
+    public function set-text(text: string) {
+        input.text = text;
+    }
+
+    public function take-focus(select: bool) {
+        input.focus();
+        if select {
+            input.select-all();
+        }
+    }
+
+    input := LineEdit {
+        x: 12px;
+        width: parent.width - 24px;
+        height: 40px;
+        placeholder-text: root.placeholder;
+        font-size: 16px;
+        accessible-label: root.placeholder;
+        edited(text) => {
+            root.edited(text);
+        }
+    }
+
+    Rectangle {
+        y: parent.height - 1px;
+        height: 1px;
+        background: Palette.edge;
+    }
+}
+
+component Footer inherits Rectangle {
+    in property <bool> development;
+    in property <string> primary-label;
+    in property <string> confirm-key;
+    in property <string> status;
+    in property <bool> hide-status;
+    in property <string> panel-key;
+    in property <bool> has-actions;
+    callback toggle-panel();
+    height: Palette.footer-height;
+
+    Rectangle {
+        y: 0;
+        height: 1px;
+        background: Palette.edge;
+    }
+
+    HorizontalLayout {
+        padding-left: 16px;
+        padding-right: 16px;
+        spacing: 16px;
+        alignment: stretch;
+        HorizontalLayout {
+            spacing: 6px;
+            horizontal-stretch: 0;
+            Text {
+                text: "Dango";
+                color: Palette.foreground-alt;
+                font-size: Palette.text-small;
+                font-weight: 500;
+                vertical-alignment: center;
+            }
+            if root.development: VerticalLayout {
+                alignment: center;
+                dev-badge := Rectangle {
+                    background: Palette.badge;
+                    border-radius: Palette.radius-keycap;
+                    accessible-role: text;
+                    accessible-label: "dev";
+                    HorizontalLayout {
+                        padding-left: 6px;
+                        padding-right: 6px;
+                        Text {
+                            text: "dev";
+                            color: Palette.badge-foreground;
+                            font-size: Palette.text-small;
+                            font-weight: 500;
+                        }
+                    }
+                }
+            }
+        }
+        HorizontalLayout {
+            spacing: 6px;
+            horizontal-stretch: 1;
+            if root.status != "": VerticalLayout {
+                alignment: center;
+                // Static: a busy state is shown, never animated.
+                Rectangle {
+                    width: 6px;
+                    height: 6px;
+                    border-radius: 3px;
+                    background: Palette.focus;
+                }
+            }
+            Text {
+                text: root.hide-status ? "" : root.status;
+                accessible-role: text;
+                accessible-label: root.status;
+                color: Palette.muted-foreground;
+                font-size: Palette.text-small;
+                overflow: elide;
+                vertical-alignment: center;
+            }
+        }
+        HorizontalLayout {
+            spacing: 6px;
+            horizontal-stretch: 0;
+            Text {
+                text: root.primary-label;
+                color: Palette.muted-foreground;
+                font-size: Palette.text-small;
+                overflow: elide;
+                max-width: 160px;
+                vertical-alignment: center;
+            }
+            VerticalLayout {
+                alignment: center;
+                Keycap {
+                    label: root.confirm-key;
+                }
+            }
+        }
+        HorizontalLayout {
+            horizontal-stretch: 0;
+            alignment: center;
+            actions := Button {
+                height: 28px;
+                text: "Actions " + root.panel-key;
+                enabled: root.has-actions;
+                accessible-label: "Actions";
+                clicked => {
+                    root.toggle-panel();
+                }
+            }
+        }
+    }
+}
+
+component ActionPanel inherits Rectangle {
+    in property <[ActionData]> actions;
+    in property <bool> pointer-resting;
+    callback activate(id: string);
+    callback pointer-moved();
+    out property <length> content-height: scroller.preferred-height;
+    background: Palette.background-alt;
+    border-radius: Palette.radius-overlay;
+    border-width: 1px;
+    border-color: Palette.edge;
+    clip: true;
+    accessible-role: list;
+    accessible-label: "Actions";
+
+    public function reveal(index: int) {
+        let top = index * 36px;
+        if top + scroller.content-y < 0 {
+            scroller.content-y = -top;
+        } else if top + 36px + scroller.content-y > scroller.visible-height {
+            scroller.content-y = scroller.visible-height - top - 36px;
+        }
+    }
+
+    scroller := ScrollView {
+        preferred-height: column.preferred-height;
+        column := VerticalLayout {
+            padding-top: 4px;
+            padding-bottom: 4px;
+            for action in root.actions: Rectangle {
+                height: 36px;
+                accessible-role: list-item;
+                accessible-label: action.title;
+                accessible-item-selected: action.selected;
+                background: action.selected ? Palette.selection
+                    : touch.has-hover && !root.pointer-resting ? Palette.hover : transparent;
+                HorizontalLayout {
+                    padding-left: 12px;
+                    padding-right: 12px;
+                    spacing: 12px;
+                    Text {
+                        text: action.title;
+                        color: Palette.foreground-alt;
+                        font-size: Palette.text;
+                        overflow: elide;
+                        vertical-alignment: center;
+                        horizontal-stretch: 1;
+                    }
+                    if action.shortcut != "": Text {
+                        text: action.shortcut;
+                        color: Palette.muted-foreground;
+                        font-size: Palette.text-small;
+                        vertical-alignment: center;
+                        horizontal-stretch: 0;
+                    }
+                }
+                touch := TouchArea {
+                    clicked => {
+                        root.activate(action.id);
+                    }
+                    changed mouse-x => {
+                        root.pointer-moved();
+                    }
+                    changed mouse-y => {
+                        root.pointer-moved();
+                    }
+                }
+            }
+        }
+    }
+}
+
+component FormView inherits Rectangle {
+    in property <[FieldData]> fields;
+    callback changed-field(id: string, value: string);
+    callback multiline-focus(focused: bool);
+
+    ScrollView {
+        VerticalLayout {
+            padding-left: 20px;
+            padding-right: 20px;
+            padding-top: 16px;
+            padding-bottom: 16px;
+            spacing: 16px;
+            alignment: start;
+            for field[index] in root.fields: VerticalLayout {
+                spacing: 6px;
+                if field.kind != FieldKind.toggle: Text {
+                    text: field.label;
+                    color: Palette.foreground-alt;
+                    font-size: Palette.text-small;
+                    font-weight: 500;
+                }
+                if field.kind == FieldKind.text || field.kind == FieldKind.password: LineEdit {
+                    text: field.value;
+                    input-type: field.kind == FieldKind.password ? InputType.password : InputType.text;
+                    accessible-label: field.label;
+                    // The launcher is summoned to be typed into, so a form
+                    // takes the cursor in its first field as it is seeded.
+                    init => {
+                        if index == 0 {
+                            self.focus();
+                        }
+                    }
+                    edited(text) => {
+                        root.changed-field(field.id, text);
+                    }
+                }
+                if field.kind == FieldKind.template: template := TextEdit {
+                    height: 96px;
+                    text: field.value;
+                    accessible-label: field.label;
+                    accessible-description: field.error;
+                    init => {
+                        if index == 0 {
+                            self.focus();
+                        }
+                    }
+                    edited(text) => {
+                        root.changed-field(field.id, text);
+                    }
+                    changed has-focus => {
+                        root.multiline-focus(self.has-focus);
+                    }
+                }
+                if field.kind == FieldKind.toggle: CheckBox {
+                    text: field.label;
+                    checked: field.value == "true";
+                    toggled => {
+                        root.changed-field(field.id, self.checked ? "true" : "false");
+                    }
+                }
+                if field.error != "": Text {
+                    text: field.error;
+                    color: Palette.destructive;
+                    font-size: Palette.text-small;
+                    wrap: word-wrap;
+                }
+                if field.error == "" && field.help != "": Text {
+                    text: field.help;
+                    color: field.help-emphasized ? Palette.foreground-alt : Palette.muted-foreground;
+                    font-size: Palette.text-small;
+                    wrap: word-wrap;
+                }
+            }
+        }
+    }
+}
+
+export component LauncherWindow inherits Window {
+    no-frame: true;
+    always-on-top: true;
+    background: transparent;
+    title: "Dango";
+    width: 720px;
+    height: 400px;
+    default-font-size: Palette.text;
+
+    in property <bool> development;
+    in property <ScreenKind> screen: ScreenKind.root;
+    in property <[RowData]> rows;
+    in property <string> empty;
+    in property <string> empty-description;
+    in property <string> detail;
+    in property <[FieldData]> fields;
+    in property <string> failure;
+    in property <string> primary-label;
+    in property <string> confirm-key;
+    in property <string> status;
+    in property <bool> hide-status;
+    in property <string> panel-key;
+    in property <bool> has-actions;
+    in property <bool> panel-open;
+    in property <[ActionData]> actions;
+    in-out property <bool> pointer-resting;
+    out property <bool> multiline-focused;
+
+    /// Whether the chord belongs to the launcher. Asked before the focused
+    /// control sees the key.
+    callback key(text: string, control: bool, alt: bool, shift: bool, meta: bool) -> bool;
+    callback query-edited(text: string);
+    callback field-edited(id: string, value: string);
+    callback activate(id: string);
+    callback toggle-panel();
+    callback close-panel();
+
+    public function set-query(text: string) {
+        prompt.set-text(text);
+    }
+
+    public function focus-prompt(select: bool) {
+        prompt.take-focus(select);
+    }
+
+    public function focus-surface() {
+        surface.focus();
+    }
+
+    public function reveal-row(top: length, height: length) {
+        results.reveal(top, height);
+    }
+
+    public function reveal-action(index: int) {
+        panel.reveal(index);
+    }
+
+    surface := FocusScope {
+        capture-key-pressed(event) => {
+            root.pointer-resting = true;
+            if root.key(event.text, event.modifiers.control, event.modifiers.alt, event.modifiers.shift, event.modifiers.meta) {
+                return accept;
+            }
+            reject
+        }
+
+        frame := Rectangle {
+            background: Palette.background;
+            border-radius: Palette.radius-shell;
+            border-width: 1px;
+            border-color: root.development ? Palette.dev-edge : Palette.edge;
+            accessible-role: groupbox;
+            accessible-label: root.development ? "Dango (development build)" : "Dango";
+            clip: true;
+
+            if root.screen == ScreenKind.error: VerticalLayout {
+                alignment: center;
+                padding-left: 24px;
+                padding-right: 24px;
+                spacing: 8px;
+                Text {
+                    text: "This view needs a newer version of Dango.";
+                    color: Palette.foreground;
+                    font-size: Palette.text;
+                }
+                Text {
+                    text: "Press Escape to go back.";
+                    color: Palette.muted-foreground;
+                    font-size: Palette.text-small;
+                }
+            }
+
+            property <bool> searching: root.screen == ScreenKind.root || root.screen == ScreenKind.list;
+            property <length> top: self.searching ? Palette.header-height : 0;
+            property <length> banner-height: root.failure != "" ? banner.preferred-height : 0;
+
+            body := Rectangle {
+                visible: root.screen != ScreenKind.error;
+                y: parent.top;
+                height: parent.height - parent.top - parent.banner-height - Palette.footer-height;
+
+                results := Results {
+                    visible: frame.searching;
+                    rows: root.rows;
+                    empty: root.empty;
+                    empty-description: root.empty-description;
+                    pointer-resting: root.pointer-resting;
+                    activate(id) => {
+                        if !root.panel-open {
+                            root.activate(id);
+                        }
+                    }
+                    pointer-moved => {
+                        root.pointer-resting = false;
+                    }
+                }
+                if root.screen == ScreenKind.detail: ScrollView {
+                    VerticalLayout {
+                        padding-left: 20px;
+                        padding-right: 20px;
+                        padding-top: 16px;
+                        padding-bottom: 16px;
+                        Text {
+                            text: root.detail;
+                            color: Palette.foreground;
+                            font-size: Palette.text;
+                            wrap: word-wrap;
+                        }
+                    }
+                }
+                if root.screen == ScreenKind.form: FormView {
+                    fields: root.fields;
+                    changed-field(id, value) => {
+                        root.field-edited(id, value);
+                    }
+                    multiline-focus(focused) => {
+                        root.multiline-focused = focused;
+                    }
+                }
+            }
+
+            Rectangle {
+                visible: root.screen != ScreenKind.error && root.failure != "";
+                y: parent.height - Palette.footer-height - self.height;
+                height: parent.banner-height;
+                Rectangle {
+                    y: 0;
+                    height: 1px;
+                    background: Palette.edge;
+                }
+                banner := HorizontalLayout {
+                    padding-left: 20px;
+                    padding-right: 20px;
+                    padding-top: 8px;
+                    padding-bottom: 8px;
+                    Text {
+                        text: root.failure;
+                        color: Palette.destructive;
+                        font-size: Palette.text;
+                        wrap: word-wrap;
+                        accessible-role: text;
+                    }
+                }
+            }
+
+            Footer {
+                visible: root.screen != ScreenKind.error;
+                y: parent.height - Palette.footer-height;
+                development: root.development;
+                primary-label: root.primary-label;
+                confirm-key: root.confirm-key;
+                status: root.status;
+                hide-status: root.hide-status;
+                panel-key: root.panel-key;
+                has-actions: root.has-actions;
+                toggle-panel => {
+                    root.toggle-panel();
+                }
+            }
+
+            prompt := Prompt {
+                y: 0;
+                visible: frame.searching;
+                placeholder: root.screen == ScreenKind.root ? "Search apps and commands" : "Search";
+                edited(text) => {
+                    root.query-edited(text);
+                }
+            }
+
+            // Swallows a press outside the open panel, so it never reaches the
+            // view underneath. The state machine decides what it means.
+            if root.panel-open: TouchArea {
+                clicked => {
+                    root.close-panel();
+                }
+            }
+
+            panel := ActionPanel {
+                visible: root.panel-open;
+                width: min(288px, parent.width - 16px);
+                height: min(self.content-height, parent.height - Palette.footer-height - 16px);
+                x: parent.width - self.width - 8px;
+                y: parent.height - Palette.footer-height - self.height - 8px;
+                actions: root.actions;
+                pointer-resting: root.pointer-resting;
+                activate(id) => {
+                    root.activate(id);
+                }
+                pointer-moved => {
+                    root.pointer-resting = false;
+                }
+            }
+        }
+    }
+}
+
+export component Tray inherits SystemTrayIcon {
+    in property <image> image;
+    in property <string> hint;
+    in property <[string]> lines;
+    in property <bool> grant-accessibility;
+    in property <bool> grant-input-monitoring;
+    callback toggle();
+    callback quit();
+    callback grant(permission: int);
+    icon: root.image;
+    tooltip: root.hint;
+
+    Menu {
+        if root.grant-accessibility: MenuItem {
+            title: "Grant Accessibility";
+            activated => {
+                root.grant(0);
+            }
+        }
+        if root.grant-input-monitoring: MenuItem {
+            title: "Grant Input Monitoring";
+            activated => {
+                root.grant(1);
+            }
+        }
+        for line in root.lines: MenuItem {
+            title: line;
+            enabled: false;
+        }
+        MenuItem {
+            title: "Show or hide Dango";
+            activated => {
+                root.toggle();
+            }
+        }
+        MenuItem {
+            title: "Quit Dango";
+            activated => {
+                root.quit();
+            }
+        }
+    }
+}

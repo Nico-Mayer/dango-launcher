@@ -16,6 +16,7 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
+slint-build = "=1.18.1"
 
 [dependencies]
 tauri = { version = "2", features = ["tray-icon", "macos-private-api", "protocol-asset"] }
@@ -23,6 +24,23 @@ global-hotkey = "0.8"
 auto-launch = "0.5"
 open = "5"
 raw-window-handle = "0.6"
+# Pinned exactly: the winit accessor and the window handle are unstable API.
+slint = { version = "=1.18.1", default-features = false, features = [
+  "std",
+  "backend-winit",
+  "renderer-femtovg",
+  "renderer-software",
+  "accessibility",
+  "compat-1-2",
+  "system-tray",
+  "unstable-winit-030",
+  "raw-window-handle-06",
+  "image-default-formats",
+] }
+icondata_lu = "0.1"
+icondata_core = "0.1"
+single-instance = "0.3"
+interprocess = "2"
 url = "2"
 # Pinned exactly: 2.13.0 and later require Tauri 2.12, which moves tao, wry and
 # webview2-com with it. Bump together with Tauri, not on its own.
@@ -54,6 +72,7 @@ nucleo-matcher = "0.3.1"
 bytesize = "2.7.0"
 
 [dev-dependencies]
+i-slint-backend-testing = "=1.18.1"
 jsonschema = { version = "0.26", default-features = false }
 # Serves the launcher state machine to the browser fixtures, see
 # examples/ui_fixture.rs.
