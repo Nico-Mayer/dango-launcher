@@ -1,4 +1,4 @@
-//! Every named icon the product can ask for, and a cache for icon files.
+//! Every named icon the product can ask for.
 //!
 //! An extension names an icon as `icon:<name>`; anything else is a path to an
 //! image file it extracted, such as an application's own icon. Adding a named
@@ -24,7 +24,7 @@ pub enum Icon {
 /// Lives on the UI thread, as `Image` does.
 #[derive(Default)]
 pub struct Icons {
-    cache: RefCell<HashMap<String, Option<Image>>>,
+    named: RefCell<HashMap<String, Option<Image>>>,
 }
 
 impl Icons {
@@ -32,20 +32,18 @@ impl Icons {
         let Some(icon) = icon else {
             return Icon::Missing;
         };
-        let named = icon.strip_prefix(NAMED_ICON);
+        let Some(name) = icon.strip_prefix(NAMED_ICON) else {
+            return Image::load_from_path(Path::new(icon)).map_or(Icon::Missing, Icon::File);
+        };
         let image = self
-            .cache
+            .named
             .borrow_mut()
-            .entry(icon.to_string())
-            .or_insert_with(|| match named {
-                Some(name) => named_image(name),
-                None => Image::load_from_path(Path::new(icon)).ok(),
-            })
+            .entry(name.to_string())
+            .or_insert_with(|| named_image(name))
             .clone();
-        match (image, named) {
-            (Some(image), Some(_)) => Icon::Named(image),
-            (Some(image), None) => Icon::File(image),
-            (None, _) => Icon::Missing,
+        match image {
+            Some(image) => Icon::Named(image),
+            None => Icon::Missing,
         }
     }
 }
