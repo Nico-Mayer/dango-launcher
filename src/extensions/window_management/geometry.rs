@@ -212,12 +212,22 @@ const MIN_HEIGHT: i32 = 300;
 pub fn step(frame: Rect, area: Rect, step: Step) -> Rect {
     let dx = area.width / STEP_DENOMINATOR;
     let dy = area.height / STEP_DENOMINATOR;
-    let (width, height) = match step {
-        Step::Larger => (frame.width + 2 * dx, frame.height + 2 * dy),
-        Step::Smaller => (frame.width - 2 * dx, frame.height - 2 * dy),
+    let (width, height, min_width, min_height) = match step {
+        Step::Larger => (
+            frame.width + 2 * dx,
+            frame.height + 2 * dy,
+            MIN_WIDTH,
+            MIN_HEIGHT,
+        ),
+        Step::Smaller => (
+            frame.width - 2 * dx,
+            frame.height - 2 * dy,
+            MIN_WIDTH.min(frame.width),
+            MIN_HEIGHT.min(frame.height),
+        ),
     };
-    let width = width.clamp(MIN_WIDTH.min(area.width), area.width);
-    let height = height.clamp(MIN_HEIGHT.min(area.height), area.height);
+    let width = width.clamp(min_width.min(area.width), area.width);
+    let height = height.clamp(min_height.min(area.height), area.height);
 
     let cx = frame.x + frame.width / 2;
     let cy = frame.y + frame.height / 2;
@@ -654,6 +664,18 @@ mod tests {
             frame = step(frame, AREA, Step::Smaller);
         }
         assert_eq!((frame.width, frame.height), (400, 300));
+    }
+
+    #[test]
+    fn smaller_never_grows_a_window_below_the_minimum() {
+        let frame = Rect {
+            x: 800,
+            y: 400,
+            width: 300,
+            height: 200,
+        };
+        let small = step(frame, AREA, Step::Smaller);
+        assert_eq!((small.width, small.height), (300, 200));
     }
 
     #[test]
