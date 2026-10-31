@@ -9,9 +9,9 @@ leaves a runnable app.
 
 ## 2. Plugin types out of the core
 
-- [ ] 2.1 Replace `tauri_plugin_global_shortcut` types in `config/mod.rs`, `config/hotkey.rs`, and `hotkeys.rs` with `global-hotkey` types. Verify `cargo test config:: hotkeys::` passes.
-- [ ] 2.2 Replace `tauri::Url` with `url::Url` in `extensions/snippets/*`. Verify `cargo test snippets::` passes.
-- [ ] 2.3 Add a `Disabled` `UpdateSource` and a test that it never reports an update. Verify `cargo test updates::`.
+- [x] 2.1 Replace `tauri_plugin_global_shortcut` types in `config/mod.rs`, `config/hotkey.rs`, and `hotkeys.rs` with `global-hotkey` types. Verify `cargo test config:: hotkeys::` passes.
+- [x] 2.2 Replace `tauri::Url` with `url::Url` in `extensions/snippets/*`. Verify `cargo test snippets::` passes.
+- [x] 2.3 Add a `Disabled` `UpdateSource` and a test that it never reports an update. Verify `cargo test updates::`.
 
 ## 3. Core context and `Shell` trait (Tauri still renders)
 

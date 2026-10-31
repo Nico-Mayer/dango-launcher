@@ -41,6 +41,24 @@ pub trait UpdateSource: Send + Sync {
     fn install(&self, bytes: &[u8]) -> Result<(), UpdateError>;
 }
 
+/// Stands in until Dango has an updater again: never finds an update.
+pub struct DisabledSource;
+
+#[async_trait]
+impl UpdateSource for DisabledSource {
+    async fn check(&self) -> Result<Option<String>, UpdateError> {
+        Ok(None)
+    }
+
+    async fn download(&self, _progress: Progress<'_>) -> Result<Vec<u8>, UpdateError> {
+        Err(UpdateError::Download("updates are disabled".into()))
+    }
+
+    fn install(&self, _bytes: &[u8]) -> Result<(), UpdateError> {
+        Err(UpdateError::Install("updates are disabled".into()))
+    }
+}
+
 pub struct PluginSource {
     app: tauri::AppHandle,
     found: Mutex<Option<tauri_plugin_updater::Update>>,
