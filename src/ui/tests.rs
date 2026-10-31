@@ -181,7 +181,7 @@ impl Harness {
                 icon: None,
             },
             invocation,
-            tree,
+            tree: Box::new(tree),
         });
     }
 
@@ -488,7 +488,7 @@ fn an_action_in_a_view_goes_to_the_owner_of_the_view() {
         owner: "clipboard".into(),
         context: Context::default(),
         invocation: 4,
-        tree: list_tree(vec![list_item(1)]),
+        tree: Box::new(list_tree(vec![list_item(1)])),
     });
     h.press("Enter");
     let runs = h.runs();
@@ -841,6 +841,64 @@ fn a_grid_binds_left_and_right() {
     assert!(bound("ArrowRight"));
 }
 
+// Filter dropdown
+
+fn filtered_tree() -> ViewTree {
+    let option = |id: &str, title: &str| crate::protocol::FieldOption {
+        id: id.into(),
+        title: title.into(),
+    };
+    let mut item = list_item(1);
+    item.actions.push(Action {
+        id: "delete".into(),
+        title: "Delete entry".into(),
+        style: crate::protocol::ActionStyle::Danger,
+        ..Default::default()
+    });
+    ViewTree::new(View::List(ListView {
+        filter: Some(crate::protocol::Filter {
+            options: vec![option("all", "All types"), option("text", "Text only")],
+            selected: "all".into(),
+        }),
+        items: vec![item, list_item(2)],
+        ..Default::default()
+    }))
+}
+
+#[test]
+fn the_panel_offers_the_filter_before_danger_actions() {
+    let mut h = Harness::view(filtered_tree());
+    h.command("k");
+    let panel = h.snapshot().panel;
+    let titles: Vec<&str> = panel.actions.iter().map(|a| a.title.as_str()).collect();
+    assert_eq!(
+        titles,
+        ["Open", "Copy", "All types", "Text only", "Delete entry"]
+    );
+    assert_eq!(panel.actions[3].section.as_deref(), Some("Filter"));
+    assert_eq!(panel.checked.as_deref(), Some(panel.actions[2].id.as_str()));
+}
+
+#[test]
+fn confirming_a_filter_option_runs_the_filter_and_closes_the_panel() {
+    let mut h = Harness::view(filtered_tree());
+    h.typed("item");
+    h.command("k");
+    for _ in 0..3 {
+        h.press("ArrowDown");
+    }
+    let effects = h.press("Enter");
+    let [Effect::RunAction(request)] = effects.as_slice() else {
+        panic!("expected one action, got {effects:?}");
+    };
+    assert_eq!(request.action_id, crate::protocol::FILTER_ACTION);
+    assert_eq!(request.item_id, "text");
+    assert!(!h.snapshot().panel.open);
+    let list = h.list();
+    assert_eq!(list.query.text, "item");
+    assert_eq!(list.filter.unwrap().selected, "text");
+}
+
 // Forms
 
 #[test]
@@ -1013,7 +1071,7 @@ fn template_fields_are_inspected_on_arrival_and_on_every_edit() {
         owner: "fixture".into(),
         context: Context::default(),
         invocation: 1,
-        tree: mixed_form(),
+        tree: Box::new(mixed_form()),
     });
     assert_eq!(
         effects,

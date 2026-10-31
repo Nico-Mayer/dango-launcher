@@ -51,6 +51,7 @@ impl Writer {
                     .unwrap_or_default()
                     .into(),
                 danger: action.style == ActionStyle::Danger,
+                checked: panel.checked.as_deref() == Some(action.id.as_str()),
                 selected: panel.selected.as_deref() == Some(action.id.as_str()),
                 ..Default::default()
             });

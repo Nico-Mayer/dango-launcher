@@ -94,7 +94,7 @@ impl Harness {
                 icon: None,
             },
             invocation: 1,
-            tree,
+            tree: Box::new(tree),
         });
     }
 
@@ -352,7 +352,7 @@ mod action_bar {
                 icon: None,
             },
             invocation: 1,
-            tree: views::list_tree(),
+            tree: Box::new(views::list_tree()),
         });
         assert!(h.find("Clipboard History").is_some());
     }
@@ -928,6 +928,46 @@ mod grid {
         assert_eq!(h.row("tile-1").accessible_item_selected(), Some(true));
         h.type_text("c");
         assert_eq!(h.query_of("Search"), "abc");
+    }
+}
+
+mod filter_dropdown {
+    use super::*;
+    use crate::protocol::{FieldOption, Filter};
+
+    #[test]
+    fn choosing_text_only_keeps_the_query_and_shows_it() {
+        let option = |id: &str, title: &str| FieldOption {
+            id: id.into(),
+            title: title.into(),
+        };
+        let mut tree = views::list_tree();
+        if let View::List(list) = &mut tree.view {
+            list.filter = Some(Filter {
+                options: vec![option("all", "All types"), option("text", "Text only")],
+                selected: "all".into(),
+            });
+        }
+        let h = Harness::root(results(1));
+        h.view(tree);
+        h.type_text("it");
+        let dropdown = h.find("Filter results").expect("the filter dropdown");
+        assert_eq!(dropdown.accessible_value().as_deref(), Some("All types"));
+        dropdown.invoke_accessible_default_action();
+        h.find("Text only")
+            .expect("the option")
+            .invoke_accessible_default_action();
+        assert!(h
+            .intents()
+            .contains(&Intent::FilterChosen { id: "text".into() }));
+        assert_eq!(
+            h.find("Filter results")
+                .unwrap()
+                .accessible_value()
+                .as_deref(),
+            Some("Text only")
+        );
+        assert_eq!(h.query_of("Search"), "it");
     }
 }
 

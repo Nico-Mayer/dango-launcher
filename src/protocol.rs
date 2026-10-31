@@ -45,6 +45,8 @@ protocol_types! {
         /// Shows the selected item's detail beside the list.
         #[serde(default)]
         pub detail_pane: bool,
+        #[serde(default)]
+        pub filter: Option<Filter>,
         pub items: Vec<ListItem>,
     }
 
@@ -66,6 +68,8 @@ protocol_types! {
         pub empty_state: Option<EmptyState>,
         #[serde(default)]
         pub sections: Vec<Section>,
+        #[serde(default)]
+        pub filter: Option<Filter>,
         pub items: Vec<GridItem>,
     }
 
@@ -95,6 +99,14 @@ protocol_types! {
         Glyph { glyph: String },
         #[default]
         Empty,
+    }
+
+    /// A dropdown at the SearchBar's end. Choosing an option runs
+    /// `FILTER_ACTION` on the view's command with the option's id as the item.
+    #[serde(rename_all = "camelCase")]
+    pub struct Filter {
+        pub options: Vec<FieldOption>,
+        pub selected: String,
     }
 
     #[serde(rename_all = "camelCase")]
@@ -309,6 +321,10 @@ protocol_types! {
 fn square() -> f32 {
     1.0
 }
+
+/// The action a view's command receives when the user chooses a filter
+/// option. The option's id arrives as the item.
+pub const FILTER_ACTION: &str = "filter";
 
 /// The column counts a grid may declare.
 pub const GRID_COLUMNS: std::ops::RangeInclusive<u8> = 4..=8;

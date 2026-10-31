@@ -2,8 +2,8 @@ use std::collections::HashMap;
 
 use crate::extension::{ActionOutcome, FormValues};
 use crate::protocol::{
-    Action, ActionStyle, FieldKind, Filtering, FormField, GridItem, GridView, ListItem, Section,
-    View, ViewTree, GRID_COLUMNS, PROTOCOL_VERSION,
+    Action, ActionStyle, FieldKind, Filter, Filtering, FormField, GridItem, GridView, ListItem,
+    Section, View, ViewTree, FILTER_ACTION, GRID_COLUMNS, PROTOCOL_VERSION,
 };
 
 use super::effect::{ActionRequest, Effect, Origin};
@@ -131,6 +131,9 @@ pub(super) struct PushedView {
     pub(super) query: String,
     pub(super) query_revision: u64,
     picked: Option<String>,
+    /// The filter option chosen since the last tree, which shows until the
+    /// command answers.
+    pub(super) filter: Option<String>,
     pub(super) form: FormState,
 }
 
@@ -207,6 +210,7 @@ impl Launcher {
             }
             Intent::ClosePanel => self.panel = None,
             Intent::Blur => fx.push(Effect::Dismiss),
+            Intent::FilterChosen { id } => self.choose_filter(id, fx),
             Intent::PanelFilterChanged { text } => {
                 if let Some(panel) = self.panel.as_mut() {
                     panel.filter = text;
@@ -237,7 +241,7 @@ impl Launcher {
                 context,
                 invocation,
                 tree,
-            } => self.rendered(owner, context, invocation, tree, fx),
+            } => self.rendered(owner, context, invocation, *tree, fx),
             Event::ActionFinished { request, outcome } => {
                 self.action_finished(request, outcome, fx)
             }
@@ -415,6 +419,7 @@ impl Launcher {
             query: String::new(),
             query_revision,
             picked: None,
+            filter: None,
             form: FormState::default(),
         };
         self.seed_form(&mut view, fx);
@@ -426,6 +431,7 @@ impl Launcher {
             return;
         };
         view.tree = tree;
+        view.filter = None;
         self.seed_form(&mut view, fx);
         self.stack.push(view);
     }
@@ -692,8 +698,27 @@ impl Launcher {
         }
     }
 
+    /// Delivers a filter option to the view's command, keeping the query.
+    fn choose_filter(&mut self, id: String, fx: &mut Vec<Effect>) {
+        let known = self
+            .filter()
+            .is_some_and(|filter| filter.options.iter().any(|option| option.id == id));
+        if !known {
+            return;
+        }
+        if let Some(view) = self.stack.last_mut() {
+            view.filter = Some(id.clone());
+        }
+        self.run_view_action(FILTER_ACTION.to_string(), Some(id), None, fx);
+    }
+
     /// Runs one of the actions the panel offers, on whatever it applies to.
     fn run_available(&mut self, action: &str, fx: &mut Vec<Effect>) {
+        if let Some(option) = action.strip_prefix(FILTER_PREFIX) {
+            self.panel = None;
+            self.choose_filter(option.to_string(), fx);
+            return;
+        }
         if self.stack.is_empty() {
             if let Some(item) = self.root_selected().cloned() {
                 self.run_root_action(&item, action, fx);
@@ -920,10 +945,27 @@ impl Launcher {
     }
 
     /// The actions in the order the panel lists them: grouped by section in
-    /// the order sections first appear, with danger actions after all others,
-    /// narrowed by the panel's filter.
-    pub(super) fn panel_actions(&self) -> Vec<&Action> {
-        let mut actions = self.ordered_actions();
+    /// the order sections first appear, then the view's filter options, with
+    /// danger actions after all others, narrowed by the panel's filter.
+    pub(super) fn panel_actions(&self) -> Vec<Action> {
+        let ordered = self.ordered_actions();
+        let (normal, danger): (Vec<&Action>, Vec<&Action>) = ordered
+            .into_iter()
+            .partition(|action| action.style != ActionStyle::Danger);
+        let options = self.filter().into_iter().flat_map(|filter| {
+            filter.options.iter().map(|option| Action {
+                id: format!("{FILTER_PREFIX}{}", option.id),
+                title: option.title.clone(),
+                section: Some("Filter".to_string()),
+                ..Default::default()
+            })
+        });
+        let mut actions: Vec<Action> = normal
+            .into_iter()
+            .cloned()
+            .chain(options)
+            .chain(danger.into_iter().cloned())
+            .collect();
         if let Some(filter) = self.panel.as_ref().map(|panel| &panel.filter) {
             if !filter.is_empty() {
                 let mut query = fuzzy::Query::new(filter);
@@ -931,6 +973,22 @@ impl Launcher {
             }
         }
         actions
+    }
+
+    /// The view's filter dropdown, if it declares one.
+    pub(super) fn filter(&self) -> Option<&Filter> {
+        match self.stack.last().map(|view| &view.tree.view) {
+            Some(View::List(list)) => list.filter.as_ref(),
+            Some(View::Grid(grid)) => grid.filter.as_ref(),
+            _ => None,
+        }
+    }
+
+    /// The option the dropdown shows: one just chosen, else the tree's.
+    pub(super) fn filter_selected(&self) -> Option<String> {
+        let filter = self.filter()?;
+        let chosen = self.stack.last().and_then(|view| view.filter.clone());
+        Some(chosen.unwrap_or_else(|| filter.selected.clone()))
     }
 
     pub(super) fn panel_filter(&self) -> &str {
@@ -985,6 +1043,9 @@ impl Launcher {
         }
     }
 }
+
+/// Marks a panel entry as a filter option rather than an action.
+pub(super) const FILTER_PREFIX: &str = "dango.filter:";
 
 /// Items in section order, narrowed by the query when the launcher filters,
 /// without the groups left empty. Items naming no declared section come first.

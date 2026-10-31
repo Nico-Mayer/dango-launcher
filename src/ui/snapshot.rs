@@ -5,7 +5,7 @@ use crate::protocol::{
 };
 
 use super::input::{Chord, Context, ResultItem};
-use super::state::{Launcher, Mode, PushedView, ToastStyle, ViewError};
+use super::state::{Launcher, Mode, PushedView, ToastStyle, ViewError, FILTER_PREFIX};
 
 macro_rules! snapshot_types {
     ($($item:item)*) => {
@@ -106,6 +106,7 @@ snapshot_types! {
     #[serde(rename_all = "camelCase")]
     pub struct ListBody {
         pub query: Text,
+        pub filter: Option<FilterView>,
         pub sections: Vec<ListSection>,
         /// The selected item's detail, when the list shows a pane for it.
         pub pane: Option<DetailBody>,
@@ -113,9 +114,17 @@ snapshot_types! {
         pub empty: Option<EmptyText>,
     }
 
+    /// The view's filter dropdown with the option it shows.
+    #[serde(rename_all = "camelCase")]
+    pub struct FilterView {
+        pub options: Vec<FieldOption>,
+        pub selected: String,
+    }
+
     #[serde(rename_all = "camelCase")]
     pub struct GridBody {
         pub query: Text,
+        pub filter: Option<FilterView>,
         pub columns: u8,
         pub aspect: f32,
         pub sections: Vec<GridSection>,
@@ -200,6 +209,8 @@ snapshot_types! {
         pub open: bool,
         /// What the panel's own filter holds. Narrows `actions`.
         pub filter: String,
+        /// The entry marked as chosen: the view's selected filter option.
+        pub checked: Option<String>,
         pub selected: Option<String>,
     }
 }
@@ -229,7 +240,10 @@ impl Launcher {
             toast: self.toast(),
             footer: self.footer(),
             panel: Panel {
-                actions: self.panel_actions().into_iter().cloned().collect(),
+                actions: self.panel_actions(),
+                checked: self
+                    .filter_selected()
+                    .map(|id| format!("{FILTER_PREFIX}{id}")),
                 open: self.panel_open(),
                 filter: self.panel_filter().to_string(),
                 selected: self.panel_selected(),
@@ -361,6 +375,7 @@ impl Launcher {
                         text: view.query.clone(),
                         revision: view.query_revision,
                     },
+                    filter: self.filter_view(),
                     sections,
                     pane: list.detail_pane.then(|| {
                         self.view_selected()
@@ -396,6 +411,7 @@ impl Launcher {
                         text: view.query.clone(),
                         revision: view.query_revision,
                     },
+                    filter: self.filter_view(),
                     columns: grid.columns,
                     aspect: grid.aspect,
                     sections,
@@ -442,6 +458,13 @@ impl Launcher {
             busy: is_busy(&view.tree.view),
             body,
         }
+    }
+
+    fn filter_view(&self) -> Option<FilterView> {
+        Some(FilterView {
+            options: self.filter()?.options.clone(),
+            selected: self.filter_selected()?,
+        })
     }
 
     /// A held toast wins; otherwise the work in progress shows as busy.

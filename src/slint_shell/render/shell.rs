@@ -1,15 +1,17 @@
 //! The `Shell` and `Search` globals: where the user is, what Enter does, and
 //! what is happening.
 
-use slint::ComponentHandle;
+use std::rc::Rc;
+
+use slint::{ComponentHandle, ModelRc, VecModel};
 
 use super::icon;
 use crate::slint_shell::generated::{
-    LauncherWindow, ScreenKind, Search, Shell, ToastStyle as SlintToastStyle,
+    LauncherWindow, OptionData, ScreenKind, Search, Shell, ToastStyle as SlintToastStyle,
 };
 use crate::slint_shell::icons::Icons;
 use crate::slint_shell::keys;
-use crate::ui::snapshot::{Screen, Snapshot};
+use crate::ui::snapshot::{Screen, Snapshot, ViewBody};
 use crate::ui::ToastStyle;
 
 pub fn init(ui: &LauncherWindow, icons: &Icons) {
@@ -54,7 +56,8 @@ pub fn write(
         None => shell.set_toast_shown(false),
     }
 
-    ui.global::<Search>().set_placeholder(
+    let search = ui.global::<Search>();
+    search.set_placeholder(
         if matches!(snapshot.screen, Screen::Root(_)) {
             "Search apps and commands"
         } else {
@@ -62,4 +65,30 @@ pub fn write(
         }
         .into(),
     );
+    let filter = match &snapshot.screen {
+        Screen::View(view) => match &view.body {
+            ViewBody::List(list) => list.filter.as_ref(),
+            ViewBody::Grid(grid) => grid.filter.as_ref(),
+            _ => None,
+        },
+        _ => None,
+    };
+    search.set_filter_shown(filter.is_some());
+    if let Some(filter) = filter {
+        let options: Vec<OptionData> = filter
+            .options
+            .iter()
+            .map(|option| OptionData {
+                id: option.id.as_str().into(),
+                title: option.title.as_str().into(),
+            })
+            .collect();
+        let current = filter
+            .options
+            .iter()
+            .position(|option| option.id == filter.selected)
+            .unwrap_or(0);
+        search.set_filter_options(ModelRc::from(Rc::new(VecModel::from(options))));
+        search.set_filter_current(current as i32);
+    }
 }

@@ -47,6 +47,10 @@ pub enum Intent {
     PanelFilterChanged {
         text: String,
     },
+    /// An option of the view's filter dropdown.
+    FilterChosen {
+        id: String,
+    },
     Blur,
 }
 
@@ -102,7 +106,7 @@ pub enum Event {
         owner: String,
         context: Context,
         invocation: u64,
-        tree: ViewTree,
+        tree: Box<ViewTree>,
     },
     ActionFinished {
         request: ActionRequest,

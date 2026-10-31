@@ -27,6 +27,8 @@ export struct ActionData {
     title: string,
     shortcut: string,
     danger: bool,
+    /// The filter option the view shows.
+    checked: bool,
     selected: bool,
 }
 
@@ -99,6 +101,9 @@ export global Shell {
 
 export global Search {
     in property <string> placeholder;
+    in property <bool> filter-shown;
+    in property <[OptionData]> filter-options;
+    in property <int> filter-current;
 }
 
 export global ListData {
@@ -145,4 +150,5 @@ export global Intents {
     callback close-panel();
     callback go-back();
     callback panel-filter-edited(text: string);
+    callback filter-chosen(id: string);
 }

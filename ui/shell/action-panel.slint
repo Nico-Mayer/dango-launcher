@@ -29,6 +29,8 @@ component PanelRow inherits Rectangle {
     accessible-role: list-item;
     accessible-label: root.data.title;
     accessible-item-selected: root.data.selected;
+    accessible-checkable: root.data.checked;
+    accessible-checked: root.data.checked;
     HorizontalLayout {
         padding-left: 10px;
         padding-right: 10px;
@@ -40,6 +42,14 @@ component PanelRow inherits Rectangle {
             overflow: elide;
             vertical-alignment: center;
             horizontal-stretch: 1;
+            accessible-role: none;
+        }
+        if root.data.checked: Text {
+            text: "✓";
+            color: Theme.accent;
+            font-size: Theme.text-body;
+            vertical-alignment: center;
+            horizontal-stretch: 0;
             accessible-role: none;
         }
         if root.data.shortcut != "": VerticalLayout {

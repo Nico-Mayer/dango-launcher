@@ -60,8 +60,8 @@
 
 ## 9. Filter dropdown
 
-- [ ] 9.1 Add the view's filter to the reducer and the "Filter" section in the action panel; verify a reducer test that confirming "Text only" emits the filter effect and closes the panel
-- [ ] 9.2 Show the selected filter at the SearchBar's right end with "Filter results" as label, opening a popup on click; verify a UI test that choosing "Text only" keeps the query and shows "Text only"
+- [x] 9.1 Add the view's filter to the reducer and the "Filter" section in the action panel; verify a reducer test that confirming "Text only" emits the filter effect and closes the panel
+- [x] 9.2 Show the selected filter at the SearchBar's right end with "Filter results" as label, opening a popup on click; verify a UI test that choosing "Text only" keeps the query and shows "Text only"
 
 ## 10. Window height
 

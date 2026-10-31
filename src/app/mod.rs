@@ -517,7 +517,7 @@ impl Core {
                             owner: owner.clone(),
                             context: context.clone(),
                             invocation,
-                            tree,
+                            tree: Box::new(tree),
                         }));
                     }
                     Output::Finished(Outcome::Success) => {

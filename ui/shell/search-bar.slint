@@ -85,6 +85,91 @@ export component SearchBar inherits Rectangle {
             }
         }
 
+        if Shell.typing && Search.filter-shown: VerticalLayout {
+            alignment: center;
+            horizontal-stretch: 0;
+            Rectangle {
+                height: 28px;
+                border-radius: Theme.radius / 2;
+                border-width: 1px;
+                border-color: Theme.border;
+                background: filter-touch.has-hover ? Theme.hover : transparent;
+                accessible-role: combobox;
+                accessible-label: "Filter results";
+                accessible-value: Search.filter-options[Search.filter-current].title;
+                accessible-action-default => {
+                    filter-popup.show();
+                }
+                HorizontalLayout {
+                    padding-left: 10px;
+                    padding-right: 10px;
+                    spacing: 6px;
+                    Text {
+                        text: Search.filter-options[Search.filter-current].title;
+                        color: Theme.muted;
+                        font-size: Theme.text-small;
+                        vertical-alignment: center;
+                        accessible-role: none;
+                    }
+                    Text {
+                        text: "▾";
+                        color: Theme.muted;
+                        font-size: Theme.text-small;
+                        vertical-alignment: center;
+                        accessible-role: none;
+                    }
+                }
+                filter-touch := TouchArea {
+                    clicked => {
+                        filter-popup.show();
+                    }
+                }
+                filter-popup := PopupWindow {
+                    x: parent.width - self.width;
+                    y: parent.height + 4px;
+                    width: 200px;
+                    Rectangle {
+                        background: Theme.surface;
+                        border-radius: Theme.radius;
+                        border-width: 1px;
+                        border-color: Theme.border;
+                        drop-shadow-blur: 16px;
+                        drop-shadow-offset-y: 4px;
+                        drop-shadow-color: Theme.shadow;
+                        VerticalLayout {
+                            padding: 4px;
+                            for option[index] in Search.filter-options: Rectangle {
+                                height: Theme.panel-row-height;
+                                border-radius: Theme.radius / 2;
+                                background: index == Search.filter-current ? Theme.selection
+                                    : option-touch.has-hover ? Theme.hover : transparent;
+                                accessible-role: list-item;
+                                accessible-label: option.title;
+                                accessible-item-selected: index == Search.filter-current;
+                                accessible-action-default => {
+                                    Intents.filter-chosen(option.id);
+                                }
+                                Text {
+                                    x: 10px;
+                                    text: option.title;
+                                    color: Theme.text;
+                                    font-size: Theme.text-body;
+                                    vertical-alignment: center;
+                                    accessible-role: none;
+                                }
+                                option-touch := TouchArea {
+                                    clicked => {
+                                        Intents.filter-chosen(option.id);
+                                        filter-popup.close();
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         if !Shell.typing: Text {
             horizontal-stretch: 1;
             text: Shell.title;
