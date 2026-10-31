@@ -570,6 +570,78 @@ fn a_long_list_shows_the_first_fifty_and_filtering_reaches_the_rest() {
     assert_eq!(h.selected(), item_id(300));
 }
 
+#[test]
+fn the_limit_counts_across_sections_and_drops_a_section_left_empty() {
+    let item = |n: usize, section: &str| ListItem {
+        section: Some(section.into()),
+        ..list_item(n)
+    };
+    let section = |id: &str| crate::protocol::Section {
+        id: id.into(),
+        title: id.into(),
+        subtitle: None,
+    };
+    let items = (1..=40)
+        .map(|n| item(n, "First"))
+        .chain((41..=80).map(|n| item(n, "Second")))
+        .chain([item(81, "Third")])
+        .collect();
+    let h = Harness::view(ViewTree::new(View::List(ListView {
+        sections: vec![section("First"), section("Second"), section("Third")],
+        items,
+        ..Default::default()
+    })));
+    let list = h.list();
+    assert_eq!(section_titles(&list), ["First", "Second"]);
+    assert_eq!(list.sections[0].items.len(), 40);
+    assert_eq!(shown_ids(&list), item_ids(1..=50));
+}
+
+#[test]
+fn a_command_filtered_list_shows_fifty() {
+    let h = Harness::view(ViewTree::new(View::List(ListView {
+        filtering: Filtering::Command,
+        items: (1..=120).map(list_item).collect(),
+        ..Default::default()
+    })));
+    assert_eq!(shown_ids(&h.list()), item_ids(1..=50));
+}
+
+#[test]
+fn a_grid_shows_fifty_tiles() {
+    let h = Harness::view(grid_tree(5, 80));
+    let ViewBody::Grid(grid) = h.view_body() else {
+        panic!("expected a grid");
+    };
+    let ids: Vec<&str> = grid
+        .sections
+        .iter()
+        .flat_map(|section| section.items.iter().map(|tile| tile.id.as_str()))
+        .collect();
+    assert_eq!(ids.len(), 50);
+    assert_eq!(ids.last(), Some(&"tile-50"));
+}
+
+#[test]
+fn arrow_down_stays_on_the_last_shown_item_and_its_panel_opens() {
+    let mut items: Vec<_> = (1..=500).map(list_item).collect();
+    items[49].actions = vec![Action {
+        id: "fiftieth".into(),
+        title: "Fiftieth".into(),
+        ..Default::default()
+    }];
+    let mut h = Harness::view(list_tree(items));
+    for _ in 0..60 {
+        h.press("ArrowDown");
+    }
+    assert_eq!(h.selected(), item_id(50));
+    h.command("k");
+    let panel = h.snapshot().panel;
+    assert!(panel.open);
+    assert_eq!(panel.actions.len(), 1);
+    assert_eq!(panel.actions[0].id, "fiftieth");
+}
+
 impl Harness {
     fn root_screen_query(&self) -> String {
         self.launcher.query.clone()
