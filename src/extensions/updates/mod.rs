@@ -34,7 +34,7 @@ const WAKE_EVERY: Duration = Duration::from_secs(10 * 60);
 
 const CHECKING: &str = "Checking for updates";
 const UP_TO_DATE: &str = "You have the latest version";
-const DEVELOPMENT: &str = "Updates are off in development builds";
+const DEVELOPMENT: &str = "Updates are off in development builds.";
 
 pub(crate) fn manifest() -> Manifest {
     Manifest {
@@ -622,7 +622,7 @@ mod tests {
         let last = fixture.views.last();
         assert_eq!(
             last.markdown,
-            "Couldn't verify the update, so it wasn't installed"
+            "Couldn't verify the update, so it wasn't installed. Try again later."
         );
         assert!(!last.loading);
         assert!(fixture.source.installed.lock().unwrap().is_empty());
@@ -638,7 +638,7 @@ mod tests {
 
         assert_eq!(
             fixture.views.last().markdown,
-            "Couldn't download the update"
+            "Couldn't download the update. Check your connection and try again."
         );
         assert!(fixture.source.installed.lock().unwrap().is_empty());
         assert_eq!(fixture.items().await.len(), 1);
@@ -682,7 +682,7 @@ mod tests {
         });
         assert_eq!(
             fixture.check_view().await.last().markdown,
-            "Couldn't check for updates"
+            "Couldn't check for updates. Check your connection and try again."
         );
     }
 
@@ -709,7 +709,7 @@ mod tests {
         tokio::time::sleep(FIRST_CHECK_AFTER * 2).await;
         assert_eq!(
             fixture.check_view().await.last().markdown,
-            "Updates are off in development builds"
+            "Updates are off in development builds."
         );
         assert_eq!(fixture.source.checks(), 0);
     }
