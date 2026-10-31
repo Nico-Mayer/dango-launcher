@@ -735,9 +735,10 @@ impl Core {
         };
         self.config.replace(config);
 
+        let mut conflicts = Vec::new();
         if let Err(error) = self.services.hotkeys.replace_launcher(launcher) {
-            crate::log::append(&format!(
-                "could not register the new launcher hotkey: {error}"
+            conflicts.push(format!(
+                "could not register the new launcher hotkey, keeping the old one: {error}"
             ));
         }
 
@@ -767,10 +768,10 @@ impl Core {
             );
         }
 
-        let conflicts = {
+        {
             let config = self.config.shared();
             let config = config.read().unwrap();
-            let mut conflicts = self.services.hotkeys.apply(&config);
+            conflicts.extend(self.services.hotkeys.apply(&config));
             if let Some(message) = apply_hyperkey(&config, &self.services.hyperkey) {
                 conflicts.push(message);
             }
@@ -779,8 +780,7 @@ impl Core {
                     conflicts.push(message);
                 }
             }
-            conflicts
-        };
+        }
         for conflict in &conflicts {
             crate::log::append(conflict);
         }

@@ -194,15 +194,20 @@ impl Registry {
         self.grab.register(self.launcher())
     }
 
-    /// Swaps the launcher chord when it changed.
+    /// Swaps the launcher chord when it changed. A chord the OS refuses leaves
+    /// the old one in place, so the launcher keeps a hotkey.
     pub fn replace_launcher(&self, chord: HotKey) -> Result<(), String> {
         let mut current = self.launcher.lock().unwrap();
         if *current == chord {
             return Ok(());
         }
         self.grab.unregister(*current);
+        if let Err(error) = self.grab.register(chord) {
+            let _ = self.grab.register(*current);
+            return Err(error);
+        }
         *current = chord;
-        self.grab.register(chord)
+        Ok(())
     }
 
     /// Gives back the command chords held now, rebuilds the table first-wins,
@@ -553,6 +558,24 @@ mod tests {
         assert_eq!(*held.lock().unwrap(), vec![chord]);
         assert_eq!(
             registry.pressed(chord.id(), HotKeyState::Pressed),
+            Some(Pressed::Launcher)
+        );
+    }
+
+    #[test]
+    fn a_refused_launcher_chord_keeps_the_old_one() {
+        let chord = HotKey::new(Some(Modifiers::CONTROL), Code::Space);
+        let grab = FakeGrab {
+            refused: vec![chord],
+            ..Default::default()
+        };
+        let held = grab.held.clone();
+        let registry = Registry::new(Box::new(grab), launcher());
+        registry.register_launcher().unwrap();
+        assert!(registry.replace_launcher(chord).is_err());
+        assert_eq!(*held.lock().unwrap(), vec![launcher()]);
+        assert_eq!(
+            registry.pressed(launcher().id(), HotKeyState::Pressed),
             Some(Pressed::Launcher)
         );
     }

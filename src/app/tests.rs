@@ -1,6 +1,7 @@
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
+use global_hotkey::hotkey::{Code, HotKey, Modifiers};
 use tokio::runtime::Handle;
 
 use super::{Core, Services, ViewRunner, RESULT_LIMIT};
@@ -16,6 +17,10 @@ use crate::shell::TrayStatus;
 use crate::ui::{snapshot::Screen, Chord, Intent};
 
 fn core(config_json: &str) -> (Arc<Core>, Arc<RecordingShell>) {
+    core_with_grab(config_json, FakeGrab::default())
+}
+
+fn core_with_grab(config_json: &str, grab: FakeGrab) -> (Arc<Core>, Arc<RecordingShell>) {
     let config = Config::parse(config_json).unwrap();
     let launcher = hotkeys::launcher(&config);
     let config = Arc::new(FileConfig::new(
@@ -42,7 +47,7 @@ fn core(config_json: &str) -> (Arc<Core>, Arc<RecordingShell>) {
         contexts,
         applications: None,
         ai: None,
-        hotkeys: Registry::new(Box::new(FakeGrab::default()), launcher),
+        hotkeys: Registry::new(Box::new(grab), launcher),
         hyperkey: Mutex::new(None),
     };
     let shell = Arc::new(RecordingShell::default());
@@ -279,6 +284,23 @@ async fn quitting_releases_the_hotkeys_and_quits_the_shell() {
     let (core, shell) = core("{}");
     core.quit();
     assert_eq!(shell.calls(), [Call::Quit]);
+}
+
+#[tokio::test]
+async fn a_refused_launcher_hotkey_on_reload_keeps_the_old_one_and_reports_it() {
+    let refused = HotKey::new(Some(Modifiers::CONTROL), Code::Space);
+    let (core, _) = core_with_grab(
+        "{}",
+        FakeGrab {
+            refused: vec![refused],
+            ..Default::default()
+        },
+    );
+    core.apply_config_reload(Config::parse(
+        r#"{ "launcher": { "hotkey": "ctrl+space" } }"#,
+    ));
+    assert_ne!(core.services.hotkeys.launcher(), refused);
+    assert!(core.tray().config_error);
 }
 
 mod inspect_tests {
