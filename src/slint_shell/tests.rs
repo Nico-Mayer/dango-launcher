@@ -8,7 +8,9 @@ use i_slint_backend_testing::ElementHandle;
 use slint::platform::{PointerEventButton, WindowEvent};
 use slint::{ComponentHandle, LogicalPosition, Model};
 
-use super::generated::{GridData, Intents, LauncherWindow, Panel, ScreenKind, Shell, Tray};
+use super::generated::{
+    GridData, Intents, LauncherWindow, ListData, Panel, ScreenKind, Shell, Tray,
+};
 use super::render::{self, Renderer};
 use crate::protocol::{
     Action, DetailView, FieldKind, Filtering, FormField, FormView, ListItem, ListView, View,
@@ -735,6 +737,15 @@ mod list_view {
         ));
         assert!(h.find("Accessory 3").is_some());
         assert!(h.find("Accessory 4").is_none());
+    }
+
+    #[test]
+    fn a_pushed_list_of_five_hundred_renders_fifty_rows() {
+        let h = Harness::root(results(1));
+        h.view(tree((1..=500).map(item).collect(), false));
+        let rows = h.ui.global::<ListData>().get_rows();
+        assert_eq!(rows.row_count(), 50);
+        assert_eq!(rows.row_data(49).unwrap().id, "item-50");
     }
 
     #[test]
