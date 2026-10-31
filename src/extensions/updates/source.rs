@@ -53,31 +53,8 @@ pub trait UpdateSource: Send + Sync {
 /// Starts Dango again from the application the update was installed into.
 pub type Restart = Box<dyn Fn(&Path) + Send + Sync>;
 
-/// The release source in a release build, nothing in a development build.
 pub fn production(restart: Restart) -> std::sync::Arc<dyn UpdateSource> {
-    if cfg!(debug_assertions) {
-        std::sync::Arc::new(DisabledSource)
-    } else {
-        std::sync::Arc::new(PackagerSource::new(restart))
-    }
-}
-
-/// Never finds an update. A development build has no release to update to.
-pub struct DisabledSource;
-
-#[async_trait]
-impl UpdateSource for DisabledSource {
-    async fn check(&self) -> Result<Option<String>, UpdateError> {
-        Ok(None)
-    }
-
-    async fn download(&self, _progress: Progress<'_>) -> Result<Vec<u8>, UpdateError> {
-        Err(UpdateError::Download("updates are disabled".into()))
-    }
-
-    fn install(&self, _bytes: &[u8]) -> Result<(), UpdateError> {
-        Err(UpdateError::Install("updates are disabled".into()))
-    }
+    std::sync::Arc::new(PackagerSource::new(restart))
 }
 
 /// The signed releases on GitHub, through `cargo-packager-updater`.
@@ -223,16 +200,6 @@ mod tests {
     fn other_download_failures_are_download_errors() {
         let error = cargo_packager_updater::Error::Network("status 404".into());
         assert!(matches!(download_error(error), UpdateError::Download(_)));
-    }
-
-    #[tokio::test]
-    async fn a_development_build_has_the_disabled_source() {
-        let source = production(Box::new(|_| panic!("a development build restarted")));
-        assert_eq!(source.check().await, Ok(None));
-        assert_eq!(
-            source.download(&mut |_, _| {}).await,
-            Err(UpdateError::Download("updates are disabled".into()))
-        );
     }
 }
 

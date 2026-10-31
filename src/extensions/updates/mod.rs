@@ -19,7 +19,7 @@ use crate::invocation::{Command, InvocationContext, Runner};
 use crate::protocol::{Action, DetailView, View, ViewTree};
 use crate::search::{Candidate, RootProvider, Source};
 
-pub use source::{production, DisabledSource, UpdateError, UpdateSource};
+pub use source::{production, UpdateError, UpdateSource};
 
 pub const EXTENSION_ID: &str = "dango.updates";
 
@@ -437,24 +437,6 @@ mod tests {
                 tokio::task::yield_now().await;
             }
         }
-    }
-
-    #[tokio::test]
-    async fn disabled_source_never_reports_an_update() {
-        let extension = UpdatesExtension::new(
-            Arc::new(DisabledSource),
-            "0.4.0",
-            true,
-            Handle::current(),
-            None,
-        );
-        extension.inner.check().await.unwrap();
-        let items = extension
-            .root_provider()
-            .unwrap()
-            .items(String::new())
-            .await;
-        assert!(items.is_empty());
     }
 
     #[tokio::test]
