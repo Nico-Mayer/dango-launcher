@@ -6,9 +6,9 @@
 
 ## 2. Schema and reference
 
-- [ ] 2.1 Extend `hotkey_pattern` in `src/config/schema.rs` with a lone function-key alternative built from `KEY_TOKENS`, and update the `hotkey_section` text to the line in design.md. Verify: `every_token_matches_the_hotkey_pattern` extended to check lone `f1`..`f20` match and `a`, `space`, `f21`, `ctrl+f24` do not, under `cargo test`.
-- [ ] 2.2 Add a test that walks every key token alone and asserts the parser and the pattern agree on it. Verify: `cargo test schema`.
-- [ ] 2.3 Regenerate `docs/config.md` with `env DANGO_UPDATE_DOCS=1 cargo test the_settings_reference_is_current`. Verify: `the_settings_reference_is_current` passes without the variable.
+- [x] 2.1 Extend `hotkey_pattern` in `src/config/schema.rs` with a lone function-key alternative built from `KEY_TOKENS`, and update the `hotkey_section` text to the line in design.md. Verify: `every_token_matches_the_hotkey_pattern` extended to check lone `f1`..`f20` match and `a`, `space`, `f21`, `ctrl+f24` do not, under `cargo test`.
+- [x] 2.2 Add a test that walks every key token alone and asserts the parser and the pattern agree on it. Verify: `cargo test schema`.
+- [x] 2.3 Regenerate `docs/config.md` with `env DANGO_UPDATE_DOCS=1 cargo test the_settings_reference_is_current`. Verify: `the_settings_reference_is_current` passes without the variable.
 
 ## 3. Hand checks
 

@@ -7,7 +7,7 @@ use std::path::Path;
 
 use serde_json::{json, Map, Value};
 
-use super::hotkey::{KEY_TOKENS, MODIFIER_TOKENS};
+use super::hotkey::{stands_alone, KEY_TOKENS, MODIFIER_TOKENS};
 use super::Config;
 use crate::extension::{Manifest, PreferenceDecl, PreferenceKind};
 
@@ -154,7 +154,13 @@ fn hotkey_pattern() -> String {
         .map(|(name, _)| *name)
         .collect::<Vec<_>>()
         .join("|");
-    format!("^(?:(?:{modifiers})\\+)+(?:{keys}|[a-z0-9])$")
+    let lone = KEY_TOKENS
+        .iter()
+        .filter(|(_, code)| stands_alone(*code))
+        .map(|(name, _)| *name)
+        .collect::<Vec<_>>()
+        .join("|");
+    format!("^(?:(?:(?:{modifiers})\\+)+(?:{keys}|[a-z0-9])|(?:{lone}))$")
 }
 
 /// The chord grammar as a pattern on both shapes a hotkey can take. The
@@ -431,7 +437,8 @@ impl Reference<'_> {
             .join(", ");
         let _ = writeln!(
             self.out,
-            "A chord is one or more modifiers joined with `+`, then one key, all lowercase.\n\n\
+            "A chord is one or more modifiers joined with `+`, then one key, all lowercase. \
+             A function key from `f1` to `f20` can also stand alone.\n\n\
              - Modifiers: {modifiers}.\n\
              - Keys: a letter, a digit, or one of {keys}.\n\n\
              Or an object with a `macos` and a `windows` chord; a missing side means no binding there."
@@ -702,10 +709,31 @@ mod tests {
             assert!(chord(&format!("hyper+{ch}")), "{ch}");
         }
         assert!(chord("ctrl+alt+shift+f12"));
+        for n in 1..=20 {
+            assert!(chord(&format!("f{n}")), "f{n}");
+        }
         assert!(!chord("hyper+lft"));
+        assert!(!chord("a"));
         assert!(!chord("space"));
+        assert!(!chord("f21"));
+        assert!(!chord("ctrl+f24"));
         assert!(!chord("ctrl+"));
         assert!(!chord("Hyper+Space"));
+    }
+
+    #[test]
+    fn the_parser_and_the_pattern_agree_on_a_lone_key() {
+        let validator = validator();
+        let names = KEY_TOKENS.iter().map(|(name, _)| name.to_string());
+        let singles = ('a'..='z').chain('0'..='9').map(String::from);
+        let beyond = ["f21", "f24"].map(String::from);
+        for key in names.chain(singles).chain(beyond) {
+            assert_eq!(
+                validator.is_valid(&json!({ "launcher": { "hotkey": key } })),
+                crate::config::hotkey::parse(&key).is_ok(),
+                "{key}"
+            );
+        }
     }
 
     #[test]

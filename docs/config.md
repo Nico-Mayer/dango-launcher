@@ -293,7 +293,7 @@ Per-command settings, keyed by command id.
 
 A hotkey: one chord that works on both platforms, such as `mod+shift+k` where `mod` is Cmd on macOS and Ctrl on Windows, or a chord per platform. The key is a physical position, so a non-US layout does not move it.
 
-A chord is one or more modifiers joined with `+`, then one key, all lowercase.
+A chord is one or more modifiers joined with `+`, then one key, all lowercase. A function key from `f1` to `f20` can also stand alone.
 
 - Modifiers: `mod`, `ctrl`, `control`, `alt`, `opt`, `option`, `shift`, `meta`, `cmd`, `command`, `super`, `win`, `windows`, `hyper`.
 - Keys: a letter, a digit, or one of `space`, `enter`, `return`, `tab`, `escape`, `esc`, `backspace`, `delete`, `del`, `up`, `down`, `left`, `right`, `home`, `end`, `pageup`, `pagedown`, `comma`, `period`, `dot`, `slash`, `backslash`, `semicolon`, `quote`, `backquote`, `grave`, `minus`, `equal`, `leftbracket`, `rightbracket`, `f1`, `f2`, `f3`, `f4`, `f5`, `f6`, `f7`, `f8`, `f9`, `f10`, `f11`, `f12`, `f13`, `f14`, `f15`, `f16`, `f17`, `f18`, `f19`, `f20`.
