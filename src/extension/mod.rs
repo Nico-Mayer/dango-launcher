@@ -253,8 +253,8 @@ impl ExtensionHost {
         report
     }
 
-    /// Brings every extension's active state in line with the enabled store,
-    /// without persisting anything. Used on a config reload, where the store
+    /// Brings every extension's active state and registered commands in line
+    /// with the enabled store, without persisting anything. Used on a config reload, where the store
     /// (the file) is already the new source of truth.
     pub fn reload_enabled(&mut self) -> LoadReport {
         let ids: Vec<String> = self.extensions.keys().cloned().collect();
@@ -263,7 +263,13 @@ impl ExtensionHost {
             match (self.enabled.is_enabled(&id), self.is_active(&id)) {
                 (true, false) => self.activate(&id, &mut report),
                 (false, true) => self.deactivate(&id),
-                _ => {}
+                (true, true) => {
+                    self.registry.unregister(&id);
+                    if let Some(extension) = self.extensions.get(&id).cloned() {
+                        self.register_commands(&id, &extension, &mut report);
+                    }
+                }
+                (false, false) => {}
             }
         }
         report
@@ -852,5 +858,26 @@ mod tests {
         assert_eq!(candidate_ids(&host), vec!["clip.history"]);
         assert!(host.resolve_command("clip.clear").is_none());
         assert!(host.resolve_command("clip.history").is_some());
+    }
+
+    #[test]
+    fn a_reload_follows_a_command_toggle_without_restarting_services() {
+        let enabled = Arc::new(MemoryEnabled::default());
+        let mut host = ExtensionHost::new(enabled.clone());
+        let extension = TwoCommands::new();
+        host.register(extension.clone()).unwrap();
+
+        enabled.set_command_enabled("clip.clear", false);
+        host.reload_enabled();
+        assert_eq!(candidate_ids(&host), vec!["clip.history"]);
+        assert!(host.resolve_command("clip.clear").is_none());
+
+        enabled.set_command_enabled("clip.clear", true);
+        host.reload_enabled();
+        assert_eq!(candidate_ids(&host), vec!["clip.clear", "clip.history"]);
+        assert!(host.resolve_command("clip.clear").is_some());
+
+        assert_eq!(extension.service.starts.load(Ordering::SeqCst), 1);
+        assert!(extension.service.running.load(Ordering::SeqCst));
     }
 }
