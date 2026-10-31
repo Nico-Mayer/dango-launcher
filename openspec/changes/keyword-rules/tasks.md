@@ -15,7 +15,7 @@
 
 ## 4. AltGr characters on Windows
 
-- [ ] 4.1 Move the chord test in `src/platform/windows/keymonitor.rs` into a pure function that, with right Alt down and no Win key, answers "translate with Ctrl+Alt" instead of `Clear`; set Ctrl and Alt in the `ToUnicodeEx` state array in that case; verify with a new test of the pure function covering AltGr, left Ctrl+Alt, Ctrl alone, and Win (`cargo test keymonitor`)
+- [x] 4.1 Move the chord test in `src/platform/windows/keymonitor.rs` into a pure function that, with right Alt down and no Win key, answers "translate with Ctrl+Alt" instead of `Clear`; set Ctrl and Alt in the `ToUnicodeEx` state array in that case; verify with a new test of the pure function covering AltGr, left Ctrl+Alt, Ctrl alone, and Win (`cargo test keymonitor`)
 - [ ] 4.2 Add the trap to AGENTS.md "Platform traps": Windows reports AltGr as left Ctrl plus right Alt, so a chord check must look at `VK_RMENU` before treating Ctrl+Alt as a shortcut; verify the entry is there
 - [ ] 4.3 Hand check on Windows with the German layout: give a snippet the keyword `@@mail`, type it in Notepad, and confirm it expands; confirm Ctrl+C still clears a half-typed keyword
 

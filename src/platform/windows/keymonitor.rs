@@ -4,9 +4,10 @@
 //! It reuses the hook-thread pattern the hyperkey built, but it never swallows a
 //! key: every event is passed on. For each key-down it works out the character
 //! with `ToUnicodeEx` and hands a `KeyStroke` to the sink; a key that is not a
-//! plain character, or a chord with a modifier other than Shift, is reported as
-//! `Clear`. Its own injected backspaces and paste carry `DANGO_INJECTED` and are
-//! ignored, so the monitor never observes Dango's own output.
+//! plain character, or a chord with a modifier other than Shift or AltGr, is
+//! reported as `Clear`. Its own injected backspaces and paste carry
+//! `DANGO_INJECTED` and are ignored, so the monitor never observes Dango's own
+//! output.
 //!
 //! `ToUnicodeEx` is called with the flag that leaves the kernel keyboard state
 //! untouched, so translating here does not clobber the dead-key composition the
@@ -161,13 +162,14 @@ fn translate(vk_code: u32, scan_code: u32, message: u32) -> Option<KeyStroke> {
         return None;
     }
     unsafe {
-        // A chord with anything but Shift is not text; it clears the buffer.
-        if message == WM_SYSKEYDOWN
-            || down(VK_CONTROL)
-            || down(VK_MENU)
-            || down(VK_LWIN)
-            || down(VK_RWIN)
-        {
+        let held = Held {
+            ctrl: down(VK_CONTROL),
+            alt: down(VK_MENU),
+            right_alt: down(VK_RMENU),
+            win: down(VK_LWIN) || down(VK_RWIN),
+        };
+        let chord = chord(held, message);
+        if chord == Chord::Shortcut {
             return Some(KeyStroke::Clear);
         }
 
@@ -175,6 +177,11 @@ fn translate(vk_code: u32, scan_code: u32, message: u32) -> Option<KeyStroke> {
         let mut state = [0u8; 256];
         if down(VK_SHIFT) {
             state[VK_SHIFT as usize] = 0x80;
+        }
+        if chord == Chord::AltGr {
+            for vk in [VK_CONTROL, VK_LCONTROL, VK_MENU, VK_RMENU] {
+                state[vk as usize] = 0x80;
+            }
         }
         if GetKeyState(VK_CAPITAL as i32) & 1 != 0 {
             state[VK_CAPITAL as usize] = 1;
@@ -204,6 +211,36 @@ fn translate(vk_code: u32, scan_code: u32, message: u32) -> Option<KeyStroke> {
     }
 }
 
+#[derive(Clone, Copy)]
+struct Held {
+    ctrl: bool,
+    alt: bool,
+    right_alt: bool,
+    win: bool,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+enum Chord {
+    Text,
+    AltGr,
+    Shortcut,
+}
+
+/// Windows reports AltGr as left Ctrl plus right Alt, so right Alt is checked
+/// before Ctrl and Alt are taken for a shortcut. If the layout gives the key no
+/// AltGr character, `ToUnicodeEx` produces nothing and the key still clears.
+fn chord(held: Held, message: u32) -> Chord {
+    if held.win {
+        Chord::Shortcut
+    } else if held.right_alt {
+        Chord::AltGr
+    } else if message == WM_SYSKEYDOWN || held.ctrl || held.alt {
+        Chord::Shortcut
+    } else {
+        Chord::Text
+    }
+}
+
 unsafe fn current_layout() -> HKL {
     let foreground = GetForegroundWindow();
     let thread = if foreground.is_null() {
@@ -212,4 +249,65 @@ unsafe fn current_layout() -> HKL {
         GetWindowThreadProcessId(foreground, std::ptr::null_mut())
     };
     GetKeyboardLayout(thread)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const NONE: Held = Held {
+        ctrl: false,
+        alt: false,
+        right_alt: false,
+        win: false,
+    };
+
+    #[test]
+    fn altgr_is_translated_with_ctrl_and_alt() {
+        let altgr = Held {
+            ctrl: true,
+            alt: true,
+            right_alt: true,
+            ..NONE
+        };
+        assert_eq!(chord(altgr, WM_KEYDOWN), Chord::AltGr);
+        assert_eq!(chord(altgr, WM_SYSKEYDOWN), Chord::AltGr);
+    }
+
+    #[test]
+    fn left_ctrl_alt_is_a_shortcut() {
+        let held = Held {
+            ctrl: true,
+            alt: true,
+            ..NONE
+        };
+        assert_eq!(chord(held, WM_KEYDOWN), Chord::Shortcut);
+    }
+
+    #[test]
+    fn ctrl_alone_is_a_shortcut() {
+        let held = Held { ctrl: true, ..NONE };
+        assert_eq!(chord(held, WM_KEYDOWN), Chord::Shortcut);
+    }
+
+    #[test]
+    fn win_is_a_shortcut_even_with_right_alt() {
+        assert_eq!(
+            chord(Held { win: true, ..NONE }, WM_KEYDOWN),
+            Chord::Shortcut
+        );
+        let held = Held {
+            ctrl: true,
+            alt: true,
+            right_alt: true,
+            win: true,
+        };
+        assert_eq!(chord(held, WM_KEYDOWN), Chord::Shortcut);
+    }
+
+    #[test]
+    fn no_modifier_is_text() {
+        assert_eq!(chord(NONE, WM_KEYDOWN), Chord::Text);
+        assert_eq!(chord(NONE, WM_SYSKEYDOWN), Chord::Shortcut);
+    }
 }
