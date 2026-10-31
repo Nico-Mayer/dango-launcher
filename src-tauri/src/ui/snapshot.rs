@@ -1,8 +1,5 @@
 use serde::Serialize;
 
-#[cfg(test)]
-use ts_rs::TS;
-
 use crate::protocol::{Action, FieldKind, ListItem, View};
 
 use super::input::{Chord, ResultItem};
@@ -11,8 +8,6 @@ use super::state::{Launcher, Mode, PushedView};
 macro_rules! snapshot_types {
     ($($item:item)*) => {
         $(
-            #[cfg_attr(test, derive(TS))]
-            #[cfg_attr(test, ts(export, export_to = "../../src/protocol/"))]
             #[derive(Clone, Debug, PartialEq, Serialize)]
             $item
         )*
@@ -38,9 +33,7 @@ snapshot_types! {
     /// Bumped on every activation, so the renderer knows to take the cursor.
     #[serde(rename_all = "camelCase")]
     pub struct Activation {
-        #[cfg_attr(test, ts(type = "number"))]
         pub count: u64,
-        #[cfg_attr(test, ts(type = "number | null"))]
         pub probe: Option<u64>,
     }
 
@@ -86,7 +79,6 @@ snapshot_types! {
     #[serde(rename_all = "camelCase")]
     pub struct Text {
         pub text: String,
-        #[cfg_attr(test, ts(type = "number"))]
         pub revision: u64,
     }
 
@@ -134,7 +126,6 @@ snapshot_types! {
     pub struct FormBody {
         /// Bumped when the form is seeded from a tree. The fields take their
         /// values from the snapshot only then.
-        #[cfg_attr(test, ts(type = "number"))]
         pub revision: u64,
         pub fields: Vec<Field>,
     }

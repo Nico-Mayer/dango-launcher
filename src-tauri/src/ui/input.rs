@@ -1,8 +1,5 @@
 use serde::{Deserialize, Serialize};
 
-#[cfg(test)]
-use ts_rs::TS;
-
 use crate::extension::ActionOutcome;
 use crate::protocol::{Action, Modifier, Shortcut, ViewTree};
 
@@ -18,8 +15,6 @@ pub enum Input {
 
 /// What the user did, in terms of the launcher rather than the DOM. Keys arrive
 /// only for a chord the snapshot declared in `bindings`.
-#[cfg_attr(test, derive(TS))]
-#[cfg_attr(test, ts(export, export_to = "../../src/protocol/"))]
 #[derive(Clone, Debug, PartialEq, Deserialize)]
 #[serde(tag = "kind", rename_all = "camelCase")]
 pub enum Intent {
@@ -27,7 +22,6 @@ pub enum Intent {
     Ready,
     /// The activation carrying this probe has been painted.
     Painted {
-        #[cfg_attr(test, ts(type = "number"))]
         probe: u64,
     },
     QueryChanged {
@@ -52,8 +46,6 @@ pub enum Intent {
 
 /// A key with its modifiers. `command` is Cmd on macOS and Ctrl on Windows,
 /// and either one counts, as both always have. `key` is lowercase.
-#[cfg_attr(test, derive(TS))]
-#[cfg_attr(test, ts(export, export_to = "../../src/protocol/"))]
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Chord {
@@ -123,8 +115,6 @@ pub enum Event {
     Reset,
 }
 
-#[cfg_attr(test, derive(TS))]
-#[cfg_attr(test, ts(export, export_to = "../../src/protocol/"))]
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ResultItem {

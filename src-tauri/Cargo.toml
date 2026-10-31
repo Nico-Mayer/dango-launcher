@@ -12,14 +12,12 @@ edition = "2021"
 # to make the lib name unique and wouldn't conflict with the bin name.
 # This seems to be only an issue on Windows, see https://github.com/rust-lang/cargo/issues/8519
 name = "dango_lib"
-crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
-tauri-build = { version = "2", features = [] }
 slint-build = "=1.18.1"
+winresource = "0.1"
 
 [dependencies]
-tauri = { version = "2", features = ["tray-icon", "macos-private-api", "protocol-asset"] }
 global-hotkey = "0.8"
 auto-launch = "0.5"
 open = "5"
@@ -42,20 +40,16 @@ icondata_core = "0.1"
 single-instance = "0.3"
 interprocess = "2"
 url = "2"
-# Pinned exactly: 2.13.0 and later require Tauri 2.12, which moves tao, wry and
-# webview2-com with it. Bump together with Tauri, not on its own.
-tauri-plugin-updater = "=2.12.0"
 schemars = "1.2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-tauri-plugin-single-instance = { version = "2.4.4", default-features = false }
 tokio = { version = "1.53.1", default-features = false, features = ["macros", "rt", "rt-multi-thread", "sync", "time"] }
 rusqlite = { version = "0.40.2", features = ["bundled"] }
 uuid = { version = "1.26.1", features = ["v4"] }
 thiserror = "2.0.20"
 async-trait = "0.1.92"
 png = "0.18"
-time = { version = "0.3", default-features = false, features = ["formatting", "local-offset", "std"] }
+time = { version = "0.3", default-features = false, features = ["formatting", "local-offset", "macros", "std"] }
 clipboard-rs = "0.3.5"
 dirs = "6"
 notify = "8"
@@ -74,11 +68,7 @@ bytesize = "2.7.0"
 [dev-dependencies]
 i-slint-backend-testing = "=1.18.1"
 jsonschema = { version = "0.26", default-features = false }
-# Serves the launcher state machine to the browser fixtures, see
-# examples/ui_fixture.rs.
-tiny_http = "0.12.0"
 tokio = { version = "1.53.1", default-features = false, features = ["test-util"] }
-ts-rs = "12.0.1"
 
 [target.'cfg(target_os = "windows")'.dependencies]
 # Reading the focused element's selection without touching the keyboard. Wraps
@@ -110,6 +100,7 @@ windows = { version = "0.61", features = [
   "Win32_System_Power",
   "Win32_System_Shutdown",
   "Win32_System_Threading",
+  "Win32_System_Variant",
   "Win32_UI_Input_KeyboardAndMouse",
   "Win32_UI_Shell",
   "Win32_UI_Shell_PropertiesSystem",
@@ -167,7 +158,6 @@ objc2-application-services = { version = "0.3", default-features = false, featur
 ] }
 
 
-# Read the optimization guideline for more details: https://tauri.app/concept/size/#cargo-configuration
 [profile.release]
 codegen-units = 1
 lto = true

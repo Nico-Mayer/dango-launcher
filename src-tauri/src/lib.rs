@@ -15,7 +15,6 @@ pub mod search;
 pub mod shell;
 mod slint_shell;
 pub mod store;
-mod tauri_shell;
 pub mod templates;
 pub mod text;
 pub mod ui;
@@ -29,10 +28,5 @@ pub fn platform_attribution() -> Arc<dyn extensions::clipboard::Attribution> {
 }
 
 pub fn run() {
-    tauri_shell::run()
-}
-
-/// The Slint shell, which replaces the Tauri one.
-pub fn run_native() {
     slint_shell::run()
 }

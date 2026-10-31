@@ -6,17 +6,16 @@ fn main() {
         .with_debug_info(std::env::var("PROFILE").as_deref() == Ok("debug"));
     slint_build::compile_with_config("ui/app.slint", config).expect("ui/app.slint compiles");
 
-    // The tray links against Common Controls 6, which only a manifest selects.
-    // tauri-build would embed one in the app alone, and the test binary would
-    // then fail to load, so every artifact gets it from the linker instead.
-    let mut attributes = tauri_build::Attributes::new();
     if std::env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("windows") {
-        attributes = attributes
-            .windows_attributes(tauri_build::WindowsAttributes::new_without_app_manifest());
+        // The tray links against Common Controls 6, which only a manifest
+        // selects. Every artifact gets it, or the test binary fails to load.
         println!("cargo:rustc-link-arg=/MANIFEST:EMBED");
         println!(
             "cargo:rustc-link-arg=/MANIFESTDEPENDENCY:type='win32' name='Microsoft.Windows.Common-Controls' version='6.0.0.0' processorArchitecture='*' publicKeyToken='6595b64144ccf1df' language='*'"
         );
+        let mut resource = winresource::WindowsResource::new();
+        resource.set_icon("icons/icon.ico");
+        resource.set("ProductName", "Dango");
+        resource.compile().expect("the Windows resource compiles");
     }
-    tauri_build::try_build(attributes).expect("tauri-build");
 }

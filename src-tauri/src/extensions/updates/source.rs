@@ -1,5 +1,3 @@
-use std::sync::Mutex;
-
 use async_trait::async_trait;
 
 #[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]
@@ -29,7 +27,7 @@ impl UpdateError {
 /// Called with each chunk's size and the total size, when the server sent one.
 pub type Progress<'a> = &'a mut (dyn FnMut(u64, Option<u64>) + Send);
 
-/// Where updates come from. The updater plugin in production, a fake in tests.
+/// Where updates come from. Nothing yet in production, a fake in tests.
 #[async_trait]
 pub trait UpdateSource: Send + Sync {
     /// The newer published version, if there is one.
@@ -59,79 +57,10 @@ impl UpdateSource for DisabledSource {
     }
 }
 
-pub struct PluginSource {
-    app: tauri::AppHandle,
-    found: Mutex<Option<tauri_plugin_updater::Update>>,
-}
-
-impl PluginSource {
-    pub fn new(app: tauri::AppHandle) -> Self {
-        Self {
-            app,
-            found: Mutex::new(None),
-        }
-    }
-
-    fn found(&self) -> Option<tauri_plugin_updater::Update> {
-        self.found.lock().unwrap().clone()
-    }
-}
-
-#[async_trait]
-impl UpdateSource for PluginSource {
-    async fn check(&self) -> Result<Option<String>, UpdateError> {
-        use tauri_plugin_updater::UpdaterExt;
-        let updater = self
-            .app
-            .updater()
-            .map_err(|error| UpdateError::Check(error.to_string()))?;
-        let found = updater
-            .check()
-            .await
-            .map_err(|error| UpdateError::Check(error.to_string()))?;
-        let version = found.as_ref().map(|update| update.version.clone());
-        *self.found.lock().unwrap() = found;
-        Ok(version)
-    }
-
-    async fn download(&self, progress: Progress<'_>) -> Result<Vec<u8>, UpdateError> {
-        let update = self
-            .found()
-            .ok_or_else(|| UpdateError::Download("no update was found to download".into()))?;
-        update
-            .download(|chunk, total| progress(chunk as u64, total), || {})
-            .await
-            .map_err(download_error)
-    }
-
-    fn install(&self, bytes: &[u8]) -> Result<(), UpdateError> {
-        let update = self
-            .found()
-            .ok_or_else(|| UpdateError::Install("no update was found to install".into()))?;
-        // On Windows this exits the app and the installer relaunches it, so
-        // the restart below only runs on macOS.
-        update
-            .install(bytes)
-            .map_err(|error| UpdateError::Install(error.to_string()))?;
-        self.app.restart()
-    }
-}
-
-fn download_error(error: tauri_plugin_updater::Error) -> UpdateError {
-    use tauri_plugin_updater::Error;
-    let detail = error.to_string();
-    match error {
-        Error::Minisign(_)
-        | Error::Base64(_)
-        | Error::SignatureUtf8(_)
-        | Error::SignedVersionMismatch { .. }
-        | Error::MissingSignedVersion => UpdateError::Signature(detail),
-        _ => UpdateError::Download(detail),
-    }
-}
-
 #[cfg(test)]
 pub mod testing {
+    use std::sync::Mutex;
+
     use super::*;
 
     /// Answers from a script: what a check finds, and how a download and an

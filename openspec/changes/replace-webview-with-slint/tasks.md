@@ -44,7 +44,7 @@ Tauri app keeps working until group 6.
 
 ## 6. Switch and delete
 
-- [ ] 6.1 Make the Slint shell the `dango` binary and delete the Tauri shell, `tauri.conf.json`, the Tauri crates, `ts-rs`, `src/protocol/*.ts`, `tiny_http`, and `examples/ui_fixture.rs`. Verify `cargo test` and clippy pass and `cargo tree` has no `tauri` or `wry`.
+- [x] 6.1 Make the Slint shell the `dango` binary and delete the Tauri shell, `tauri.conf.json`, the Tauri crates, `ts-rs`, `src/protocol/*.ts`, `tiny_http`, and `examples/ui_fixture.rs`. Verify `cargo test` and clippy pass and `cargo tree` has no `tauri` or `wry`.
 - [ ] 6.2 Delete Svelte, Vite, `src/` frontend files, `index.html`, `package.json`, `package-lock.json`, `playwright.config.ts`, `tests/browser`, `tests/fixtures`, `static/`, and `svelte.config.js`. Verify the repo has no `.svelte` or `.ts` files outside `node_modules` and `mise run release --dry-run` still works.
 - [ ] 6.3 Update `hk.pkl` (drop `svelte-check`) and `ci.yml` (drop Node, npm, and the binding diff check). Disable `release.yml` until `native-release-pipeline`. Verify `hk check` passes and CI is green on both platforms.
 
