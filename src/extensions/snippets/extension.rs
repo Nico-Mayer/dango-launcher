@@ -15,8 +15,8 @@ use crate::extension::{
 };
 use crate::invocation::{Command, InvocationContext};
 use crate::protocol::{
-    Action, ActionStyle, EmptyState, FieldKind, Filtering, FormField, FormView, ListItem, ListView,
-    View, ViewTree, PROTOCOL_VERSION,
+    Action, ActionStyle, EmptyState, FieldKind, FormField, FormView, ListItem, ListView, View,
+    ViewTree, PROTOCOL_VERSION,
 };
 use crate::search::{Candidate, RootProvider, Source};
 use crate::templates::{Rendered, Template, Values};
@@ -535,7 +535,6 @@ fn list_tree(records: &[Record], sheet: &Sheet) -> ViewTree {
     ViewTree {
         protocol_version: PROTOCOL_VERSION,
         view: View::List(ListView {
-            filtering: Filtering::Launcher,
             loading: false,
             empty_state: Some(EmptyState {
                 title: title.into(),
@@ -566,7 +565,6 @@ fn failure_tree(message: &str, kind: Kind) -> ViewTree {
     ViewTree {
         protocol_version: PROTOCOL_VERSION,
         view: View::List(ListView {
-            filtering: Filtering::Launcher,
             loading: false,
             empty_state: Some(EmptyState {
                 title: title.into(),

@@ -1,7 +1,7 @@
 use crate::extension::ActionOutcome;
 use crate::protocol::{
-    Action, DetailView, FieldKind, Filtering, FormField, FormView, ListItem, ListView, Modifier,
-    Shortcut, View, ViewTree,
+    Action, DetailView, FieldKind, FormField, FormView, ListItem, ListView, Modifier, Shortcut,
+    View, ViewTree,
 };
 
 use super::snapshot::{DetailBody, Focus, ListBody, RootScreen, Screen, ViewBody};
@@ -62,7 +62,6 @@ fn list_item(n: usize) -> ListItem {
 
 fn list_tree(items: Vec<ListItem>) -> ViewTree {
     ViewTree::new(View::List(ListView {
-        filtering: Filtering::Launcher,
         loading: false,
         empty_state: None,
         items,
@@ -595,16 +594,6 @@ fn the_limit_counts_across_sections_and_drops_a_section_left_empty() {
     assert_eq!(section_titles(&list), ["First", "Second"]);
     assert_eq!(list.sections[0].items.len(), 40);
     assert_eq!(shown_ids(&list), item_ids(1..=50));
-}
-
-#[test]
-fn a_command_filtered_list_shows_fifty() {
-    let h = Harness::view(ViewTree::new(View::List(ListView {
-        filtering: Filtering::Command,
-        items: (1..=120).map(list_item).collect(),
-        ..Default::default()
-    })));
-    assert_eq!(shown_ids(&h.list()), item_ids(1..=50));
 }
 
 #[test]

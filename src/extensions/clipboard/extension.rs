@@ -10,8 +10,8 @@ use crate::extension::{
 };
 use crate::invocation::{Command, InvocationContext};
 use crate::protocol::{
-    Action, ActionStyle, EmptyState, Filtering, ListItem, ListView, Modifier, Shortcut, View,
-    ViewTree, PROTOCOL_VERSION,
+    Action, ActionStyle, EmptyState, ListItem, ListView, Modifier, Shortcut, View, ViewTree,
+    PROTOCOL_VERSION,
 };
 use crate::text::{TextError, TextTarget};
 
@@ -271,7 +271,6 @@ pub fn history_view(entries: &[Entry], primary: PrimaryAction) -> ViewTree {
     ViewTree {
         protocol_version: PROTOCOL_VERSION,
         view: View::List(ListView {
-            filtering: Filtering::Launcher,
             loading: false,
             empty_state: Some(EmptyState {
                 title: "Nothing copied yet".into(),
@@ -577,7 +576,6 @@ mod tests {
 
         let tree = extension.list();
         let list = list_of(&tree);
-        assert!(matches!(list.filtering, Filtering::Launcher));
         let titles: Vec<_> = list.items.iter().map(|i| i.title.as_str()).collect();
         assert_eq!(titles, ["two", "one"]);
     }

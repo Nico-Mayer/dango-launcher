@@ -13,8 +13,7 @@ use super::generated::{
 };
 use super::render::{self, Renderer};
 use crate::protocol::{
-    Action, DetailView, FieldKind, Filtering, FormField, FormView, ListItem, ListView, View,
-    ViewTree,
+    Action, DetailView, FieldKind, FormField, FormView, ListItem, ListView, View, ViewTree,
 };
 use crate::shell::TrayStatus;
 use crate::ui::{Context, Event, Input, Intent, Launcher, ResultItem, TemplateInspection};
@@ -601,7 +600,6 @@ mod views {
 
     pub(super) fn list_tree() -> ViewTree {
         ViewTree::new(View::List(ListView {
-            filtering: Filtering::Launcher,
             loading: false,
             empty_state: None,
             items: (1..=3)
@@ -964,7 +962,6 @@ mod grid {
         ViewTree::new(View::Grid(GridView {
             columns: 5,
             aspect: 1.0,
-            filtering: Filtering::Command,
             items: (1..=count)
                 .map(|n| GridItem {
                     id: format!("tile-{n}"),
@@ -999,13 +996,13 @@ mod grid {
     fn arrow_left_moves_the_selection_not_the_text_cursor() {
         let h = Harness::root(results(1));
         h.view(grid_tree(12));
-        h.type_text("ab");
+        h.type_text("ti");
         h.key("\u{F703}");
         assert_eq!(h.row("Tile 2").accessible_item_selected(), Some(true));
         h.key("\u{F702}");
         assert_eq!(h.row("Tile 1").accessible_item_selected(), Some(true));
-        h.type_text("c");
-        assert_eq!(h.query_of("Search"), "abc");
+        h.type_text("l");
+        assert_eq!(h.query_of("Search"), "til");
     }
 
     #[test]

@@ -1,8 +1,8 @@
 ## 1. Remove command filtering
 
-- [ ] 1.1 Remove `Filtering` and the `filtering` fields of `ListView` and `GridView` in `src/protocol.rs`, drop the argument from `group` in `src/ui/state.rs` so it always filters, and drop the stale doc line on `view_sections`; verify `cargo clippy --all-targets -- -D warnings` passes
-- [ ] 1.2 Remove `filtering` from the clipboard, snippets, and system built-ins, the `src/invocation.rs` test helper, and their `Filtering::Launcher` asserts; verify `cargo test` passes
-- [ ] 1.3 Replace `a_command_filtered_list_shows_fifty` in `src/ui/tests.rs` with nothing (the other limit tests cover it) and drop `filtering` from the grid tree in `src/slint_shell/tests.rs`; verify `cargo test` passes, UI tests included
+- [x] 1.1 Remove `Filtering` and the `filtering` fields of `ListView` and `GridView` in `src/protocol.rs`, drop the argument from `group` in `src/ui/state.rs` so it always filters, and drop the stale doc line on `view_sections`; verify `cargo clippy --all-targets -- -D warnings` passes
+- [x] 1.2 Remove `filtering` from the clipboard, snippets, and system built-ins, the `src/invocation.rs` test helper, and their `Filtering::Launcher` asserts; verify `cargo test` passes
+- [x] 1.3 Replace `a_command_filtered_list_shows_fifty` in `src/ui/tests.rs` with nothing (the other limit tests cover it) and drop `filtering` from the grid tree in `src/slint_shell/tests.rs`; verify `cargo test` passes, UI tests included
 
 ## 2. Refuse Shift or Alt shortcuts on other keys
 

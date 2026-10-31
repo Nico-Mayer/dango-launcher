@@ -225,7 +225,7 @@ impl Sink for ChannelSink {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::protocol::{Filtering, ListView, View};
+    use crate::protocol::{ListView, View};
     use std::collections::HashMap;
     use std::sync::Mutex;
 
@@ -233,7 +233,6 @@ mod tests {
         ViewTree {
             protocol_version: crate::protocol::PROTOCOL_VERSION,
             view: View::List(ListView {
-                filtering: Filtering::Launcher,
                 loading: false,
                 empty_state: None,
                 items: vec![],

@@ -34,7 +34,6 @@ protocol_types! {
     #[derive(Default)]
     #[serde(rename_all = "camelCase")]
     pub struct ListView {
-        pub filtering: Filtering,
         #[serde(default)]
         pub loading: bool,
         #[serde(default)]
@@ -51,7 +50,7 @@ protocol_types! {
     }
 
     /// Tiles in a fixed number of columns. Shares the list's sections,
-    /// filtering, empty state, and actions.
+    /// empty state, and actions.
     #[derive(Default)]
     #[serde(rename_all = "camelCase")]
     pub struct GridView {
@@ -60,8 +59,6 @@ protocol_types! {
         /// A tile's width over its height.
         #[serde(default = "square")]
         pub aspect: f32,
-        #[serde(default)]
-        pub filtering: Filtering,
         #[serde(default)]
         pub loading: bool,
         #[serde(default)]
@@ -115,17 +112,6 @@ protocol_types! {
         pub title: String,
         #[serde(default)]
         pub subtitle: Option<String>,
-    }
-
-    /// Who narrows a list as the user types. `Launcher` filters the given items
-    /// without re-invoking the command; `Command` means the command owns
-    /// filtering and receives each query change.
-    #[derive(Default)]
-    #[serde(rename_all = "camelCase")]
-    pub enum Filtering {
-        #[default]
-        Launcher,
-        Command,
     }
 
     #[derive(Default)]

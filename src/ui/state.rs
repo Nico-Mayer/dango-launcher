@@ -2,8 +2,8 @@ use std::collections::HashMap;
 
 use crate::extension::{ActionOutcome, FormValues};
 use crate::protocol::{
-    Action, ActionStyle, FieldKind, Filter, Filtering, FormField, GridItem, GridView, ListItem,
-    Section, View, ViewTree, FILTER_ACTION, GRID_COLUMNS, PROTOCOL_VERSION,
+    Action, ActionStyle, FieldKind, Filter, FormField, GridItem, GridView, ListItem, Section, View,
+    ViewTree, FILTER_ACTION, GRID_COLUMNS, PROTOCOL_VERSION,
 };
 
 use super::effect::{ActionRequest, Effect, Origin};
@@ -816,8 +816,7 @@ impl Launcher {
 
     /// A pushed list's items after launcher-side narrowing, grouped in section
     /// order, without the groups left empty. Items naming no declared section
-    /// come first. A view that owns its own filtering would get each query
-    /// change instead, which no command needs yet.
+    /// come first.
     pub(super) fn view_sections(&self) -> Vec<(Option<&Section>, Vec<&ListItem>)> {
         let Some(view) = self.stack.last() else {
             return Vec::new();
@@ -825,7 +824,7 @@ impl Launcher {
         let View::List(list) = &view.tree.view else {
             return Vec::new();
         };
-        group(&list.items, &list.sections, &list.filtering, &view.query)
+        group(&list.items, &list.sections, &view.query)
     }
 
     /// A pushed grid's tiles, grouped and narrowed as a list's items are.
@@ -836,7 +835,7 @@ impl Launcher {
         let View::Grid(grid) = &view.tree.view else {
             return Vec::new();
         };
-        group(&grid.items, &grid.sections, &grid.filtering, &view.query)
+        group(&grid.items, &grid.sections, &view.query)
     }
 
     pub(super) fn grid(&self) -> Option<&GridView> {
@@ -1054,19 +1053,16 @@ fn ordered_actions(actions: &[Action]) -> Vec<&Action> {
 /// Marks a panel entry as a filter option rather than an action.
 pub(super) const FILTER_PREFIX: &str = "dango.filter:";
 
-/// Items in section order, narrowed by the query when the launcher filters and
-/// then cut to the item limit, without the groups left empty. Items naming no
+/// Items in section order, narrowed by the query and then cut to the item limit, without the groups left empty. Items naming no
 /// declared section come first.
 fn group<'a, T: Grouped>(
     items: &'a [T],
     sections: &'a [Section],
-    filtering: &Filtering,
     query: &str,
 ) -> Vec<(Option<&'a Section>, Vec<&'a T>)> {
     let needle = query.to_lowercase();
     let shown = |item: &&T| {
-        *filtering != Filtering::Launcher
-            || needle.is_empty()
+        needle.is_empty()
             || item.title().to_lowercase().contains(&needle)
             || item
                 .keywords()

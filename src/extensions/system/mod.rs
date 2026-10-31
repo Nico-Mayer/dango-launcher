@@ -12,9 +12,7 @@ use crate::extension::{
 use crate::extensions::applications::{IconCache, ICON_SIZE};
 use crate::invocation::{Command, InvocationContext};
 use crate::platform::{self, Label, SystemControl, SystemError};
-use crate::protocol::{
-    Action, DetailView, Filtering, ListItem, ListView, View, ViewTree, PROTOCOL_VERSION,
-};
+use crate::protocol::{Action, DetailView, ListItem, ListView, View, ViewTree, PROTOCOL_VERSION};
 
 mod commands;
 
@@ -221,7 +219,6 @@ fn running_list(apps: Vec<crate::platform::RunningApp>, icons: &IconCache) -> Vi
     ViewTree {
         protocol_version: PROTOCOL_VERSION,
         view: View::List(ListView {
-            filtering: Filtering::Launcher,
             loading: false,
             empty_state: Some(crate::protocol::EmptyState {
                 title: "No apps to quit".into(),
@@ -526,7 +523,6 @@ pub mod tests {
         let View::List(list) = &tree.view else {
             panic!("expected a list view");
         };
-        assert!(matches!(list.filtering, Filtering::Launcher));
         let titles: Vec<_> = list.items.iter().map(|i| i.title.as_str()).collect();
         assert_eq!(titles, ["Safari", "Mail"]);
         assert_eq!(list.items[0].actions[0].id, ACTION_QUIT);
