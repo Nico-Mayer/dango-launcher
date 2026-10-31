@@ -3,7 +3,8 @@
 
 use serde::{Deserialize, Serialize};
 
-/// Bumped when the protocol changes shape. Dango refuses a tree whose
+/// Bumped when a tree from outside this build could be read wrongly, which no
+/// tree can be yet: every producer is a built-in. Dango refuses a tree whose
 /// version it does not recognise.
 pub const PROTOCOL_VERSION: u32 = 2;
 
@@ -275,6 +276,10 @@ protocol_types! {
         Danger,
     }
 
+    /// With Shift or Alt, `key` must be one letter: key events carry the
+    /// character a key produced, so Shift+1 arrives as `!`. Dango refuses a
+    /// tree that breaks this. On macOS, Alt with a letter and without Cmd or
+    /// Ctrl types a composed character and does not fire.
     #[serde(rename_all = "camelCase")]
     pub struct Shortcut {
         pub key: String,
