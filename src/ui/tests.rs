@@ -974,6 +974,20 @@ fn shift_or_alt_shortcuts_on_named_keys_run() {
 }
 
 #[test]
+fn a_root_action_answering_with_a_refused_shortcut_is_refused() {
+    let mut h = Harness::root(3);
+    h.press("Enter");
+    let request = h.runs()[0].clone();
+    let mut item = list_item(1);
+    item.actions = vec![shortcut_action("1", vec![Modifier::Shift])];
+    h.finish(
+        request,
+        ActionOutcome::Replaced(Box::new(list_tree(vec![item]))),
+    );
+    assert_refused(&h);
+}
+
+#[test]
 fn a_five_column_grid_shows_its_tiles() {
     let h = Harness::view(grid_tree(5, 12));
     let ViewBody::Grid(grid) = h.view_body() else {
