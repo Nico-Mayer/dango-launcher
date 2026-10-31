@@ -1,8 +1,9 @@
 name: Release
 
+# Off until native-release-pipeline: this still builds with tauri-action,
+# which the Slint app no longer uses. A tag produces no release meanwhile.
 on:
-  push:
-    tags: ["v*"]
+  workflow_dispatch:
 
 permissions:
   contents: write
