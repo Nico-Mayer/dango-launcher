@@ -336,8 +336,15 @@ impl Records {
         if let Some(parent) = self.path.parent() {
             std::fs::create_dir_all(parent)?;
         }
-        *self.own_write.lock().unwrap() = Some(text.clone());
-        std::fs::write(&self.path, text).inspect_err(|_| *self.own_write.lock().unwrap() = None)
+        let temp = self
+            .path
+            .with_file_name(format!("{}.tmp", self.kind.file_name()));
+        std::fs::write(&temp, &text)?;
+        *self.own_write.lock().unwrap() = Some(text);
+        std::fs::rename(&temp, &self.path).inspect_err(|_| {
+            *self.own_write.lock().unwrap() = None;
+            let _ = std::fs::remove_file(&temp);
+        })
     }
 }
 
@@ -451,6 +458,7 @@ mod tests {
             .contains("Sign-off"));
         records.remove(&id).unwrap();
         assert_eq!(records.all().unwrap().len(), 0);
+        assert!(!records.path().with_extension("json.tmp").exists());
     }
 
     #[test]
