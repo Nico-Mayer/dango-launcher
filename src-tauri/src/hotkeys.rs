@@ -1,13 +1,14 @@
 //! Turning the command and application hotkeys in the config file into one
 //! table of chords, resolving conflicts first-wins and reporting them.
 //!
-//! Pure over the config and the launcher chord: registering the survivors and
-//! dispatching a press live in `lib.rs`, which owns the shortcut plugin and the
-//! invocation path.
+//! The table is pure over the config and the launcher chord. `Registry` holds
+//! what is registered with the OS and answers which target a press belongs to.
 
 use std::fmt;
+use std::sync::Mutex;
 
-use global_hotkey::hotkey::HotKey;
+use global_hotkey::hotkey::{Code, HotKey, Modifiers};
+use global_hotkey::{GlobalHotKeyManager, HotKeyState};
 
 use crate::config::Config;
 use crate::extensions::applications::IndexedApp;
@@ -115,6 +116,167 @@ impl Table {
     }
 }
 
+/// The launcher shortcut from the config file, or the platform default when it
+/// is unset or invalid. Option+Space on macOS and Alt+Space on Windows are the
+/// same chord: Option is Alt.
+pub fn launcher(config: &Config) -> HotKey {
+    if let Some(hotkey) = &config.launcher.hotkey {
+        match hotkey.parse_with_hyper(config.hyper_modifiers()) {
+            Ok(parsed) => return HotKey::new(Some(parsed.modifiers), parsed.code),
+            Err(error) => eprintln!("[dango] invalid launcher hotkey, using the default: {error}"),
+        }
+    }
+    HotKey::new(Some(Modifiers::ALT), Code::Space)
+}
+
+/// Taking a chord system-wide and giving it back.
+pub trait Grab: Send + Sync {
+    fn register(&self, chord: HotKey) -> Result<(), String>;
+    fn unregister(&self, chord: HotKey);
+}
+
+/// The OS registration. It has to live on the thread whose message loop
+/// receives the presses, which is the main thread.
+pub struct SystemGrab(GlobalHotKeyManager);
+
+// Safety: created on the main thread and only used there. Every registration
+// happens at startup, on a config reload, or at quit, all of which the shell
+// runs on the main thread.
+unsafe impl Send for SystemGrab {}
+unsafe impl Sync for SystemGrab {}
+
+impl SystemGrab {
+    pub fn new() -> Result<Self, String> {
+        GlobalHotKeyManager::new()
+            .map(Self)
+            .map_err(|error| error.to_string())
+    }
+}
+
+impl Grab for SystemGrab {
+    fn register(&self, chord: HotKey) -> Result<(), String> {
+        self.0.register(chord).map_err(|error| error.to_string())
+    }
+    fn unregister(&self, chord: HotKey) {
+        let _ = self.0.unregister(chord);
+    }
+}
+
+/// What a press asks for.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Pressed {
+    Launcher,
+    Target(Target),
+}
+
+/// The launcher chord and the command bindings currently held. Shared so a
+/// reload can rebuild the set while a press looks it up.
+pub struct Registry {
+    grab: Box<dyn Grab>,
+    launcher: Mutex<HotKey>,
+    bindings: Mutex<Vec<(HotKey, Target)>>,
+}
+
+impl Registry {
+    pub fn new(grab: Box<dyn Grab>, launcher: HotKey) -> Self {
+        Self {
+            grab,
+            launcher: Mutex::new(launcher),
+            bindings: Mutex::new(Vec::new()),
+        }
+    }
+
+    pub fn launcher(&self) -> HotKey {
+        *self.launcher.lock().unwrap()
+    }
+
+    pub fn register_launcher(&self) -> Result<(), String> {
+        self.grab.register(self.launcher())
+    }
+
+    /// Swaps the launcher chord when it changed.
+    pub fn replace_launcher(&self, chord: HotKey) -> Result<(), String> {
+        let mut current = self.launcher.lock().unwrap();
+        if *current == chord {
+            return Ok(());
+        }
+        self.grab.unregister(*current);
+        *current = chord;
+        self.grab.register(chord)
+    }
+
+    /// Gives back the command chords held now, rebuilds the table first-wins,
+    /// registers the survivors, and returns the conflicts to surface: the
+    /// collisions plus any the OS refused.
+    pub fn apply(&self, config: &Config) -> Vec<String> {
+        let mut table = self.bindings.lock().unwrap();
+        for (chord, _) in table.drain(..) {
+            self.grab.unregister(chord);
+        }
+        let built = bindings(config, self.launcher());
+        let mut conflicts = built.conflicts;
+        for binding in built.bindings {
+            match self.grab.register(binding.chord) {
+                Ok(()) => table.push((binding.chord, binding.target)),
+                Err(error) => conflicts.push(format!(
+                    "{}: could not register its hotkey, {error}",
+                    binding.target
+                )),
+            }
+        }
+        conflicts
+    }
+
+    /// Only a press counts. The release of the same chord would toggle twice.
+    pub fn pressed(&self, id: u32, state: HotKeyState) -> Option<Pressed> {
+        if state != HotKeyState::Pressed {
+            return None;
+        }
+        if self.launcher().id() == id {
+            return Some(Pressed::Launcher);
+        }
+        self.bindings
+            .lock()
+            .unwrap()
+            .iter()
+            .find(|(chord, _)| chord.id() == id)
+            .map(|(_, target)| Pressed::Target(target.clone()))
+    }
+
+    /// Hands every chord back, or they stay claimed until the session ends.
+    pub fn release_all(&self) {
+        self.grab.unregister(self.launcher());
+        for (chord, _) in self.bindings.lock().unwrap().drain(..) {
+            self.grab.unregister(chord);
+        }
+    }
+}
+
+#[cfg(test)]
+pub mod testing {
+    use super::*;
+
+    /// Records what is held, and refuses the chords it is told to.
+    #[derive(Default)]
+    pub struct FakeGrab {
+        pub held: std::sync::Arc<Mutex<Vec<HotKey>>>,
+        pub refused: Vec<HotKey>,
+    }
+
+    impl Grab for FakeGrab {
+        fn register(&self, chord: HotKey) -> Result<(), String> {
+            if self.refused.contains(&chord) {
+                return Err("already in use".into());
+            }
+            self.held.lock().unwrap().push(chord);
+            Ok(())
+        }
+        fn unregister(&self, chord: HotKey) {
+            self.held.lock().unwrap().retain(|held| *held != chord);
+        }
+    }
+}
+
 /// What a press on an application binding should do, given the applications
 /// whose shown name matched. Two matches launch the first and say so, because
 /// a silent guess is worse than a launch the user can then disambiguate.
@@ -146,8 +308,8 @@ pub fn resolve_application(name: &str, matches: Vec<IndexedApp>) -> Resolution {
 
 #[cfg(test)]
 mod tests {
+    use super::testing::FakeGrab;
     use super::*;
-    use global_hotkey::hotkey::{Code, Modifiers};
 
     fn config(json: &str) -> Config {
         Config::parse(json).unwrap()
@@ -319,5 +481,88 @@ mod tests {
         let result = bindings(&c, launcher());
         assert!(result.bindings.is_empty());
         assert!(result.conflicts.is_empty());
+    }
+
+    fn registry(config_json: &str) -> (Registry, std::sync::Arc<Mutex<Vec<HotKey>>>) {
+        let grab = FakeGrab::default();
+        let held = grab.held.clone();
+        let registry = Registry::new(Box::new(grab), launcher());
+        registry.register_launcher().unwrap();
+        registry.apply(&config(config_json));
+        (registry, held)
+    }
+
+    #[test]
+    fn a_press_on_the_launcher_chord_toggles_the_launcher() {
+        let (registry, _) = registry("{}");
+        let pressed = registry.pressed(launcher().id(), HotKeyState::Pressed);
+        assert_eq!(pressed, Some(Pressed::Launcher));
+    }
+
+    #[test]
+    fn a_release_does_nothing() {
+        let (registry, _) = registry("{}");
+        assert_eq!(
+            registry.pressed(launcher().id(), HotKeyState::Released),
+            None
+        );
+    }
+
+    #[test]
+    fn a_press_on_a_binding_names_its_target() {
+        let (registry, _) = registry(
+            r#"{ "extensions": { "x": { "commands": { "a": { "hotkey": "ctrl+alt+j" } } } } }"#,
+        );
+        let chord = HotKey::new(Some(Modifiers::CONTROL | Modifiers::ALT), Code::KeyJ);
+        assert_eq!(
+            registry.pressed(chord.id(), HotKeyState::Pressed),
+            Some(Pressed::Target(Target::Command("x.a".into())))
+        );
+    }
+
+    #[test]
+    fn a_reload_gives_back_chords_no_longer_bound() {
+        let (registry, held) = registry(
+            r#"{ "extensions": { "x": { "commands": { "a": { "hotkey": "ctrl+alt+j" } } } } }"#,
+        );
+        assert_eq!(held.lock().unwrap().len(), 2);
+        registry.apply(&config("{}"));
+        assert_eq!(*held.lock().unwrap(), vec![launcher()]);
+    }
+
+    #[test]
+    fn a_refused_chord_is_reported_and_not_held() {
+        let refused = HotKey::new(Some(Modifiers::CONTROL | Modifiers::ALT), Code::KeyJ);
+        let grab = FakeGrab {
+            refused: vec![refused],
+            ..Default::default()
+        };
+        let registry = Registry::new(Box::new(grab), launcher());
+        let conflicts = registry.apply(&config(
+            r#"{ "extensions": { "x": { "commands": { "a": { "hotkey": "ctrl+alt+j" } } } } }"#,
+        ));
+        assert_eq!(conflicts.len(), 1);
+        assert_eq!(registry.pressed(refused.id(), HotKeyState::Pressed), None);
+    }
+
+    #[test]
+    fn a_new_launcher_chord_replaces_the_old_one() {
+        let (registry, held) = registry("{}");
+        let chord = HotKey::new(Some(Modifiers::CONTROL), Code::Space);
+        registry.replace_launcher(chord).unwrap();
+        assert_eq!(*held.lock().unwrap(), vec![chord]);
+        assert_eq!(
+            registry.pressed(chord.id(), HotKeyState::Pressed),
+            Some(Pressed::Launcher)
+        );
+    }
+
+    #[test]
+    fn quitting_releases_every_chord() {
+        let (registry, held) = registry(
+            r#"{ "extensions": { "x": { "commands": { "a": { "hotkey": "ctrl+alt+j" } } } } }"#,
+        );
+        registry.release_all();
+        assert!(held.lock().unwrap().is_empty());
     }
 }

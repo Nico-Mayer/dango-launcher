@@ -27,8 +27,11 @@ use std::sync::OnceLock;
 use objc2::rc::Retained;
 use objc2::runtime::{AnyClass, AnyObject, Bool, ClassBuilder, Sel};
 use objc2::sel;
-use objc2_app_kit::{NSWindow, NSWindowCollectionBehavior, NSWindowStyleMask};
-use tauri::WebviewWindow;
+use objc2_app_kit::{
+    NSEvent, NSScreen, NSView, NSWindow, NSWindowCollectionBehavior, NSWindowStyleMask,
+};
+use objc2_foundation::{MainThreadMarker, NSPoint};
+use raw_window_handle::RawWindowHandle;
 
 use super::{LauncherWindow, RunningApp, SystemControl, SystemError};
 
@@ -116,7 +119,7 @@ const NS_POPUP_MENU_WINDOW_LEVEL: isize = 101;
 pub struct MacLauncherWindow;
 
 impl MacLauncherWindow {
-    pub fn new(window: &WebviewWindow) -> Self {
+    pub fn new(window: RawWindowHandle) -> Self {
         if let Some(ns_window) = ns_window(window) {
             reclass_as_panel(&ns_window);
 
@@ -136,10 +139,11 @@ impl MacLauncherWindow {
 }
 
 impl LauncherWindow for MacLauncherWindow {
-    fn show(&mut self, window: &WebviewWindow) {
-        let _ = window.show();
-        // Ordering is re-asserted after the show, because Tauri reapplies its
-        // own always-on-top level on the way out and would clobber ours.
+    fn will_show(&mut self) {}
+
+    fn did_show(&mut self, window: RawWindowHandle) {
+        // Ordering is re-asserted after the show, because the toolkit reapplies
+        // its own always-on-top level on the way out and would clobber ours.
         if let Some(ns_window) = ns_window(window) {
             ns_window.setLevel(NS_POPUP_MENU_WINDOW_LEVEL);
             ns_window.orderFrontRegardless();
@@ -147,34 +151,40 @@ impl LauncherWindow for MacLauncherWindow {
         }
     }
 
-    fn hide(&mut self, window: &WebviewWindow) {
-        let _ = window.hide();
-    }
-
-    /// macOS positions in logical points, and each display's physical
-    /// coordinates are its own points times its own scale, so centring has to
-    /// stay in logical space.
-    fn position_on_active_display(&self, window: &WebviewWindow) {
-        let Some(monitor) = super::active_monitor(window) else {
+    /// Centred on the display under the cursor, in AppKit's points, whose
+    /// origin is the bottom-left of the primary display.
+    fn position_on_active_display(&self, window: RawWindowHandle) {
+        let (Some(ns_window), Some(mtm)) = (ns_window(window), MainThreadMarker::new()) else {
             return;
         };
-        let scale = monitor.scale_factor();
-        let area = monitor.size().to_logical::<f64>(scale);
-        let origin = monitor.position().to_logical::<f64>(scale);
-        let Ok(size) = window.outer_size() else {
+        let cursor = NSEvent::mouseLocation();
+        let screens = NSScreen::screens(mtm);
+        let screen = (0..screens.count())
+            .map(|index| screens.objectAtIndex(index))
+            .find(|screen| {
+                let frame = screen.frame();
+                cursor.x >= frame.origin.x
+                    && cursor.x < frame.origin.x + frame.size.width
+                    && cursor.y >= frame.origin.y
+                    && cursor.y < frame.origin.y + frame.size.height
+            })
+            .or_else(|| NSScreen::mainScreen(mtm));
+        let Some(screen) = screen else {
             return;
         };
-        let size = size.to_logical::<f64>(scale);
-
-        let (x, y) = super::launcher_origin(
-            origin.x,
-            origin.y,
-            area.width,
-            area.height,
+        let area = screen.frame();
+        let size = ns_window.frame().size;
+        // Measured from the display's top edge, then flipped.
+        let (x, from_top) = super::launcher_origin(
+            area.origin.x,
+            0.0,
+            area.size.width,
+            area.size.height,
             size.width,
             size.height,
         );
-        let _ = window.set_position(tauri::LogicalPosition::new(x, y));
+        let y = area.origin.y + area.size.height - from_top - size.height;
+        ns_window.setFrameOrigin(NSPoint::new(x, y));
     }
 
     fn restore_previous_focus(&mut self) {
@@ -188,7 +198,7 @@ extern "C" fn can_become_key_window(_this: NonNull<AnyObject>, _cmd: Sel) -> Boo
 }
 
 /// NSPanel accepts the non-activating style mask that a plain NSWindow rejects.
-/// The subclass exists because reclassing drops tao's `canBecomeKeyWindow`
+/// The subclass exists because reclassing drops the toolkit's `canBecomeKeyWindow`
 /// override, and a borderless window answers NO by default, which would leave
 /// the launcher unable to receive typing.
 fn panel_class() -> Option<&'static AnyClass> {
@@ -221,10 +231,10 @@ fn reclass_as_panel(ns_window: &NSWindow) {
     }
 }
 
-fn ns_window(window: &WebviewWindow) -> Option<Retained<NSWindow>> {
-    let ptr = window.ns_window().ok()? as *mut AnyObject;
-    if ptr.is_null() {
+fn ns_window(window: RawWindowHandle) -> Option<Retained<NSWindow>> {
+    let RawWindowHandle::AppKit(handle) = window else {
         return None;
-    }
-    unsafe { Retained::retain(ptr.cast::<NSWindow>()) }
+    };
+    let view = unsafe { handle.ns_view.cast::<NSView>().as_ref() };
+    view.window()
 }

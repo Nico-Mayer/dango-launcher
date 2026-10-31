@@ -15,8 +15,8 @@ leaves a runnable app.
 
 ## 3. Core context and `Shell` trait (Tauri still renders)
 
-- [ ] 3.1 Introduce `Core` owning the state behind today's 32 `app.state()` lookups, and a tokio runtime replacing `tauri::async_runtime`. Verify `cargo test` and clippy pass.
-- [ ] 3.2 Introduce the `Shell` trait from design decision 1, with a Tauri implementation and a recording fake. Route snapshot publishing, show, hide, main-thread work, tray notices, and quit through it. Verify `cargo test` with tests that drive activation, hold expiry, and dismiss through the fake.
+- [x] 3.1 Introduce `Core` owning the state behind today's 32 `app.state()` lookups, and a tokio runtime replacing `tauri::async_runtime`. Verify `cargo test` and clippy pass.
+- [x] 3.2 Introduce the `Shell` trait from design decision 1, with a Tauri implementation and a recording fake. Route snapshot publishing, show, hide, main-thread work, tray notices, and quit through it. Verify `cargo test` with tests that drive activation, hold expiry, and dismiss through the fake.
 - [ ] 3.3 Change `LauncherWindow` and the Windows and macOS implementations to take a raw window handle instead of a `WebviewWindow`. Verify clippy on Windows locally and on macOS in CI.
 
 ## 4. Slint shell beside Tauri

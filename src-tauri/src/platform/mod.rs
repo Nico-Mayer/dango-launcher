@@ -1,4 +1,4 @@
-use tauri::WebviewWindow;
+pub use raw_window_handle::RawWindowHandle;
 
 #[cfg(target_os = "macos")]
 mod macos;
@@ -13,14 +13,18 @@ pub use windows::{own_integrity_level, remember_previous_foreground, WindowsHand
 #[cfg(not(any(target_os = "macos", target_os = "windows")))]
 compile_error!("Dango targets macOS and Windows only. Linux is out of scope.");
 
+/// The platform half of showing the launcher. The shell shows and hides the
+/// window itself; this does what its toolkit cannot.
 pub trait LauncherWindow: Send {
-    fn show(&mut self, window: &WebviewWindow);
-    fn hide(&mut self, window: &WebviewWindow);
-    fn position_on_active_display(&self, window: &WebviewWindow);
+    /// Before the shell shows the window.
+    fn will_show(&mut self);
+    /// After the shell has shown the window: takes the keyboard.
+    fn did_show(&mut self, window: RawWindowHandle);
+    fn position_on_active_display(&self, window: RawWindowHandle);
     fn restore_previous_focus(&mut self);
 }
 
-pub fn launcher_window(window: &WebviewWindow) -> Box<dyn LauncherWindow> {
+pub fn launcher_window(window: RawWindowHandle) -> Box<dyn LauncherWindow> {
     #[cfg(target_os = "macos")]
     return Box::new(macos::MacLauncherWindow::new(window));
     #[cfg(target_os = "windows")]
@@ -393,22 +397,6 @@ pub fn window_manager(
     {
         std::sync::Arc::new(macos::MacWindowManager::new(main))
     }
-}
-
-/// The cursor is the most reliable signal for "the display the user is looking
-/// at". `current_monitor` cannot answer while the window is parked offscreen for
-/// warmup, and returning nothing there would leave the launcher unpositioned and
-/// invisible.
-fn active_monitor(window: &WebviewWindow) -> Option<tauri::Monitor> {
-    if let Ok(cursor) = window.cursor_position() {
-        if let Ok(Some(monitor)) = window.monitor_from_point(cursor.x, cursor.y) {
-            return Some(monitor);
-        }
-    }
-    if let Ok(Some(monitor)) = window.current_monitor() {
-        return Some(monitor);
-    }
-    window.primary_monitor().ok().flatten()
 }
 
 /// Horizontal centre, above vertical centre, in the display's work area.

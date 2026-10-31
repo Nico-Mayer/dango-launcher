@@ -23,15 +23,20 @@ pub use window::WindowsWindowManager;
 /// the user's and pass it straight through.
 pub(super) const DANGO_INJECTED: usize = 0x44_41_4E_47;
 
-use tauri::WebviewWindow;
-use windows_sys::Win32::Foundation::{FALSE, HWND, TRUE};
+use raw_window_handle::RawWindowHandle;
+use windows_sys::Win32::Foundation::{FALSE, HWND, POINT, RECT, TRUE};
+use windows_sys::Win32::Graphics::Gdi::{
+    GetMonitorInfoW, MonitorFromPoint, MONITORINFO, MONITOR_DEFAULTTOPRIMARY,
+};
 use windows_sys::Win32::System::Threading::{AttachThreadInput, GetCurrentThreadId};
+use windows_sys::Win32::UI::HiDpi::{GetDpiForMonitor, GetDpiForWindow, MDT_EFFECTIVE_DPI};
 use windows_sys::Win32::UI::WindowsAndMessaging::{
-    AllowSetForegroundWindow, BringWindowToTop, GetForegroundWindow, GetWindowLongPtrW,
-    GetWindowThreadProcessId, SetForegroundWindow, SetWindowLongPtrW, SetWindowPos,
-    SystemParametersInfoW, GWL_EXSTYLE, HWND_TOPMOST, SPIF_SENDCHANGE,
-    SPI_GETFOREGROUNDLOCKTIMEOUT, SPI_SETFOREGROUNDLOCKTIMEOUT, SWP_FRAMECHANGED, SWP_NOACTIVATE,
-    SWP_NOMOVE, SWP_NOSIZE, WS_EX_APPWINDOW, WS_EX_TOOLWINDOW, WS_EX_TOPMOST,
+    AllowSetForegroundWindow, BringWindowToTop, GetCursorPos, GetForegroundWindow,
+    GetWindowLongPtrW, GetWindowRect, GetWindowThreadProcessId, SetForegroundWindow,
+    SetWindowLongPtrW, SetWindowPos, SystemParametersInfoW, GWL_EXSTYLE, HWND_TOPMOST,
+    SPIF_SENDCHANGE, SPI_GETFOREGROUNDLOCKTIMEOUT, SPI_SETFOREGROUNDLOCKTIMEOUT, SWP_FRAMECHANGED,
+    SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SWP_NOZORDER, WS_EX_APPWINDOW, WS_EX_TOOLWINDOW,
+    WS_EX_TOPMOST,
 };
 
 use super::{LauncherWindow, RunningApp, SystemControl, SystemError};
@@ -44,7 +49,7 @@ pub struct WindowsLauncherWindow {
 }
 
 impl WindowsLauncherWindow {
-    pub fn new(window: &WebviewWindow) -> Self {
+    pub fn new(window: RawWindowHandle) -> Self {
         if let Some(hwnd) = hwnd(window) {
             unsafe { apply_tool_window_style(hwnd) };
         }
@@ -55,7 +60,7 @@ impl WindowsLauncherWindow {
 }
 
 impl LauncherWindow for WindowsLauncherWindow {
-    fn show(&mut self, window: &WebviewWindow) {
+    fn will_show(&mut self) {
         unsafe {
             let foreground = GetForegroundWindow();
             if !foreground.is_null() {
@@ -63,9 +68,9 @@ impl LauncherWindow for WindowsLauncherWindow {
                 text::remember_previous_foreground(foreground as isize);
             }
         }
+    }
 
-        let _ = window.show();
-
+    fn did_show(&mut self, window: RawWindowHandle) {
         if let Some(hwnd) = hwnd(window) {
             unsafe {
                 apply_tool_window_style(hwnd);
@@ -74,38 +79,56 @@ impl LauncherWindow for WindowsLauncherWindow {
         }
     }
 
-    fn hide(&mut self, window: &WebviewWindow) {
-        let _ = window.hide();
-    }
-
     /// Windows uses one physical pixel space across displays, so the window's
     /// size is projected to the target display's DPI before centring. Going
     /// through logical coordinates would scale by the display the window is
     /// leaving, not the one it is moving to.
-    fn position_on_active_display(&self, window: &WebviewWindow) {
-        let Some(monitor) = super::active_monitor(window) else {
+    fn position_on_active_display(&self, window: RawWindowHandle) {
+        let Some(hwnd) = hwnd(window) else {
             return;
         };
-        let (Ok(size), Ok(scale)) = (window.outer_size(), window.scale_factor()) else {
-            return;
-        };
-        let size = size
-            .to_logical::<f64>(scale)
-            .to_physical::<f64>(monitor.scale_factor());
-        let area = monitor.work_area();
-
-        let (x, y) = super::launcher_origin(
-            area.position.x as f64,
-            area.position.y as f64,
-            area.size.width as f64,
-            area.size.height as f64,
-            size.width,
-            size.height,
-        );
-        let _ = window.set_position(tauri::PhysicalPosition::new(
-            x.round() as i32,
-            y.round() as i32,
-        ));
+        unsafe {
+            // The cursor is the most reliable signal for the display the user
+            // is looking at.
+            let mut cursor = POINT { x: 0, y: 0 };
+            GetCursorPos(&mut cursor);
+            let monitor = MonitorFromPoint(cursor, MONITOR_DEFAULTTOPRIMARY);
+            let mut info: MONITORINFO = std::mem::zeroed();
+            info.cbSize = std::mem::size_of::<MONITORINFO>() as u32;
+            if GetMonitorInfoW(monitor, &mut info) == 0 {
+                return;
+            }
+            let (mut target_dpi, mut unused) = (0u32, 0u32);
+            if GetDpiForMonitor(monitor, MDT_EFFECTIVE_DPI, &mut target_dpi, &mut unused) != 0 {
+                return;
+            }
+            let window_dpi = GetDpiForWindow(hwnd);
+            let mut rect: RECT = std::mem::zeroed();
+            if window_dpi == 0 || GetWindowRect(hwnd, &mut rect) == 0 {
+                return;
+            }
+            let scale = f64::from(target_dpi) / f64::from(window_dpi);
+            let width = f64::from(rect.right - rect.left) * scale;
+            let height = f64::from(rect.bottom - rect.top) * scale;
+            let area = info.rcWork;
+            let (x, y) = super::launcher_origin(
+                f64::from(area.left),
+                f64::from(area.top),
+                f64::from(area.right - area.left),
+                f64::from(area.bottom - area.top),
+                width,
+                height,
+            );
+            SetWindowPos(
+                hwnd,
+                std::ptr::null_mut(),
+                x.round() as i32,
+                y.round() as i32,
+                0,
+                0,
+                SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE,
+            );
+        }
     }
 
     fn restore_previous_focus(&mut self) {
@@ -209,10 +232,11 @@ pub(super) unsafe fn force_foreground(target: HWND) {
     );
 }
 
-fn hwnd(window: &WebviewWindow) -> Option<HWND> {
-    // Tauri hands back the windows crate HWND, whose inner pointer is exactly
-    // the windows-sys HWND, so no conversion is involved.
-    Some(window.hwnd().ok()?.0)
+fn hwnd(window: RawWindowHandle) -> Option<HWND> {
+    match window {
+        RawWindowHandle::Win32(handle) => Some(handle.hwnd.get() as HWND),
+        _ => None,
+    }
 }
 
 /// The foreground application's name, resolved the same way the clipboard names

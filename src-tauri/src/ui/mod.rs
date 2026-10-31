@@ -4,7 +4,7 @@
 
 mod effect;
 mod input;
-mod snapshot;
+pub mod snapshot;
 mod state;
 #[cfg(test)]
 mod tests;
