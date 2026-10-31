@@ -64,13 +64,9 @@ impl WindowsLauncherWindow {
 
 impl LauncherWindow for WindowsLauncherWindow {
     fn will_show(&mut self) {
-        unsafe {
-            let foreground = GetForegroundWindow();
-            if !foreground.is_null() {
-                self.previous_foreground = Some(foreground as isize);
-                text::remember_previous_foreground(foreground as isize);
-            }
-        }
+        let foreground = unsafe { GetForegroundWindow() } as isize;
+        self.previous_foreground = (foreground != 0).then_some(foreground);
+        text::remember_previous_foreground(foreground);
     }
 
     fn did_show(&mut self, window: RawWindowHandle) {
