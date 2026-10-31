@@ -80,6 +80,22 @@ pub fn bindings(config: &Config, launcher: HotKey) -> Bindings {
     }
 }
 
+/// Commands the config gives a hotkey and also turns off with `"enabled":
+/// false`, one line each.
+pub fn disabled_with_hotkey(config: &Config) -> Vec<String> {
+    let mut lines = Vec::new();
+    for (extension_id, extension) in &config.extensions {
+        for (command_id, command) in &extension.commands {
+            if command.hotkey.is_some() && command.enabled == Some(false) {
+                lines.push(format!(
+                    "{extension_id}.{command_id}: has a hotkey but is disabled"
+                ));
+            }
+        }
+    }
+    lines
+}
+
 struct Table {
     launcher: HotKey,
     hyper: global_hotkey::hotkey::Modifiers,
@@ -223,6 +239,9 @@ impl Registry {
         let mut table = self.bindings.lock().unwrap();
         for (chord, _) in table.drain(..) {
             self.grab.unregister(chord);
+        }
+        for line in disabled_with_hotkey(config) {
+            crate::log::append(&line);
         }
         let built = bindings(config, self.launcher());
         let mut conflicts = built.conflicts;
@@ -500,6 +519,21 @@ mod tests {
         let result = bindings(&c, launcher());
         assert!(result.bindings.is_empty());
         assert!(result.conflicts.is_empty());
+    }
+
+    #[test]
+    fn a_hotkey_on_a_disabled_command_is_named() {
+        let c = config(
+            r#"{ "extensions": { "dango.ai": { "commands": {
+                "make-longer": { "hotkey": "ctrl+alt+l", "enabled": false },
+                "summarize": { "hotkey": "ctrl+alt+s" },
+                "fix": { "enabled": false }
+            } } } }"#,
+        );
+        assert_eq!(
+            disabled_with_hotkey(&c),
+            ["dango.ai.make-longer: has a hotkey but is disabled"]
+        );
     }
 
     fn registry(config_json: &str) -> (Registry, std::sync::Arc<Mutex<Vec<HotKey>>>) {
