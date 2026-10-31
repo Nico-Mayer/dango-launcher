@@ -41,6 +41,8 @@ pub enum RecordError {
     KeywordNeedsPlainSnippet,
     #[error("Another snippet already uses that keyword")]
     KeywordTaken(String),
+    #[error("One keyword can't be the start of another, so choose a different keyword")]
+    KeywordOverlaps(String),
     #[error("Fix the error in {0} first")]
     FileBroken(&'static str),
     #[error("Couldn't save, check that {0} isn't read-only")]
@@ -196,8 +198,9 @@ impl Records {
 
     /// Checks a keyword before it is stored: a snippet whose template needs a
     /// fill-in-the-blank cannot have one, because expanding in place has no way
-    /// to ask, and no two snippets may share a keyword. `own_id` is the record
-    /// being edited, excluded from the uniqueness check. Returns the normalised
+    /// to ask, and no two snippets may share a keyword or have one start
+    /// with the other. `own_id` is the record
+    /// being edited, excluded from these checks. Returns the normalised
     /// keyword (trimmed, empty becomes `None`).
     fn validate_keyword(
         &self,
@@ -212,12 +215,20 @@ impl Records {
         if !Template::parse(body)?.arguments().is_empty() {
             return Err(RecordError::KeywordNeedsPlainSnippet);
         }
-        let taken = self.cache.read().unwrap().iter().any(|record| {
-            record_id(record) != own_id
-                && record.get("keyword").and_then(Value::as_str) == Some(keyword)
-        });
-        if taken {
+        let cache = self.cache.read().unwrap();
+        let others: Vec<&str> = cache
+            .iter()
+            .filter(|record| record_id(record) != own_id)
+            .filter_map(|record| record.get("keyword").and_then(Value::as_str))
+            .collect();
+        if others.contains(&keyword) {
             return Err(RecordError::KeywordTaken(keyword.to_string()));
+        }
+        if let Some(other) = others
+            .iter()
+            .find(|other| keyword.starts_with(**other) || other.starts_with(keyword))
+        {
+            return Err(RecordError::KeywordOverlaps(other.to_string()));
         }
         Ok(Some(keyword.to_string()))
     }
@@ -796,6 +807,37 @@ mod tests {
         let id = records.create("Three", "third", Some(";x")).unwrap();
         assert!(records.update(&id, "Three", "third", Some(";x")).is_ok());
     }
+
+    #[test]
+    fn a_keyword_that_starts_with_another_is_refused() {
+        let records = records(Kind::Snippet);
+        records.create("Short", "short", Some(";s")).unwrap();
+        let error = records.create("Long", "long", Some(";sig")).unwrap_err();
+        assert!(matches!(error, RecordError::KeywordOverlaps(k) if k == ";s"));
+    }
+
+    #[test]
+    fn a_keyword_that_starts_another_is_refused() {
+        let records = records(Kind::Snippet);
+        records.create("Long", "long", Some(";sig")).unwrap();
+        let error = records.create("Short", "short", Some(";s")).unwrap_err();
+        assert!(matches!(error, RecordError::KeywordOverlaps(k) if k == ";sig"));
+    }
+
+    #[test]
+    fn keywords_differing_in_case_do_not_overlap() {
+        let records = records(Kind::Snippet);
+        records.create("Short", "short", Some(";s")).unwrap();
+        assert!(records.create("Long", "long", Some(";Sig")).is_ok());
+    }
+
+    #[test]
+    fn an_edit_may_lengthen_its_own_keyword() {
+        let records = records(Kind::Snippet);
+        let id = records.create("Sig", "sig", Some(";s")).unwrap();
+        records.update(&id, "Sig", "sig", Some(";sig")).unwrap();
+        assert_eq!(records.get(&id).unwrap().keyword.as_deref(), Some(";sig"));
+    }
 }
 
 #[cfg(test)]
@@ -813,6 +855,7 @@ mod display_tests {
             RecordError::Gone,
             RecordError::KeywordNeedsPlainSnippet,
             RecordError::KeywordTaken("sig".into()),
+            RecordError::KeywordOverlaps("sig".into()),
             RecordError::FileBroken(Kind::Snippet.file_name()),
             RecordError::Write(Kind::Snippet.file_name()),
         ];

@@ -1,6 +1,6 @@
 ## 1. Overlapping keywords
 
-- [ ] 1.1 Add `RecordError::KeywordOverlaps` with the message "One keyword can't be the start of another, so choose a different keyword", and refuse an overlap in `validate_keyword` in `src/extensions/snippets/store.rs` after the exact-duplicate check, case-sensitive, skipping the record being edited; verify with new tests in `store.rs` for `;s` then `;sig`, `;sig` then `;s`, `;s` with `;Sig` allowed, and an edit that lengthens its own keyword, plus the new variant in `every_fixed_message_is_a_sentence` (`cargo test snippets`)
+- [x] 1.1 Add `RecordError::KeywordOverlaps` with the message "One keyword can't be the start of another, so choose a different keyword", and refuse an overlap in `validate_keyword` in `src/extensions/snippets/store.rs` after the exact-duplicate check, case-sensitive, skipping the record being edited; verify with new tests in `store.rs` for `;s` then `;sig`, `;sig` then `;s`, `;s` with `;Sig` allowed, and an edit that lengthens its own keyword, plus the new variant in `every_fixed_message_is_a_sentence` (`cargo test snippets`)
 
 ## 2. Skip keystrokes aimed at Dango on Windows
 
