@@ -207,14 +207,14 @@ for debugging SHALL go to the log.
 - **THEN** the request is abandoned
 - **AND** the message says the model did not answer in time
 
-### Requirement: Requests are made from the application, never the webview
+### Requirement: Requests are made by the application core, never the UI layer
 
-Every request to a provider SHALL be made by the application itself. No key and
-no request SHALL be handed to the webview, and no provider endpoint SHALL be
-called from it.
+Every request to a provider SHALL be made by the application core. No key and
+no request SHALL be handed to the code that draws the interface, and no
+provider endpoint SHALL be called from it.
 
 #### Scenario: The webview never holds a key
 
 - **WHEN** an AI command runs
-- **THEN** the key and the request stay inside the application
-- **AND** the webview receives only the text of the answer
+- **THEN** the key and the request stay inside the application core
+- **AND** the interface receives only the text of the answer

@@ -26,14 +26,15 @@ MUST be preserved unchanged.
 
 #### Scenario: Commit without Rust files
 
-- **WHEN** the developer commits only non-Rust files, such as Markdown or Svelte
+- **WHEN** the developer commits only non-Rust files, such as Markdown or `.slint` files
 - **THEN** no Rust tooling runs and the hook adds no noticeable time to the commit
 
 ### Requirement: Pushing runs the CI lints
 
-The system SHALL run clippy with `--all-targets` and warnings denied, and the
-frontend type check, before a push, using the same flags as the CI workflow, and
-SHALL abort the push when either fails.
+The system SHALL run clippy with `--all-targets` and warnings denied before a
+push, using the same flags as the CI workflow, and SHALL abort the push when it
+fails. Because the build compiles the `.slint` files, an interface file that
+does not compile SHALL fail the same check.
 
 #### Scenario: Clippy warning present
 
@@ -42,12 +43,12 @@ SHALL abort the push when either fails.
 
 #### Scenario: Frontend type error present
 
-- **WHEN** the developer pushes a commit for which `svelte-check` reports an error
-- **THEN** the push is aborted and the error is printed in the terminal
+- **WHEN** the developer pushes a commit with a `.slint` file that does not compile
+- **THEN** the push is aborted and the compiler error is printed in the terminal
 
 #### Scenario: Clean tree
 
-- **WHEN** clippy and `svelte-check` both pass
+- **WHEN** clippy passes
 - **THEN** the push proceeds without further prompts
 
 ### Requirement: Checks run on demand

@@ -13,7 +13,8 @@ release with installers for both platforms.
 The system SHALL keep the application version in exactly one file, the Rust
 crate manifest, and every produced artifact MUST report that version: the
 window and installer metadata, the bundle file names, the git tag, and the
-GitHub release name.
+GitHub release name. No other checked-in file SHALL carry an application
+version.
 
 #### Scenario: Version read from the crate manifest
 
@@ -22,8 +23,8 @@ GitHub release name.
 
 #### Scenario: Frontend package version is inert
 
-- **WHEN** the version in `package.json` differs from the crate manifest
-- **THEN** the build output and the release are unaffected
+- **WHEN** the repository is searched for an application version field
+- **THEN** only the crate manifest carries one
 
 ### Requirement: Next version derives from commit history
 

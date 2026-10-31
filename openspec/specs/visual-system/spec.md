@@ -12,26 +12,26 @@ customization without changing its familiar layout.
 
 Dango SHALL use a consistent presentation for equivalent surfaces and controls
 across root search, pushed lists, forms, detail views, and the action panel.
-Changing a shared presentation value SHALL affect all consumers of that value,
-including floating content, without requiring feature-specific styling changes.
+All colours, corner radii, and type sizes SHALL come from one built-in
+palette, so changing a value there changes every surface that uses it,
+including the action panel.
 
-The built-in appearance SHALL remain available without external theme files.
-This capability SHALL NOT introduce theme file loading, a theme picker, or
-automatic operating-system theme selection.
+The built-in dark palette is the only appearance. This capability SHALL NOT
+introduce theme file loading, a theme picker, a light palette, or automatic
+operating-system theme selection.
 
 #### Scenario: Shared selection appearance changes consistently
 
-- **WHEN** the shared selection color is overridden in a development preview
+- **WHEN** the selection colour in the built-in palette is changed
 - **THEN** selected items in root search, pushed lists, and the action panel use
   that value
-- **AND** hover, focus, and error colors remain independently adjustable
+- **AND** hover, focus, and error colours remain independent values
 
 #### Scenario: Floating content inherits the presentation
 
-- **WHEN** shared typography, corner, and surface values are overridden and the
-  action panel opens
-- **THEN** the panel uses the current shared values rather than an unrelated
-  built-in appearance
+- **WHEN** the type size, corner radius, or surface colour in the built-in
+  palette is changed and the action panel opens
+- **THEN** the panel uses the changed values rather than its own
 
 #### Scenario: No theme configuration exists
 
@@ -49,8 +49,8 @@ of application icons and quicklink favicons.
 #### Scenario: Default search density is preserved
 
 - **WHEN** root search or a pushed list is displayed at the default text scale
-- **THEN** result rows are 56 CSS pixels high and the search header is 64 CSS
-  pixels high
+- **THEN** result rows are 56 logical pixels high and the search header is 64
+  logical pixels high
 - **AND** the footer remains anchored below the scrollable content
 
 #### Scenario: Icons retain their meaning
@@ -72,15 +72,14 @@ selected row, not through a ring around the whole surface.
 
 Required text SHALL remain readable rather than relying on faint opacity for
 hierarchy. Errors and busy states SHALL include text or accessible state
-information instead of relying on color or animation alone.
+information instead of relying on colour alone.
 
 #### Scenario: Built-in text and focus contrast
 
-- **WHEN** the built-in dark or light palette is reviewed in a development
-  preview
+- **WHEN** the built-in dark palette is reviewed
 - **THEN** normal-size enabled text, including subtitles and shortcut hints, has
   at least 4.5:1 contrast against its actual background
-- **AND** the focus indicator has at least 3:1 contrast against adjacent colors
+- **AND** the focus indicator has at least 3:1 contrast against adjacent colours
 
 #### Scenario: Hover cannot impersonate selection
 
@@ -92,8 +91,8 @@ information instead of relying on color or animation alone.
 #### Scenario: Form error remains associated with its field
 
 - **WHEN** a template field reports an error
-- **THEN** its message is visually distinguishable and programmatically
-  associated with that field
+- **THEN** its message is visually distinguishable and exposed to assistive
+  technology as the description of that field
 - **AND** focus and editing remain available
 
 ### Requirement: Overlays keep keyboard ownership through dismissal
@@ -133,14 +132,12 @@ the launcher unintentionally.
 
 ### Requirement: Motion communicates state without delaying work
 
-Launcher activation and keyboard selection SHALL NOT wait for or travel through
-an animation. Pointer hover and action-panel entrances and exits SHALL use
-restrained transitions. Result changes and full-tree replacements SHALL NOT
-replay entrance animations, stagger results, or animate selection travel.
+Dango SHALL NOT animate its interface. Launcher activation, keyboard
+selection, hover, the action panel, result changes, and full-tree replacements
+SHALL change state in a single frame, without entrance or exit effects.
 
-The interface SHALL show no looping decorative effect when idle. Ongoing work
-SHALL use at most one activity sweep per visible busy surface, alongside its
-non-animated status information.
+Ongoing work SHALL be shown by a static busy indicator next to its status
+text. No looping effect SHALL run.
 
 #### Scenario: Activation stays immediate on Windows
 
@@ -158,43 +155,20 @@ non-animated status information.
 
 #### Scenario: Overlay feedback is short and non-blocking
 
-- **WHEN** the action panel opens or closes with reduced motion disabled
-- **THEN** each entrance or exit transition lasts no more than 180 milliseconds
-- **AND** opening feedback does not delay keyboard navigation
+- **WHEN** the action panel opens or closes
+- **THEN** it appears or disappears in one frame, without a transition
+- **AND** keyboard navigation in it works at once
 
 #### Scenario: A streamed view stays stable
 
 - **WHEN** a command emits thirty replacements of the same view over one second
-- **THEN** content updates without replayed entrances, flicker, or animation-
-  induced dropped frames
-- **AND** selection and focus are not reset by the visual treatment
+- **THEN** content updates without flicker or dropped frames
+- **AND** selection and focus are not reset
 
 #### Scenario: Idle and hidden surfaces do not animate
 
-- **WHEN** work finishes or the launcher is hidden
-- **THEN** the activity sweep stops and no decorative loop remains running for
-  that surface
-
-### Requirement: Reduced motion retains all state information
-
-Dango SHALL honor the operating system's reduced-motion preference, including
-changes while running. Reduced motion SHALL remove activity sweeps, shimmer,
-repeated pulses, and entrance or exit movement without removing loading, focus,
-selection, or error information.
-
-#### Scenario: Reduced motion on Windows
-
-- **WHEN** Windows exposes a reduced-motion preference while a busy view or
-  action panel is visible
-- **THEN** moving and looping effects stop, the panel remains usable, and a
-  static busy indicator and status text remain available
-
-#### Scenario: Reduced motion on macOS
-
-- **WHEN** macOS exposes a reduced-motion preference while a busy view or action
-  panel is visible
-- **THEN** moving and looping effects stop, the panel remains usable, and a
-  static busy indicator and status text remain available
+- **WHEN** work is in progress, finishes, or the launcher is hidden
+- **THEN** no animation runs on any surface
 
 ### Requirement: Presentation fits the launcher viewport
 
@@ -206,10 +180,10 @@ action visible.
 
 #### Scenario: Compact viewport and long content
 
-- **WHEN** the launcher renderer is previewed at 480 by 300 CSS pixels with long
-  result titles, subtitles, actions, and form help
+- **WHEN** the launcher is shown at 480 by 300 logical pixels with long result
+  titles, subtitles, actions, and form help
 - **THEN** the footer and active controls remain reachable, floating content
-  stays within the viewport, and no horizontal scrollbar appears
+  stays within the window, and nothing scrolls horizontally
 
 #### Scenario: Long action list
 

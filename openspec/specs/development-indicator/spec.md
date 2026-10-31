@@ -16,9 +16,10 @@ colour, and the footer SHALL show a short "dev" badge next to the product
 name. A release build SHALL show neither. "Development build" means a debug
 build, the same meaning the autostart and latency behaviour already use.
 
-The marker SHALL be drawn inside the webview, SHALL NOT change the window's
-system chrome, size, or layout density, and SHALL be present on every launcher
-surface: root search, pushed views, and the protocol error screen.
+The marker SHALL be drawn inside the launcher window's own content, SHALL NOT
+change the window's system chrome, size, or layout density, and SHALL be
+present on every launcher surface: root search, pushed views, and the protocol
+error screen.
 
 #### Scenario: Development build on Windows
 
@@ -50,10 +51,9 @@ surface: root search, pushed views, and the protocol error screen.
 
 #### Scenario: Marker follows the shared presentation
 
-- **WHEN** the development edge colour is overridden in a development preview
-- **THEN** the frame edge uses the overridden value
-- **AND** the badge remains readable against the footer in both the dark and
-  light built-in palettes
+- **WHEN** the development colour is changed in the built-in palette
+- **THEN** the frame edge uses the new value
+- **AND** the badge remains readable against the footer in the dark palette
 
 ### Requirement: The marker does not cost activation time
 
@@ -97,18 +97,18 @@ product name only.
 
 ### Requirement: Both states are testable without a Tauri process
 
-The browser fixtures SHALL be able to mount the launcher in either the
-development or the release state, so each appearance can be checked in the
-browser test suite.
+The automated UI tests SHALL be able to mount the launcher in either the
+development or the release state without a visible window, so each
+appearance is checked by `cargo test`.
 
 #### Scenario: Fixture mounts the development state
 
-- **WHEN** a fixture scene is opened with the development switch on
+- **WHEN** a headless UI test mounts the launcher in the development state
 - **THEN** the frame carries the development marker and the footer shows the
   badge
 
 #### Scenario: Fixture default is the release state
 
-- **WHEN** a fixture scene is opened without the development switch
-- **THEN** no marker and no badge are shown, so existing presentation checks
-  are unaffected
+- **WHEN** a headless UI test mounts the launcher without the development
+  state
+- **THEN** no marker and no badge are shown
