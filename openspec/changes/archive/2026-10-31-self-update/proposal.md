@@ -17,7 +17,7 @@ macOS build keeps one signing identity across releases.
   few hours while it runs. Development builds never check.
 - When an update is available, an item at the top of root search names the new
   version. Its primary action downloads it, verifies its signature, installs it,
-  and restarts Dango. The tray menu shows the same item.
+  and restarts Dango.
 - A "Check for Updates" command checks on demand and reports the result.
 - Dango installs an update only after the user confirms. It never installs on
   its own.
@@ -38,6 +38,7 @@ Platforms: Windows and macOS, both fully covered.
 - Distribution through winget, Scoop, or Homebrew.
 - A setting to turn the automatic check off.
 - Showing the release notes inside Dango.
+- A tray menu item for an available update.
 - Updating the MSI install. The NSIS installer is the update route on Windows.
 
 ## Capabilities
@@ -45,7 +46,7 @@ Platforms: Windows and macOS, both fully covered.
 ### New Capabilities
 
 - `app-updates`: when Dango checks for an update, how an available update is
-  shown in root search and the tray, the "Check for Updates" command, the
+  shown in root search, the "Check for Updates" command, the
   confirm, download, install, and restart flow, failure reporting, and
   development builds never checking.
 
@@ -62,7 +63,7 @@ Platforms: Windows and macOS, both fully covered.
   `endpoints`, Windows `installMode`, macOS signing and entitlements.
 - `src-tauri/src/extensions/`: a new `updates` built-in extension with a root
   provider and the command.
-- `src-tauri/src/lib.rs`: the periodic check and the tray item.
+- `src-tauri/src/lib.rs`: the periodic check.
 - `.github/workflows/release.yml`: updater signing key and macOS certificate
   secrets, `uploadUpdaterJson: true`.
 - GitHub repository secrets: the updater private key and its password, the

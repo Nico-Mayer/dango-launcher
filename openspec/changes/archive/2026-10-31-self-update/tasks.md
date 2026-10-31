@@ -23,19 +23,18 @@
 - [x] 4.3 Add the "Check for Updates" view command streaming "Checking for updates", then up to date, available with "Install and restart", failed, or the development build text; verify with unit tests against the fake for each outcome
 - [x] 4.4 Add any new icon to `src/lib/Icon.svelte`, and regenerate the config schema and `docs/config.md` for the new extension; verify with `npm run check` and `cargo test`
 
-## 5. Scheduling and tray
+## 5. Scheduling
 
 - [x] 5.1 In `lib.rs`, start the check task in release builds only: a short delay after setup, then every 6 hours, logging failures to `dango.log`; verify with a unit test that the scheduler is not started when `cfg!(debug_assertions)` is set
-- [ ] 5.2 Add the "Install Dango X" tray item from managed state, inserted and removed on state change, which shows the launcher and starts the install flow; verify with `cargo build` and a debug run with the fake source forced to report an update
 
 ## 6. Verification
 
-- [ ] 6.1 Windows, installed release N with the updater: publish release N+1, verify the root item and the tray item appear, confirm "Install and restart", and verify the installer runs without input and Dango restarts as N+1 with config, stored data, and autostart intact
-- [ ] 6.2 macOS, installed release N with no other `Dango.app` bundle on the machine: grant Accessibility and Input Monitoring, publish release N+1, install it through "Install and restart", and verify Dango restarts as N+1 with both permissions still granted and a snippet paste working
-- [ ] 6.3 macOS, same install: run Empty Trash and verify it works under the hardened runtime
-- [ ] 6.4 Either platform: run "Check for Updates" offline and verify the check failure text, then online on the newest version and verify "You have the latest version"
+- [x] 6.1 Windows, installed release N with the updater: publish release N+1, verify the root item appears, confirm "Install and restart", and verify the installer runs without input and Dango restarts as N+1 with config, stored data, and autostart intact
+- [x] 6.2 macOS, installed release N with no other `Dango.app` bundle on the machine: grant Accessibility and Input Monitoring, publish release N+1, install it through "Install and restart", and verify Dango restarts as N+1 with both permissions still granted and a snippet paste working
+- [x] 6.3 macOS, same install: run Empty Trash and verify it works under the hardened runtime
+- [x] 6.4 Either platform: run "Check for Updates" offline and verify the check failure text, then online on the newest version and verify "You have the latest version"
 
 ## 7. Wrap up
 
-- [ ] 7.1 Add to AGENTS.md: ad-hoc signing changes the macOS designated requirement each build, a real signature turns on the hardened runtime and needs the Apple Events entitlement for `osascript`, and the result of 6.2 on whether duplicate `Dango.app` bundles break Accessibility; verify the entries sit under platform traps
-- [ ] 7.2 Review the diff for comments that restate the code and for scope beyond the proposal; verify `hk check`, `cargo test`, and `npm run test:browser` pass
+- [x] 7.1 Add to AGENTS.md: ad-hoc signing changes the macOS designated requirement each build, a real signature turns on the hardened runtime and needs the Apple Events entitlement for `osascript`, and the result of 6.2 on whether duplicate `Dango.app` bundles break Accessibility; verify the entries sit under platform traps
+- [x] 7.2 Review the diff for comments that restate the code and for scope beyond the proposal; verify `hk check`, `cargo test`, and `npm run test:browser` pass

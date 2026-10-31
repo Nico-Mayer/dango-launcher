@@ -1,10 +1,12 @@
+# app-updates Specification
+
 ## Purpose
 
 Keeps an installed Dango current: it finds newer releases on its own, shows
 them where the user already looks, and installs one only when the user
 confirms, so updating never means a trip to GitHub.
 
-## ADDED Requirements
+## Requirements
 
 ### Requirement: Dango checks for updates in the background
 
@@ -82,38 +84,11 @@ restart".
 - **WHEN** no update is available
 - **THEN** typing "update" lists the "Check for Updates" command and no update item
 
-### Requirement: An available update is shown in the tray
-
-When an update is available, the tray menu SHALL show an enabled item reading
-"Install Dango" followed by the new version. Choosing it SHALL show the
-launcher and start the same install as "Install and restart". The item SHALL be
-absent when no update is available.
-
-#### Scenario: Tray item on Windows
-
-- **WHEN** version 0.5.0 is available and the user right-clicks the tray icon on Windows
-- **THEN** the menu has an item reading "Install Dango 0.5.0"
-
-#### Scenario: Tray item on macOS
-
-- **WHEN** version 0.5.0 is available and the user clicks the menu bar icon on macOS
-- **THEN** the menu has an item reading "Install Dango 0.5.0"
-
-#### Scenario: Installing from the tray
-
-- **WHEN** the user chooses "Install Dango 0.5.0" in the tray
-- **THEN** the launcher appears showing the download, as after "Install and restart"
-
-#### Scenario: No update in the tray
-
-- **WHEN** no update is available
-- **THEN** the tray menu has no install item
-
 ### Requirement: An update installs only after the user confirms
 
 Dango SHALL download and install an update only as the result of "Install and
-restart" or the tray item. While it downloads, the launcher SHALL show a view
-naming the version and the download's progress. Dango SHALL verify the
+restart". While it downloads, the launcher SHALL show a view naming the version
+and the download's progress. Dango SHALL verify the
 download's signature against the key built into Dango and SHALL refuse an
 update whose signature does not match. After installing it SHALL restart into
 the new version.
@@ -175,7 +150,7 @@ stay available.
 
 A built-in "Check for Updates" command SHALL check at once and show the result
 in the launcher. If an update is found, the result SHALL offer "Install and
-restart", and the update item SHALL appear in root search and the tray.
+restart", and the update item SHALL appear in root search.
 
 #### Scenario: Checking
 

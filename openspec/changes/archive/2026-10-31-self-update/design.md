@@ -24,7 +24,7 @@ Current state:
 
 - Use the official updater with the GitHub release as the only server.
 - One `updates` built-in extension owns the check state, the root item, the
-  command, and the install flow. `lib.rs` only schedules and wires the tray.
+  command, and the install flow. `lib.rs` only schedules the check.
 - No change to the extension manifest, the view protocol, or stored data.
 
 **Non-Goals:**
@@ -84,9 +84,6 @@ failed automatic check logs and leaves the previous state.
 - **Root item**: a pinned candidate from the `updates` root provider. The
   `permissions` extension is registered before `updates`, so permission
   warnings come first.
-- **Tray**: one `MenuItem` held in managed state and inserted or removed when
-  the state changes, like the permission items. Choosing it shows the launcher
-  and starts the install flow through the same entry point as the root action.
 - **Install flow**: the action returns `ActionOutcome::Started` and streams a
   detail view. While downloading, the view has `loading: true` and its markdown
   shows the downloaded and total size. The full tree is replaced on each
@@ -146,7 +143,6 @@ Written with the `ux-writing` skill and checked against
 | Root item title | "Dango 0.5.0 is available" |
 | Root item subtitle | "You have 0.4.0" |
 | Primary action | "Install and restart" |
-| Tray item | "Install Dango 0.5.0" |
 | Command title | "Check for Updates" |
 | Check view, in progress | "Checking for updates" |
 | Check view, up to date | "You have the latest version" |
