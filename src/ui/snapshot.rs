@@ -1,6 +1,6 @@
 use serde::Serialize;
 
-use crate::protocol::{Action, FieldKind, ListItem, Metadata, View};
+use crate::protocol::{Action, FieldKind, FieldOption, ListItem, Metadata, View};
 
 use super::input::{Chord, Context, ResultItem};
 use super::state::{Launcher, Mode, PushedView, ToastStyle, ViewError};
@@ -150,6 +150,7 @@ snapshot_types! {
         pub help: Option<String>,
         pub help_emphasized: bool,
         pub error: Option<String>,
+        pub options: Vec<FieldOption>,
     }
 
     #[serde(rename_all = "camelCase")]
@@ -385,6 +386,7 @@ impl Launcher {
                             error: inspection
                                 .filter(|_| template)
                                 .and_then(|i| i.error.clone()),
+                            options: field.options.clone(),
                         }
                     })
                     .collect(),
@@ -443,7 +445,7 @@ impl Launcher {
                 .first()
                 .map(|action| action.title.clone()),
             confirm_with_command: matches!(&view.tree.view, View::Form(form)
-                if form.fields.iter().any(|field| field.kind == FieldKind::Template)),
+                if form.fields.iter().any(|field| field.kind.is_multiline())),
             many_actions: self.available_actions().len() > 1,
         }
     }

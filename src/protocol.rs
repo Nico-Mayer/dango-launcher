@@ -150,24 +150,43 @@ protocol_types! {
         pub actions: Vec<Action>,
     }
 
+    #[derive(Default)]
     #[serde(rename_all = "camelCase")]
     pub struct FormField {
         pub id: String,
+        #[serde(default)]
         pub label: String,
         pub kind: FieldKind,
         #[serde(default)]
         pub value: Option<String>,
+        /// What a dropdown offers. Its value is the chosen option's id.
+        #[serde(default)]
+        pub options: Vec<FieldOption>,
     }
 
+    #[derive(Default)]
+    #[serde(rename_all = "camelCase")]
+    pub struct FieldOption {
+        pub id: String,
+        pub title: String,
+    }
+
+    #[derive(Default)]
     #[serde(rename_all = "camelCase")]
     pub enum FieldKind {
+        #[default]
         Text,
         Password,
+        /// Several lines. Enter makes a newline, as in a template.
+        Textarea,
         Toggle,
+        Dropdown,
         /// A field holding a template. Renders with the arguments it will ask
         /// for shown beneath it, so text that became a placeholder by accident
         /// is visible while it is still being edited.
         Template,
+        /// A line between fields. Holds no value.
+        Separator,
     }
 
     #[derive(Default)]
@@ -234,6 +253,13 @@ protocol_types! {
         Failure {
             message: String,
         },
+    }
+}
+
+impl FieldKind {
+    /// Keeps Enter for a newline, so the form submits on Cmd or Ctrl with Enter.
+    pub fn is_multiline(&self) -> bool {
+        matches!(self, Self::Textarea | Self::Template)
     }
 }
 

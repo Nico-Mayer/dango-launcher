@@ -1,0 +1,42 @@
+import { Theme } from "../theme.slint";
+
+/// One line of text, or a password. The border turns accent while focused.
+export component TextField inherits Rectangle {
+    in property <string> label;
+    in property <string> value;
+    in property <string> error;
+    in property <bool> password;
+    callback edited(text: string);
+    height: 32px;
+    background: Theme.surface;
+    border-radius: Theme.radius / 2;
+    border-width: 1px;
+    border-color: input.has-focus ? Theme.accent : Theme.border;
+    accessible-role: text-input;
+    accessible-label: root.label;
+    accessible-value: root.password ? "" : input.text;
+    accessible-description: root.error;
+    accessible-action-set-value(value) => {
+        input.text = value;
+        root.edited(value);
+    }
+    forward-focus: input;
+
+    input := TextInput {
+        x: 10px;
+        width: parent.width - 20px;
+        height: parent.height;
+        text: root.value;
+        single-line: true;
+        input-type: root.password ? InputType.password : InputType.text;
+        color: Theme.text;
+        selection-background-color: Theme.selection;
+        selection-foreground-color: Theme.text;
+        font-size: Theme.text-body;
+        vertical-alignment: center;
+        accessible-role: none;
+        edited => {
+            root.edited(self.text);
+        }
+    }
+}

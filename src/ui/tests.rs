@@ -85,6 +85,7 @@ fn field(id: &str, kind: FieldKind, value: &str) -> FormField {
         label: id.into(),
         kind,
         value: Some(value.into()),
+        ..Default::default()
     }
 }
 
@@ -789,6 +790,74 @@ fn each_first_field_kind_submits_string_values() {
         assert_eq!(runs.len(), 1);
         assert_eq!(runs[0].values.clone().unwrap()["first"], edited);
     }
+}
+
+#[test]
+fn a_dropdown_submits_the_chosen_identifier() {
+    let folder = FormField {
+        options: ["work", "personal"]
+            .map(|id| crate::protocol::FieldOption {
+                id: id.into(),
+                title: id.into(),
+            })
+            .to_vec(),
+        value: None,
+        ..field("folder", FieldKind::Dropdown, "")
+    };
+    let mut h = Harness::view(form_tree(vec![
+        folder,
+        field("break", FieldKind::Separator, ""),
+    ]));
+    h.press("Enter");
+    assert_eq!(
+        h.runs()[0]
+            .values
+            .as_ref()
+            .unwrap()
+            .get("folder")
+            .map(String::as_str),
+        Some("work")
+    );
+    assert!(!h.runs()[0].values.as_ref().unwrap().contains_key("break"));
+    h.intent(Intent::FieldChanged {
+        id: "folder".into(),
+        value: "personal".into(),
+    });
+    h.press("Enter");
+    assert_eq!(
+        h.runs()[1]
+            .values
+            .as_ref()
+            .unwrap()
+            .get("folder")
+            .map(String::as_str),
+        Some("personal")
+    );
+}
+
+#[test]
+fn a_text_area_keeps_its_line_break() {
+    let mut h = Harness::view(form_tree(vec![field("notes", FieldKind::Textarea, "")]));
+    assert!(h.snapshot().footer.confirm_with_command);
+    h.intent(Intent::FieldChanged {
+        id: "notes".into(),
+        value: "first
+second"
+            .into(),
+    });
+    h.command("Enter");
+    assert_eq!(
+        h.runs()[0]
+            .values
+            .as_ref()
+            .unwrap()
+            .get("notes")
+            .map(String::as_str),
+        Some(
+            "first
+second"
+        )
+    );
 }
 
 #[test]

@@ -2,7 +2,8 @@ use std::collections::HashMap;
 
 use crate::extension::{ActionOutcome, FormValues};
 use crate::protocol::{
-    Action, ActionStyle, FieldKind, Filtering, ListItem, Section, View, ViewTree, PROTOCOL_VERSION,
+    Action, ActionStyle, FieldKind, Filtering, FormField, ListItem, Section, View, ViewTree,
+    PROTOCOL_VERSION,
 };
 
 use super::effect::{ActionRequest, Effect, Origin};
@@ -378,7 +379,8 @@ impl Launcher {
             values: form
                 .fields
                 .iter()
-                .map(|field| (field.id.clone(), field.value.clone().unwrap_or_default()))
+                .filter(|field| field.kind != FieldKind::Separator)
+                .map(|field| (field.id.clone(), seeded_value(field)))
                 .collect(),
             inspections: HashMap::new(),
             revision: self.next_revision(),
@@ -866,6 +868,20 @@ impl Launcher {
             Some(View::Form(form)) => form.item_id.clone(),
             Some(View::Detail(_)) | None => None,
         }
+    }
+}
+
+/// What a field submits until the user changes it. A dropdown without a value
+/// holds its first option, as that is what it shows.
+pub(super) fn seeded_value(field: &FormField) -> String {
+    match (&field.value, field.kind == FieldKind::Dropdown) {
+        (Some(value), _) => value.clone(),
+        (None, true) => field
+            .options
+            .first()
+            .map(|option| option.id.clone())
+            .unwrap_or_default(),
+        (None, false) => String::new(),
     }
 }
 

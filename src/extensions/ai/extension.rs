@@ -374,6 +374,7 @@ fn argument_tree(command: &AiCommand, template: &Template) -> ViewTree {
                     label: name.clone(),
                     kind: FieldKind::Text,
                     value: None,
+                    ..Default::default()
                 })
                 .collect(),
             actions: vec![Action {

@@ -1,0 +1,43 @@
+import { Theme } from "../theme.slint";
+
+/// Several lines of text. Enter makes a newline.
+export component TextArea inherits Rectangle {
+    in property <string> label;
+    in property <string> value;
+    in property <string> error;
+    out property <bool> focused: input.has-focus;
+    callback edited(text: string);
+    height: 96px;
+    background: Theme.surface;
+    border-radius: Theme.radius / 2;
+    border-width: 1px;
+    border-color: input.has-focus ? Theme.accent : Theme.border;
+    clip: true;
+    accessible-role: text-input;
+    accessible-label: root.label;
+    accessible-value: input.text;
+    accessible-description: root.error;
+    accessible-action-set-value(value) => {
+        input.text = value;
+        root.edited(value);
+    }
+    forward-focus: input;
+
+    input := TextInput {
+        x: 10px;
+        y: 8px;
+        width: parent.width - 20px;
+        height: parent.height - 16px;
+        text: root.value;
+        single-line: false;
+        wrap: word-wrap;
+        color: Theme.text;
+        selection-background-color: Theme.selection;
+        selection-foreground-color: Theme.text;
+        font-size: Theme.text-body;
+        accessible-role: none;
+        edited => {
+            root.edited(self.text);
+        }
+    }
+}

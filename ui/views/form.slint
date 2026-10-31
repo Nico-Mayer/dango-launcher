@@ -1,75 +1,105 @@
-import { CheckBox, LineEdit, ScrollView, TextEdit } from "std-widgets.slint";
+import { ScrollView } from "std-widgets.slint";
 import { Theme } from "../theme.slint";
+import { TextField } from "../atoms/text-field.slint";
+import { TextArea } from "../atoms/text-area.slint";
+import { Checkbox } from "../atoms/checkbox.slint";
+import { Dropdown } from "../atoms/dropdown.slint";
+import { Separator } from "../atoms/separator.slint";
 import { FieldKind, FormData, Intents, Shell } from "../globals.slint";
 
-/// Fields in order, each with its help or error below it.
+/// A label column and a control column. Tab and Shift+Tab move through the
+/// controls in order.
 export component Form inherits Rectangle {
     ScrollView {
         VerticalLayout {
-            padding-left: 20px;
-            padding-right: 20px;
-            padding-top: 16px;
-            padding-bottom: 16px;
+            padding: 20px;
             spacing: 16px;
             alignment: start;
             for field[index] in FormData.fields: VerticalLayout {
-                spacing: 6px;
-                if field.kind != FieldKind.toggle: Text {
-                    text: field.label;
-                    color: Theme.text;
-                    font-size: Theme.text-small;
-                    font-weight: 500;
-                }
-                if field.kind == FieldKind.text || field.kind == FieldKind.password: LineEdit {
-                    text: field.value;
-                    input-type: field.kind == FieldKind.password ? InputType.password : InputType.text;
-                    accessible-label: field.label;
-                    // The launcher is summoned to be typed into, so a form
-                    // takes the cursor in its first field as it is seeded.
-                    init => {
-                        if index == 0 {
-                            self.focus();
+                if field.kind == FieldKind.separator: Separator { }
+                if field.kind != FieldKind.separator: HorizontalLayout {
+                    spacing: 16px;
+                    VerticalLayout {
+                        width: 120px;
+                        // Lines the label up with the first line of its control.
+                        padding-top: 8px;
+                        alignment: start;
+                        Text {
+                            text: field.kind == FieldKind.toggle ? "" : field.label;
+                            color: Theme.muted;
+                            font-size: Theme.text-small;
+                            horizontal-alignment: right;
+                            overflow: elide;
+                            accessible-role: none;
                         }
                     }
-                    edited(text) => {
-                        Intents.field-edited(field.id, text);
-                    }
-                }
-                if field.kind == FieldKind.template: template := TextEdit {
-                    height: 96px;
-                    text: field.value;
-                    accessible-label: field.label;
-                    accessible-description: field.error;
-                    init => {
-                        if index == 0 {
-                            self.focus();
+                    VerticalLayout {
+                        horizontal-stretch: 1;
+                        spacing: 6px;
+                        if field.kind == FieldKind.text || field.kind == FieldKind.password: TextField {
+                            label: field.label;
+                            value: field.value;
+                            error: field.error;
+                            password: field.kind == FieldKind.password;
+                            // The launcher is summoned to be typed into, so a
+                            // form takes the cursor in its first field as it is
+                            // seeded.
+                            init => {
+                                if index == 0 {
+                                    self.focus();
+                                }
+                            }
+                            edited(text) => {
+                                Intents.field-edited(field.id, text);
+                            }
+                        }
+                        if field.kind == FieldKind.textarea || field.kind == FieldKind.template: TextArea {
+                            label: field.label;
+                            value: field.value;
+                            error: field.error;
+                            init => {
+                                if index == 0 {
+                                    self.focus();
+                                }
+                            }
+                            edited(text) => {
+                                Intents.field-edited(field.id, text);
+                            }
+                            changed focused => {
+                                Shell.multiline-focused = self.focused;
+                            }
+                        }
+                        if field.kind == FieldKind.toggle: Checkbox {
+                            label: field.label;
+                            checked: field.value == "true";
+                            error: field.error;
+                            toggled(checked) => {
+                                Intents.field-edited(field.id, checked ? "true" : "false");
+                            }
+                        }
+                        if field.kind == FieldKind.dropdown: Dropdown {
+                            label: field.label;
+                            options: field.options;
+                            current: field.current;
+                            error: field.error;
+                            chosen(id) => {
+                                Intents.field-edited(field.id, id);
+                            }
+                        }
+                        if field.error != "": Text {
+                            text: field.error;
+                            color: Theme.danger;
+                            font-size: Theme.text-small;
+                            wrap: word-wrap;
+                            accessible-role: none;
+                        }
+                        if field.error == "" && field.help != "": Text {
+                            text: field.help;
+                            color: field.help-emphasized ? Theme.text : Theme.muted;
+                            font-size: Theme.text-small;
+                            wrap: word-wrap;
                         }
                     }
-                    edited(text) => {
-                        Intents.field-edited(field.id, text);
-                    }
-                    changed has-focus => {
-                        Shell.multiline-focused = self.has-focus;
-                    }
-                }
-                if field.kind == FieldKind.toggle: CheckBox {
-                    text: field.label;
-                    checked: field.value == "true";
-                    toggled => {
-                        Intents.field-edited(field.id, self.checked ? "true" : "false");
-                    }
-                }
-                if field.error != "": Text {
-                    text: field.error;
-                    color: Theme.danger;
-                    font-size: Theme.text-small;
-                    wrap: word-wrap;
-                }
-                if field.error == "" && field.help != "": Text {
-                    text: field.help;
-                    color: field.help-emphasized ? Theme.text : Theme.muted;
-                    font-size: Theme.text-small;
-                    wrap: word-wrap;
                 }
             }
         }

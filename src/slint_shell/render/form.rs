@@ -6,7 +6,7 @@ use std::rc::Rc;
 use slint::{ComponentHandle, Model, ModelRc, VecModel};
 
 use crate::protocol;
-use crate::slint_shell::generated::{FieldData, FieldKind, FormData, LauncherWindow};
+use crate::slint_shell::generated::{FieldData, FieldKind, FormData, LauncherWindow, OptionData};
 use crate::ui::snapshot::{Field, FormBody};
 
 pub struct Writer {
@@ -53,9 +53,27 @@ fn field(field: &Field) -> FieldData {
         kind: match field.kind {
             protocol::FieldKind::Text => FieldKind::Text,
             protocol::FieldKind::Password => FieldKind::Password,
+            protocol::FieldKind::Textarea => FieldKind::Textarea,
             protocol::FieldKind::Toggle => FieldKind::Toggle,
+            protocol::FieldKind::Dropdown => FieldKind::Dropdown,
             protocol::FieldKind::Template => FieldKind::Template,
+            protocol::FieldKind::Separator => FieldKind::Separator,
         },
+        options: ModelRc::from(Rc::new(VecModel::from(
+            field
+                .options
+                .iter()
+                .map(|option| OptionData {
+                    id: option.id.as_str().into(),
+                    title: option.title.as_str().into(),
+                })
+                .collect::<Vec<_>>(),
+        ))),
+        current: field
+            .options
+            .iter()
+            .position(|option| option.id == field.value)
+            .unwrap_or(0) as i32,
         value: field.value.as_str().into(),
         help: field.help.clone().unwrap_or_default().into(),
         help_emphasized: field.help_emphasized,

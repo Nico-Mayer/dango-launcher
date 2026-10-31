@@ -571,6 +571,7 @@ mod views {
             label: id.into(),
             kind,
             value: Some(String::new()),
+            ..Default::default()
         };
         ViewTree::new(View::Form(FormView {
             item_id: None,
@@ -760,6 +761,116 @@ mod detail {
         assert!(y("Some **copied** text") < y("Source"));
         assert!(y("Source") < y("Copied"));
         assert!(h.find("Today, 14:31").is_some());
+    }
+}
+
+mod form {
+    use super::*;
+    use crate::protocol::FieldOption;
+    use i_slint_backend_testing::AccessibleRole;
+
+    fn field(id: &str, label: &str, kind: FieldKind) -> FormField {
+        FormField {
+            id: id.into(),
+            label: label.into(),
+            kind,
+            value: None,
+            ..Default::default()
+        }
+    }
+
+    fn every_kind() -> ViewTree {
+        ViewTree::new(View::Form(FormView {
+            item_id: None,
+            fields: vec![
+                field("name", "Name", FieldKind::Text),
+                field("secret", "Secret", FieldKind::Password),
+                field("notes", "Notes", FieldKind::Textarea),
+                field("break", "", FieldKind::Separator),
+                field("enabled", "Enabled", FieldKind::Toggle),
+                FormField {
+                    options: vec![
+                        FieldOption {
+                            id: "work".into(),
+                            title: "Work".into(),
+                        },
+                        FieldOption {
+                            id: "personal".into(),
+                            title: "Personal".into(),
+                        },
+                    ],
+                    ..field("folder", "Folder", FieldKind::Dropdown)
+                },
+            ],
+            actions: vec![Action {
+                id: "save".into(),
+                title: "Save".into(),
+                ..Default::default()
+            }],
+        }))
+    }
+
+    fn role(h: &Harness, label: &str) -> Option<AccessibleRole> {
+        ElementHandle::find_by_accessible_label(&h.ui, label)
+            .find_map(|element| element.accessible_role())
+    }
+
+    #[test]
+    fn every_control_is_found_by_its_label() {
+        let h = Harness::root(results(1));
+        h.view(every_kind());
+        assert_eq!(role(&h, "Name"), Some(AccessibleRole::TextInput));
+        assert_eq!(role(&h, "Secret"), Some(AccessibleRole::TextInput));
+        assert_eq!(role(&h, "Notes"), Some(AccessibleRole::TextInput));
+        assert_eq!(role(&h, "Enabled"), Some(AccessibleRole::Checkbox));
+        assert_eq!(role(&h, "Folder"), Some(AccessibleRole::Combobox));
+        let folder = h.find("Folder").unwrap();
+        assert_eq!(folder.accessible_value().as_deref(), Some("Work"));
+    }
+
+    #[test]
+    fn tab_moves_to_the_next_control() {
+        let h = Harness::root(results(1));
+        h.view(every_kind());
+        h.type_text("a");
+        h.key("\t");
+        h.type_text("b");
+        let edits: Vec<Intent> = h
+            .intents()
+            .into_iter()
+            .filter(|intent| matches!(intent, Intent::FieldChanged { .. }))
+            .collect();
+        assert_eq!(
+            edits,
+            [
+                Intent::FieldChanged {
+                    id: "name".into(),
+                    value: "a".into()
+                },
+                Intent::FieldChanged {
+                    id: "secret".into(),
+                    value: "b".into()
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn choosing_a_dropdown_option_edits_the_field() {
+        let h = Harness::root(results(1));
+        h.view(every_kind());
+        h.find("Folder").unwrap().invoke_accessible_default_action();
+        h.find("Personal")
+            .expect("the option")
+            .invoke_accessible_default_action();
+        assert!(h.intents().contains(&Intent::FieldChanged {
+            id: "folder".into(),
+            value: "personal".into()
+        }));
+        assert_eq!(
+            h.find("Folder").unwrap().accessible_value().as_deref(),
+            Some("Personal")
+        );
     }
 }
 

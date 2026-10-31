@@ -1,6 +1,7 @@
 import { IconKind } from "atoms/icon.slint";
 import { AccessoryData } from "atoms/accessory.slint";
 import { ToastStyle } from "atoms/dot.slint";
+import { OptionData } from "atoms/dropdown.slint";
 
 export enum ScreenKind { root, list, detail, form, empty }
 
@@ -34,7 +35,7 @@ export struct MetaData {
     value: string,
 }
 
-export enum FieldKind { text, password, toggle, template }
+export enum FieldKind { text, password, textarea, toggle, dropdown, template, separator }
 
 export struct FieldData {
     id: string,
@@ -44,6 +45,9 @@ export struct FieldData {
     help: string,
     help-emphasized: bool,
     error: string,
+    options: [OptionData],
+    /// The chosen option's place in `options`.
+    current: int,
 }
 
 /// Where the user is, what Enter does, and what is happening.

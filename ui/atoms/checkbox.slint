@@ -1,0 +1,62 @@
+import { Theme } from "../theme.slint";
+
+/// A box with its label beside it. Space or a click toggles it.
+export component Checkbox inherits FocusScope {
+    in property <string> label;
+    in property <bool> checked;
+    in property <string> error;
+    callback toggled(checked: bool);
+    height: 24px;
+    accessible-role: checkbox;
+    accessible-label: root.label;
+    accessible-checkable: true;
+    accessible-checked: root.checked;
+    accessible-description: root.error;
+    accessible-action-default => {
+        root.toggled(!root.checked);
+    }
+
+    key-pressed(event) => {
+        if event.text == " " {
+            root.toggled(!root.checked);
+            return accept;
+        }
+        reject
+    }
+
+    HorizontalLayout {
+        spacing: Theme.gap;
+        alignment: start;
+        VerticalLayout {
+            alignment: center;
+            Rectangle {
+                width: 16px;
+                height: 16px;
+                border-radius: Theme.radius / 2;
+                border-width: 1px;
+                border-color: root.has-focus ? Theme.accent : Theme.border;
+                background: Theme.surface;
+                if root.checked: Rectangle {
+                    width: 8px;
+                    height: 8px;
+                    border-radius: 2px;
+                    background: Theme.accent;
+                }
+            }
+        }
+        Text {
+            text: root.label;
+            color: Theme.text;
+            font-size: Theme.text-body;
+            vertical-alignment: center;
+            accessible-role: none;
+        }
+    }
+
+    TouchArea {
+        clicked => {
+            root.focus();
+            root.toggled(!root.checked);
+        }
+    }
+}

@@ -47,10 +47,10 @@
 
 ## 7. Form view
 
-- [ ] 7.1 Build TextField, TextArea, Checkbox, Dropdown, and Separator atoms on primitives with an accent focus border and accessible role, label, value, and description; verify UI tests that each is found by label and that an error is the field's description
-- [ ] 7.2 Lay out the form as a label column and a control column with Tab and Shift+Tab order; verify a UI test that Tab moves the accent border
-- [ ] 7.3 Add the `textarea` and `dropdown` field kinds and the separator to the form protocol; verify reducer tests that a dropdown submits the chosen identifier and a text area keeps its line break
-- [ ] 7.4 Move the snippet and quicklink forms to the new layout; verify the existing snippet form tests pass
+- [x] 7.1 Build TextField, TextArea, Checkbox, Dropdown, and Separator atoms on primitives with an accent focus border and accessible role, label, value, and description; verify UI tests that each is found by label and that an error is the field's description
+- [x] 7.2 Lay out the form as a label column and a control column with Tab and Shift+Tab order; verify a UI test that Tab moves the accent border
+- [x] 7.3 Add the `textarea` and `dropdown` field kinds and the separator to the form protocol; verify reducer tests that a dropdown submits the chosen identifier and a text area keeps its line break
+- [x] 7.4 Move the snippet and quicklink forms to the new layout; verify the existing snippet form tests pass
 
 ## 8. Grid view
 

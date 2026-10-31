@@ -468,6 +468,7 @@ fn form_tree(record: Option<&Record>, kind: Kind) -> ViewTree {
             label: "Name".into(),
             kind: FieldKind::Text,
             value: record.map(|record| record.name.clone()),
+            ..Default::default()
         },
         FormField {
             id: FIELD_BODY.into(),
@@ -476,6 +477,7 @@ fn form_tree(record: Option<&Record>, kind: Kind) -> ViewTree {
             // while the user is still editing it.
             kind: FieldKind::Template,
             value: record.map(|record| record.body.clone()),
+            ..Default::default()
         },
     ];
     // Only a snippet expands from a keyword; a quicklink is not typed mid-line.
@@ -485,6 +487,7 @@ fn form_tree(record: Option<&Record>, kind: Kind) -> ViewTree {
             label: "Keyword (optional)".into(),
             kind: FieldKind::Text,
             value: record.and_then(|record| record.keyword.clone()),
+            ..Default::default()
         });
     }
     ViewTree {
@@ -515,6 +518,7 @@ fn argument_tree(record: &Record, template: &Template, action_id: &str) -> ViewT
                     label: name.clone(),
                     kind: FieldKind::Text,
                     value: None,
+                    ..Default::default()
                 })
                 .collect(),
             actions: vec![Action {

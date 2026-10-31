@@ -1,0 +1,125 @@
+import { Theme } from "../theme.slint";
+
+export struct OptionData {
+    id: string,
+    title: string,
+}
+
+/// One choice among options. A click opens the list; the arrow keys step
+/// through it while focused.
+export component Dropdown inherits FocusScope {
+    in property <string> label;
+    in property <[OptionData]> options;
+    in property <int> current: 0;
+    in property <string> error;
+    callback chosen(id: string);
+    height: 32px;
+    accessible-role: combobox;
+    accessible-label: root.label;
+    accessible-value: root.options[root.current].title;
+    accessible-description: root.error;
+    accessible-action-default => {
+        popup.show();
+    }
+
+    function step(by: int) {
+        let next = root.current + by;
+        if next >= 0 && next < root.options.length {
+            root.chosen(root.options[next].id);
+        }
+    }
+
+    key-pressed(event) => {
+        if event.text == Key.DownArrow {
+            root.step(1);
+            return accept;
+        }
+        if event.text == Key.UpArrow {
+            root.step(-1);
+            return accept;
+        }
+        if event.text == " " {
+            popup.show();
+            return accept;
+        }
+        reject
+    }
+
+    Rectangle {
+        background: Theme.surface;
+        border-radius: Theme.radius / 2;
+        border-width: 1px;
+        border-color: root.has-focus ? Theme.accent : Theme.border;
+        HorizontalLayout {
+            padding-left: 10px;
+            padding-right: 10px;
+            spacing: Theme.gap;
+            Text {
+                horizontal-stretch: 1;
+                text: root.options[root.current].title;
+                color: Theme.text;
+                font-size: Theme.text-body;
+                vertical-alignment: center;
+                overflow: elide;
+                accessible-role: none;
+            }
+            Text {
+                text: "▾";
+                color: Theme.muted;
+                font-size: Theme.text-small;
+                vertical-alignment: center;
+                accessible-role: none;
+            }
+        }
+    }
+
+    TouchArea {
+        clicked => {
+            root.focus();
+            popup.show();
+        }
+    }
+
+    popup := PopupWindow {
+        y: root.height + 4px;
+        width: root.width;
+        Rectangle {
+            background: Theme.surface;
+            border-radius: Theme.radius;
+            border-width: 1px;
+            border-color: Theme.border;
+            drop-shadow-blur: 16px;
+            drop-shadow-offset-y: 4px;
+            drop-shadow-color: Theme.shadow;
+            VerticalLayout {
+                padding: 4px;
+                for option[index] in root.options: Rectangle {
+                    height: Theme.panel-row-height;
+                    border-radius: Theme.radius / 2;
+                    background: index == root.current ? Theme.selection
+                        : option-touch.has-hover ? Theme.hover : transparent;
+                    accessible-role: list-item;
+                    accessible-label: option.title;
+                    accessible-item-selected: index == root.current;
+                    accessible-action-default => {
+                        root.chosen(option.id);
+                    }
+                    Text {
+                        x: 10px;
+                        text: option.title;
+                        color: Theme.text;
+                        font-size: Theme.text-body;
+                        vertical-alignment: center;
+                        accessible-role: none;
+                    }
+                    option-touch := TouchArea {
+                        clicked => {
+                            root.chosen(option.id);
+                            popup.close();
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
