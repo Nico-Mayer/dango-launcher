@@ -79,25 +79,6 @@ a system face rather than show as a missing glyph.
 - **WHEN** a result title contains a character Geist does not hold
 - **THEN** that character is drawn from a system face, not as a box
 
-### Requirement: Text meets contrast in both themes
-
-In both themes, text and muted text SHALL have at least 4.5:1 contrast against
-every background they are drawn on: the background, surface, raised, selection,
-and hover roles. Accent and danger text, tags, and key chords SHALL meet the
-same ratio against their background. A focus indicator SHALL have at least
-3:1 contrast against its neighbours. Busy, success, and failure states SHALL
-carry text, not only a colour.
-
-#### Scenario: Muted text on the ActionBar
-
-- **WHEN** either theme is reviewed
-- **THEN** muted text on the raised role has at least 4.5:1 contrast
-
-#### Scenario: Muted text on a selected row
-
-- **WHEN** either theme is reviewed
-- **THEN** a subtitle on a selected row has at least 4.5:1 contrast
-
 ### Requirement: Every screen is one shell around one view
 
 The launcher SHALL show, from top to bottom, the SearchBar, exactly one view,

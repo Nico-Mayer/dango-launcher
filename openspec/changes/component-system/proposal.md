@@ -67,7 +67,7 @@ get a manual check on each platform.
 ### New Capabilities
 
 - `design-system`: the theme roles and how they apply, light and dark themes
-  following the operating system, the type faces, density, contrast, the shell
+  following the operating system, the type faces, density, the shell
   regions and their sizes, the atoms, the toast, focus and hover treatment,
   overlays, no motion, and fitting the viewport.
 

@@ -15,8 +15,8 @@ look the same everywhere" in `design-system`.
 ### Requirement: Interaction states remain clear and accessible
 
 **Reason**: Replaced by `design-system`.
-**Migration**: See "Text meets contrast in both themes" and "Selection, hover,
-and focus are told apart" in `design-system`.
+**Migration**: See "Selection, hover, and focus are told apart" in
+`design-system`.
 
 ### Requirement: Overlays keep keyboard ownership through dismissal
 

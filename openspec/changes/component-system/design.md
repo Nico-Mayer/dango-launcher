@@ -116,8 +116,7 @@ clipboard, and German dead keys behave the same.
 ### D5. Theme values
 
 `Theme` derives `dark` from std-widgets `Palette.color-scheme`, left unset so
-it follows the OS. Values are the design's, adjusted for contrast (checked with
-WCAG relative luminance against the blended selection and hover colours):
+it follows the OS. Values are the design's, with the changes marked:
 
 | Role      | Dark                      | Light                     |
 |-----------|---------------------------|---------------------------|
@@ -131,10 +130,6 @@ WCAG relative luminance against the blended selection and hover colours):
 | selection | `#ffffff12`               | `#0000000e`               |
 | hover     | `#ffffff08` (new)         | `#00000006` (new)         |
 | danger    | `#ff8080` (was `#ef5350`) | `#b71c1c` (was `#d32f2f`) |
-
-Why the changes: dark muted was 4.00:1 on a selected row and 4.46:1 on the
-ActionBar; light accent `#ff6363` was 2.91:1 on white; dark danger was 3.88:1
-on a selected row. Every role now passes 4.5:1 on every background it meets.
 
 Sizes: radius 8, row 40, gap 8, SearchBar 56, ActionBar 40, icon 20, window
 width 720, max height 480; type 12, 14, 16.
