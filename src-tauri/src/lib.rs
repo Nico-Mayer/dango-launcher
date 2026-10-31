@@ -13,6 +13,7 @@ pub mod search;
 pub mod store;
 pub mod templates;
 pub mod text;
+pub mod ui;
 
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
