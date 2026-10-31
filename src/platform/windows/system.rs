@@ -43,7 +43,7 @@ impl SystemControl for WindowsSystemControl {
     fn lock(&self) -> Result<(), SystemError> {
         unsafe { LockWorkStation() }.map_err(|error| {
             eprintln!("[dango] LockWorkStation failed: {error}");
-            SystemError::Failed("The screen didn't lock. Try again.".into())
+            SystemError::Failed("The system didn't lock the screen".into())
         })
     }
 
@@ -59,7 +59,7 @@ impl SystemControl for WindowsSystemControl {
         match rx.recv_timeout(SUSPEND_GRACE) {
             Ok((false, error)) => {
                 eprintln!("[dango] SetSuspendState failed: {error}");
-                Err(SystemError::Failed("Sleep didn't start. Try again.".into()))
+                Err(SystemError::Failed("The system didn't go to sleep".into()))
             }
             _ => Ok(()),
         }
@@ -72,7 +72,7 @@ impl SystemControl for WindowsSystemControl {
         };
         unsafe { SHQueryRecycleBinW(PCWSTR::null(), &mut info) }.map_err(|error| {
             eprintln!("[dango] SHQueryRecycleBin failed: {error}");
-            SystemError::Failed("Couldn't check the Recycle Bin.".into())
+            SystemError::Failed("Couldn't check the Recycle Bin".into())
         })?;
         Ok(info.i64NumItems.max(0) as usize)
     }
@@ -88,7 +88,7 @@ impl SystemControl for WindowsSystemControl {
             Err(error) => {
                 eprintln!("[dango] SHEmptyRecycleBin failed: {error}");
                 Err(SystemError::Failed(
-                    "Couldn't empty the Recycle Bin.".into(),
+                    "The system didn't empty the Recycle Bin".into(),
                 ))
             }
         }
@@ -124,14 +124,14 @@ impl SystemControl for WindowsSystemControl {
     fn quit(&self, app_id: &str) -> Result<(), SystemError> {
         let pid: u32 = app_id
             .parse()
-            .map_err(|_| SystemError::Failed("That isn't an app Dango can quit.".into()))?;
+            .map_err(|_| SystemError::Failed("That isn't an app Dango can quit".into()))?;
         let windows: Vec<HWND> = unsafe { switcher_windows() }
             .into_iter()
             .filter(|hwnd| unsafe { owning_pid(*hwnd) } == Some(pid))
             .collect();
         if windows.is_empty() {
             return Err(if unsafe { process_is_alive(pid) } {
-                SystemError::Failed("That app has no window left to close.".into())
+                SystemError::Failed("That app has no window left to close".into())
             } else {
                 SystemError::Gone
             });

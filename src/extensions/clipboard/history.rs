@@ -102,11 +102,11 @@ impl Default for Bounds {
 
 #[derive(Debug, thiserror::Error)]
 pub enum HistoryError {
-    #[error("That entry is too large to keep.")]
+    #[error("That entry is too large to keep")]
     TooLarge,
-    #[error("That entry was already deleted.")]
+    #[error("That entry was already deleted")]
     Gone,
-    #[error("Couldn't read the clipboard history. Try again.")]
+    #[error("Couldn't read the clipboard history")]
     Failed(String),
 }
 
@@ -529,7 +529,7 @@ mod display_tests {
         for error in errors {
             let text = error.to_string();
             assert!(text.starts_with(char::is_uppercase), "{text}");
-            assert!(text.ends_with('.'), "{text}");
+            assert!(!text.ends_with('.') && !text.contains(". "), "{text}");
         }
     }
 }

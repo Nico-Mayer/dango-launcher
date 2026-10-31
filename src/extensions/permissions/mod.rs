@@ -62,7 +62,7 @@ impl Extension for PermissionsExtension {
         _values: &FormValues,
     ) -> ActionOutcome {
         let Some(permission) = from_item_id(item_id).filter(|_| action_id == ACTION_GRANT) else {
-            return ActionOutcome::Failed("That action isn't available.".into());
+            return ActionOutcome::Failed("That action isn't available".into());
         };
         grant(self.permissions.as_ref(), self.opener.as_ref(), permission)
     }
@@ -84,7 +84,7 @@ pub fn grant(
         Err(error) => {
             eprintln!("[dango] couldn't open System Settings: {error}");
             ActionOutcome::Failed(format!(
-                "Couldn't open System Settings. Open Privacy & Security, {}, and turn on Dango.",
+                "Turn on {} for Dango in System Settings",
                 name(permission)
             ))
         }

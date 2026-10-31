@@ -29,7 +29,7 @@ impl WindowManager for WindowsWindowManager {
         let hwnd = previous_foreground().ok_or(WindowError::NoTarget)?;
         if is_out_of_reach(hwnd) {
             return Err(WindowError::Unreachable(
-                "Dango can't move windows of programs running as administrator.".into(),
+                "Dango can't move administrator windows".into(),
             ));
         }
         let frame = visible_frame(hwnd).ok_or_else(|| {
@@ -63,7 +63,7 @@ impl WindowManager for WindowsWindowManager {
         let hwnd = previous_foreground().ok_or(WindowError::NoTarget)?;
         if is_out_of_reach(hwnd) {
             return Err(WindowError::Unreachable(
-                "Dango can't move windows of programs running as administrator.".into(),
+                "Dango can't move administrator windows".into(),
             ));
         }
 
@@ -89,9 +89,7 @@ impl WindowManager for WindowsWindowManager {
             )
         };
         if ok == 0 {
-            return Err(WindowError::Failed(
-                "That window didn't move. It may have a fixed size.".into(),
-            ));
+            return Err(WindowError::Failed("That window didn't move".into()));
         }
         Ok(())
     }

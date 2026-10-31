@@ -68,10 +68,7 @@ impl AppIndexer for WindowsAppIndexer {
             if instance.0 as isize > 32 {
                 Ok(())
             } else {
-                Err(LaunchError::Failed(format!(
-                    "Couldn't open {}. Try again.",
-                    app.name
-                )))
+                Err(LaunchError::Failed(format!("Couldn't open {}", app.name)))
             }
         }
     }

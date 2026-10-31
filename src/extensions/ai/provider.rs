@@ -45,11 +45,11 @@ pub enum AiError {
     UnknownModel { provider: String },
     #[error("{provider} couldn't be reached. Check your connection and try again.")]
     Unreachable { provider: String },
-    #[error("The local model couldn't be reached. Check that your model server is running.")]
+    #[error("Couldn't reach your local model server")]
     LocalUnreachable,
     #[error("{provider} is busy right now. Try again in a moment.")]
     RateLimited { provider: String },
-    #[error("The model didn't answer in time. Try again.")]
+    #[error("The model didn't answer in time")]
     Timeout,
     #[error("auth.json couldn't be read. Check the file in your config folder.")]
     KeyFileUnreadable,

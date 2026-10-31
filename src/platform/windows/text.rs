@@ -140,7 +140,7 @@ impl Handoff for WindowsHandoff {
         };
         if is_out_of_reach(previous) {
             return Err(TextError::TargetUnavailable(
-                "Dango can't paste into programs running as administrator.".into(),
+                "Dango can't paste into administrator apps".into(),
             ));
         }
 
@@ -159,8 +159,7 @@ impl Handoff for WindowsHandoff {
             }
             if Instant::now() >= deadline {
                 return Err(TextError::TargetUnavailable(
-                    "The previous app didn't come back to the front. Click into it and try again."
-                        .into(),
+                    "The previous app didn't come back to the front".into(),
                 ));
             }
             std::thread::sleep(FOREGROUND_POLL);

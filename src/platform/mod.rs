@@ -81,9 +81,9 @@ pub struct RunningApp {
 pub enum SystemError {
     #[error("{0}")]
     Failed(String),
-    #[error("That app is no longer running.")]
+    #[error("That app is no longer running")]
     Gone,
-    #[error("{0} isn't available on this platform.")]
+    #[error("{0} isn't available on this platform")]
     Unsupported(&'static str),
 }
 
@@ -385,11 +385,11 @@ pub struct Placement {
     pub work_area: Rect,
 }
 
-pub const WINDOW_READ_FAILED: &str = "Couldn't read the window's position. Try again.";
+pub const WINDOW_READ_FAILED: &str = "Couldn't read the window's position";
 
 #[derive(Clone, Debug, thiserror::Error, PartialEq, Eq)]
 pub enum WindowError {
-    #[error("No window to move. Focus one first.")]
+    #[error("Focus the window to move first")]
     NoTarget,
     #[error("{0}")]
     Unreachable(String),
@@ -489,13 +489,13 @@ mod display_tests {
 
     fn assert_sentence(text: String) {
         assert!(text.starts_with(char::is_uppercase), "{text}");
-        assert!(text.ends_with('.'), "{text}");
+        assert!(!text.ends_with('.') && !text.contains(". "), "{text}");
     }
 
     #[test]
     fn every_system_message_is_a_sentence() {
         assert_sentence(
-            SystemError::Failed("The screen didn't lock. Try again.".into()).to_string(),
+            SystemError::Failed("The system didn't lock the screen".into()).to_string(),
         );
         assert_sentence(SystemError::Gone.to_string());
         assert_sentence(SystemError::Unsupported("Lock screen").to_string());
@@ -505,7 +505,7 @@ mod display_tests {
     fn every_window_message_is_a_sentence() {
         assert_sentence(WindowError::NoTarget.to_string());
         assert_sentence(
-            WindowError::Unreachable("That app doesn't let Dango move its windows.".into())
+            WindowError::Unreachable("That app doesn't let Dango move its windows".into())
                 .to_string(),
         );
         assert_sentence(WindowError::Failed(WINDOW_READ_FAILED.into()).to_string());

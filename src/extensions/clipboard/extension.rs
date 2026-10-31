@@ -119,7 +119,7 @@ impl Extension for ClipboardExtension {
                 Ok(()) => ActionOutcome::Replaced(Box::new(self.list())),
                 Err(error) => ActionOutcome::Failed(error.to_string()),
             },
-            _ => ActionOutcome::Failed("That action isn't available.".into()),
+            _ => ActionOutcome::Failed("That action isn't available".into()),
         }
     }
 }
@@ -281,10 +281,7 @@ pub fn history_view(entries: &[Entry], primary: PrimaryAction) -> ViewTree {
             loading: false,
             empty_state: Some(EmptyState {
                 title: "Nothing copied yet".into(),
-                description: Some(
-                    "Text and images you copy will show up here. Copies from excluded apps are left out."
-                        .into(),
-                ),
+                description: Some("Text and images you copy will show up here".into()),
                 ..Default::default()
             }),
             items: entries.iter().map(|entry| item(entry, primary)).collect(),

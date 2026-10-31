@@ -101,7 +101,7 @@ impl Extension for SystemExtension {
                 Ok(()) => ActionOutcome::Done,
                 Err(error) => ActionOutcome::Failed(error.to_string()),
             },
-            _ => ActionOutcome::Failed("That action isn't available.".into()),
+            _ => ActionOutcome::Failed("That action isn't available".into()),
         }
     }
 }

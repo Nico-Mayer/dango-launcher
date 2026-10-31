@@ -201,7 +201,7 @@ impl SnippetsExtension {
             Err(error) => return ActionOutcome::Failed(error.to_string()),
         };
         let Some(opener) = &self.opener else {
-            return ActionOutcome::Failed("Dango can't open URLs on this platform.".into());
+            return ActionOutcome::Failed("Dango can't open URLs on this platform".into());
         };
         match opener.open(&url) {
             Ok(()) => ActionOutcome::Done,
@@ -305,7 +305,7 @@ impl Extension for SnippetsExtension {
                     (_, Kind::Snippet) => self.insert(&record, arguments),
                 }
             }
-            _ => ActionOutcome::Failed("That action isn't available.".into()),
+            _ => ActionOutcome::Failed("That action isn't available".into()),
         }
     }
 }

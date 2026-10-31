@@ -33,7 +33,7 @@ const WAKE_EVERY: Duration = Duration::from_secs(10 * 60);
 
 const CHECKING: &str = "Checking for updates";
 const UP_TO_DATE: &str = "You have the latest version";
-const DEVELOPMENT: &str = "Updates are off in development builds.";
+const DEVELOPMENT: &str = "Updates are off in development builds";
 
 pub(crate) fn manifest() -> Manifest {
     Manifest {
@@ -146,7 +146,7 @@ impl Extension for UpdatesExtension {
     ) -> ActionOutcome {
         match action_id {
             ACTION_INSTALL => self.inner.start_install(),
-            _ => ActionOutcome::Failed("That action isn't available.".into()),
+            _ => ActionOutcome::Failed("That action isn't available".into()),
         }
     }
 }
@@ -189,10 +189,10 @@ impl Inner {
 
     fn start_install(self: &Arc<Self>) -> ActionOutcome {
         let Some(version) = self.available() else {
-            return ActionOutcome::Failed("That action isn't available.".into());
+            return ActionOutcome::Failed("That action isn't available".into());
         };
         let Some(ctx) = self.runner.as_ref().and_then(|runner| runner.start()) else {
-            return ActionOutcome::Failed("The update can't start right now. Try again.".into());
+            return ActionOutcome::Failed("The update can't start right now".into());
         };
         if let Some(tree) = self.shown.lock().unwrap().clone() {
             ctx.push_view(tree);
@@ -599,7 +599,7 @@ mod tests {
         let last = fixture.views.last();
         assert_eq!(
             last.markdown,
-            "Couldn't verify the update, so it wasn't installed. Try again later."
+            "Couldn't verify the update, so it wasn't installed"
         );
         assert!(!last.loading);
         assert!(fixture.source.installed.lock().unwrap().is_empty());
@@ -615,7 +615,7 @@ mod tests {
 
         assert_eq!(
             fixture.views.last().markdown,
-            "Couldn't download the update. Check your connection and try again."
+            "Couldn't download the update"
         );
         assert!(fixture.source.installed.lock().unwrap().is_empty());
         assert_eq!(fixture.items().await.len(), 1);
@@ -659,7 +659,7 @@ mod tests {
         });
         assert_eq!(
             fixture.check_view().await.last().markdown,
-            "Couldn't check for updates. Check your connection and try again."
+            "Couldn't check for updates"
         );
     }
 
@@ -669,7 +669,7 @@ mod tests {
         assert!(!fixture.extension.schedule());
         assert_eq!(
             fixture.check_view().await.last().markdown,
-            "Updates are off in development builds."
+            "Updates are off in development builds"
         );
         assert_eq!(fixture.source.checks(), 0);
     }

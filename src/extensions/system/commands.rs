@@ -10,8 +10,8 @@ use crate::platform::SystemControl;
 
 use super::{confirmation, report, running_list, OpenFile};
 
-pub const CREATE_FAILED: &str = "Couldn't create the config file. See dango.log for the reason.";
-pub const OPEN_FAILED: &str = "Couldn't open the config file. See dango.log for the reason.";
+pub const CREATE_FAILED: &str = "Couldn't create the config file";
+pub const OPEN_FAILED: &str = "Couldn't open the config file";
 
 pub struct Lock(pub Arc<dyn SystemControl>);
 

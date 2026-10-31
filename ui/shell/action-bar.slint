@@ -6,6 +6,8 @@ import { Intents, Shell } from "../globals.slint";
 
 /// Where the user is, or a toast, and what Enter does.
 export component ActionBar inherits Rectangle {
+    /// The context or toast does not fit and is cut off.
+    out property <bool> label-cut: label.preferred-width > label.width;
     height: Theme.action-bar-height;
     background: Theme.raised;
 
@@ -20,32 +22,16 @@ export component ActionBar inherits Rectangle {
         padding-right: 12px;
         spacing: 12px;
 
-        if Shell.toast-shown: HorizontalLayout {
+        HorizontalLayout {
             horizontal-stretch: 1;
             spacing: Theme.gap;
-            accessible-role: AccessibleRole.text;
-            accessible-label: Shell.toast-text;
-            accessible-description: Shell.toast-style == ToastStyle.failure ? "Failed" : "";
-            VerticalLayout {
+            if Shell.toast-shown: VerticalLayout {
                 alignment: center;
                 Dot {
                     style: Shell.toast-style;
                 }
             }
-            Text {
-                text: Shell.toast-text;
-                color: Shell.toast-style == ToastStyle.failure ? Theme.text : Theme.muted;
-                font-size: Theme.text-small;
-                vertical-alignment: center;
-                overflow: elide;
-                accessible-role: none;
-            }
-        }
-
-        if !Shell.toast-shown: HorizontalLayout {
-            horizontal-stretch: 1;
-            spacing: Theme.gap;
-            if Shell.context != "": VerticalLayout {
+            if !Shell.toast-shown && Shell.context != "": VerticalLayout {
                 alignment: center;
                 Icon {
                     width: 16px;
@@ -54,14 +40,15 @@ export component ActionBar inherits Rectangle {
                     kind: Shell.context-icon-kind;
                 }
             }
-            Text {
-                text: Shell.context;
-                color: Theme.muted;
+            label := Text {
+                text: Shell.toast-shown ? Shell.toast-text : Shell.context;
+                color: Shell.toast-shown && Shell.toast-style == ToastStyle.failure ? Theme.text : Theme.muted;
                 font-size: Theme.text-small;
                 vertical-alignment: center;
                 overflow: elide;
                 accessible-role: AccessibleRole.text;
-                accessible-label: Shell.context;
+                accessible-label: self.text;
+                accessible-description: Shell.toast-shown && Shell.toast-style == ToastStyle.failure ? "Failed" : "";
             }
         }
 

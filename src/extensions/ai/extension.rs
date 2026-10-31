@@ -112,14 +112,14 @@ impl Extension for AiExtension {
                 Some(answer) => ActionOutcome::CopyToClipboard(answer),
                 None => ActionOutcome::Failed(NO_ANSWER.into()),
             },
-            _ => ActionOutcome::Failed("That action isn't available.".into()),
+            _ => ActionOutcome::Failed("That action isn't available".into()),
         }
     }
 }
 
-const NO_ANSWER: &str = "The model returned no text. Try again.";
-const NO_SELECTION: &str = "Select some text first, then run this command.";
-const UNREADABLE_PROMPT: &str = "This command's prompt can't be read. Check your config file.";
+const NO_ANSWER: &str = "The model returned no text";
+const NO_SELECTION: &str = "Select some text first";
+const UNREADABLE_PROMPT: &str = "Fix this command's prompt in your config file";
 const WORKING: &str = "Working…";
 
 impl Inner {
@@ -133,10 +133,10 @@ impl Inner {
     /// an argument form does.
     fn start(self: &Arc<Self>, command_id: &str, arguments: FormValues) -> ActionOutcome {
         let Some(runner) = &self.runner else {
-            return ActionOutcome::Failed("This command can't run right now.".into());
+            return ActionOutcome::Failed("This command can't run right now".into());
         };
         let Some(ctx) = runner.start() else {
-            return ActionOutcome::Failed("This command can't run right now.".into());
+            return ActionOutcome::Failed("This command can't run right now".into());
         };
         let inner = self.clone();
         let command_id = command_id.to_string();
@@ -147,7 +147,7 @@ impl Inner {
     /// One run, start to finish, on whatever thread is already carrying it.
     fn run(&self, command_id: &str, arguments: FormValues, ctx: &InvocationContext) {
         let Some(command) = self.find(command_id) else {
-            ctx.fail("This command isn't available any more. Check your config file.");
+            ctx.fail("That command is no longer available");
             return;
         };
         let Some(request) = self.prepare(command, arguments, ctx) else {
@@ -697,10 +697,7 @@ mod tests {
         let sink = Arc::new(Recorded::default());
         run(&fixture, "improve-writing", sink.clone());
 
-        assert_eq!(
-            sink.failure().as_deref(),
-            Some("Select some text first, then run this command.")
-        );
+        assert_eq!(sink.failure().as_deref(), Some("Select some text first"));
         assert!(
             fixture.client.last_request().is_none(),
             "a request was made"
@@ -821,7 +818,7 @@ mod tests {
 
         assert_eq!(
             sink.failure().as_deref(),
-            Some("The model returned no text. Try again.")
+            Some("The model returned no text")
         );
         assert!(fixture.text.inserted.lock().unwrap().is_empty());
         assert!(fixture.clipboard.written.lock().unwrap().is_empty());
@@ -858,7 +855,7 @@ mod tests {
         run(&fixture, "improve-writing", sink.clone());
         assert_eq!(
             sink.failure().as_deref(),
-            Some("The local model couldn't be reached. Check that your model server is running.")
+            Some("Couldn't reach your local model server")
         );
     }
 

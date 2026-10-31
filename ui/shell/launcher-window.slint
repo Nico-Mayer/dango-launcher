@@ -19,6 +19,7 @@ export component LauncherWindow inherits Window {
     height: Theme.max-height;
     default-font-size: Theme.text-body;
     default-font-family: Theme.font;
+    out property <bool> toast-cut: Shell.toast-shown && action-bar.label-cut;
 
     public function set-query(text: string) {
         search.set-text(text);
@@ -83,7 +84,7 @@ export component LauncherWindow inherits Window {
                 height: parent.body-height;
             }
 
-            ActionBar {
+            action-bar := ActionBar {
                 y: parent.height - Theme.action-bar-height;
             }
 

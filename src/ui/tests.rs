@@ -1135,7 +1135,7 @@ fn a_reset_while_the_panel_is_open_closes_it_and_the_next_open_starts_fresh() {
         h.command("k");
         h.press("ArrowDown");
         h.event(Event::Reset);
-        h.event(Event::Failed("Couldn't paste. Try again.".into()));
+        h.event(Event::Failed("Couldn't paste".into()));
         h.results("", results(18));
         h.event(Event::Activated {
             held: false,
@@ -1143,7 +1143,7 @@ fn a_reset_while_the_panel_is_open_closes_it_and_the_next_open_starts_fresh() {
         });
         let snapshot = h.snapshot();
         assert!(!snapshot.panel.open);
-        assert_eq!(h.failure().as_deref(), Some("Couldn't paste. Try again."));
+        assert_eq!(h.failure().as_deref(), Some("Couldn't paste"));
         assert_eq!(snapshot.focus, Focus::RootInput);
         h.command("k");
         assert_eq!(h.panel_selected().as_deref(), Some("open"));
@@ -1155,7 +1155,7 @@ fn a_reset_while_the_panel_is_open_closes_it_and_the_next_open_starts_fresh() {
 #[test]
 fn opening_the_panel_clears_a_failure() {
     let mut h = Harness::root(18);
-    h.event(Event::Failed("Couldn't paste. Try again.".into()));
+    h.event(Event::Failed("Couldn't paste".into()));
     h.command("k");
     assert!(h.failure().is_none());
 }
@@ -1253,11 +1253,11 @@ fn a_failure_survives_reset_either_way_round_and_clears_on_typing_acting_or_esca
         for clear in ["typing", "action", "Escape"] {
             let mut h = Harness::root(18);
             if before_reset {
-                h.event(Event::Failed("Couldn't paste. Try again.".into()));
+                h.event(Event::Failed("Couldn't paste".into()));
             }
             h.event(Event::Reset);
             if !before_reset {
-                h.event(Event::Failed("Couldn't paste. Try again.".into()));
+                h.event(Event::Failed("Couldn't paste".into()));
             }
             h.results("", results(18));
             h.event(Event::Activated {
@@ -1299,7 +1299,7 @@ fn a_running_command_shows_a_busy_toast_until_it_fails_or_resets() {
     );
     assert_eq!(h.status(), "Running Clipboard History…");
     assert!(h.root_screen().busy);
-    h.event(Event::Failed("Couldn't paste. Try again.".into()));
+    h.event(Event::Failed("Couldn't paste".into()));
     assert_eq!(h.status(), "");
     assert!(h.failure().is_some());
     h.press("Enter");

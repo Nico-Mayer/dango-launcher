@@ -20,21 +20,21 @@ use crate::templates::{Template, TemplateError, Values};
 
 #[derive(Debug, thiserror::Error)]
 pub enum RecordError {
-    #[error("Enter a name.")]
+    #[error("Enter a name")]
     NoName,
     #[error("{0}")]
     NoBody(&'static str),
     #[error("{0}")]
     Template(#[from] TemplateError),
-    #[error("Enter a valid URL, such as https://example.com.")]
+    #[error("Enter a URL such as https://example.com")]
     InvalidUrl,
-    #[error("That one no longer exists. Go back to refresh the list.")]
+    #[error("That no longer exists")]
     Gone,
     #[error("The file isn't valid JSON: {0}")]
     Parse(String),
-    #[error("A snippet that asks for input can't have a keyword.")]
+    #[error("A snippet that asks for input can't have a keyword")]
     KeywordNeedsPlainSnippet,
-    #[error("Another snippet already uses the keyword {0}.")]
+    #[error("Another snippet already uses that keyword")]
     KeywordTaken(String),
 }
 
@@ -75,8 +75,8 @@ impl Kind {
 
     fn missing_body(self) -> &'static str {
         match self {
-            Kind::Snippet => "Enter the snippet text.",
-            Kind::Quicklink => "Enter a URL.",
+            Kind::Snippet => "Enter the snippet text",
+            Kind::Quicklink => "Enter a URL",
         }
     }
 }
@@ -533,17 +533,14 @@ mod tests {
     fn a_quicklink_says_it_needs_a_url() {
         let records = records(Kind::Quicklink);
         let error = records.create("Search", "  ", None).unwrap_err();
-        assert_eq!(error.to_string(), "Enter a URL.");
+        assert_eq!(error.to_string(), "Enter a URL");
     }
 
     #[test]
     fn a_quicklink_refuses_text_that_cannot_form_a_url() {
         let records = records(Kind::Quicklink);
         let error = records.create("Search", "not a URL", None).unwrap_err();
-        assert_eq!(
-            error.to_string(),
-            "Enter a valid URL, such as https://example.com."
-        );
+        assert_eq!(error.to_string(), "Enter a URL such as https://example.com");
         assert!(records.all().unwrap().is_empty());
     }
 
@@ -638,7 +635,7 @@ mod display_tests {
         for error in errors {
             let text = error.to_string();
             assert!(text.starts_with(char::is_uppercase), "{text}");
-            assert!(text.ends_with('.'), "{text}");
+            assert!(!text.ends_with('.') && !text.contains(". "), "{text}");
         }
     }
 

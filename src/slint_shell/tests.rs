@@ -430,6 +430,28 @@ mod toast {
     }
 
     #[test]
+    fn the_longest_failures_fit_at_full_width() {
+        let mut item = result(1);
+        item.actions.push(Action {
+            id: "copy".into(),
+            title: "Copy".into(),
+            ..Default::default()
+        });
+        let h = Harness::root(vec![item]);
+        for message in [
+            "Set up this command's provider in your config file",
+            "Couldn't verify the update, so it wasn't installed",
+            "Copy the text first, as Visual Studio Code doesn't share its selection",
+        ] {
+            h.event(Event::Failed(message.into()));
+            assert!(h.shell().get_panel_hint());
+            assert!(!h.ui.get_toast_cut(), "{message} is cut off");
+        }
+        h.event(Event::Failed("Too long ".repeat(20)));
+        assert!(h.ui.get_toast_cut(), "the measure sees a cut");
+    }
+
+    #[test]
     fn typing_reaches_the_search_bar_while_a_toast_shows() {
         let h = Harness::root(results(3));
         h.event(Event::Failed("That command is no longer available".into()));
@@ -604,12 +626,12 @@ mod views {
             source: "{{ broken".into(),
             inspection: TemplateInspection {
                 arguments: Vec::new(),
-                error: Some("The template doesn't close.".into()),
+                error: Some("The template doesn't close".into()),
             },
         });
         let described = ElementHandle::find_by_accessible_label(&h.ui, "template")
             .filter_map(|field| field.accessible_description())
-            .any(|description| description == "The template doesn't close.");
+            .any(|description| description == "The template doesn't close");
         assert!(described);
     }
 }

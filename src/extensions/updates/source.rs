@@ -12,13 +12,13 @@ const PUBLIC_KEY: &str = "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6ID
 
 #[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]
 pub enum UpdateError {
-    #[error("Couldn't check for updates. Check your connection and try again.")]
+    #[error("Couldn't check for updates")]
     Check(String),
-    #[error("Couldn't download the update. Check your connection and try again.")]
+    #[error("Couldn't download the update")]
     Download(String),
-    #[error("Couldn't verify the update, so it wasn't installed. Try again later.")]
+    #[error("Couldn't verify the update, so it wasn't installed")]
     Signature(String),
-    #[error("Couldn't install the update. Try again later.")]
+    #[error("Couldn't install the update")]
     Install(String),
 }
 

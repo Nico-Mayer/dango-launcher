@@ -25,7 +25,7 @@
 - [x] 3.4 Build the ActionBar: context (extension name and icon at root, command title and icon in a view), primary label with Enter Kbd, and "Actions" with the panel chord only when there is more than one action; verify UI tests for "Applications" with "Open", "Clipboard History" as context, and a single-action row
 - [x] 3.5 Show toasts in the ActionBar's left slot with a static dot per style and accessible text; verify UI tests for each style and that typing reaches the SearchBar while a toast shows
 - [x] 3.6 Delete the failure banner and the error screen kind, showing an unsupported view as an empty view with "This view needs a newer version of Dango" and "Press Escape to go back"; verify a UI test with a version 1 tree
-- [ ] 3.7 Cut the failure strings listed in design D12 and every other failure string in `src/` to one sentence that fits the toast; verify `cargo test` and a UI test that the longest failure string is not elided at 720 logical pixels
+- [x] 3.7 Cut the failure strings listed in design D12 and every other failure string in `src/` to one sentence that fits the toast; verify `cargo test` and a UI test that the longest failure string is not elided at 720 logical pixels
 
 ## 4. List view
 

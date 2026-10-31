@@ -117,7 +117,7 @@ impl CommandHost for BuiltinHost {
             // Only catches an unwind, which a release build does not do because
             // the profile aborts. It still keeps a debug session alive.
             if catch_unwind(AssertUnwindSafe(|| command.invoke(&ctx))).is_err() {
-                ctx.fail("That command stopped unexpectedly. Try again.");
+                ctx.fail("That command stopped unexpectedly");
             }
         });
     }
@@ -125,9 +125,9 @@ impl CommandHost for BuiltinHost {
 
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
 pub enum InvokeError {
-    #[error("That command isn't available any more. Search again to refresh the list.")]
+    #[error("That command is no longer available")]
     Unavailable,
-    #[error("That command isn't available on this platform.")]
+    #[error("That command isn't available on this platform")]
     HostUnavailable,
 }
 
@@ -540,7 +540,7 @@ mod display_tests {
         for error in [InvokeError::Unavailable, InvokeError::HostUnavailable] {
             let text = error.to_string();
             assert!(text.starts_with(char::is_uppercase), "{text}");
-            assert!(text.ends_with('.'), "{text}");
+            assert!(!text.ends_with('.') && !text.contains(". "), "{text}");
         }
     }
 }

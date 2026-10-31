@@ -191,13 +191,13 @@ pub struct Providers {
 /// because nothing was sent.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum NotReady {
-    #[error("No AI provider is set up yet. Add one to your config file.")]
+    #[error("Add an AI provider to your config file")]
     NoProvider,
-    #[error("No default AI provider is set. Add one to your config file.")]
+    #[error("Set a default AI provider in your config file")]
     NoDefault,
-    #[error("This command uses a provider that isn't set up. Check your config file.")]
+    #[error("Set up this command's provider in your config file")]
     UnknownProvider,
-    #[error("No model is set for {provider}. Add one to your config file.")]
+    #[error("Set a model for {provider} in your config file")]
     NoModel { provider: String },
 }
 

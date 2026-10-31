@@ -28,21 +28,21 @@ const COPY_POLL: std::time::Duration = std::time::Duration::from_millis(5);
 /// inside the 400ms an insertion and the 500ms an expansion are allowed.
 const PASTE_GRACE: std::time::Duration = std::time::Duration::from_millis(120);
 
-pub const KEYSTROKE_FAILED: &str = "Couldn't send the keystroke. Try again.";
+pub const KEYSTROKE_FAILED: &str = "Couldn't send the keystroke";
 
 #[derive(Debug, thiserror::Error, PartialEq, Eq, Clone)]
 pub enum TextError {
-    #[error("Dango needs the Accessibility permission to paste. Grant it in System Settings, Privacy & Security.")]
+    #[error("Allow Accessibility in System Settings")]
     PermissionMissing,
-    #[error("Nothing to paste into. Switch to an app first.")]
+    #[error("Switch to an app to paste into")]
     NoTarget,
     #[error("{0}")]
     TargetUnavailable(String),
-    #[error("Couldn't use the clipboard. Try again.")]
+    #[error("Couldn't use the clipboard")]
     Clipboard,
-    #[error("Dango can't read the selection in {0}. Copy the text first, then run this command.")]
+    #[error("Copy the text first, as {0} doesn't share its selection")]
     SelectionRefused(String),
-    #[error("Dango can't reach other apps right now. See dango.log for the reason.")]
+    #[error("Dango can't reach other apps right now")]
     Unavailable,
 }
 
@@ -1322,7 +1322,7 @@ mod tests {
     fn the_refusal_says_which_application_it_is_about() {
         assert_eq!(
             TextError::SelectionRefused("Zed".into()).to_string(),
-            "Dango can't read the selection in Zed. Copy the text first, then run this command."
+            "Copy the text first, as Zed doesn't share its selection"
         );
     }
 
@@ -1368,7 +1368,7 @@ mod display_tests {
         for error in errors {
             let text = error.to_string();
             assert!(text.starts_with(char::is_uppercase), "{text}");
-            assert!(text.ends_with('.'), "{text}");
+            assert!(!text.ends_with('.') && !text.contains(". "), "{text}");
         }
     }
 }

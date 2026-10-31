@@ -31,8 +31,8 @@ const FOCUSED_WINDOW: &str = "AXFocusedWindow";
 const POSITION: &str = "AXPosition";
 const SIZE: &str = "AXSize";
 
-const PERMISSION_MISSING: &str = "Dango needs the Accessibility permission to move windows. Grant it in System Settings, Privacy & Security.";
-const NOT_MOVABLE: &str = "That app doesn't let Dango move its windows.";
+const PERMISSION_MISSING: &str = "Allow Accessibility in System Settings";
+const NOT_MOVABLE: &str = "That app doesn't let Dango move its windows";
 
 /// Long enough that a briefly busy main thread still answers, short enough that
 /// a wedged one fails rather than hanging the command.
@@ -204,7 +204,7 @@ fn ax_error(error: AXError) -> WindowError {
         AXError::InvalidUIElement => WindowError::NoTarget,
         other => {
             eprintln!("[dango] accessibility error {}", other.0);
-            WindowError::Failed("Couldn't reach that window. Try again.".into())
+            WindowError::Failed("Couldn't reach that window".into())
         }
     }
 }

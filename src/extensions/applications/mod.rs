@@ -91,7 +91,7 @@ impl ApplicationsExtension {
                     ActionOutcome::Failed(match error {
                         LaunchError::Failed(message) => message,
                         LaunchError::NotFound => {
-                            format!("Couldn't open {}. Try again.", app.name)
+                            format!("Couldn't open {}", app.name)
                         }
                     })
                 }
@@ -100,14 +100,14 @@ impl ApplicationsExtension {
                 Ok(()) => ActionOutcome::Done,
                 Err(error) => {
                     eprintln!("[dango] could not reveal {}: {error}", app.name);
-                    ActionOutcome::Failed(format!("Couldn't show {} in {FILE_MANAGER}.", app.name))
+                    ActionOutcome::Failed(format!("Couldn't show {} in {FILE_MANAGER}", app.name))
                 }
             },
             ACTION_COPY_PATH => match app.target {
                 Some(path) => ActionOutcome::CopyToClipboard(path),
-                None => ActionOutcome::Failed("This app has no file path to copy.".into()),
+                None => ActionOutcome::Failed("This app has no file path to copy".into()),
             },
-            _ => ActionOutcome::Failed("That action isn't available.".into()),
+            _ => ActionOutcome::Failed("That action isn't available".into()),
         }
     }
 }
@@ -336,7 +336,7 @@ mod tests {
         indexer.make_launch_fail_not_found();
         assert_eq!(
             ext.perform("code", ACTION_LAUNCH),
-            ActionOutcome::Failed("Couldn't open VS Code. Try again.".into())
+            ActionOutcome::Failed("Couldn't open VS Code".into())
         );
         assert!(ext.index.get("code").is_some());
     }
