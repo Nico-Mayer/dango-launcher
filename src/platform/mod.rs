@@ -54,9 +54,10 @@ pub fn watch_focus_loss(lost: Box<dyn Fn()>) {
     drop(lost);
 }
 
-/// Whether this is the main thread. Only macOS, where AppKit work from another
-/// thread aborts, answers; elsewhere it is always false.
-pub fn is_main_thread() -> bool {
+/// Whether work meant for the main thread runs inline here. Only macOS, where
+/// AppKit work from another thread aborts, checks the thread; Windows always
+/// queues it.
+pub fn runs_inline_on_main_thread() -> bool {
     #[cfg(target_os = "macos")]
     return objc2_foundation::MainThreadMarker::new().is_some();
     #[cfg(target_os = "windows")]
