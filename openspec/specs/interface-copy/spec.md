@@ -34,8 +34,8 @@ source open.
 
 Text SHALL use sentence case: the first word capitalised, the rest lower case
 except for proper nouns and product names. This applies to action labels, form
-labels, placeholders, empty states, status lines, footer labels, tray items,
-and messages.
+labels, placeholders, empty states, toasts, ActionBar labels, section headings,
+tags, tray items, and messages.
 
 Command titles in root search SHALL be Title Case, because they are shown in
 one list with application names and are searched as names. Extension names
@@ -58,7 +58,7 @@ Recycle Bin, Accessibility, Cmd, Ctrl, Option, Alt, Enter, Escape.
 
 #### Scenario: A message is sentence case
 
-- **WHEN** a failure, empty state, status line, or tray notice is shown
+- **WHEN** a failure, empty state, toast, or tray notice is shown
 - **THEN** it starts with a capital letter and is otherwise lower case except
   for names
 
@@ -66,10 +66,10 @@ Recycle Bin, Accessibility, Cmd, Ctrl, Option, Alt, Enter, Escape.
 
 An action label SHALL start with an imperative verb and SHALL be at most four
 words. It SHALL name what happens to the selected thing, so that it reads
-correctly in the footer next to the Enter key. The verb SHALL match the effect:
-"Delete" when the thing is gone for good, "Remove" only when it can come back,
-"Open" for launching an application or a URL, "Paste" for putting text into the
-previous application, "Copy" for putting it on the clipboard.
+correctly in the ActionBar next to the Enter key. The verb SHALL match the
+effect: "Delete" when the thing is gone for good, "Remove" only when it can
+come back, "Open" for launching an application or a URL, "Paste" for putting
+text into the previous application, "Copy" for putting it on the clipboard.
 
 #### Scenario: A permanent action says delete
 
@@ -81,7 +81,7 @@ previous application, "Copy" for putting it on the clipboard.
 
 - **WHEN** an application result is selected in root search
 - **THEN** its primary action is labelled "Open"
-- **AND** the footer reads "Open" next to the Enter key
+- **AND** the ActionBar reads "Open" next to the Enter key
 
 #### Scenario: A reveal action names the platform's file manager on macOS
 
@@ -95,78 +95,74 @@ previous application, "Copy" for putting it on the clipboard.
 
 #### Scenario: A label fits the footer
 
-- **WHEN** any view's primary action is shown in the footer
+- **WHEN** any view's primary action is shown in the ActionBar
 - **THEN** the label is four words or fewer
 
 ### Requirement: A failure says what failed and what to do
 
-A failure shown in the banner SHALL be one or two complete sentences. The first
-SHALL say what did not happen, in terms of the user's action. The second, when
-there is something the user can do, SHALL say what. A failure message SHALL NOT
-blame the user, SHALL NOT be a raw error from a library or the operating system,
-and SHALL NOT end with a bare parenthesised code. Detail useful only for
-debugging SHALL go to the log, not to the banner.
+A failure SHALL be shown as a failure toast of one sentence that fits the toast
+without being cut off at the launcher's width. When the user can do something
+about it, the sentence SHALL say what. Otherwise it SHALL say what did not
+happen, in terms of the user's action. A failure message SHALL NOT blame the
+user, SHALL NOT be a raw error from a library or the operating system, and
+SHALL NOT end with a bare parenthesised code. Detail useful only for debugging
+SHALL go to the log, not to the toast.
 
-A failure caused by a missing permission SHALL name the permission and say how
-to grant it. A failure caused by a thing that no longer exists SHALL say so and
-let the user carry on.
+A failure caused by a missing permission SHALL name the permission and where
+to grant it. A failure caused by a thing that no longer exists SHALL say so.
 
 #### Scenario: A command is no longer available
 
 - **WHEN** the user runs a command whose extension has been disabled since the
   results were shown
-- **THEN** the banner reads a sentence saying the command is no longer
-  available and that the list will update on the next search
+- **THEN** the toast reads "That command is no longer available"
 
 #### Scenario: A window cannot be moved on Windows
 
 - **WHEN** a window-management command targets a window belonging to an
   elevated program on Windows
-- **THEN** the banner says Dango cannot move windows of programs running as
-  administrator
-- **AND** the banner contains no window handle or Win32 error code
+- **THEN** the toast says Dango can't move administrator windows
+- **AND** the toast contains no window handle or Win32 error code
 
 #### Scenario: A window cannot be moved on macOS
 
 - **WHEN** a window-management command fails on macOS because the application
   does not expose its windows
-- **THEN** the banner says that application does not let Dango move its
-  windows
-- **AND** the banner contains no `AXError` code
+- **THEN** the toast says that app doesn't let Dango move its windows
+- **AND** the toast contains no `AXError` code
 
 #### Scenario: The Accessibility permission is missing on macOS
 
 - **WHEN** a paste, expansion, or window command fails on macOS for lack of the
   Accessibility permission
-- **THEN** the banner names the Accessibility permission
-- **AND** says it is granted in System Settings under Privacy and Security
+- **THEN** the toast reads "Allow Accessibility in System Settings"
 
 #### Scenario: A system command is refused
 
 - **WHEN** lock, sleep, or empty trash is refused by the operating system
-- **THEN** the banner says the system did not carry out that action
+- **THEN** the toast says the system didn't do that action
 - **AND** the operating system's own error text is written to the log, not shown
 
 #### Scenario: An application has gone
 
 - **WHEN** the user opens an application that has been uninstalled since it was
   indexed
-- **THEN** the banner says the application is no longer installed and has been
-  removed from results
+- **THEN** the toast reads "That app is no longer installed"
+- **AND** the application is removed from results
 
 #### Scenario: Form validation fails
 
 - **WHEN** the user saves a snippet or quicklink form that is missing a name,
   has an invalid URL, or reuses a keyword
-- **THEN** the banner names the field and what it needs, such as "Enter a
-  name" or "Another snippet already uses that keyword"
+- **THEN** the toast names the field and what it needs, such as "Enter a name"
+  or "Another snippet already uses that keyword"
 
 #### Scenario: A template has a problem
 
 - **WHEN** the user edits a snippet template into a state the template engine
   cannot parse
-- **THEN** the form shows a line saying the template cannot be read, followed
-  by the engine's description of where
+- **THEN** the form shows, under the template field, a line saying the template
+  cannot be read, followed by the engine's description of where
 - **AND** the form still accepts further edits
 
 ### Requirement: Empty states name the thing and the next step
@@ -204,7 +200,7 @@ error SHALL follow the failure requirement above.
 
 ### Requirement: Status lines say what is happening
 
-A status line shown while Dango works SHALL say what is being waited for. The
+A busy toast shown while Dango works SHALL say what is being waited for. The
 form's template inspection SHALL say what the template will ask for, or that it
 will ask for nothing, in words the user would use.
 
@@ -212,13 +208,12 @@ will ask for nothing, in words the user would use.
 
 - **WHEN** a command has been invoked from root search and has neither
   finished nor shown a view yet
-- **THEN** the root view shows a status line reading "Running" followed by the
-  command's title
+- **THEN** a busy toast reads "Running" followed by the command's title
 
 #### Scenario: A pushed list is loading
 
 - **WHEN** a list view is marked loading and has no items yet
-- **THEN** the list shows "Loading…"
+- **THEN** a busy toast reads "Loading…"
 
 #### Scenario: A template asks for input
 
