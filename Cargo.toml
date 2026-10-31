@@ -7,6 +7,20 @@ edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+# Keys are camelCase: cargo-packager reads this table as its JSON config.
+[package.metadata.packager]
+productName = "Dango"
+identifier = "com.nimayer.dango"
+icons = ["icons/icon.ico", "icons/icon.icns"]
+beforePackagingCommand = "cargo build --release"
+
+[package.metadata.packager.nsis]
+installMode = "currentUser"
+
+[package.metadata.packager.macos]
+infoPlistPath = "Info.plist"
+entitlements = "Entitlements.plist"
+
 [lib]
 # The `_lib` suffix may seem redundant but it is necessary
 # to make the lib name unique and wouldn't conflict with the bin name.
