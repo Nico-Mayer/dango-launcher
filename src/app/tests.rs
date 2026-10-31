@@ -238,6 +238,17 @@ async fn a_hide_for_work_comes_back_with_the_commands_view() {
     assert!(shows_a_view(&shell));
 }
 
+#[tokio::test(start_paused = true)]
+async fn a_hide_for_work_while_hidden_keeps_the_held_query() {
+    let (core, shell) = core("{}");
+    core.toggle();
+    type_query(&core, "fire");
+    core.toggle();
+    core.hide_for_work();
+    core.toggle();
+    assert_eq!(query(&shell), "fire");
+}
+
 #[tokio::test]
 async fn focus_loss_hides_without_taking_focus_back() {
     let (core, shell) = core("{}");

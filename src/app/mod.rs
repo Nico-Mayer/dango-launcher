@@ -354,7 +354,9 @@ impl Core {
     fn hide_for_work(self: &Arc<Self>) {
         let core = self.clone();
         self.on_main_thread(move || {
-            core.visible.store(false, Ordering::SeqCst);
+            if !core.visible.swap(false, Ordering::SeqCst) {
+                return;
+            }
             core.shell.hide(false);
             core.settle_hide(HideReason::ForWork);
         });
