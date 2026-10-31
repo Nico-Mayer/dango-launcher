@@ -24,5 +24,5 @@
 
 ## 5. Manual checks on the real OS
 
-- [ ] 5.1 Windows: uninstall the old Tauri Dango, cut a real release, and install it as the standard user without an elevation prompt. Then cut the next release and update from inside Dango: progress shows, the installer runs passively, Dango comes back as the new version with the same config, and the autostart entry points at the installed path.
+- [x] 5.1 Windows: uninstall the old Tauri Dango, cut a real release, and install it as the standard user without an elevation prompt. Then cut the next release and update from inside Dango: progress shows, the installer runs passively, Dango comes back as the new version with the same config, and the autostart entry points at the installed path.
 - [ ] 5.2 macOS: install the `.dmg` from the same releases, pass the one-time Gatekeeper override, grant Accessibility and Input Monitoring, then update from inside Dango: Dango restarts as the new version once, without a second instance, and both grants are still in place.
