@@ -948,6 +948,32 @@ fn a_ctrl_shift_shortcut_on_a_letter_runs() {
 }
 
 #[test]
+fn shift_or_alt_shortcuts_on_named_keys_run() {
+    let mut h = Harness::view(ViewTree::new(View::Detail(DetailView {
+        markdown: "x".into(),
+        actions: vec![
+            shortcut_action("Enter", vec![Modifier::Shift]),
+            Action {
+                id: "up".into(),
+                ..shortcut_action("ArrowUp", vec![Modifier::Alt])
+            },
+        ],
+        ..Default::default()
+    })));
+    h.key(Chord {
+        shift: true,
+        ..Chord::plain("Enter")
+    });
+    h.key(Chord {
+        alt: true,
+        ..Chord::plain("ArrowUp")
+    });
+    let runs = h.runs();
+    assert_eq!(runs[0].action_id, "shortcut");
+    assert_eq!(runs[1].action_id, "up");
+}
+
+#[test]
 fn a_five_column_grid_shows_its_tiles() {
     let h = Harness::view(grid_tree(5, 12));
     let ViewBody::Grid(grid) = h.view_body() else {

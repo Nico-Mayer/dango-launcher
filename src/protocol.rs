@@ -276,10 +276,11 @@ protocol_types! {
         Danger,
     }
 
-    /// With Shift or Alt, `key` must be one letter: key events carry the
-    /// character a key produced, so Shift+1 arrives as `!`. Dango refuses a
-    /// tree that breaks this. On macOS, Alt with a letter and without Cmd or
-    /// Ctrl types a composed character and does not fire.
+    /// With Shift or Alt, `key` must be one letter or a named key such as
+    /// `Enter` or `ArrowUp`: key events carry the character a key produced,
+    /// so Shift+1 arrives as `!`. Dango refuses a tree that breaks this. On
+    /// macOS, Alt with a letter and without Cmd or Ctrl types a composed
+    /// character and does not fire.
     #[serde(rename_all = "camelCase")]
     pub struct Shortcut {
         pub key: String,

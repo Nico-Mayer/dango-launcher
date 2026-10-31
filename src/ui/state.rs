@@ -1138,15 +1138,31 @@ fn tree_actions(view: &View) -> Vec<&Action> {
     }
 }
 
-/// Key events carry the character a key produced, so Shift or Alt with
-/// anything but a letter never matches its declared key.
+const NAMED_KEYS: [&str; 13] = [
+    "backspace",
+    "tab",
+    "enter",
+    "escape",
+    "delete",
+    "arrowup",
+    "arrowdown",
+    "arrowleft",
+    "arrowright",
+    "home",
+    "end",
+    "pageup",
+    "pagedown",
+];
+
 fn fires(shortcut: &Shortcut) -> bool {
     let shifted = shortcut
         .modifiers
         .iter()
         .any(|modifier| matches!(modifier, Modifier::Shift | Modifier::Alt));
-    let letter = shortcut.key.len() == 1 && shortcut.key.as_bytes()[0].is_ascii_alphabetic();
-    !shifted || letter
+    let key = &shortcut.key;
+    let letter = key.len() == 1 && key.as_bytes()[0].is_ascii_alphabetic();
+    let named = NAMED_KEYS.iter().any(|name| key.eq_ignore_ascii_case(name));
+    !shifted || letter || named
 }
 
 /// What a field submits until the user changes it. A dropdown without a value
