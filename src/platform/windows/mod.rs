@@ -318,10 +318,25 @@ pub(super) fn foreground_app() -> Option<String> {
         if pid == 0 {
             return None;
         }
+        let key = (hwnd.0 as isize, pid);
+        let mut last = LAST_FOREGROUND.lock().unwrap();
+        if let Some((seen, name)) = last.as_ref() {
+            if *seen == key {
+                return name.clone();
+            }
+        }
         apps::init_com();
-        system::identify(hwnd, pid).map(|identity| identity.name)
+        let name = system::identify(hwnd, pid).map(|identity| identity.name);
+        *last = Some((key, name.clone()));
+        name
     }
 }
+
+/// Keyword expansion asks for every typed character, and naming an app reads
+/// its shell item and file description.
+static LAST_FOREGROUND: std::sync::Mutex<Option<NamedForeground>> = std::sync::Mutex::new(None);
+
+type NamedForeground = ((isize, u32), Option<String>);
 
 /// The application the launcher is covering, named the same way as the
 /// foreground one. Asked before the launcher gets out of the way, so a question
