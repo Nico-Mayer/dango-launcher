@@ -2,7 +2,7 @@ import { ScrollView } from "std-widgets.slint";
 import { Theme } from "../theme.slint";
 import { Icon } from "../atoms/icon.slint";
 import { Accessory } from "../atoms/accessory.slint";
-import { Intents, ListData, Panel, RowData, Shell } from "../globals.slint";
+import { Intents, ListData, RowData, Shell } from "../globals.slint";
 import { Detail } from "detail.slint";
 
 component Heading inherits Rectangle {
@@ -97,9 +97,7 @@ component Row inherits Rectangle {
 
     touch := TouchArea {
         clicked => {
-            if !Panel.open {
-                Intents.activate(root.data.id);
-            }
+            Intents.activate(root.data.id);
         }
         changed mouse-x => {
             Shell.pointer-resting = false;

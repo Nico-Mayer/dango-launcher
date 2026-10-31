@@ -1,7 +1,7 @@
 import { ScrollView } from "std-widgets.slint";
 import { Theme } from "../theme.slint";
 import { Icon, IconKind } from "../atoms/icon.slint";
-import { GridData, Intents, Panel, Shell, TileData, TileKind } from "../globals.slint";
+import { GridData, Intents, Shell, TileData, TileKind } from "../globals.slint";
 
 component Tile inherits Rectangle {
     in property <TileData> data;
@@ -53,9 +53,7 @@ component Tile inherits Rectangle {
 
     touch := TouchArea {
         clicked => {
-            if !Panel.open {
-                Intents.activate(root.data.id);
-            }
+            Intents.activate(root.data.id);
         }
         changed mouse-x => {
             Shell.pointer-resting = false;
