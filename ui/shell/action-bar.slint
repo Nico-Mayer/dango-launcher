@@ -1,5 +1,5 @@
 import { Theme } from "../theme.slint";
-import { Icon } from "../atoms/icon.slint";
+import { Icon, IconKind } from "../atoms/icon.slint";
 import { Kbd } from "../atoms/kbd.slint";
 import { Dot, ToastStyle } from "../atoms/dot.slint";
 import { Intents, Shell } from "../globals.slint";
@@ -31,7 +31,7 @@ export component ActionBar inherits Rectangle {
                     style: Shell.toast-style;
                 }
             }
-            if !Shell.toast-shown && Shell.context != "": VerticalLayout {
+            if !Shell.toast-shown && Shell.context-icon-kind != IconKind.none: VerticalLayout {
                 alignment: center;
                 Icon {
                     width: 16px;
