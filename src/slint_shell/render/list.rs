@@ -120,6 +120,7 @@ fn result_row(item: &ResultItem, selected: Option<&str>, icons: &Icons) -> RowDa
     RowData {
         id: item.id.as_str().into(),
         title: highlighted(&item.title, &item.match_positions),
+        label: item.title.as_str().into(),
         subtitle: item.subtitle.clone().unwrap_or_default().into(),
         icon,
         icon_kind,
@@ -139,6 +140,7 @@ fn list_row(item: &ListItem, selected: Option<&str>, icons: &Icons) -> RowData {
     RowData {
         id: item.id.as_str().into(),
         title: StyledText::from_plain_text(&item.title),
+        label: item.title.as_str().into(),
         subtitle: item.subtitle.clone().unwrap_or_default().into(),
         icon,
         icon_kind,

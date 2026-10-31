@@ -6,7 +6,7 @@ import { GridData, Intents, Shell, TileData, TileKind } from "../globals.slint";
 component Tile inherits Rectangle {
     in property <TileData> data;
     accessible-role: list-item;
-    accessible-label: root.data.id;
+    accessible-label: root.data.title;
     accessible-item-selected: root.data.selected;
 
     box := Rectangle {

@@ -161,8 +161,12 @@ impl Harness {
         ElementHandle::find_by_accessible_label(&self.ui, label).next()
     }
 
-    fn row(&self, id: &str) -> ElementHandle {
-        self.find(id).unwrap_or_else(|| panic!("row {id} is drawn"))
+    fn row(&self, title: &str) -> ElementHandle {
+        ElementHandle::find_by_accessible_label(&self.ui, title)
+            .find(|element| {
+                element.accessible_role() == Some(i_slint_backend_testing::AccessibleRole::ListItem)
+            })
+            .unwrap_or_else(|| panic!("row {title} is drawn"))
     }
 
     fn query(&self) -> String {
@@ -326,7 +330,7 @@ mod search_bar {
             .expect("the back control")
             .mock_single_click(PointerEventButton::Left);
         assert_eq!(h.shell().get_screen(), ScreenKind::Root);
-        assert!(h.find("result-1").is_some());
+        assert!(h.find("Result 1").is_some());
     }
 
     #[test]
@@ -504,19 +508,19 @@ mod root_search {
     #[test]
     fn pointer_hover_never_selects_and_keyboard_suppresses_resting_hover() {
         let h = Harness::root(results(5));
-        assert_eq!(h.row("result-1").accessible_item_selected(), Some(true));
+        assert_eq!(h.row("Result 1").accessible_item_selected(), Some(true));
 
-        h.move_pointer_to(&h.row("result-3"));
+        h.move_pointer_to(&h.row("Result 3"));
         assert!(!h.shell().get_pointer_resting());
-        assert_eq!(h.row("result-1").accessible_item_selected(), Some(true));
-        assert_eq!(h.row("result-3").accessible_item_selected(), Some(false));
+        assert_eq!(h.row("Result 1").accessible_item_selected(), Some(true));
+        assert_eq!(h.row("Result 3").accessible_item_selected(), Some(false));
         assert!(h.intents().is_empty(), "hover sent {:?}", h.intents());
 
         h.arrow_down();
         assert!(h.shell().get_pointer_resting());
-        assert_eq!(h.row("result-2").accessible_item_selected(), Some(true));
+        assert_eq!(h.row("Result 2").accessible_item_selected(), Some(true));
 
-        h.move_pointer_to(&h.row("result-4"));
+        h.move_pointer_to(&h.row("Result 4"));
         assert!(!h.shell().get_pointer_resting());
     }
 
@@ -526,7 +530,7 @@ mod root_search {
         h.type_text("re");
         assert_eq!(h.query(), "re");
 
-        h.row("result-2")
+        h.row("Result 2")
             .mock_single_click(PointerEventButton::Left);
         assert!(h.intents().contains(&Intent::Activate {
             id: "result-2".into()
@@ -553,7 +557,7 @@ mod root_search {
         for _ in 0..5 {
             h.arrow_down();
         }
-        let row = h.row("result-6");
+        let row = h.row("Result 6");
         assert_eq!(row.accessible_item_selected(), Some(true));
         let top = row.absolute_position().y;
         assert!(top >= LIST_TOP, "row starts at {top}");
@@ -642,8 +646,8 @@ mod views {
         h.view(list_tree());
         assert_eq!(h.shell().get_screen(), ScreenKind::List);
         assert!(h.find("Search").is_some());
-        assert_eq!(h.row("item-1").accessible_item_selected(), Some(true));
-        assert!(h.find("item-3").is_some());
+        assert_eq!(h.row("Item 1").accessible_item_selected(), Some(true));
+        assert!(h.find("Item 3").is_some());
     }
 
     #[test]
@@ -711,7 +715,7 @@ mod list_view {
     #[test]
     fn a_row_is_forty_pixels_high() {
         let h = Harness::root(results(3));
-        assert_eq!(h.row("result-1").size().height, 40.0);
+        assert_eq!(h.row("Result 1").size().height, 40.0);
     }
 
     #[test]
@@ -772,7 +776,7 @@ mod list_view {
         ));
         let first = h.find("First body").expect("the first detail");
         assert!(first.absolute_position().x >= 720.0 * 2.0 / 5.0);
-        assert!(h.row("item-1").size().width <= 720.0 * 2.0 / 5.0);
+        assert!(h.row("Item 1").size().width <= 720.0 * 2.0 / 5.0);
         h.arrow_down();
         assert!(h.find("Second body").is_some());
         assert!(h.find("First body").is_none());
@@ -969,7 +973,7 @@ mod grid {
         let h = Harness::root(results(1));
         h.view(grid_tree(12));
         assert_eq!(h.shell().get_screen(), ScreenKind::Grid);
-        let place = |n: usize| h.row(&format!("tile-{n}")).absolute_position();
+        let place = |n: usize| h.row(&format!("Tile {n}")).absolute_position();
         for n in 2..=5 {
             assert_eq!(place(n).y, place(1).y, "tile {n} is in the first row");
         }
@@ -977,7 +981,7 @@ mod grid {
         assert_eq!(place(6).x, place(1).x);
         assert!(place(11).y > place(6).y);
         assert_eq!(place(12).y, place(11).y);
-        assert_eq!(h.row("tile-1").accessible_item_selected(), Some(true));
+        assert_eq!(h.row("Tile 1").accessible_item_selected(), Some(true));
     }
 
     #[test]
@@ -986,9 +990,9 @@ mod grid {
         h.view(grid_tree(12));
         h.type_text("ab");
         h.key("\u{F703}");
-        assert_eq!(h.row("tile-2").accessible_item_selected(), Some(true));
+        assert_eq!(h.row("Tile 2").accessible_item_selected(), Some(true));
         h.key("\u{F702}");
-        assert_eq!(h.row("tile-1").accessible_item_selected(), Some(true));
+        assert_eq!(h.row("Tile 1").accessible_item_selected(), Some(true));
         h.type_text("c");
         assert_eq!(h.query_of("Search"), "abc");
     }
@@ -999,7 +1003,7 @@ mod grid {
         h.view(grid_tree(7));
         let content = h.ui.global::<GridData>().get_content_height();
         assert!((h.height() - (56.0 + content + 40.0)).abs() < 0.01);
-        let last = h.row("tile-7");
+        let last = h.row("Tile 7");
         let bottom = last.absolute_position().y + last.size().height;
         assert!(bottom <= h.height() - 40.0, "the last row is not cut off");
     }
@@ -1141,7 +1145,7 @@ mod action_panel {
         h.freeze();
         h.intents.borrow_mut().clear();
 
-        h.row("result-2")
+        h.row("Result 2")
             .mock_single_click(PointerEventButton::Left);
         assert_eq!(h.intents(), [Intent::ClosePanel]);
         assert!(h.panel().get_open(), "only a snapshot closes the panel");
@@ -1228,7 +1232,7 @@ mod action_panel {
             }]
         );
         assert!(!h.panel().get_open());
-        assert_eq!(h.row("result-1").accessible_item_selected(), Some(true));
+        assert_eq!(h.row("Result 1").accessible_item_selected(), Some(true));
     }
 
     #[test]

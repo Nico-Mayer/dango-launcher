@@ -40,7 +40,7 @@ component Row inherits Rectangle {
     in property <length> right-inset: 6px;
     height: Theme.row-height;
     accessible-role: list-item;
-    accessible-label: root.data.id;
+    accessible-label: root.data.label;
     accessible-item-selected: root.data.selected;
 
     fill := Rectangle {
