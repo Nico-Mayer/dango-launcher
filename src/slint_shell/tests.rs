@@ -152,7 +152,6 @@ fn result(n: usize) -> ResultItem {
         title: format!("Result {n}"),
         subtitle: None,
         icon: None,
-        tint: None,
         actions: vec![Action {
             id: "open".into(),
             title: "Open".into(),

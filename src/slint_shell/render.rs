@@ -232,7 +232,7 @@ impl Renderer {
     }
 
     fn result_row(&self, item: &ResultItem, selected: Option<&str>) -> RowData {
-        let mut row = self.icon_row(item.icon.as_deref(), item.tint.as_deref(), false);
+        let mut row = self.icon_row(item.icon.as_deref(), false);
         row.id = item.id.as_str().into();
         row.title = highlighted(&item.title, &item.match_positions);
         row.subtitle = item.subtitle.clone().unwrap_or_default().into();
@@ -241,7 +241,7 @@ impl Renderer {
     }
 
     fn list_row(&self, item: &ListItem, selected: Option<&str>) -> RowData {
-        let mut row = self.icon_row(item.icon.as_deref(), None, true);
+        let mut row = self.icon_row(item.icon.as_deref(), true);
         row.id = item.id.as_str().into();
         row.title = StyledText::from_plain_text(&item.title);
         row.subtitle = item.subtitle.clone().unwrap_or_default().into();
@@ -249,7 +249,7 @@ impl Renderer {
         row
     }
 
-    fn icon_row(&self, icon: Option<&str>, tint: Option<&str>, content: bool) -> RowData {
+    fn icon_row(&self, icon: Option<&str>, content: bool) -> RowData {
         let (icon, icon_kind) = match self.icons.get(icon) {
             Icon::Named(image) => (image, IconKind::Named),
             Icon::File(image) => (image, IconKind::File),
@@ -258,7 +258,6 @@ impl Renderer {
         RowData {
             icon,
             icon_kind,
-            tint: tint.and_then(tint_index).unwrap_or(-1),
             content,
             ..Default::default()
         }
@@ -351,13 +350,4 @@ fn highlighted(title: &str, positions: &[usize]) -> StyledText {
         markdown.push_str("</u>");
     }
     StyledText::from_markdown(&markdown).unwrap_or_else(|_| StyledText::from_plain_text(title))
-}
-
-/// Where an extension's tint sits in the palette's tint list. Nothing for a
-/// name this palette does not hold.
-fn tint_index(name: &str) -> Option<i32> {
-    ["red", "amber", "green", "blue", "purple", "pink"]
-        .iter()
-        .position(|tint| *tint == name)
-        .map(|index| index as i32)
 }

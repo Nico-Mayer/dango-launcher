@@ -55,7 +55,7 @@ fn named_image(name: &str) -> Option<Image> {
     Image::load_from_svg_data(svg(data).as_bytes()).ok()
 }
 
-/// Drawn in black so a tint can colourise it.
+/// Drawn in black so a theme role can colourise it.
 fn svg(data: &IconData) -> String {
     format!(
         r#"<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="{}" fill="none" stroke="black" stroke-width="{}" stroke-linecap="round" stroke-linejoin="round">{}</svg>"#,

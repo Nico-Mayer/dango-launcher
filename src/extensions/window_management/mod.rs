@@ -206,7 +206,6 @@ pub(crate) fn manifest() -> Manifest {
         id: EXTENSION_ID.into(),
         name: "Window Management".into(),
         icon: None,
-        tint: Some("blue".into()),
         commands: vec![
             command(
                 COMMAND_LEFT_HALF,

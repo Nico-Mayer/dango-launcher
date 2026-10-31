@@ -55,10 +55,6 @@ pub struct Services {
     pub pipeline: SearchPipeline,
     pub frecency: Arc<FrecencyTable>,
     pub learned: Arc<InputHistory>,
-    /// What each extension declared as its tint, so a result can be drawn in
-    /// its owner's colour. Held apart from the host, whose lock has no business
-    /// on the path that streams results.
-    pub tints: std::collections::HashMap<String, String>,
     pub applications: Option<Arc<ApplicationsExtension>>,
     pub ai: Option<AiParts>,
     pub hotkeys: Registry,
@@ -258,7 +254,6 @@ impl Core {
 
     fn result_item(&self, c: Candidate) -> ui::ResultItem {
         ui::ResultItem {
-            tint: self.services.tints.get(&c.extension_id).cloned(),
             extension_id: c.extension_id,
             id: c.id,
             title: c.title,

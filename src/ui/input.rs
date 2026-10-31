@@ -123,7 +123,6 @@ pub struct ResultItem {
     pub title: String,
     pub subtitle: Option<String>,
     pub icon: Option<String>,
-    pub tint: Option<String>,
     pub actions: Vec<Action>,
     pub match_positions: Vec<usize>,
     pub suggested: bool,

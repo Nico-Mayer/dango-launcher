@@ -21,7 +21,6 @@ pub(crate) fn manifest() -> Manifest {
         id: EXTENSION_ID.into(),
         name: "Permissions".into(),
         icon: None,
-        tint: Some("amber".into()),
         commands: vec![],
         preferences: vec![],
         root_items: true,

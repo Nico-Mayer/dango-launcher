@@ -332,7 +332,6 @@ fn build_services(
         ranker,
         RESULT_LIMIT,
     );
-    let tints = host.tints();
 
     // Shared rather than owned by the invoker, because resolving a command has
     // to see the host as it is now: an extension disabled since startup must no
@@ -361,7 +360,6 @@ fn build_services(
         pipeline,
         frecency,
         learned,
-        tints,
         applications: Some(applications),
         ai: Some(ai),
         hotkeys,

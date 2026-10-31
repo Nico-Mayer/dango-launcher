@@ -112,7 +112,6 @@ pub(crate) fn manifest() -> Manifest {
         id: EXTENSION_ID.into(),
         name: "System".into(),
         icon: None,
-        tint: Some("red".into()),
         commands: vec![
             command(
                 COMMAND_LOCK,

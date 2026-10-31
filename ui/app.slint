@@ -13,8 +13,6 @@ export struct RowData {
     subtitle: string,
     icon: image,
     icon-kind: IconKind,
-    /// An index into the palette's tints, or -1 for none.
-    tint: int,
     /// The icon is content in its own right, as a copied image is.
     content: bool,
     selected: bool,
@@ -62,7 +60,6 @@ component Keycap inherits Rectangle {
 component IconTile inherits Rectangle {
     in property <image> icon;
     in property <IconKind> kind;
-    in property <int> tint: -1;
     in property <bool> content;
     width: 32px;
     height: 32px;
@@ -112,7 +109,6 @@ component ResultRow inherits Rectangle {
                 IconTile {
                     icon: root.data.icon;
                     kind: root.data.icon-kind;
-                    tint: root.data.tint;
                     content: root.data.content;
                 }
             }

@@ -41,7 +41,6 @@ pub(crate) fn manifest() -> Manifest {
         id: EXTENSION_ID.into(),
         name: "Updates".into(),
         icon: None,
-        tint: Some("green".into()),
         commands: vec![CommandDecl {
             id: COMMAND_CHECK.into(),
             title: "Check for Updates".into(),

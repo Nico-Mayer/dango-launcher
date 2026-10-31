@@ -28,7 +28,6 @@ pub(crate) fn manifest() -> Manifest {
         id: EXTENSION_ID.into(),
         name: "Applications".into(),
         icon: None,
-        tint: None,
         commands: vec![],
         preferences: vec![],
         root_items: true,

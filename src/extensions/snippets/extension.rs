@@ -43,13 +43,6 @@ fn icon(kind: Kind) -> String {
     }
 }
 
-fn tint(kind: Kind) -> &'static str {
-    match kind {
-        Kind::Snippet => "green",
-        Kind::Quicklink => "pink",
-    }
-}
-
 pub const COMMAND_CREATE: &str = "create";
 pub const COMMAND_SEARCH: &str = "search";
 
@@ -595,7 +588,6 @@ pub(crate) fn manifest(kind: Kind) -> Manifest {
         id: extension_id(kind).into(),
         name: name.into(),
         icon: Some(icon(kind)),
-        tint: Some(tint(kind).into()),
         commands: vec![
             CommandDecl {
                 id: COMMAND_CREATE.into(),
