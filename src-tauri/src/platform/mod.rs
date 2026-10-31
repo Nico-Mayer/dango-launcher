@@ -24,6 +24,19 @@ pub trait LauncherWindow: Send {
     fn restore_previous_focus(&mut self);
 }
 
+/// Calls `lost` on the main thread whenever another application takes the
+/// foreground. Main thread only, and once.
+///
+/// winit never reports focus for the launcher on Windows: the window is the
+/// foreground and has the keyboard, yet `has_focus` stays false and no
+/// `Focused` event arrives. macOS relies on the toolkit's focus event.
+pub fn watch_focus_loss(lost: Box<dyn Fn()>) {
+    #[cfg(target_os = "windows")]
+    windows::watch_focus_loss(lost);
+    #[cfg(target_os = "macos")]
+    drop(lost);
+}
+
 pub fn launcher_window(window: RawWindowHandle) -> Box<dyn LauncherWindow> {
     #[cfg(target_os = "macos")]
     return Box::new(macos::MacLauncherWindow::new(window));

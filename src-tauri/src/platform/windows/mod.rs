@@ -23,20 +23,23 @@ pub use window::WindowsWindowManager;
 /// the user's and pass it straight through.
 pub(super) const DANGO_INJECTED: usize = 0x44_41_4E_47;
 
+use std::cell::RefCell;
+
 use raw_window_handle::RawWindowHandle;
 use windows_sys::Win32::Foundation::{FALSE, HWND, POINT, RECT, TRUE};
 use windows_sys::Win32::Graphics::Gdi::{
     GetMonitorInfoW, MonitorFromPoint, MONITORINFO, MONITOR_DEFAULTTOPRIMARY,
 };
 use windows_sys::Win32::System::Threading::{AttachThreadInput, GetCurrentThreadId};
+use windows_sys::Win32::UI::Accessibility::{SetWinEventHook, HWINEVENTHOOK};
 use windows_sys::Win32::UI::HiDpi::{GetDpiForMonitor, GetDpiForWindow, MDT_EFFECTIVE_DPI};
 use windows_sys::Win32::UI::WindowsAndMessaging::{
     AllowSetForegroundWindow, BringWindowToTop, GetCursorPos, GetForegroundWindow,
     GetWindowLongPtrW, GetWindowRect, GetWindowThreadProcessId, SetForegroundWindow,
-    SetWindowLongPtrW, SetWindowPos, SystemParametersInfoW, GWL_EXSTYLE, HWND_TOPMOST,
-    SPIF_SENDCHANGE, SPI_GETFOREGROUNDLOCKTIMEOUT, SPI_SETFOREGROUNDLOCKTIMEOUT, SWP_FRAMECHANGED,
-    SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SWP_NOZORDER, WS_EX_APPWINDOW, WS_EX_TOOLWINDOW,
-    WS_EX_TOPMOST,
+    SetWindowLongPtrW, SetWindowPos, SystemParametersInfoW, EVENT_SYSTEM_FOREGROUND, GWL_EXSTYLE,
+    HWND_TOPMOST, SPIF_SENDCHANGE, SPI_GETFOREGROUNDLOCKTIMEOUT, SPI_SETFOREGROUNDLOCKTIMEOUT,
+    SWP_FRAMECHANGED, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SWP_NOZORDER, WINEVENT_OUTOFCONTEXT,
+    WINEVENT_SKIPOWNPROCESS, WS_EX_APPWINDOW, WS_EX_TOOLWINDOW, WS_EX_TOPMOST,
 };
 
 use super::{LauncherWindow, RunningApp, SystemControl, SystemError};
@@ -141,6 +144,46 @@ impl LauncherWindow for WindowsLauncherWindow {
             force_foreground(hwnd);
         }
     }
+}
+
+thread_local! {
+    static FOCUS_LOST: RefCell<Option<Box<dyn Fn()>>> = const { RefCell::new(None) };
+}
+
+/// Out of context, so the callback runs on this thread's message loop, and
+/// skipping Dango's own process, so taking the foreground does not count.
+pub(super) fn watch_focus_loss(lost: Box<dyn Fn()>) {
+    FOCUS_LOST.with(|slot| *slot.borrow_mut() = Some(lost));
+    let hook = unsafe {
+        SetWinEventHook(
+            EVENT_SYSTEM_FOREGROUND,
+            EVENT_SYSTEM_FOREGROUND,
+            std::ptr::null_mut(),
+            Some(foreground_changed),
+            0,
+            0,
+            WINEVENT_OUTOFCONTEXT | WINEVENT_SKIPOWNPROCESS,
+        )
+    };
+    if hook.is_null() {
+        eprintln!("[dango] focus loss is not watched; the launcher stays up when clicked away");
+    }
+}
+
+unsafe extern "system" fn foreground_changed(
+    _hook: HWINEVENTHOOK,
+    _event: u32,
+    _window: HWND,
+    _object: i32,
+    _child: i32,
+    _thread: u32,
+    _time: u32,
+) {
+    FOCUS_LOST.with(|slot| {
+        if let Some(lost) = slot.borrow().as_ref() {
+            lost();
+        }
+    });
 }
 
 /// tao rewrites the extended style from its own flags whenever visibility

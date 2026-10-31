@@ -251,6 +251,10 @@ fn connect(
 
     {
         let core = core.clone();
+        platform::watch_focus_loss(Box::new(move || core.hide_on_focus_loss()));
+    }
+    {
+        let core = core.clone();
         window.window().on_winit_window_event(move |_, event| {
             if let winit::event::WindowEvent::Focused(false) = event {
                 core.hide_on_focus_loss();
