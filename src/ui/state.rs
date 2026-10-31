@@ -2,8 +2,8 @@ use std::collections::HashMap;
 
 use crate::extension::{ActionOutcome, FormValues};
 use crate::protocol::{
-    Action, ActionStyle, FieldKind, Filtering, FormField, ListItem, Section, View, ViewTree,
-    PROTOCOL_VERSION,
+    Action, ActionStyle, FieldKind, Filtering, FormField, GridItem, GridView, ListItem, Section,
+    View, ViewTree, GRID_COLUMNS, PROTOCOL_VERSION,
 };
 
 use super::effect::{ActionRequest, Effect, Origin};
@@ -58,6 +58,62 @@ pub(super) struct HeldToast {
 pub(super) enum ViewError {
     /// A protocol version this build does not know.
     Unsupported,
+    /// A tree that breaks the protocol's rules, such as a grid's column count.
+    Invalid,
+}
+
+/// A selectable item of a list or a grid.
+#[derive(Clone, Copy)]
+pub(super) enum Entry<'a> {
+    List(&'a ListItem),
+    Grid(&'a GridItem),
+}
+
+impl<'a> Entry<'a> {
+    pub(super) fn id(self) -> &'a str {
+        match self {
+            Self::List(item) => &item.id,
+            Self::Grid(item) => &item.id,
+        }
+    }
+
+    fn actions(self) -> &'a [Action] {
+        match self {
+            Self::List(item) => &item.actions,
+            Self::Grid(item) => &item.actions,
+        }
+    }
+}
+
+/// What the launcher's filter and sections need of an item.
+pub(super) trait Grouped {
+    fn title(&self) -> &str;
+    fn keywords(&self) -> &[String];
+    fn section(&self) -> Option<&str>;
+}
+
+impl Grouped for ListItem {
+    fn title(&self) -> &str {
+        &self.title
+    }
+    fn keywords(&self) -> &[String] {
+        &self.keywords
+    }
+    fn section(&self) -> Option<&str> {
+        self.section.as_deref()
+    }
+}
+
+impl Grouped for GridItem {
+    fn title(&self) -> &str {
+        &self.title
+    }
+    fn keywords(&self) -> &[String] {
+        &self.keywords
+    }
+    fn section(&self) -> Option<&str> {
+        self.section.as_deref()
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize)]
@@ -97,6 +153,7 @@ pub(super) enum Mode {
     Panel,
     Root,
     List,
+    Grid,
     Detail,
     Form,
 }
@@ -257,6 +314,10 @@ impl Launcher {
         self.working = None;
         if tree.protocol_version != PROTOCOL_VERSION {
             self.view_error = Some(ViewError::Unsupported);
+            return;
+        }
+        if matches!(&tree.view, View::Grid(grid) if !GRID_COLUMNS.contains(&grid.columns)) {
+            self.view_error = Some(ViewError::Invalid);
             return;
         }
         self.owner = Some(owner);
@@ -437,6 +498,8 @@ impl Launcher {
         let enter = *chord == Chord::plain("Enter");
         let up = *chord == Chord::plain("ArrowUp");
         let down = *chord == Chord::plain("ArrowDown");
+        let left = *chord == Chord::plain("ArrowLeft");
+        let right = *chord == Chord::plain("ArrowRight");
         let mode = self.mode();
         match mode {
             Mode::Error => {
@@ -465,7 +528,7 @@ impl Launcher {
                 }
                 return;
             }
-            Mode::Root | Mode::List | Mode::Detail | Mode::Form => {}
+            Mode::Root | Mode::List | Mode::Grid | Mode::Detail | Mode::Form => {}
         }
 
         if escape {
@@ -479,10 +542,15 @@ impl Launcher {
             self.picked = next;
         } else if (up || down) && mode == Mode::List {
             let next = step(
-                self.view_items().into_iter().map(|item| item.id.as_str()),
-                self.view_selected().map(|item| item.id.clone()),
+                self.entries().into_iter().map(Entry::id),
+                self.entry_selected().map(|entry| entry.id().to_string()),
                 down,
             );
+            if let Some(view) = self.stack.last_mut() {
+                view.picked = next;
+            }
+        } else if mode == Mode::Grid && (up || down || left || right) {
+            let next = self.grid_step(chord);
             if let Some(view) = self.stack.last_mut() {
                 view.picked = next;
             }
@@ -549,10 +617,10 @@ impl Launcher {
                     }
                 }
             }
-            Mode::List => match self.view_selected() {
-                Some(item) => {
-                    if let Some(action) = item.actions.first() {
-                        let (action, item) = (action.id.clone(), item.id.clone());
+            Mode::List | Mode::Grid => match self.entry_selected() {
+                Some(entry) => {
+                    if let Some(action) = entry.actions().first() {
+                        let (action, item) = (action.id.clone(), entry.id().to_string());
                         self.run_view_action(action, Some(item), None, fx);
                     }
                 }
@@ -606,8 +674,8 @@ impl Launcher {
                     self.confirm(fx);
                 }
             }
-            Mode::List => {
-                if self.view_items().iter().any(|item| item.id == id) {
+            Mode::List | Mode::Grid => {
+                if self.entries().iter().any(|entry| entry.id() == id) {
                     if let Some(view) = self.stack.last_mut() {
                         view.picked = Some(id.to_string());
                     }
@@ -688,6 +756,7 @@ impl Launcher {
         match self.stack.last().map(|view| &view.tree.view) {
             None => Mode::Root,
             Some(View::List(_)) => Mode::List,
+            Some(View::Grid(_)) => Mode::Grid,
             Some(View::Detail(_)) => Mode::Detail,
             Some(View::Form(_)) => Mode::Form,
         }
@@ -726,59 +795,99 @@ impl Launcher {
         let View::List(list) = &view.tree.view else {
             return Vec::new();
         };
-        let needle = view.query.to_lowercase();
-        let shown = |item: &&ListItem| {
-            list.filtering != Filtering::Launcher
-                || needle.is_empty()
-                || item.title.to_lowercase().contains(&needle)
-                || item
-                    .keywords
-                    .iter()
-                    .any(|keyword| keyword.to_lowercase().contains(&needle))
-        };
-        let declared = |id: &str| list.sections.iter().any(|section| section.id == id);
-        let loose = list
-            .items
-            .iter()
-            .filter(|item| item.section.as_deref().is_none_or(|id| !declared(id)))
-            .filter(shown)
-            .collect();
-        let mut groups = vec![(None, loose)];
-        for section in &list.sections {
-            let items = list
-                .items
-                .iter()
-                .filter(|item| item.section.as_deref() == Some(section.id.as_str()))
-                .filter(shown)
-                .collect();
-            groups.push((Some(section), items));
-        }
-        groups.retain(|(_, items): &(_, Vec<_>)| !items.is_empty());
-        groups
+        group(&list.items, &list.sections, &list.filtering, &view.query)
     }
 
-    /// The list's items in the order they are drawn.
-    pub(super) fn view_items(&self) -> Vec<&ListItem> {
-        self.view_sections()
+    /// A pushed grid's tiles, grouped and narrowed as a list's items are.
+    pub(super) fn grid_sections(&self) -> Vec<(Option<&Section>, Vec<&GridItem>)> {
+        let Some(view) = self.stack.last() else {
+            return Vec::new();
+        };
+        let View::Grid(grid) = &view.tree.view else {
+            return Vec::new();
+        };
+        group(&grid.items, &grid.sections, &grid.filtering, &view.query)
+    }
+
+    pub(super) fn grid(&self) -> Option<&GridView> {
+        match self.stack.last().map(|view| &view.tree.view) {
+            Some(View::Grid(grid)) => Some(grid),
+            _ => None,
+        }
+    }
+
+    /// The list's items or the grid's tiles in the order they are drawn.
+    pub(super) fn entries(&self) -> Vec<Entry<'_>> {
+        let list = self
+            .view_sections()
             .into_iter()
-            .flat_map(|(_, items)| items)
-            .collect()
+            .flat_map(|(_, items)| items);
+        let grid = self
+            .grid_sections()
+            .into_iter()
+            .flat_map(|(_, items)| items);
+        list.map(Entry::List).chain(grid.map(Entry::Grid)).collect()
+    }
+
+    pub(super) fn entry_selected(&self) -> Option<Entry<'_>> {
+        let entries = self.entries();
+        let picked = self.stack.last().and_then(|view| view.picked.as_deref());
+        picked
+            .and_then(|picked| entries.iter().find(|entry| entry.id() == picked))
+            .or_else(|| entries.first())
+            .copied()
     }
 
     pub(super) fn view_selected(&self) -> Option<&ListItem> {
-        let items = self.view_items();
-        let picked = self.stack.last().and_then(|view| view.picked.as_deref());
-        picked
-            .and_then(|picked| items.iter().find(|item| item.id == picked))
-            .or_else(|| items.first())
-            .copied()
+        match self.entry_selected() {
+            Some(Entry::List(item)) => Some(item),
+            _ => None,
+        }
+    }
+
+    /// The tile an arrow key moves to. Rows restart under each section, so
+    /// Up and Down look for the same column in the row above or below, and
+    /// take that row's last tile when it is shorter.
+    fn grid_step(&self, chord: &Chord) -> Option<String> {
+        let columns = usize::from(self.grid()?.columns);
+        let rows: Vec<Vec<&str>> = self
+            .grid_sections()
+            .into_iter()
+            .flat_map(|(_, items)| {
+                items
+                    .chunks(columns)
+                    .map(|row| row.iter().map(|item| item.id.as_str()).collect())
+                    .collect::<Vec<_>>()
+            })
+            .collect();
+        let current = self.entry_selected()?.id();
+        let (row, column) = rows
+            .iter()
+            .enumerate()
+            .find_map(|(r, ids)| ids.iter().position(|id| *id == current).map(|c| (r, c)))?;
+        let flat: Vec<&str> = rows.iter().flatten().copied().collect();
+        let index = flat.iter().position(|id| *id == current)?;
+        let target = match chord.key.as_str() {
+            "arrowleft" => flat[index.saturating_sub(1)],
+            "arrowright" => flat[(index + 1).min(flat.len() - 1)],
+            "arrowup" if row > 0 => {
+                let above = &rows[row - 1];
+                above[column.min(above.len() - 1)]
+            }
+            "arrowdown" if row + 1 < rows.len() => {
+                let below = &rows[row + 1];
+                below[column.min(below.len() - 1)]
+            }
+            _ => current,
+        };
+        Some(target.to_string())
     }
 
     fn view_actions(&self) -> &[Action] {
         match self.stack.last().map(|view| &view.tree.view) {
             Some(View::Detail(detail)) => &detail.actions,
             Some(View::Form(form)) => &form.actions,
-            Some(View::List(_)) | None => &[],
+            Some(View::List(_) | View::Grid(_)) | None => &[],
         }
     }
 
@@ -787,8 +896,8 @@ impl Launcher {
     pub(super) fn available_actions(&self) -> &[Action] {
         match self.surface() {
             Mode::Root => self.root_selected().map_or(&[], |item| &item.actions),
-            Mode::List => match self.view_selected() {
-                Some(item) => &item.actions,
+            Mode::List | Mode::Grid => match self.entry_selected() {
+                Some(entry) => entry.actions(),
                 None => self.empty_actions(),
             },
             _ => self.view_actions(),
@@ -799,6 +908,10 @@ impl Launcher {
     fn empty_actions(&self) -> &[Action] {
         match self.stack.last().map(|view| &view.tree.view) {
             Some(View::List(list)) if !list.loading => list
+                .empty_state
+                .as_ref()
+                .map_or(&[], |state| &state.actions),
+            Some(View::Grid(grid)) if !grid.loading => grid
                 .empty_state
                 .as_ref()
                 .map_or(&[], |state| &state.actions),
@@ -864,11 +977,50 @@ impl Launcher {
     /// the record that opened them, and detail views have none.
     fn view_item_id(&self) -> Option<String> {
         match self.stack.last().map(|view| &view.tree.view) {
-            Some(View::List(_)) => self.view_selected().map(|item| item.id.clone()),
+            Some(View::List(_) | View::Grid(_)) => {
+                self.entry_selected().map(|entry| entry.id().to_string())
+            }
             Some(View::Form(form)) => form.item_id.clone(),
             Some(View::Detail(_)) | None => None,
         }
     }
+}
+
+/// Items in section order, narrowed by the query when the launcher filters,
+/// without the groups left empty. Items naming no declared section come first.
+fn group<'a, T: Grouped>(
+    items: &'a [T],
+    sections: &'a [Section],
+    filtering: &Filtering,
+    query: &str,
+) -> Vec<(Option<&'a Section>, Vec<&'a T>)> {
+    let needle = query.to_lowercase();
+    let shown = |item: &&T| {
+        *filtering != Filtering::Launcher
+            || needle.is_empty()
+            || item.title().to_lowercase().contains(&needle)
+            || item
+                .keywords()
+                .iter()
+                .any(|keyword| keyword.to_lowercase().contains(&needle))
+    };
+    let declared = |id: &str| sections.iter().any(|section| section.id == id);
+    let loose = items
+        .iter()
+        .filter(|item| item.section().is_none_or(|id| !declared(id)))
+        .filter(shown)
+        .collect();
+    let mut groups = vec![(None, loose)];
+    for section in sections {
+        let members = items
+            .iter()
+            .filter(|item| item.section() == Some(section.id.as_str()))
+            .filter(shown)
+            .collect();
+        groups.push((Some(section), members));
+    }
+    groups.retain(|(_, members): &(_, Vec<_>)| !members.is_empty());
+    groups
 }
 
 /// What a field submits until the user changes it. A dropdown without a value

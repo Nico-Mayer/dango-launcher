@@ -54,9 +54,9 @@
 
 ## 8. Grid view
 
-- [ ] 8.1 Add `GridView` with columns 4 to 8, aspect, and image, colour, or glyph content, rejecting other column counts with "This view can't be shown"; verify reducer tests for a two-column grid and a valid five-column grid
-- [ ] 8.2 Add grid navigation to the reducer per design D9; verify reducer tests for the scenarios in `list-navigation` "A grid moves in four directions"
-- [ ] 8.3 Render tiles in a `ScrollView` with computed positions, titles below, and the selected tile outlined in accent; verify a UI test for twelve tiles in five columns and that Arrow Left does not move the SearchBar's text cursor
+- [x] 8.1 Add `GridView` with columns 4 to 8, aspect, and image, colour, or glyph content, rejecting other column counts with "This view can't be shown"; verify reducer tests for a two-column grid and a valid five-column grid
+- [x] 8.2 Add grid navigation to the reducer per design D9; verify reducer tests for the scenarios in `list-navigation` "A grid moves in four directions"
+- [x] 8.3 Render tiles in a `ScrollView` with computed positions, titles below, and the selected tile outlined in accent; verify a UI test for twelve tiles in five columns and that Arrow Left does not move the SearchBar's text cursor
 
 ## 9. Filter dropdown
 

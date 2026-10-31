@@ -18,12 +18,15 @@ pub fn init(ui: &LauncherWindow, icons: &Icons) {
     shell.set_panel_key(keys::panel_label().into());
 }
 
-pub fn write(ui: &LauncherWindow, snapshot: &Snapshot, kind: ScreenKind, icons: &Icons) {
+pub fn write(
+    ui: &LauncherWindow,
+    snapshot: &Snapshot,
+    kind: ScreenKind,
+    typing: bool,
+    icons: &Icons,
+) {
     let shell = ui.global::<Shell>();
     shell.set_screen(kind);
-    let typing = matches!(&snapshot.screen, Screen::Root(_))
-        || matches!(kind, ScreenKind::List)
-        || matches!(&snapshot.screen, Screen::View(_)) && kind == ScreenKind::Empty;
     shell.set_typing(typing);
     shell.set_can_go_back(!matches!(snapshot.screen, Screen::Root(_)));
     shell.set_loading(matches!(&snapshot.screen, Screen::View(view) if view.busy));

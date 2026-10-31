@@ -150,7 +150,11 @@ impl Harness {
     }
 
     fn query(&self) -> String {
-        self.find("Search apps and commands")
+        self.query_of("Search apps and commands")
+    }
+
+    fn query_of(&self, placeholder: &str) -> String {
+        self.find(placeholder)
             .and_then(|prompt| prompt.accessible_value())
             .unwrap_or_default()
             .to_string()
@@ -871,6 +875,59 @@ mod form {
             h.find("Folder").unwrap().accessible_value().as_deref(),
             Some("Personal")
         );
+    }
+}
+
+mod grid {
+    use super::*;
+    use crate::protocol::{GridItem, GridView, TileContent};
+
+    fn grid_tree(count: usize) -> ViewTree {
+        ViewTree::new(View::Grid(GridView {
+            columns: 5,
+            aspect: 1.0,
+            filtering: Filtering::Command,
+            items: (1..=count)
+                .map(|n| GridItem {
+                    id: format!("tile-{n}"),
+                    title: format!("Tile {n}"),
+                    content: TileContent::Glyph {
+                        glyph: "★".into()
+                    },
+                    ..Default::default()
+                })
+                .collect(),
+            ..Default::default()
+        }))
+    }
+
+    #[test]
+    fn twelve_tiles_fill_three_rows_of_five() {
+        let h = Harness::root(results(1));
+        h.view(grid_tree(12));
+        assert_eq!(h.shell().get_screen(), ScreenKind::Grid);
+        let place = |n: usize| h.row(&format!("tile-{n}")).absolute_position();
+        for n in 2..=5 {
+            assert_eq!(place(n).y, place(1).y, "tile {n} is in the first row");
+        }
+        assert!(place(6).y > place(1).y);
+        assert_eq!(place(6).x, place(1).x);
+        assert!(place(11).y > place(6).y);
+        assert_eq!(place(12).y, place(11).y);
+        assert_eq!(h.row("tile-1").accessible_item_selected(), Some(true));
+    }
+
+    #[test]
+    fn arrow_left_moves_the_selection_not_the_text_cursor() {
+        let h = Harness::root(results(1));
+        h.view(grid_tree(12));
+        h.type_text("ab");
+        h.key("\u{F703}");
+        assert_eq!(h.row("tile-2").accessible_item_selected(), Some(true));
+        h.key("\u{F702}");
+        assert_eq!(h.row("tile-1").accessible_item_selected(), Some(true));
+        h.type_text("c");
+        assert_eq!(h.query_of("Search"), "abc");
     }
 }
 

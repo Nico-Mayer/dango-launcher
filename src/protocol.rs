@@ -26,6 +26,7 @@ protocol_types! {
     #[serde(tag = "kind", rename_all = "camelCase")]
     pub enum View {
         List(ListView),
+        Grid(GridView),
         Detail(DetailView),
         Form(FormView),
     }
@@ -45,6 +46,55 @@ protocol_types! {
         #[serde(default)]
         pub detail_pane: bool,
         pub items: Vec<ListItem>,
+    }
+
+    /// Tiles in a fixed number of columns. Shares the list's sections,
+    /// filtering, empty state, and actions.
+    #[derive(Default)]
+    #[serde(rename_all = "camelCase")]
+    pub struct GridView {
+        /// From 4 to 8; any other count is refused.
+        pub columns: u8,
+        /// A tile's width over its height.
+        #[serde(default = "square")]
+        pub aspect: f32,
+        #[serde(default)]
+        pub filtering: Filtering,
+        #[serde(default)]
+        pub loading: bool,
+        #[serde(default)]
+        pub empty_state: Option<EmptyState>,
+        #[serde(default)]
+        pub sections: Vec<Section>,
+        pub items: Vec<GridItem>,
+    }
+
+    #[derive(Default)]
+    #[serde(rename_all = "camelCase")]
+    pub struct GridItem {
+        pub id: String,
+        pub title: String,
+        #[serde(default)]
+        pub subtitle: Option<String>,
+        pub content: TileContent,
+        #[serde(default)]
+        pub section: Option<String>,
+        #[serde(default)]
+        pub keywords: Vec<String>,
+        #[serde(default)]
+        pub actions: Vec<Action>,
+    }
+
+    #[derive(Default)]
+    #[serde(tag = "kind", rename_all = "camelCase")]
+    pub enum TileContent {
+        /// `icon:<name>` or a path to an image file.
+        Image { image: String },
+        /// `#rrggbb`.
+        Color { color: String },
+        Glyph { glyph: String },
+        #[default]
+        Empty,
     }
 
     #[serde(rename_all = "camelCase")]
@@ -255,6 +305,13 @@ protocol_types! {
         },
     }
 }
+
+fn square() -> f32 {
+    1.0
+}
+
+/// The column counts a grid may declare.
+pub const GRID_COLUMNS: std::ops::RangeInclusive<u8> = 4..=8;
 
 impl FieldKind {
     /// Keeps Enter for a newline, so the form submits on Cmd or Ctrl with Enter.

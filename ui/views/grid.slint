@@ -1,0 +1,113 @@
+import { ScrollView } from "std-widgets.slint";
+import { Theme } from "../theme.slint";
+import { Icon, IconKind } from "../atoms/icon.slint";
+import { GridData, Intents, Panel, Shell, TileData, TileKind } from "../globals.slint";
+
+component Tile inherits Rectangle {
+    in property <TileData> data;
+    accessible-role: list-item;
+    accessible-label: root.data.id;
+    accessible-item-selected: root.data.selected;
+
+    box := Rectangle {
+        y: 0;
+        height: root.data.box-height;
+        border-radius: Theme.radius;
+        background: root.data.kind == TileKind.color ? root.data.color : Theme.raised;
+        border-width: root.data.selected ? 2px : 1px;
+        border-color: root.data.selected ? Theme.accent : Theme.border;
+        clip: true;
+
+        if root.data.kind == TileKind.image: Image {
+            width: parent.width;
+            height: parent.height;
+            source: root.data.image;
+            image-fit: root.data.image-kind == IconKind.named ? ImageFit.contain : ImageFit.cover;
+            colorize: root.data.image-kind == IconKind.named ? Theme.muted : transparent;
+        }
+        if root.data.kind == TileKind.glyph: Text {
+            text: root.data.glyph;
+            color: Theme.text;
+            font-size: min(parent.height, parent.width) / 2;
+            horizontal-alignment: center;
+            vertical-alignment: center;
+            accessible-role: none;
+        }
+        Rectangle {
+            background: root.data.selected ? Theme.selection
+                : touch.has-hover && !Shell.pointer-resting ? Theme.hover : transparent;
+        }
+    }
+
+    Text {
+        y: root.data.box-height + 4px;
+        height: 16px;
+        width: parent.width;
+        text: root.data.title;
+        color: root.data.selected ? Theme.text : Theme.muted;
+        font-size: Theme.text-small;
+        horizontal-alignment: center;
+        overflow: elide;
+        accessible-role: none;
+    }
+
+    touch := TouchArea {
+        clicked => {
+            if !Panel.open {
+                Intents.activate(root.data.id);
+            }
+        }
+        changed mouse-x => {
+            Shell.pointer-resting = false;
+        }
+        changed mouse-y => {
+            Shell.pointer-resting = false;
+        }
+    }
+}
+
+/// Tiles in a fixed number of columns, placed by the renderer so a repeater
+/// can fill rows under section headings.
+export component Grid inherits Rectangle {
+    public function reveal(top: length, height: length) {
+        if top + scroller.content-y < 0 {
+            scroller.content-y = -top;
+        } else if top + height + scroller.content-y > scroller.visible-height {
+            scroller.content-y = scroller.visible-height - top - height;
+        }
+    }
+
+    scroller := ScrollView {
+        content-width: self.visible-width;
+        content-height: GridData.content-height;
+        accessible-role: AccessibleRole.list;
+        for tile in GridData.tiles: Rectangle {
+            x: tile.x;
+            y: tile.y;
+            width: tile.width;
+            height: tile.height;
+            if tile.heading != "": HorizontalLayout {
+                spacing: Theme.gap;
+                alignment: start;
+                Text {
+                    text: tile.heading;
+                    color: Theme.muted;
+                    font-size: Theme.text-small;
+                    font-weight: 500;
+                    vertical-alignment: center;
+                    accessible-role: AccessibleRole.text;
+                    accessible-label: tile.heading;
+                }
+                if tile.heading-subtitle != "": Text {
+                    text: tile.heading-subtitle;
+                    color: Theme.muted;
+                    font-size: Theme.text-small;
+                    vertical-alignment: center;
+                }
+            }
+            if tile.heading == "": Tile {
+                data: tile;
+            }
+        }
+    }
+}

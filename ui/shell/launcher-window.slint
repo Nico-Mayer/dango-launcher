@@ -4,6 +4,7 @@ import { SearchBar } from "search-bar.slint";
 import { ActionBar } from "action-bar.slint";
 import { ActionPanel } from "action-panel.slint";
 import { List } from "../views/list.slint";
+import { Grid } from "../views/grid.slint";
 import { Detail } from "../views/detail.slint";
 import { EmptyView } from "../views/empty-view.slint";
 import { Form } from "../views/form.slint";
@@ -35,6 +36,10 @@ export component LauncherWindow inherits Window {
 
     public function reveal-row(top: length, height: length) {
         list.reveal(top, height);
+    }
+
+    public function reveal-tile(top: length, height: length) {
+        grid.reveal(top, height);
     }
 
     public function reveal-action(top: length, height: length) {
@@ -76,6 +81,11 @@ export component LauncherWindow inherits Window {
 
             list := List {
                 visible: Shell.screen == ScreenKind.root || Shell.screen == ScreenKind.list;
+                y: parent.body-top;
+                height: parent.body-height;
+            }
+            grid := Grid {
+                visible: Shell.screen == ScreenKind.grid;
                 y: parent.body-top;
                 height: parent.body-height;
             }

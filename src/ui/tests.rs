@@ -234,6 +234,7 @@ impl Harness {
             Screen::Root(root) => root.selected,
             Screen::View(view) => match view.body {
                 ViewBody::List(list) => list.selected,
+                ViewBody::Grid(grid) => grid.selected,
                 _ => None,
             },
             Screen::Error(_) => None,
@@ -735,6 +736,109 @@ fn enter_in_a_form_submits_its_primary_action_with_the_values() {
     assert_eq!(values["password"], "fixture-only");
     assert_eq!(values["enabled"], "true");
     assert_eq!(values["template"], "Hello {{name}}");
+}
+
+// Grid
+
+fn grid_tree(columns: u8, count: usize) -> ViewTree {
+    ViewTree::new(View::Grid(crate::protocol::GridView {
+        columns,
+        aspect: 1.0,
+        items: (1..=count)
+            .map(|n| crate::protocol::GridItem {
+                id: format!("tile-{n}"),
+                title: format!("Tile {n}"),
+                content: crate::protocol::TileContent::Glyph {
+                    glyph: "★".into()
+                },
+                actions: actions(),
+                ..Default::default()
+            })
+            .collect(),
+        ..Default::default()
+    }))
+}
+
+fn tile(n: usize) -> Option<String> {
+    Some(format!("tile-{n}"))
+}
+
+fn grid_from(columns: u8, count: usize, selected: usize) -> Harness {
+    let mut h = Harness::view(grid_tree(columns, count));
+    for _ in 1..selected {
+        h.press("ArrowRight");
+    }
+    assert_eq!(h.selected(), tile(selected));
+    h
+}
+
+#[test]
+fn a_grid_outside_four_to_eight_columns_is_refused() {
+    let h = Harness::view(grid_tree(2, 4));
+    let Screen::Error(text) = h.snapshot().screen else {
+        panic!("expected the invalid view");
+    };
+    assert_eq!(text.title, "This view can't be shown");
+}
+
+#[test]
+fn a_five_column_grid_shows_its_tiles() {
+    let h = Harness::view(grid_tree(5, 12));
+    let ViewBody::Grid(grid) = h.view_body() else {
+        panic!("expected a grid");
+    };
+    assert_eq!(grid.columns, 5);
+    assert_eq!(grid.sections[0].items.len(), 12);
+    assert_eq!(grid.selected, tile(1));
+    assert_eq!(h.snapshot().focus, Focus::ViewInput);
+}
+
+#[test]
+fn a_grid_moves_right_and_wraps_into_the_next_row() {
+    let mut h = grid_from(5, 12, 2);
+    h.press("ArrowRight");
+    assert_eq!(h.selected(), tile(3));
+    let mut h = grid_from(5, 12, 5);
+    h.press("ArrowRight");
+    assert_eq!(h.selected(), tile(6));
+}
+
+#[test]
+fn a_grid_moves_down_by_a_row() {
+    let mut h = grid_from(5, 12, 2);
+    h.press("ArrowDown");
+    assert_eq!(h.selected(), tile(7));
+    h.press("ArrowUp");
+    assert_eq!(h.selected(), tile(2));
+}
+
+#[test]
+fn moving_down_into_a_short_row_takes_its_last_tile() {
+    let mut h = grid_from(5, 7, 5);
+    h.press("ArrowDown");
+    assert_eq!(h.selected(), tile(7));
+}
+
+#[test]
+fn the_last_tile_stays() {
+    let mut h = grid_from(5, 7, 7);
+    h.press("ArrowRight");
+    assert_eq!(h.selected(), tile(7));
+    h.press("ArrowDown");
+    assert_eq!(h.selected(), tile(7));
+}
+
+#[test]
+fn a_grid_binds_left_and_right() {
+    let h = Harness::view(grid_tree(5, 3));
+    let bound = |key| {
+        h.snapshot()
+            .bindings
+            .iter()
+            .any(|binding| binding.chord == Chord::plain(key))
+    };
+    assert!(bound("ArrowLeft"));
+    assert!(bound("ArrowRight"));
 }
 
 // Forms

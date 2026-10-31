@@ -3,7 +3,7 @@ import { AccessoryData } from "atoms/accessory.slint";
 import { ToastStyle } from "atoms/dot.slint";
 import { OptionData } from "atoms/dropdown.slint";
 
-export enum ScreenKind { root, list, detail, form, empty }
+export enum ScreenKind { root, list, grid, detail, form, empty }
 
 /// A non-empty heading makes this a section heading rather than an item.
 export struct RowData {
@@ -27,6 +27,28 @@ export struct ActionData {
     title: string,
     shortcut: string,
     danger: bool,
+    selected: bool,
+}
+
+export enum TileKind { none, image, color, glyph }
+
+/// A tile or, with a non-empty heading, a section heading, placed by the
+/// renderer.
+export struct TileData {
+    heading: string,
+    heading-subtitle: string,
+    id: string,
+    title: string,
+    x: length,
+    y: length,
+    width: length,
+    height: length,
+    box-height: length,
+    kind: TileKind,
+    image: image,
+    image-kind: IconKind,
+    color: color,
+    glyph: string,
     selected: bool,
 }
 
@@ -82,6 +104,11 @@ export global Search {
 export global ListData {
     in property <[RowData]> rows;
     in property <bool> detail-pane;
+}
+
+export global GridData {
+    in property <[TileData]> tiles;
+    in property <length> content-height;
 }
 
 export global EmptyData {

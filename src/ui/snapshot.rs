@@ -1,6 +1,8 @@
 use serde::Serialize;
 
-use crate::protocol::{Action, FieldKind, FieldOption, ListItem, Metadata, View};
+use crate::protocol::{
+    Action, EmptyState, FieldKind, FieldOption, GridItem, ListItem, Metadata, View,
+};
 
 use super::input::{Chord, Context, ResultItem};
 use super::state::{Launcher, Mode, PushedView, ToastStyle, ViewError};
@@ -96,6 +98,7 @@ snapshot_types! {
     #[serde(tag = "kind", rename_all = "camelCase")]
     pub enum ViewBody {
         List(ListBody),
+        Grid(GridBody),
         Detail(DetailBody),
         Form(FormBody),
     }
@@ -108,6 +111,23 @@ snapshot_types! {
         pub pane: Option<DetailBody>,
         pub selected: Option<String>,
         pub empty: Option<EmptyText>,
+    }
+
+    #[serde(rename_all = "camelCase")]
+    pub struct GridBody {
+        pub query: Text,
+        pub columns: u8,
+        pub aspect: f32,
+        pub sections: Vec<GridSection>,
+        pub selected: Option<String>,
+        pub empty: Option<EmptyText>,
+    }
+
+    #[serde(rename_all = "camelCase")]
+    pub struct GridSection {
+        pub title: Option<String>,
+        pub subtitle: Option<String>,
+        pub items: Vec<GridItem>,
     }
 
     #[serde(rename_all = "camelCase")]
@@ -196,7 +216,7 @@ impl Launcher {
                 Mode::Error => Focus::Nothing,
                 Mode::Panel => Focus::Panel,
                 Mode::Root => Focus::RootInput,
-                Mode::List => Focus::ViewInput,
+                Mode::List | Mode::Grid => Focus::ViewInput,
                 Mode::Detail => Focus::Detail,
                 Mode::Form => Focus::Form,
             },
@@ -232,6 +252,22 @@ impl Launcher {
                 let mut keys = ["Escape", "ArrowUp", "ArrowDown", "Enter"]
                     .map(plain)
                     .to_vec();
+                keys.push(anywhere(Chord::command("k")));
+                keys
+            }
+            // Left and Right move the selection, so they never reach the
+            // SearchBar's text cursor.
+            Mode::Grid => {
+                let mut keys = [
+                    "Escape",
+                    "ArrowUp",
+                    "ArrowDown",
+                    "ArrowLeft",
+                    "ArrowRight",
+                    "Enter",
+                ]
+                .map(plain)
+                .to_vec();
                 keys.push(anywhere(Chord::command("k")));
                 keys
             }
@@ -314,30 +350,12 @@ impl Launcher {
                         items: items.into_iter().cloned().collect(),
                     })
                     .collect();
-                // A loading list says so in its busy toast, not in its body.
-                let empty = (sections.is_empty() && !list.loading).then(|| {
-                    if !view.query.is_empty() {
-                        EmptyText {
-                            icon: list
-                                .empty_state
-                                .as_ref()
-                                .and_then(|s| s.icon.clone())
-                                .or_else(|| Some(SEARCH_ICON.to_string())),
-                            title: format!("No results for “{}”", view.query),
-                            description: None,
-                            truncate: true,
-                        }
-                    } else if let Some(state) = &list.empty_state {
-                        EmptyText {
-                            icon: state.icon.clone().or_else(|| Some(SEARCH_ICON.to_string())),
-                            title: state.title.clone(),
-                            description: state.description.clone(),
-                            truncate: false,
-                        }
-                    } else {
-                        EmptyText::plain("Nothing to show")
-                    }
-                });
+                let empty = empty_text(
+                    sections.is_empty(),
+                    list.loading,
+                    &view.query,
+                    list.empty_state.as_ref(),
+                );
                 ViewBody::List(ListBody {
                     query: Text {
                         text: view.query.clone(),
@@ -354,6 +372,34 @@ impl Launcher {
                             .unwrap_or_default()
                     }),
                     selected: self.view_selected().map(|item| item.id.clone()),
+                    empty,
+                })
+            }
+            View::Grid(grid) => {
+                let sections: Vec<GridSection> = self
+                    .grid_sections()
+                    .into_iter()
+                    .map(|(section, items)| GridSection {
+                        title: section.map(|s| s.title.clone()),
+                        subtitle: section.and_then(|s| s.subtitle.clone()),
+                        items: items.into_iter().cloned().collect(),
+                    })
+                    .collect();
+                let empty = empty_text(
+                    sections.is_empty(),
+                    grid.loading,
+                    &view.query,
+                    grid.empty_state.as_ref(),
+                );
+                ViewBody::Grid(GridBody {
+                    query: Text {
+                        text: view.query.clone(),
+                        revision: view.query_revision,
+                    },
+                    columns: grid.columns,
+                    aspect: grid.aspect,
+                    sections,
+                    selected: self.entry_selected().map(|entry| entry.id().to_string()),
                     empty,
                 })
             }
@@ -453,9 +499,43 @@ impl Launcher {
 
 const SEARCH_ICON: &str = "icon:search";
 
+/// What a list or grid with nothing to show says. A loading view says so in
+/// its busy toast, not in its body.
+fn empty_text(
+    nothing: bool,
+    loading: bool,
+    query: &str,
+    state: Option<&EmptyState>,
+) -> Option<EmptyText> {
+    if !nothing || loading {
+        return None;
+    }
+    let icon = state
+        .and_then(|state| state.icon.clone())
+        .or_else(|| Some(SEARCH_ICON.to_string()));
+    Some(if !query.is_empty() {
+        EmptyText {
+            icon,
+            title: format!("No results for “{query}”"),
+            description: None,
+            truncate: true,
+        }
+    } else if let Some(state) = state {
+        EmptyText {
+            icon,
+            title: state.title.clone(),
+            description: state.description.clone(),
+            truncate: false,
+        }
+    } else {
+        EmptyText::plain("Nothing to show")
+    })
+}
+
 fn error_text(error: ViewError) -> EmptyText {
     let title = match error {
         ViewError::Unsupported => "This view needs a newer version of Dango",
+        ViewError::Invalid => "This view can't be shown",
     };
     EmptyText {
         icon: Some("icon:triangle-alert".to_string()),
@@ -479,6 +559,7 @@ impl EmptyText {
 fn is_busy(view: &View) -> bool {
     match view {
         View::List(list) => list.loading,
+        View::Grid(grid) => grid.loading,
         View::Detail(detail) => detail.loading,
         View::Form(_) => false,
     }

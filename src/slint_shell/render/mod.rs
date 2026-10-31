@@ -6,6 +6,7 @@
 mod detail;
 mod empty;
 mod form;
+mod grid;
 mod list;
 mod panel;
 mod shell;
@@ -27,8 +28,10 @@ pub struct Renderer {
     list: list::Writer,
     panel: panel::Writer,
     form: form::Writer,
+    grid: grid::Writer,
     detail: detail::Writer,
-    query: Option<(ScreenKind, u64)>,
+    /// Whether root or a view holds the query, and the revision last written.
+    query: Option<(bool, u64)>,
     activation: u64,
     focus: Option<Focus>,
     /// The activation probe still waiting for its frame.
@@ -43,6 +46,7 @@ impl Renderer {
             list: list::Writer::new(ui),
             panel: panel::Writer::new(ui),
             form: form::Writer::new(ui),
+            grid: grid::Writer::new(ui),
             detail: detail::Writer::new(ui),
             icons,
             last: None,
@@ -67,7 +71,7 @@ impl Renderer {
 
     pub fn render(&mut self, ui: &LauncherWindow, snapshot: Snapshot) {
         let kind = screen_kind(&snapshot.screen);
-        shell::write(ui, &snapshot, kind, &self.icons);
+        shell::write(ui, &snapshot, kind, typing(&snapshot.screen), &self.icons);
 
         let mut selected = None;
         match &snapshot.screen {
@@ -76,7 +80,7 @@ impl Renderer {
                 empty::write(ui, text, &self.icons);
             }
             Screen::Root(root) => {
-                self.write_query(ui, kind, &root.query.text, root.query.revision);
+                self.write_query(ui, true, &root.query.text, root.query.revision);
                 self.list.root(ui, root, &self.icons);
                 if let Some(text) = &root.empty {
                     empty::write(ui, text, &self.icons);
@@ -85,7 +89,7 @@ impl Renderer {
             }
             Screen::View(view) => match &view.body {
                 ViewBody::List(body) => {
-                    self.write_query(ui, kind, &body.query.text, body.query.revision);
+                    self.write_query(ui, false, &body.query.text, body.query.revision);
                     self.list.view(ui, body, &self.icons);
                     if let Some(pane) = &body.pane {
                         self.detail.write(pane);
@@ -95,15 +99,18 @@ impl Renderer {
                     }
                     selected = body.selected.clone();
                 }
+                ViewBody::Grid(body) => {
+                    self.write_query(ui, false, &body.query.text, body.query.revision);
+                    self.grid.write(ui, body, &self.icons);
+                    if let Some(text) = &body.empty {
+                        empty::write(ui, text, &self.icons);
+                    }
+                }
                 ViewBody::Detail(body) => self.detail.write(body),
                 ViewBody::Form(body) => self.form.write(body),
             },
         }
-        if !matches!(
-            kind,
-            ScreenKind::Root | ScreenKind::List | ScreenKind::Empty
-        ) || matches!(snapshot.screen, Screen::Error(_))
-        {
+        if !typing(&snapshot.screen) {
             self.query = None;
         }
         if kind != ScreenKind::Form {
@@ -118,15 +125,10 @@ impl Renderer {
 
     /// Writes the field only when the revision moved, so an answer to an older
     /// keystroke never overwrites newer typing.
-    fn write_query(&mut self, ui: &LauncherWindow, kind: ScreenKind, text: &str, revision: u64) {
-        let kind = if kind == ScreenKind::Empty {
-            ScreenKind::List
-        } else {
-            kind
-        };
-        if self.query != Some((kind, revision)) {
+    fn write_query(&mut self, ui: &LauncherWindow, root: bool, text: &str, revision: u64) {
+        if self.query != Some((root, revision)) {
             ui.invoke_set_query(text.into());
-            self.query = Some((kind, revision));
+            self.query = Some((root, revision));
         }
     }
 
@@ -151,6 +153,16 @@ impl Renderer {
     }
 }
 
+/// Whether the SearchBar holds a query, which root, a list, and a grid do,
+/// empty or not.
+fn typing(screen: &Screen) -> bool {
+    match screen {
+        Screen::Root(_) => true,
+        Screen::View(view) => matches!(view.body, ViewBody::List(_) | ViewBody::Grid(_)),
+        Screen::Error(_) => false,
+    }
+}
+
 /// What the body of the launcher shows. An empty list is the empty view.
 fn screen_kind(screen: &Screen) -> ScreenKind {
     match screen {
@@ -160,6 +172,8 @@ fn screen_kind(screen: &Screen) -> ScreenKind {
         Screen::View(view) => match &view.body {
             ViewBody::List(list) if list.empty.is_some() => ScreenKind::Empty,
             ViewBody::List(_) => ScreenKind::List,
+            ViewBody::Grid(grid) if grid.empty.is_some() => ScreenKind::Empty,
+            ViewBody::Grid(_) => ScreenKind::Grid,
             ViewBody::Detail(_) => ScreenKind::Detail,
             ViewBody::Form(_) => ScreenKind::Form,
         },
