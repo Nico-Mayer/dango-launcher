@@ -209,10 +209,7 @@ unsafe fn apply_tool_window_style(hwnd: HWND) {
 /// thread lifts the restriction, which is the standard way around foreground
 /// lock.
 ///
-/// Deliberately no SetFocus on the target: activation already hands focus to
-/// the WebView2 child, and re-focusing the top-level window afterwards pulls it
-/// away for an instant, which fires blur in the page and dismisses the launcher
-/// as soon as it shows.
+/// No SetFocus on the target: activation already gives it the keyboard.
 pub(super) unsafe fn force_foreground(target: HWND) {
     // The lock is time based: after the launcher took the foreground, the system
     // refuses to give it away again until a timeout passes, and the request is

@@ -85,7 +85,7 @@ pub struct SnippetsExtension {
 }
 
 /// Opening a URL in whatever the user's default browser is. A trait so the
-/// extension can be tested without a running Tauri application.
+/// extension can be tested without opening a browser.
 pub trait OpenUrl: Send + Sync {
     fn open(&self, url: &str) -> Result<(), String>;
 }

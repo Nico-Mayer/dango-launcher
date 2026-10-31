@@ -2,9 +2,9 @@
 //! away to keep it bounded.
 //!
 //! Text lives in the row. An image lives as a PNG beside the database, because
-//! the webview can load a file through the asset protocol but cannot render a
-//! blob without a round trip, and because a blob would make the size ceiling a
-//! `VACUUM` problem in the file that also holds preferences and frecency.
+//! Slint loads an image from a path and caches it, and because a blob would
+//! make the size ceiling a `VACUUM` problem in the file that also holds
+//! preferences and frecency.
 
 use std::hash::{DefaultHasher, Hash, Hasher};
 use std::path::{Path, PathBuf};

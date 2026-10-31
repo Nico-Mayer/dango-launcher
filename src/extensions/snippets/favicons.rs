@@ -2,9 +2,9 @@
 //! keeps the two in step.
 //!
 //! One icon per host, so several quicklinks into the same site share a file and
-//! a request. The bytes are written exactly as they arrived, because the webview
+//! a request. The bytes are written exactly as they arrived, because Slint
 //! decodes PNG, ICO, SVG, JPEG, WebP and GIF on its own and a decode step here
-//! would only add a dependency and lose the formats it cannot read.
+//! would only add work and lose the formats it cannot read.
 //!
 //! The search path may not touch the network or the disk, so the cache holds an
 //! in-memory map from host to file and the provider does one lookup in it.
@@ -37,7 +37,7 @@ const MAX_BYTES: u64 = 256 * 1024;
 /// Marks a host that answered without a usable icon.
 const MISS_EXTENSION: &str = "miss";
 
-/// The formats both webviews draw, and so the only ones worth keeping.
+/// The favicon formats Slint draws, and so the only ones worth keeping.
 const DRAWABLE: [&str; 6] = ["png", "ico", "svg", "jpg", "webp", "gif"];
 
 const TIMEOUT: Duration = Duration::from_secs(5);
@@ -233,8 +233,8 @@ fn key(host: &str) -> String {
         .collect()
 }
 
-/// The file extension for a content type, or `None` for anything the webview
-/// cannot draw. The parameters after a `;` and the case are ignored, because
+/// The file extension for a content type, or `None` for anything Slint cannot
+/// draw. The parameters after a `;` and the case are ignored, because
 /// both vary by server.
 fn extension_for(content_type: &str) -> Option<&'static str> {
     let kind = content_type.split(';').next()?.trim().to_ascii_lowercase();
@@ -561,7 +561,7 @@ mod tests {
     }
 
     #[test]
-    fn every_type_the_webview_draws_maps_to_an_extension() {
+    fn every_type_slint_draws_maps_to_an_extension() {
         for (content_type, extension) in [
             ("image/png", "png"),
             ("image/x-icon", "ico"),
@@ -866,8 +866,8 @@ mod tests {
     }
 
     /// Fetches from the real internet, so it runs only when asked for by name.
-    /// The check that matters is that a live site answers with a type the
-    /// webview can draw, which no fake can tell us.
+    /// The check that matters is that a live site answers with a type
+    /// Slint can draw, which no fake can tell us.
     #[test]
     #[ignore]
     fn real_sites_answer_with_something_drawable() {

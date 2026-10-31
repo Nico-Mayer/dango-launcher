@@ -278,9 +278,9 @@ mod harness {
         // Drives the launcher's own create form, which is the only way a record
         // is written by the app rather than by hand.
         // Note for anyone picking this up: driving the launcher's own create
-        // form was tried and abandoned. The form is a webview, and synthesized
-        // keystrokes reach it out of order even at 180ms spacing ("ProbeName"
-        // arriving as "eNamePro"), while a synthesized Tab is typed into the
+        // form was tried and abandoned. In the old webview UI, synthesized
+        // keystrokes reached it out of order even at 180ms spacing ("ProbeName"
+        // arriving as "eNamePro"), while a synthesized Tab was typed into the
         // field instead of moving focus. Records written by hand are covered
         // above; a record written by the app is not, and saying so is better
         // than a check that passes for the wrong reason.

@@ -3,8 +3,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Mutex;
 use std::time::Instant;
 
-/// Measures hotkey-to-paint against a single monotonic clock on the Rust side,
-/// so the number is not distorted by clock skew between Rust and the webview.
+/// Measures hotkey-to-paint against a single monotonic clock.
 #[derive(Default)]
 pub struct LatencyProbe {
     next_id: AtomicU64,

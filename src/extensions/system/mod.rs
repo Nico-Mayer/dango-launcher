@@ -33,8 +33,6 @@ pub const ACTION_CANCEL: &str = "cancel";
 pub const ACTION_QUIT: &str = "quit";
 
 /// Hands a file to whatever the operating system associates with its type.
-/// Implemented on the app handle, where the opener plugin lives, so the
-/// extension never sees Tauri.
 pub trait OpenFile: Send + Sync {
     fn open(&self, path: &Path) -> Result<(), String>;
 }

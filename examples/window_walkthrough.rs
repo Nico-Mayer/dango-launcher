@@ -110,7 +110,7 @@ mod windows_harness {
     }
 
     pub fn run() {
-        // Match the launcher, which Tauri runs per-monitor DPI aware. Without
+        // Match the launcher, which runs per-monitor DPI aware. Without
         // this the process is DPI-virtualised and every coordinate it reads or
         // writes is scaled, so placement can never land where the geometry says.
         unsafe {

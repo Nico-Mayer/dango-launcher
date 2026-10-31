@@ -20,8 +20,8 @@ pub type ActivationResult = Result<(), Box<dyn std::error::Error + Send + Sync>>
 pub type FormValues = std::collections::HashMap<String, String>;
 
 /// What running an action on a result produced. `Done` means the work is
-/// finished and the launcher should get out of the way; a copy hands text back
-/// because only the webview can reach the clipboard.
+/// finished and the launcher should get out of the way; a copy hands its text
+/// back for the core to write to the clipboard.
 #[derive(Debug, PartialEq)]
 pub enum ActionOutcome {
     Done,
