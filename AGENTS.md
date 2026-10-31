@@ -52,6 +52,8 @@ spend design on honouring old values.
 - Linux is out of scope. No Linux code, no Wayland design, no Linux branches
   "just in case".
 - Development happens on both macOS and Windows, daily use on Windows.
+- Text input covers English and German keyboards only. No IME, non-Latin
+  script, or right-to-left requirements, checks, or tests.
 - OS-specific code sits behind narrow Rust traits (for example `WindowManager`,
   `ClipboardSource`, `KeyMonitor`, `AppIndexer`), implemented in
   `platform/windows` and `platform/macos`. Never scatter `cfg` attributes
