@@ -31,8 +31,10 @@ cargo test                   # every test, the UI included
 cargo build --release        # target/release/dango(.exe)
 ```
 
-A release build is installed by hand for now: copy the binary somewhere stable
-and start it. Starting it again while it runs shows the launcher.
+Releases come from CI (see below). To build an installer locally, run
+`cargo packager --release --formats nsis` on Windows or
+`cargo packager --release --formats app,dmg` on macOS. Starting Dango again
+while it runs shows the launcher.
 
 ## Configuration
 
@@ -58,10 +60,6 @@ release task edits it; never bump it by hand.
 
 ## Releasing
 
-Releases are off until the native release pipeline lands: pushing a tag builds
-nothing. The steps below describe the release task, which still bumps the
-version, writes the changelog, and tags.
-
 Releases are cut from a clean, up-to-date `main`:
 
 ```sh
@@ -80,9 +78,11 @@ with a level or a version, for example `cargo release minor --execute` or
 
 The release commit touches `CHANGELOG.md`, `Cargo.toml`, and `Cargo.lock` and
 is tagged `vX.Y.Z`. The command refuses to run with uncommitted changes, from
-a branch other than `main`, or when the tag exists. The release workflow,
-`.github/workflows/release.yml`, only runs by hand while it waits for the
-native release pipeline.
+a branch other than `main`, or when the tag exists. Pushing the tag runs
+`.github/workflows/release.yml`: it builds both platforms, attaches the
+installers, the update files, and `latest.json`, and publishes the release
+once both builds succeeded. Running the workflow by hand is a dry run: it
+leaves a draft release named `dry-run-<run id>` and never publishes it.
 
 ### Changelog
 
@@ -95,15 +95,19 @@ Performance, `refactor` under Refactoring, `docs` under Documentation, and
 
 ### Installing a build
 
-Builds are unsigned. On macOS, Gatekeeper blocks a downloaded build until you
-clear the quarantine flag once:
+Download the installer from the latest GitHub release. After that, Dango
+updates itself from inside the app.
 
-```sh
-xattr -cr /Applications/Dango.app
-```
+- Windows: `dango_<version>_x64-setup.exe`. It installs for your user and needs
+  no administrator rights. The installer is unsigned, so SmartScreen warns on
+  the first run; choose "More info" and then "Run anyway".
+- macOS (Apple Silicon): `Dango_<version>_aarch64.dmg`. Drag Dango to
+  Applications. The app is signed but not notarized, so Gatekeeper blocks it
+  until you clear the quarantine flag once:
 
-On Windows, SmartScreen warns on the first run of a downloaded `.exe`; choose
-"More info" and then "Run anyway".
+  ```sh
+  xattr -cr /Applications/Dango.app
+  ```
 
 To start Dango at login, set `launcher.autostart` to `true` in the config file
 (see `docs/config.md`). The login entry records the path Dango was

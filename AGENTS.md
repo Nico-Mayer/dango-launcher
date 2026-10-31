@@ -236,8 +236,20 @@ load and are not reliable.
   `Cargo.toml`, so a release cannot open the port:
   `env SLINT_MCP_PORT=9315 cargo run --features slint/mcp`. It starts
   listening on the first window show; `.mcp.json` points `dango-ui` at it.
-- The updater and the release workflow are off until
-  `native-release-pipeline`. Builds are installed by hand.
-- A macOS bundle without `APPLE_SIGNING_IDENTITY` in the environment is
-  ad-hoc signed and carries no entitlements. Set it to the identity from
-  `security find-identity -v -p codesigning` to test a signed build.
+- Packaging is `cargo-packager`, configured in `[package.metadata.packager]`
+  in `Cargo.toml` with camelCase keys. Windows packages with
+  `cargo packager --release --formats nsis`, macOS with `--formats app,dmg`.
+  With `CARGO_PACKAGER_SIGN_PRIVATE_KEY` set, it writes a minisign `.sig` next
+  to each output and tars the `.app` into the `.app.tar.gz` the updater
+  installs.
+- cargo-packager writes no update manifest. The `manifest` job in
+  `release.yml` builds `latest.json` from the uploaded `.sig` files.
+- cargo-packager reads the macOS signing identity only from its config, and
+  `--config` replaces the `Cargo.toml` table instead of merging into it. CI
+  writes `signingIdentity` into `Cargo.toml` before packaging. Without it the
+  bundle is not codesigned and carries no entitlements. To test a signed build,
+  add `signingIdentity` locally with the identity from
+  `security find-identity -v -p codesigning`, and do not commit it.
+- On macOS the updater swaps the bundle in place and returns. Dango then
+  releases its single instance lock and starts the bundle again with
+  `open -n`. On Windows the NSIS installer exits Dango and starts it again.
