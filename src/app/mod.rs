@@ -30,7 +30,7 @@ use global_hotkey::hotkey::Modifiers;
 pub use startup::{cache_dir, start, Startup};
 
 /// The most results streamed to the renderer for one query.
-const RESULT_LIMIT: usize = 50;
+const RESULT_LIMIT: usize = ui::ITEM_LIMIT;
 
 const DEFAULT_RESET_AFTER_SECS: u32 = 60;
 

@@ -1,6 +1,6 @@
 ## 1. One limit for root and views
 
-- [ ] 1.1 Move the limit of 50 into one constant in `src/ui` and make `src/app`'s `RESULT_LIMIT` use it; verify `cargo test` passes unchanged (root search tests in `src/app/tests.rs` and `src/search`)
+- [x] 1.1 Move the limit of 50 into one constant in `src/ui` and make `src/app`'s `RESULT_LIMIT` use it; verify `cargo test` passes unchanged (root search tests in `src/app/tests.rs` and `src/search`)
 
 ## 2. Cap pushed lists and grids
 
