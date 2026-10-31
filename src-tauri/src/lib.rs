@@ -27,7 +27,7 @@ use tauri::{
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
 
 use extension::{ActionOutcome, EnabledStore, ExtensionHost, FormValues, HostResolver};
-use extensions::ai::{AiExtension, AuthFile, CliClient, Clients, GenAiClient};
+use extensions::ai::{AiExtension, AuthFile, GenAiClient};
 use extensions::applications::{AppIndex, ApplicationsExtension, IconCache};
 use extensions::clipboard::{
     ClipboardExtension, ClipboardSource, History, PreferencePolicy, Watcher,
@@ -1598,12 +1598,9 @@ pub fn run() {
             {
                 let parts = AiParts {
                     keys: Arc::new(AuthFile::new(config::auth_path())),
-                    client: Arc::new(Clients {
-                        service: Arc::new(GenAiClient::new(
-                            tauri::async_runtime::handle().inner().clone(),
-                        )),
-                        command: Arc::new(CliClient),
-                    }),
+                    client: Arc::new(GenAiClient::new(
+                        tauri::async_runtime::handle().inner().clone(),
+                    )),
                     text: app
                         .try_state::<Arc<TextExchange>>()
                         .map(|state| state.inner().clone() as Arc<dyn text::TextTarget>),

@@ -6,11 +6,10 @@
 //! settings, and the extension does the rest.
 
 use std::collections::BTreeMap;
-use std::path::PathBuf;
 
-use crate::config::{CommandSettings, Config, ProviderKind, ProviderSettings, SearchPath};
+use crate::config::{CommandSettings, Config, ProviderSettings};
 
-use super::provider::{CliSpec, Request, Thinking};
+use super::provider::{Request, Thinking};
 
 pub const EXTENSION_ID: &str = "dango.ai";
 pub const PREF_PROVIDER: &str = "provider";
@@ -186,7 +185,6 @@ pub struct Providers {
     entries: BTreeMap<String, ProviderSettings>,
     default_provider: Option<String>,
     default_thinking: Thinking,
-    search: Vec<PathBuf>,
 }
 
 /// Why a request could not even be made. Separate from a request that failed,
@@ -216,11 +214,6 @@ impl Providers {
             entries: extension.providers.clone(),
             default_provider: config.preference(EXTENSION_ID, None, PREF_PROVIDER),
             default_thinking,
-            search: extension
-                .path
-                .as_ref()
-                .map(SearchPath::for_platform)
-                .unwrap_or_default(),
         }
     }
 
@@ -237,13 +230,10 @@ impl Providers {
             // looking for the wrong thing: what is missing is which one to use.
             None => return Err(NotReady::NoDefault),
         };
-        let entry = self.entries.get(name).ok_or(NotReady::UnknownProvider)?;
-        // A command provider with no command cannot be used, so from the
-        // user's side it is not set up.
-        if entry.kind == ProviderKind::Cli && entry.command.is_none() {
-            return Err(NotReady::UnknownProvider);
-        }
-        let (name, entry) = self.entries.get_key_value(name).unwrap();
+        let (name, entry) = self
+            .entries
+            .get_key_value(name)
+            .ok_or(NotReady::UnknownProvider)?;
         Ok((name.as_str(), entry))
     }
 
@@ -253,9 +243,6 @@ impl Providers {
         let (name, entry) = self.choose(command.provider.as_deref())?;
         let model = match command.model.clone().or_else(|| entry.model.clone()) {
             Some(model) => model,
-            // A program picks its own model unless the arguments name one, so
-            // there is nothing to insist on here.
-            None if entry.kind == ProviderKind::Cli => String::new(),
             None => {
                 return Err(NotReady::NoModel {
                     provider: name.to_string(),
@@ -270,11 +257,6 @@ impl Providers {
             thinking: command.thinking.unwrap_or(self.default_thinking),
             prompt: String::new(),
             key: None,
-            cli: entry.command.as_ref().map(|command| CliSpec {
-                command: command.clone(),
-                args: entry.args.clone(),
-                search: self.search.clone(),
-            }),
         })
     }
 }
@@ -282,6 +264,7 @@ impl Providers {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::ProviderKind;
     use crate::templates::Template;
 
     fn config(json: &str) -> Config {
@@ -556,50 +539,6 @@ mod tests {
         let error = providers
             .resolve(&command(Some("openrouter"), None, None))
             .unwrap_err();
-        assert!(matches!(error, NotReady::UnknownProvider), "{error}");
-    }
-
-    #[test]
-    fn a_command_provider_resolves_to_its_program() {
-        let providers = Providers::from_config(&config(
-            r#"{ "extensions": { "dango.ai": { "providers": {
-                "claude": { "kind": "cli", "command": "claude", "args": ["-p"] }
-            } } } }"#,
-        ));
-        let request = providers.resolve(&command(None, None, None)).unwrap();
-        assert_eq!(request.kind, ProviderKind::Cli);
-        let cli = request.cli.expect("the program");
-        assert_eq!(cli.command, "claude");
-        assert_eq!(cli.args, ["-p"]);
-        assert_eq!(request.model, "", "a program needs no model named for it");
-        assert!(cli.search.is_empty());
-    }
-
-    #[test]
-    fn a_command_provider_carries_the_configured_directories() {
-        let providers = Providers::from_config(&config(
-            r#"{ "extensions": { "dango.ai": {
-                "path": ["/opt/one", "/opt/two"],
-                "providers": { "claude": { "kind": "cli", "command": "claude" } }
-            } } }"#,
-        ));
-        let cli = providers
-            .resolve(&command(None, None, None))
-            .unwrap()
-            .cli
-            .unwrap();
-        assert_eq!(
-            cli.search,
-            [PathBuf::from("/opt/one"), PathBuf::from("/opt/two")]
-        );
-    }
-
-    #[test]
-    fn a_command_provider_with_no_command_is_not_usable() {
-        let providers = Providers::from_config(&config(
-            r#"{ "extensions": { "dango.ai": { "providers": { "broken": { "kind": "cli" } } } } }"#,
-        ));
-        let error = providers.resolve(&command(None, None, None)).unwrap_err();
         assert!(matches!(error, NotReady::UnknownProvider), "{error}");
     }
 

@@ -43,15 +43,7 @@ impl Completions for GenAiClient {
 }
 
 async fn run(request: Request, sender: mpsc::Sender<Result<String, AiError>>) {
-    let client = match build(&request) {
-        Some(client) => client,
-        None => {
-            let _ = sender.send(Err(AiError::Unreachable {
-                provider: request.provider.clone(),
-            }));
-            return;
-        }
-    };
+    let client = build(&request);
 
     let chat = ChatRequest::default().append_message(ChatMessage::user(request.prompt.clone()));
     let options = options(&request);
@@ -84,8 +76,8 @@ async fn run(request: Request, sender: mpsc::Sender<Result<String, AiError>>) {
     }
 }
 
-fn build(request: &Request) -> Option<Client> {
-    let kind = adapter_kind(&request.kind)?;
+fn build(request: &Request) -> Client {
+    let kind = adapter_kind(&request.kind);
     let endpoint = Endpoint::from_owned(base_url(request));
     let auth = match &request.key {
         Some(key) => AuthData::from_single(key.clone()),
@@ -103,20 +95,16 @@ fn build(request: &Request) -> Option<Client> {
         },
     );
 
-    Some(
-        Client::builder()
-            .with_service_target_resolver(resolver)
-            .build(),
-    )
+    Client::builder()
+        .with_service_target_resolver(resolver)
+        .build()
 }
 
-fn adapter_kind(kind: &ProviderKind) -> Option<AdapterKind> {
+fn adapter_kind(kind: &ProviderKind) -> AdapterKind {
     match kind {
-        ProviderKind::Anthropic => Some(AdapterKind::Anthropic),
-        ProviderKind::Openai => Some(AdapterKind::OpenAI),
-        ProviderKind::Ollama => Some(AdapterKind::Ollama),
-        // Answered by the command client, which never asks this.
-        ProviderKind::Cli => None,
+        ProviderKind::Anthropic => AdapterKind::Anthropic,
+        ProviderKind::Openai => AdapterKind::OpenAI,
+        ProviderKind::Ollama => AdapterKind::Ollama,
     }
 }
 
@@ -246,7 +234,6 @@ mod tests {
             thinking: Thinking::Off,
             prompt: "Improve this.".into(),
             key: None,
-            cli: None,
         }
     }
 
@@ -382,7 +369,6 @@ mod tests {
             thinking: Thinking::Off,
             prompt: "Reply with exactly: pong".into(),
             key: None,
-            cli: None,
         });
 
         let mut answer = String::new();

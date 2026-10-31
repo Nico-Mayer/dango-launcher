@@ -37,7 +37,6 @@ Settings for the AI extension.
 | --- | --- | --- | --- | --- |
 | `commands` | map of [AI command settings](#ai-command-settings) |  |  | Per-command settings, keyed by command id. |
 | `enabled` | boolean |  |  | Whether the extension runs. Absent means enabled. |
-| `path` | [Search path](#search-path) |  |  | Directories searched for a command provider's program before PATH, in order: one list, or one per platform. A leading `~` is the home directory. |
 | `preferences` | object |  |  | The extension's preference values, overriding its defaults. |
 | `providers` | map of [Provider settings](#provider-settings) |  |  | Model services, keyed by the name commands refer to them by. That name is also the key its API key is filed under in auth.json. |
 
@@ -253,23 +252,12 @@ Per-command settings, keyed by command id.
 | --- | --- | --- | --- | --- |
 | `excluded-applications` | string |  |  | Applications where Dango must never send the copy chord to read a selection, comma separated and matched ignoring case. For editors that bind Ctrl+C to something of their own. Dango says it cannot read the selection there instead. |
 
-## Search path
-
-Directories to search: one list for both platforms, or one per platform.
-
-One of:
-
-- array
-- object
-
 ## Provider settings
 
 | Setting | Type | Default | Values | Description |
 | --- | --- | --- | --- | --- |
-| `args` | array |  |  | What to pass it. `{prompt}` and `{model}` are replaced where they appear; with no `{prompt}`, the prompt goes in on standard input. |
 | `baseUrl` | string |  |  | Where the service lives. Anthropic needs none; an OpenAI-compatible endpoint always does; Ollama defaults to the local one. |
-| `command` | string |  |  | The program to run, for a provider of the `cli` kind. |
-| `kind` | string |  | `anthropic`, `openai`, `ollama`, `cli` | The protocol a provider speaks. `openai` covers any OpenAI-compatible endpoint, such as OpenRouter, LM Studio, or vLLM. `cli` runs a program on this machine that takes a prompt and prints an answer. |
+| `kind` | string |  | `anthropic`, `openai`, `ollama` | The protocol a provider speaks. `openai` covers any OpenAI-compatible endpoint, such as OpenRouter, LM Studio, or vLLM. |
 | `model` | string |  |  | The model used by a command that names this provider but no model. |
 
 ## AI command settings

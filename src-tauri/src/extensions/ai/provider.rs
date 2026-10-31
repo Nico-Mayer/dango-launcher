@@ -4,21 +4,11 @@
 //! service lives on the other side of `Completions`, so the client can be
 //! swapped and a test can answer without a network.
 
-use std::path::PathBuf;
 use std::time::Duration;
 
 pub use crate::config::ProviderKind;
 
 pub use crate::config::Thinking;
-
-/// The program behind a provider of the `cli` kind.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct CliSpec {
-    pub command: String,
-    pub args: Vec<String>,
-    /// Searched for the command before PATH, in order.
-    pub search: Vec<PathBuf>,
-}
 
 /// One resolved request: which service, which model, what to ask, and the key
 /// to ask with. Built fresh per invocation, so no key is held between them.
@@ -32,15 +22,13 @@ pub struct Request {
     pub thinking: Thinking,
     pub prompt: String,
     pub key: Option<String>,
-    /// Present only for a command provider.
-    pub cli: Option<CliSpec>,
 }
 
 impl Request {
     /// Whether the service runs on the user's own machine, which changes the
     /// message when it cannot be reached and means no key is needed.
     pub fn is_local(&self) -> bool {
-        matches!(self.kind, ProviderKind::Ollama | ProviderKind::Cli)
+        self.kind == ProviderKind::Ollama
     }
 }
 
@@ -65,10 +53,6 @@ pub enum AiError {
     Timeout,
     #[error("auth.json couldn't be read. Check the file in your config folder.")]
     KeyFileUnreadable,
-    #[error("Dango couldn't run {command}. Check that it's installed and on your PATH.")]
-    CommandMissing { command: String },
-    #[error("{provider} gave no answer. See dango.log for what it printed.")]
-    CommandFailed { provider: String },
 }
 
 /// What the next poll of a running request produced.
@@ -194,7 +178,6 @@ mod tests {
             thinking: Thinking::Off,
             prompt: "Improve this.".into(),
             key: None,
-            cli: None,
         }
     }
 

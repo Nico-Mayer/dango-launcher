@@ -79,7 +79,6 @@ mod tests {
             thinking: Thinking::Off,
             prompt: "Improve this.".into(),
             key: None,
-            cli: None,
         }
     }
 

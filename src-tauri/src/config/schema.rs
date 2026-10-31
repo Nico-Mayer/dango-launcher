@@ -26,7 +26,6 @@ pub fn generate(manifests: &[Manifest]) -> Value {
     close_objects(&mut schema);
     describe_root(&mut schema);
     constrain_hotkeys(&mut schema);
-    constrain_search_path(&mut schema);
     constrain_hyperkey(&mut schema);
     split_command_settings(&mut schema);
     let extensions = extensions(manifests, &schema["$defs"]["Extension"]);
@@ -179,32 +178,6 @@ fn constrain_hotkeys(schema: &mut Value) {
     ]);
 }
 
-/// Inlined like a hotkey's, so the list form does not leave schemars' numbered
-/// second `PerPlatform` def behind.
-fn constrain_search_path(schema: &mut Value) {
-    let defs = defs(schema);
-    let generated = defs["SearchPath"]["anyOf"][1]["$ref"]
-        .as_str()
-        .and_then(|r| r.strip_prefix("#/$defs/"))
-        .map(str::to_string);
-    if let Some(name) = generated {
-        defs.remove(&name);
-    }
-    let list = |description: &str| json!({ "type": "array", "items": { "type": "string" }, "description": description });
-    defs["SearchPath"]["anyOf"] = json!([
-        list("Directories searched on both platforms."),
-        {
-            "type": "object",
-            "additionalProperties": false,
-            "description": "Directories per platform. A missing side means none there.",
-            "properties": {
-                "macos": list("Directories searched on macOS."),
-                "windows": list("Directories searched on Windows.")
-            }
-        }
-    ]);
-}
-
 fn key_names() -> Vec<String> {
     KEY_TOKENS
         .iter()
@@ -253,7 +226,6 @@ fn extensions(manifests: &[Manifest], base: &Value) -> Value {
         }
         if manifest.id != AI_ID {
             fields.remove("providers");
-            fields.remove("path");
         }
         properties.insert(manifest.id.clone(), entry);
     }
@@ -519,7 +491,6 @@ fn def_title(name: &str) -> String {
         "AppName" => "Application name",
         "ProviderSettings" => "Provider settings",
         "PerPlatform" => "Per-platform value",
-        "SearchPath" => "Search path",
         other => other,
     }
     .to_string()
@@ -596,7 +567,6 @@ mod tests {
             "dango.ai": {
                 "providers": {
                     "anthropic": { "kind": "anthropic", "model": "claude-sonnet-5" },
-                    "claude": { "kind": "cli", "command": "claude", "args": ["-p"] },
                     "local": { "kind": "ollama", "baseUrl": "http://localhost:11434" }
                 },
                 "preferences": { "provider": "anthropic", "thinking": "low" },
@@ -685,27 +655,6 @@ mod tests {
         assert!(!accepts(
             r#"{ "extensions": { "dango.system": { "commands": { "lock": { "output": "copy" } } } } }"#
         ));
-    }
-
-    #[test]
-    fn a_search_path_is_checked_and_only_for_ai() {
-        assert!(accepts(
-            r#"{ "extensions": { "dango.ai": { "path": ["~/bin"] } } }"#
-        ));
-        assert!(accepts(
-            r#"{ "extensions": { "dango.ai": { "path": { "macos": ["~/bin"], "windows": ["C:/bin"] } } } }"#
-        ));
-        assert!(!accepts(
-            r#"{ "extensions": { "dango.ai": { "path": "~/bin" } } }"#
-        ));
-        assert!(!accepts(
-            r#"{ "extensions": { "dango.ai": { "path": { "linux": ["~/bin"] } } } }"#
-        ));
-        assert!(!accepts(
-            r#"{ "extensions": { "dango.system": { "path": ["~/bin"] } } }"#
-        ));
-        let defs = schema()["$defs"].as_object().unwrap().clone();
-        assert!(defs.keys().all(|name| name != "PerPlatform2"), "{defs:?}");
     }
 
     #[test]
