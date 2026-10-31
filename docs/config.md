@@ -236,7 +236,7 @@ Per-command settings, keyed by command id.
 | --- | --- | --- | --- | --- |
 | `key` | string | `capslock` | `capslock`, `caps` | The physical key to remap. Defaults to capslock. |
 | `shift` | boolean |  |  | Whether Shift is part of the combination. Default true; false emits Ctrl+Alt+Super, which leaves typed characters unshifted. |
-| `tap` | string |  | `space`, `enter`, `return`, `tab`, `escape`, `esc`, `backspace`, `delete` and 70 more | A key to send on a quick, solitary tap of the hyperkey, such as `escape`. A hold, or a press with another key, still acts as the modifier. Leave it out for no tap action. |
+| `tap` | string |  | `space`, `enter`, `return`, `tab`, `escape`, `esc`, `backspace`, `delete` and 78 more | A key to send on a quick, solitary tap of the hyperkey, such as `escape`. A hold, or a press with another key, still acts as the modifier. Leave it out for no tap action. |
 
 ## Launcher
 
@@ -296,7 +296,7 @@ A hotkey: one chord that works on both platforms, such as `mod+shift+k` where `m
 A chord is one or more modifiers joined with `+`, then one key, all lowercase.
 
 - Modifiers: `mod`, `ctrl`, `control`, `alt`, `opt`, `option`, `shift`, `meta`, `cmd`, `command`, `super`, `win`, `windows`, `hyper`.
-- Keys: a letter, a digit, or one of `space`, `enter`, `return`, `tab`, `escape`, `esc`, `backspace`, `delete`, `del`, `up`, `down`, `left`, `right`, `home`, `end`, `pageup`, `pagedown`, `comma`, `period`, `dot`, `slash`, `backslash`, `semicolon`, `quote`, `backquote`, `grave`, `minus`, `equal`, `leftbracket`, `rightbracket`, `f1`, `f2`, `f3`, `f4`, `f5`, `f6`, `f7`, `f8`, `f9`, `f10`, `f11`, `f12`.
+- Keys: a letter, a digit, or one of `space`, `enter`, `return`, `tab`, `escape`, `esc`, `backspace`, `delete`, `del`, `up`, `down`, `left`, `right`, `home`, `end`, `pageup`, `pagedown`, `comma`, `period`, `dot`, `slash`, `backslash`, `semicolon`, `quote`, `backquote`, `grave`, `minus`, `equal`, `leftbracket`, `rightbracket`, `f1`, `f2`, `f3`, `f4`, `f5`, `f6`, `f7`, `f8`, `f9`, `f10`, `f11`, `f12`, `f13`, `f14`, `f15`, `f16`, `f17`, `f18`, `f19`, `f20`.
 
 Or an object with a `macos` and a `windows` chord; a missing side means no binding there.
 

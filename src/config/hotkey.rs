@@ -200,6 +200,14 @@ pub const KEY_TOKENS: &[(&str, Code)] = &[
     ("f10", Code::F10),
     ("f11", Code::F11),
     ("f12", Code::F12),
+    ("f13", Code::F13),
+    ("f14", Code::F14),
+    ("f15", Code::F15),
+    ("f16", Code::F16),
+    ("f17", Code::F17),
+    ("f18", Code::F18),
+    ("f19", Code::F19),
+    ("f20", Code::F20),
 ];
 
 fn modifier(token: &str, hyper: Modifiers) -> Result<Modifiers, HotkeyError> {
