@@ -33,8 +33,6 @@ spec.
 - Work one platform at a time. Finish and verify on the machine at hand, and
   leave the other platform's hand checks open until a session on that
   machine. Do not switch back and forth within a session.
-- A check that cannot be run on one platform becomes a GitHub issue, not a
-  note in an archived change.
 - When you hit a platform trap or build fact not listed below, add it here in
   the same change.
 
