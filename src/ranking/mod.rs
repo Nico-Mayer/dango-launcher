@@ -44,6 +44,7 @@ impl DangoRanker {
 impl Ranker for DangoRanker {
     fn rank(&self, query: &str, candidates: Vec<Candidate>, limit: usize) -> Vec<Candidate> {
         let now = frecency::now_millis();
+        let query = query.trim();
         if query.is_empty() {
             return rank_empty_query(&self.frecency, candidates, now, limit);
         }
@@ -307,6 +308,20 @@ mod tests {
         let ranker = ranker();
         let ranked = ranker.rank("shell", vec![c], 10);
         assert_eq!(ranked.len(), 1);
+    }
+
+    #[test]
+    fn surrounding_spaces_in_the_query_are_ignored() {
+        let ranker = ranker();
+        let fox = || vec![candidate("fox", "Firefox")];
+        assert_eq!(ranker.rank("firefox ", fox(), 10).len(), 1);
+        assert_eq!(ranker.rank(" fire", fox(), 10).len(), 1);
+        assert_eq!(ranker.rank(" ", fox(), 10).len(), 1);
+
+        let mut mail = candidate("mail", "Some Unrelated Thing");
+        mail.alias = Some("gm".into());
+        let ranked = ranker.rank("gm ", vec![candidate("game", "Game"), mail], 10);
+        assert_eq!(ranked[0].id, "mail");
     }
 
     #[test]
