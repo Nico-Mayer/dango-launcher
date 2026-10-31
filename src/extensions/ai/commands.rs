@@ -165,8 +165,18 @@ fn merge(
         return Err(format!("{EXTENSION_ID}: the command '{id}' has no prompt"));
     }
 
-    let thinking = overrides.thinking;
-    let output = overrides.output.unwrap_or_default();
+    let thinking = match overrides.thinking.as_deref() {
+        None => None,
+        Some(text) => Some(Thinking::parse(text).ok_or_else(|| {
+            format!("{EXTENSION_ID}: the command '{id}' has an unknown thinking level '{text}'")
+        })?),
+    };
+    let output = match overrides.output.as_deref() {
+        None => Output::default(),
+        Some(text) => Output::parse(text).ok_or_else(|| {
+            format!("{EXTENSION_ID}: the command '{id}' has an unknown output '{text}'")
+        })?,
+    };
 
     Ok(AiCommand {
         id: id.into(),
@@ -394,13 +404,22 @@ mod tests {
     }
 
     #[test]
-    fn an_unknown_thinking_level_or_output_is_a_config_error() {
-        for text in [
-            r#"{ "extensions": { "dango.ai": { "commands": { "summarize": { "thinking": "deep" } } } } }"#,
-            r#"{ "extensions": { "dango.ai": { "commands": { "explain": { "output": "speak" } } } } }"#,
-        ] {
-            assert!(Config::parse(text).is_err(), "accepted {text}");
-        }
+    fn an_unknown_thinking_level_or_output_is_reported_and_skipped() {
+        let built = build(&config(
+            r#"{ "extensions": { "dango.ai": { "commands": {
+                "summarize": { "thinking": "max" },
+                "explain": { "output": "speak" }
+            } } } }"#,
+        ));
+        assert!(find(&built, "summarize").is_none());
+        assert!(find(&built, "explain").is_none());
+        assert_eq!(built.commands.len(), SHIPPED.len() - 2, "others survived");
+        assert_eq!(built.problems.len(), 2);
+        assert!(built.problems.iter().any(|problem| problem.contains("max")));
+        assert!(built
+            .problems
+            .iter()
+            .any(|problem| problem.contains("speak")));
     }
 
     #[test]

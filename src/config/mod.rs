@@ -268,6 +268,17 @@ pub enum Output {
     Copy,
 }
 
+impl Output {
+    pub fn parse(text: &str) -> Option<Self> {
+        match text {
+            "view" => Some(Output::View),
+            "paste" => Some(Output::Paste),
+            "copy" => Some(Output::Copy),
+            _ => None,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Default, Serialize, Deserialize, JsonSchema)]
 pub struct AppSettings {
     /// The application's shown name when it differs from the key, either one
@@ -337,11 +348,13 @@ pub struct CommandSettings {
     /// How hard the model thinks before answering. Absent falls back to the
     /// extension's default level.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub thinking: Option<Thinking>,
+    #[schemars(with = "Option<Thinking>")]
+    pub thinking: Option<String>,
     /// What becomes of the answer: shown in the launcher, pasted into the
     /// previous app, or copied. Default view.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub output: Option<Output>,
+    #[schemars(with = "Option<Output>")]
+    pub output: Option<String>,
     #[serde(flatten)]
     pub extra: Map<String, Value>,
 }
