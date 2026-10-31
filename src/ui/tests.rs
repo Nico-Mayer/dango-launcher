@@ -463,7 +463,8 @@ fn an_unsupported_protocol_version_shows_the_error_until_escape() {
     let snapshot = h.snapshot();
     assert!(matches!(snapshot.screen, Screen::Error(_)));
     assert_eq!(snapshot.focus, Focus::Nothing);
-    assert_eq!(snapshot.bindings.len(), 1);
+    // Escape, and Tab held so focus stays put.
+    assert_eq!(snapshot.bindings.len(), 3);
     assert!(h.press("Escape").is_empty());
     assert!(matches!(h.snapshot().screen, Screen::View(_)));
 }
@@ -1218,10 +1219,15 @@ fn the_panel_binds_only_its_own_keys() {
     let mut h = Harness::root(3);
     h.command("k");
     let chords: Vec<_> = h.snapshot().bindings.into_iter().map(|b| b.chord).collect();
-    assert_eq!(
-        chords,
-        ["ArrowUp", "ArrowDown", "Enter", "Escape"].map(Chord::plain)
-    );
+    let shift_tab = Chord {
+        shift: true,
+        ..Chord::plain("Tab")
+    };
+    let mut expected = ["ArrowUp", "ArrowDown", "Enter", "Escape", "Tab"]
+        .map(Chord::plain)
+        .to_vec();
+    expected.push(shift_tab);
+    assert_eq!(chords, expected);
 }
 
 #[test]

@@ -84,7 +84,8 @@ fn name(text: &str) -> Option<String> {
     }
     let special = match first {
         '\u{8}' => "backspace",
-        '\t' => "tab",
+        // Shift+Tab arrives as Backtab; the held Shift tells the two apart.
+        '\t' | '\u{19}' => "tab",
         '\n' | '\r' => "enter",
         '\u{1b}' => "escape",
         '\u{7f}' => "delete",

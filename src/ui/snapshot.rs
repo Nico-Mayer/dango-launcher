@@ -300,6 +300,16 @@ impl Launcher {
                 anywhere(Chord::command("k")),
             ],
         };
+        // Only a form moves focus with Tab. Anywhere else it would take the
+        // keyboard from the SearchBar or the panel's filter.
+        if mode != Mode::Form {
+            let shift_tab = Chord {
+                shift: true,
+                ..Chord::plain("Tab")
+            };
+            bindings.push(plain("Tab"));
+            bindings.push(anywhere(shift_tab));
+        }
         if !matches!(mode, Mode::Error | Mode::Panel) {
             let shortcuts = self
                 .available_actions()

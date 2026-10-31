@@ -580,6 +580,15 @@ mod root_search {
     }
 
     #[test]
+    fn tab_does_not_take_typing_from_the_search_bar() {
+        let h = Harness::root(results(3));
+        h.type_text("re");
+        h.key("	");
+        h.type_text("s");
+        assert_eq!(h.query(), "res");
+    }
+
+    #[test]
     fn an_answer_to_an_older_keystroke_does_not_overwrite_typing() {
         let h = Harness::root(results(3));
         h.type_text("ab");
