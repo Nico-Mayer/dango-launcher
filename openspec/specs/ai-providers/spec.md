@@ -12,10 +12,10 @@ kept, and what the user is told when a request cannot be made or fails.
 
 A provider SHALL be an entry the user names in the configuration file, carrying
 the kind of service it speaks to, an endpoint where one applies, and a default
-model. Four kinds SHALL be supported: Anthropic's own protocol, an
-OpenAI-compatible endpoint, Ollama on the local machine, and a command on the
-local machine. No provider SHALL be assumed: with none configured, the AI
-commands SHALL say so rather than failing when they are run.
+model. Three kinds SHALL be supported: Anthropic's own protocol, an
+OpenAI-compatible endpoint, and Ollama on the local machine. No provider SHALL
+be assumed: with none configured, the AI commands SHALL say so rather than
+failing when they are run.
 
 #### Scenario: A hosted provider is configured
 
@@ -34,6 +34,11 @@ commands SHALL say so rather than failing when they are run.
 - **THEN** that provider is ignored and the problem is surfaced the way a
   configuration problem is
 - **AND** the other providers still work
+
+#### Scenario: A program is not a provider kind
+
+- **WHEN** a provider entry names the kind `cli`
+- **THEN** it is treated as an unknown provider kind
 
 #### Scenario: No provider is configured
 
@@ -59,70 +64,6 @@ a local provider SHALL NOT leave the machine.
 - **THEN** the command fails with a message saying the local model could not be
   reached
 - **AND** the message says to check that the local model server is running
-
-### Requirement: A provider may be a command on this machine
-
-A provider MAY be a program to run rather than a service to call: one that takes
-a prompt and prints an answer. Such a provider SHALL name the command and the
-arguments to pass it. The prompt SHALL reach the command on its standard input,
-unless the arguments say where it goes.
-
-A command provider SHALL need no credential, and SHALL NOT be looked up in the
-key file. Its answer SHALL stream as the command prints it, and SHALL be subject
-to the same abandoning, output settings, and result actions as any other answer.
-
-Dango SHALL run the command in an empty working directory, so a program that can
-touch files has nothing of the user's within reach.
-
-#### Scenario: A command answers a transform
-
-- **WHEN** a provider names a command that prints an answer, and a command using
-  it is run
-- **THEN** the prompt reaches the program
-- **AND** what it prints appears as the answer
-
-#### Scenario: The prompt goes where the arguments say
-
-- **WHEN** a provider's arguments contain a placeholder for the prompt
-- **THEN** the prompt is passed as that argument rather than on standard input
-
-#### Scenario: The model is named the way the program expects
-
-- **WHEN** a provider's arguments contain a placeholder for the model
-- **THEN** the model the command resolved to is put in its place
-
-#### Scenario: A command provider needs no key
-
-- **WHEN** a command provider is used and `auth.json` has no entry for it
-- **THEN** the request is made anyway
-- **AND** no key is read for it
-
-#### Scenario: The program is not installed
-
-- **WHEN** the named command cannot be run
-- **THEN** the failure says which command could not be run and to check that it
-  is installed
-
-#### Scenario: The program fails
-
-- **WHEN** the command exits without printing an answer
-- **THEN** the failure says the provider gave no answer and where to look
-- **AND** what the program printed on its error output goes to the log
-
-#### Scenario: The answer arrives while the program is still running
-
-- **WHEN** a command prints its answer over several seconds
-- **THEN** the text appears as it is printed rather than only at the end
-
-#### Scenario: Abandoning stops the program
-
-- **WHEN** the user abandons an answer a command provider is still producing
-- **THEN** the program is stopped rather than left running
-
-#### Scenario: The program cannot see the user's files
-
-- **WHEN** a command provider runs
-- **THEN** its working directory is an empty one, not the user's own
 
 ### Requirement: Keys live in a plain file in the config directory
 

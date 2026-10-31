@@ -31,7 +31,7 @@
 
 ## 4. Author's config
 
-- [ ] 4.1 In `~/.config/dango/config.json`, set `dango.ai` `preferences.provider`
+- [x] 4.1 In `~/.config/dango/config.json`, set `dango.ai` `preferences.provider`
   to `local`, remove the `claude` provider, the `path` key, and every command's
   `"provider": "claude"`. Verify: the file parses with `jq`, and an AI command
   run from the release build answers through Ollama.
