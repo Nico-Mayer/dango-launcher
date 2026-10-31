@@ -11,7 +11,7 @@
 
 use std::sync::Arc;
 
-use crate::extensions::clipboard::{ClipboardSource, Content};
+use crate::extensions::clipboard::{ClipboardSource, Content, Snapshot};
 
 /// How long to wait for a copy to land before calling the selection empty.
 /// Inside the 300ms the spec gives a selection read, with room for the
@@ -393,7 +393,7 @@ impl TextExchange {
 
     fn paste_borrowed(
         &self,
-        saved: Option<Content>,
+        saved: Snapshot,
         text: &str,
         caret: Option<usize>,
     ) -> Result<(), TextError> {
@@ -428,11 +428,8 @@ impl TextExchange {
         self.keys.caret_left(after)
     }
 
-    fn read_clipboard(&self) -> Option<Content> {
-        if let Some(text) = self.clipboard.text().filter(|text| !text.is_empty()) {
-            return Some(Content::Text(text));
-        }
-        self.clipboard.image().map(Content::Image)
+    fn read_clipboard(&self) -> Snapshot {
+        self.clipboard.snapshot()
     }
 
     /// Puts back what the user had, unless they have copied something else in
@@ -442,15 +439,17 @@ impl TextExchange {
     ///
     /// `borrowed` is what Dango last wrote. Anything else on the clipboard now
     /// came from the user.
-    fn restore(&self, saved: Option<Content>, borrowed: &str) {
-        let Some(saved) = saved else {
+    fn restore(&self, saved: Snapshot, borrowed: &str) {
+        if saved.is_empty() {
             return;
-        };
+        }
         if self.clipboard.text().as_deref() != Some(borrowed) {
             return;
         }
-        self.own_writes.expect(&saved);
-        self.write(&saved);
+        if let Some(content) = saved.content() {
+            self.own_writes.expect(&content);
+        }
+        self.clipboard.put_back(&saved);
     }
 
     fn write(&self, content: &Content) {
@@ -473,6 +472,9 @@ mod tests {
         /// The user copying something of their own the moment after Dango has
         /// looked, which is the window a restore has to respect.
         after_next_read: Mutex<Option<String>>,
+        /// Files copied in a file manager, which a plain text or image write
+        /// replaces.
+        files: Mutex<Vec<String>>,
     }
 
     impl FakeClipboard {
@@ -511,11 +513,33 @@ mod tests {
             let content = Content::Text(text.to_string());
             self.writes.lock().unwrap().push(content.clone());
             *self.content.lock().unwrap() = Some(content);
+            self.files.lock().unwrap().clear();
         }
         fn set_image(&self, png: &[u8]) {
             let content = Content::Image(png.to_vec());
             self.writes.lock().unwrap().push(content.clone());
             *self.content.lock().unwrap() = Some(content);
+            self.files.lock().unwrap().clear();
+        }
+        fn snapshot(&self) -> Snapshot {
+            let text = self.text().filter(|text| !text.is_empty());
+            let image = if text.is_none() { self.image() } else { None };
+            Snapshot {
+                text,
+                image,
+                files: self.files.lock().unwrap().clone(),
+                ..Snapshot::default()
+            }
+        }
+        fn put_back(&self, snapshot: &Snapshot) {
+            if let Some(text) = &snapshot.text {
+                self.set_text(text);
+            } else if let Some(png) = &snapshot.image {
+                self.set_image(png);
+            } else {
+                *self.content.lock().unwrap() = None;
+            }
+            *self.files.lock().unwrap() = snapshot.files.clone();
         }
     }
 
@@ -763,6 +787,18 @@ mod tests {
         f.exchange.insert("the snippet", None).unwrap();
 
         assert_eq!(f.clipboard.now(), Some(Content::Image(png)));
+    }
+
+    #[test]
+    fn copied_files_survive_an_insertion() {
+        let clipboard = Arc::new(FakeClipboard::default());
+        *clipboard.files.lock().unwrap() = vec!["report.pdf".into()];
+        let f = fixture(clipboard, FakeKeys::working());
+
+        f.exchange.insert("the snippet", None).unwrap();
+
+        assert_eq!(*f.clipboard.files.lock().unwrap(), ["report.pdf"]);
+        assert_eq!(f.clipboard.now(), None);
     }
 
     #[test]

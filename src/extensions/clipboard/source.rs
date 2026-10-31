@@ -10,7 +10,9 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use clipboard_rs::common::RustImage;
-use clipboard_rs::{Clipboard, ClipboardContext, RustImageData};
+use clipboard_rs::{Clipboard, ClipboardContent, ClipboardContext, ContentFormat, RustImageData};
+
+use super::history::Content;
 
 /// How long to wait for another process to let go of the clipboard.
 ///
@@ -59,6 +61,60 @@ pub trait ClipboardSource: Send + Sync {
     fn image(&self) -> Option<Vec<u8>>;
     fn set_text(&self, text: &str);
     fn set_image(&self, png: &[u8]);
+
+    /// Everything on the clipboard that `put_back` can restore.
+    fn snapshot(&self) -> Snapshot {
+        let text = self.text().filter(|text| !text.is_empty());
+        let image = if text.is_none() { self.image() } else { None };
+        Snapshot {
+            text,
+            image,
+            ..Snapshot::default()
+        }
+    }
+
+    fn put_back(&self, snapshot: &Snapshot) {
+        if let Some(text) = &snapshot.text {
+            self.set_text(text);
+        } else if let Some(png) = &snapshot.image {
+            self.set_image(png);
+        }
+    }
+}
+
+/// What the clipboard held, as far as Dango can put it back.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct Snapshot {
+    pub text: Option<String>,
+    pub html: Option<String>,
+    pub rtf: Option<String>,
+    pub files: Vec<String>,
+    /// Encoded PNG bytes.
+    pub image: Option<Vec<u8>>,
+}
+
+impl Snapshot {
+    pub fn is_empty(&self) -> bool {
+        *self == Self::default()
+    }
+
+    /// The image goes back only without text or files: on Windows the crate
+    /// empties the clipboard whenever it writes an image, so the two cannot be
+    /// restored together.
+    fn keeps_image(&self) -> bool {
+        self.text.is_none() && self.files.is_empty()
+    }
+
+    /// What the clipboard history reads once this is put back.
+    pub fn content(&self) -> Option<Content> {
+        if let Some(text) = &self.text {
+            return Some(Content::Text(text.clone()));
+        }
+        self.image
+            .clone()
+            .filter(|_| self.keeps_image())
+            .map(Content::Image)
+    }
 }
 
 pub struct CrateClipboard {
@@ -132,6 +188,81 @@ impl ClipboardSource for CrateClipboard {
             ));
         }
     }
+
+    fn snapshot(&self) -> Snapshot {
+        const FORMATS: [ContentFormat; 4] = [
+            ContentFormat::Text,
+            ContentFormat::Html,
+            ContentFormat::Rtf,
+            ContentFormat::Files,
+        ];
+        let contents = until_free(
+            || match self.context.get(&FORMATS) {
+                Ok(contents) if contents.is_empty() && busy::holds_anything() => Err(()),
+                Ok(contents) => Ok(contents),
+                Err(_) => Err(()),
+            },
+            busy::holds_anything,
+        )
+        .unwrap_or_default();
+
+        let mut snapshot = Snapshot::default();
+        for content in contents {
+            match content {
+                ClipboardContent::Text(text) if !text.is_empty() => snapshot.text = Some(text),
+                ClipboardContent::Html(html) => snapshot.html = Some(html),
+                ClipboardContent::Rtf(rtf) => snapshot.rtf = Some(rtf),
+                ClipboardContent::Files(files) => snapshot.files = files,
+                _ => {}
+            }
+        }
+        // Decoding and re-encoding an image is the slow part, so it is only
+        // read when it would be put back.
+        if snapshot.keeps_image() {
+            snapshot.image = self.image();
+        }
+        snapshot
+    }
+
+    fn put_back(&self, snapshot: &Snapshot) {
+        if snapshot.keeps_image() {
+            if let Some(png) = &snapshot.image {
+                self.set_image(png);
+                return;
+            }
+        }
+        let mut first = Some(crate_contents(snapshot));
+        if first.as_ref().is_some_and(Vec::is_empty) {
+            return;
+        }
+        let written = until_free(
+            || {
+                let contents = first.take().unwrap_or_else(|| crate_contents(snapshot));
+                self.context.set(contents)
+            },
+            busy::possible,
+        );
+        if let Err(error) = written {
+            crate::log::append(&format!("could not put the clipboard back: {error}"));
+        }
+    }
+}
+
+fn crate_contents(snapshot: &Snapshot) -> Vec<ClipboardContent> {
+    let mut contents = Vec::new();
+    if let Some(text) = &snapshot.text {
+        contents.push(ClipboardContent::Text(text.clone()));
+    }
+    if let Some(html) = &snapshot.html {
+        contents.push(ClipboardContent::Html(html.clone()));
+    }
+    if let Some(rtf) = &snapshot.rtf {
+        contents.push(ClipboardContent::Rtf(rtf.clone()));
+    }
+    if !snapshot.files.is_empty() {
+        contents.push(ClipboardContent::Files(snapshot.files.clone()));
+    }
+    contents
 }
 
 /// Retries `attempt` while `worth_waiting` says a failure is the clipboard

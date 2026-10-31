@@ -8,7 +8,7 @@ mod watcher;
 pub(crate) use extension::manifest;
 pub use extension::{preference_declarations, ClipboardExtension, PreferencePolicy, EXTENSION_ID};
 pub use history::{Bounds, Content, Entry, History, HistoryError, Kind};
-pub use source::{Attribution, ClipboardSource, CrateClipboard};
+pub use source::{Attribution, ClipboardSource, CrateClipboard, Snapshot};
 pub use watcher::{Policy, WatchService, Watcher};
 
 /// Applications excluded until the user says otherwise.
