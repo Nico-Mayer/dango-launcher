@@ -4,8 +4,8 @@
 
 ## 2. Skip keystrokes aimed at Dango on Windows
 
-- [ ] 2.1 Add `platform::foreground_is_dango()` with a Windows implementation in `src/platform/windows/mod.rs` that compares the foreground window's process id with `std::process::id()`, and a macOS implementation that returns false; verify `cargo clippy --all-targets -- -D warnings` passes
-- [ ] 2.2 In `run` in `src/extensions/snippets/service.rs`, clear the buffer and skip the character when `foreground_is_dango()` is true, before the exclusion check, with the decision in a pure helper next to `is_excluded`; verify with a new test in `service.rs` (`cargo test snippets`)
+- [x] 2.1 Add `platform::foreground_is_dango()` with a Windows implementation in `src/platform/windows/mod.rs` that compares the foreground window's process id with `std::process::id()`, and a macOS implementation that returns false; verify `cargo clippy --all-targets -- -D warnings` passes
+- [x] 2.2 In `run` in `src/extensions/snippets/service.rs`, clear the buffer and skip the character when `foreground_is_dango()` is true, before the exclusion check, with the decision in a pure helper next to `is_excluded`; verify with a new test in `service.rs` (`cargo test snippets`)
 - [ ] 2.3 Hand check on Windows: start a debug build, open the launcher with `scripts/send-keys.ps1`, type a snippet's keyword, and confirm with `scripts/screenshot.ps1` that the search field shows the keyword unexpanded; then type the keyword in Notepad and confirm it expands
 
 ## 3. Skip keystrokes aimed at Dango on macOS

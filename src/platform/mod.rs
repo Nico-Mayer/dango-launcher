@@ -231,6 +231,20 @@ pub fn foreground_app() -> Option<String> {
     }
 }
 
+/// Whether keystrokes go to Dango's own window, where expansion must not act.
+/// Always false on macOS: the launcher panel never makes Dango frontmost, so
+/// the key monitor's tap checks the event's target process there instead.
+pub fn foreground_is_dango() -> bool {
+    #[cfg(target_os = "windows")]
+    {
+        windows::foreground_is_dango()
+    }
+    #[cfg(target_os = "macos")]
+    {
+        false
+    }
+}
+
 /// Whether the focused field is one the monitor must not act in, such as a
 /// password field. Authoritative on macOS through secure event input; a
 /// best-effort guess on Windows, where the system offers no reliable signal (see

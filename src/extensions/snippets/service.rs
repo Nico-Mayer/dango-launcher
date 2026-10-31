@@ -170,7 +170,9 @@ fn run(
                     expander.clear();
                     last_app = app.clone();
                 }
-                if platform::focused_field_is_secure() || is_excluded(app.as_deref(), &excluded) {
+                if platform::focused_field_is_secure()
+                    || is_skipped(platform::foreground_is_dango(), app.as_deref(), &excluded)
+                {
                     expander.clear();
                     continue;
                 }
@@ -189,6 +191,10 @@ fn run(
             Err(RecvTimeoutError::Disconnected) => break,
         }
     }
+}
+
+fn is_skipped(into_dango: bool, app: Option<&str>, excluded: &ExcludedApps) -> bool {
+    into_dango || is_excluded(app, excluded)
 }
 
 fn is_excluded(app: Option<&str>, excluded: &ExcludedApps) -> bool {
@@ -394,5 +400,14 @@ mod tests {
         assert!(is_excluded(Some("proton pass"), &list));
         assert!(!is_excluded(Some("Notepad"), &list));
         assert!(!is_excluded(None, &list));
+    }
+
+    #[test]
+    fn typing_into_dango_is_skipped_before_the_exclusion_list() {
+        let list: ExcludedApps = Arc::new(|| vec!["Proton Pass".to_string()]);
+        assert!(is_skipped(true, Some("Notepad"), &list));
+        assert!(is_skipped(true, None, &list));
+        assert!(is_skipped(false, Some("Proton Pass"), &list));
+        assert!(!is_skipped(false, Some("Notepad"), &list));
     }
 }

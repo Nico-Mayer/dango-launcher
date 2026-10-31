@@ -324,6 +324,19 @@ pub(super) fn foreground_app() -> Option<String> {
     }
 }
 
+pub(super) fn foreground_is_dango() -> bool {
+    use windows::Win32::UI::WindowsAndMessaging::{GetForegroundWindow, GetWindowThreadProcessId};
+    unsafe {
+        let hwnd = GetForegroundWindow();
+        if hwnd.0.is_null() {
+            return false;
+        }
+        let mut pid = 0u32;
+        GetWindowThreadProcessId(hwnd, Some(&mut pid));
+        pid == std::process::id()
+    }
+}
+
 /// Keyword expansion asks for every typed character, and naming an app reads
 /// its shell item and file description.
 static LAST_FOREGROUND: std::sync::Mutex<Option<NamedForeground>> = std::sync::Mutex::new(None);
