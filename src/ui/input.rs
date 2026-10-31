@@ -94,6 +94,7 @@ pub enum Event {
     },
     Rendered {
         owner: String,
+        context: Context,
         invocation: u64,
         tree: ViewTree,
     },
@@ -122,6 +123,8 @@ pub enum Event {
 #[serde(rename_all = "camelCase")]
 pub struct ResultItem {
     pub extension_id: String,
+    /// The contributing extension, named in the ActionBar while selected.
+    pub context: Context,
     pub id: String,
     pub title: String,
     pub subtitle: Option<String>,
@@ -130,6 +133,14 @@ pub struct ResultItem {
     pub match_positions: Vec<usize>,
     pub suggested: bool,
     pub pinned: bool,
+}
+
+/// A name and icon the ActionBar shows for where the user is.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Context {
+    pub title: String,
+    pub icon: Option<String>,
 }
 
 /// What a template field's text will ask for.

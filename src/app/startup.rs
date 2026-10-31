@@ -6,7 +6,10 @@ use std::sync::{Arc, Mutex, Weak};
 
 use tokio::runtime::Handle;
 
-use super::{aliased_candidates, apply_hyperkey, AiParts, Core, HideLauncher, OnMainThread};
+use super::{
+    aliased_candidates, apply_hyperkey, extension_contexts, AiParts, Core, HideLauncher,
+    OnMainThread,
+};
 use super::{Services, ViewRunner, RESULT_LIMIT};
 use crate::config::{self, FileConfig};
 use crate::extension::{self, EnabledStore, ExtensionHost, HostResolver};
@@ -332,6 +335,7 @@ fn build_services(
         ranker,
         RESULT_LIMIT,
     );
+    let contexts = extension_contexts(&host);
 
     // Shared rather than owned by the invoker, because resolving a command has
     // to see the host as it is now: an extension disabled since startup must no
@@ -360,6 +364,7 @@ fn build_services(
         pipeline,
         frecency,
         learned,
+        contexts,
         applications: Some(applications),
         ai: Some(ai),
         hotkeys,

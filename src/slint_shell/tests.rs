@@ -15,7 +15,7 @@ use crate::protocol::{
     ViewTree,
 };
 use crate::shell::TrayStatus;
-use crate::ui::{Event, Input, Intent, Launcher, ResultItem, TemplateInspection};
+use crate::ui::{Context, Event, Input, Intent, Launcher, ResultItem, TemplateInspection};
 
 const LIST_TOP: f32 = 56.0 + 8.0;
 const LIST_BOTTOM: f32 = 400.0 - 40.0 - 8.0;
@@ -89,6 +89,10 @@ impl Harness {
     fn view(&self, tree: ViewTree) {
         self.event(Event::Rendered {
             owner: "fixture".into(),
+            context: Context {
+                title: "Fixture Command".into(),
+                icon: None,
+            },
             invocation: 1,
             tree,
         });
@@ -148,6 +152,10 @@ impl Harness {
 fn result(n: usize) -> ResultItem {
     ResultItem {
         extension_id: "fixture".into(),
+        context: Context {
+            title: "Fixture".into(),
+            icon: None,
+        },
         id: format!("result-{n}"),
         title: format!("Result {n}"),
         subtitle: None,

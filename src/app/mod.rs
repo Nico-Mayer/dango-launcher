@@ -5,6 +5,7 @@ mod startup;
 #[cfg(test)]
 mod tests;
 
+use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, Weak};
 use std::time::Duration;
@@ -57,6 +58,10 @@ pub struct Services {
     pub pipeline: SearchPipeline,
     pub frecency: Arc<FrecencyTable>,
     pub learned: Arc<InputHistory>,
+    /// Each extension's name and icon, keyed by id, for the ActionBar. Held
+    /// apart from the host, whose lock has no business on the path that
+    /// streams results.
+    pub contexts: HashMap<String, ui::Context>,
     pub applications: Option<Arc<ApplicationsExtension>>,
     pub ai: Option<AiParts>,
     pub hotkeys: Registry,
@@ -263,6 +268,7 @@ impl Core {
 
     fn result_item(&self, c: Candidate) -> ui::ResultItem {
         ui::ResultItem {
+            context: self.context(&c.extension_id),
             extension_id: c.extension_id,
             id: c.id,
             title: c.title,
@@ -458,16 +464,32 @@ impl Core {
     /// Runs a command through the invoker and streams its output the same way
     /// for a launcher selection and a hotkey press.
     fn run_command(self: &Arc<Self>, command_id: &str) -> Result<(), InvokeError> {
-        let owner = self
+        let (owner, title, icon) = self
             .services
             .host
             .lock()
             .ok()
-            .and_then(|host| Some(host.registry().get(command_id)?.extension_id.clone()))
+            .and_then(|host| {
+                let command = host.registry().get(command_id)?;
+                Some((
+                    command.extension_id.clone(),
+                    command.decl.title.clone(),
+                    command.decl.icon.clone(),
+                ))
+            })
             .ok_or(InvokeError::Unavailable)?;
         let running = self.services.invoker.invoke(command_id)?;
-        self.pump(owner, running);
+        let icon = icon.or_else(|| self.context(&owner).icon);
+        self.pump(owner, ui::Context { title, icon }, running);
         Ok(())
+    }
+
+    fn context(&self, extension_id: &str) -> ui::Context {
+        self.services
+            .contexts
+            .get(extension_id)
+            .cloned()
+            .unwrap_or_default()
     }
 
     /// Carries one invocation's output to the renderer: a view goes out as a
@@ -475,7 +497,7 @@ impl Core {
     /// tree carries the invocation that produced it, so the launcher replaces
     /// the tree it is already showing for that invocation rather than stacking
     /// another on top.
-    fn pump(self: &Arc<Self>, owner: String, running: invocation::Running) {
+    fn pump(self: &Arc<Self>, owner: String, context: ui::Context, running: invocation::Running) {
         let core = self.clone();
         let invocation = running.invocation;
         let mut output = running.output;
@@ -493,6 +515,7 @@ impl Core {
                         }
                         core.apply(ui::Input::Event(ui::Event::Rendered {
                             owner: owner.clone(),
+                            context: context.clone(),
                             invocation,
                             tree,
                         }));
@@ -755,7 +778,7 @@ impl invocation::Runner for ViewRunner {
     fn start(&self) -> Option<Arc<InvocationContext>> {
         let core = self.core.upgrade()?;
         let (ctx, running) = core.services.invoker.detached(self.owner);
-        core.pump(self.owner.to_string(), running);
+        core.pump(self.owner.to_string(), core.context(self.owner), running);
         Some(Arc::new(ctx))
     }
 }
@@ -801,6 +824,20 @@ fn inspect_template(source: &str) -> ui::TemplateInspection {
             error: Some(error.to_string()),
         },
     }
+}
+
+/// Each extension's name and icon. Names never change at runtime, so the
+/// result is held rather than asked for per query.
+fn extension_contexts(host: &ExtensionHost) -> HashMap<String, ui::Context> {
+    host.manifests()
+        .map(|manifest| {
+            let context = ui::Context {
+                title: manifest.name.clone(),
+                icon: manifest.icon.clone(),
+            };
+            (manifest.id.clone(), context)
+        })
+        .collect()
 }
 
 /// Command candidates with the config file's aliases applied over the manifest's.

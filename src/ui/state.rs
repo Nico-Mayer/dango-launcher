@@ -6,7 +6,7 @@ use crate::protocol::{
 };
 
 use super::effect::{ActionRequest, Effect, Origin};
-use super::input::{Chord, Event, Input, Intent, ResultItem, TemplateInspection};
+use super::input::{Chord, Context, Event, Input, Intent, ResultItem, TemplateInspection};
 
 /// All interaction state of the launcher. A pure reducer: input goes in,
 /// effects for the shell come out, and `snapshot` says what to draw.
@@ -61,6 +61,8 @@ pub enum ToastStyle {
 
 pub(super) struct PushedView {
     pub(super) tree: ViewTree,
+    /// The command it belongs to, named in the ActionBar.
+    pub(super) context: Context,
     pub(super) query: String,
     pub(super) query_revision: u64,
     picked: Option<String>,
@@ -149,9 +151,10 @@ impl Launcher {
             }
             Event::Rendered {
                 owner,
+                context,
                 invocation,
                 tree,
-            } => self.rendered(owner, invocation, tree, fx),
+            } => self.rendered(owner, context, invocation, tree, fx),
             Event::ActionFinished { request, outcome } => {
                 self.action_finished(request, outcome, fx)
             }
@@ -210,7 +213,14 @@ impl Launcher {
         fx.push(Effect::Search(String::new()));
     }
 
-    fn rendered(&mut self, owner: String, invocation: u64, tree: ViewTree, fx: &mut Vec<Effect>) {
+    fn rendered(
+        &mut self,
+        owner: String,
+        context: Context,
+        invocation: u64,
+        tree: ViewTree,
+        fx: &mut Vec<Effect>,
+    ) {
         if self
             .abandoned_invocation
             .is_some_and(|abandoned| invocation <= abandoned)
@@ -227,7 +237,7 @@ impl Launcher {
         if self.shown_invocation == Some(invocation) && !self.stack.is_empty() {
             self.replace_top(tree, fx);
         } else {
-            self.push(tree, fx);
+            self.push(tree, context, fx);
         }
         self.shown_invocation = Some(invocation);
     }
@@ -249,9 +259,18 @@ impl Launcher {
             // A root action that produces a view opens it. A snippet needing
             // arguments has to ask before it can do anything.
             (ActionOutcome::Replaced(tree), Origin::Root) => {
+                let context = self
+                    .results
+                    .iter()
+                    .find(|item| item.id == request.item_id)
+                    .map(|item| Context {
+                        title: item.title.clone(),
+                        icon: item.icon.clone(),
+                    })
+                    .unwrap_or_default();
                 self.owner = Some(request.extension_id);
                 self.stack.clear();
-                self.push(*tree, fx);
+                self.push(*tree, context, fx);
                 self.shown_invocation = None;
             }
             (ActionOutcome::Removed(_), Origin::Root) => {
@@ -259,7 +278,7 @@ impl Launcher {
             }
             (ActionOutcome::Replaced(tree) | ActionOutcome::Removed(tree), Origin::View) => {
                 if self.stack.is_empty() {
-                    self.push(*tree, fx);
+                    self.push(*tree, Context::default(), fx);
                 } else {
                     self.replace_top(*tree, fx);
                 }
@@ -300,11 +319,12 @@ impl Launcher {
         fx.push(Effect::ExpireToast { id });
     }
 
-    fn push(&mut self, tree: ViewTree, fx: &mut Vec<Effect>) {
+    fn push(&mut self, tree: ViewTree, context: Context, fx: &mut Vec<Effect>) {
         self.panel = None;
         let query_revision = self.next_revision();
         let mut view = PushedView {
             tree,
+            context,
             query: String::new(),
             query_revision,
             picked: None,

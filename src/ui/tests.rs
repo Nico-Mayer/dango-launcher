@@ -30,6 +30,10 @@ fn actions() -> Vec<Action> {
 fn result(n: usize) -> ResultItem {
     ResultItem {
         extension_id: "fixture".into(),
+        context: Context {
+            title: "Fixture".into(),
+            icon: None,
+        },
         id: format!("result-{n}"),
         title: format!("Result {n}"),
         subtitle: None,
@@ -170,6 +174,10 @@ impl Harness {
     fn render(&mut self, invocation: u64, tree: ViewTree) {
         self.event(Event::Rendered {
             owner: "fixture".into(),
+            context: Context {
+                title: "Fixture Command".into(),
+                icon: None,
+            },
             invocation,
             tree,
         });
@@ -470,6 +478,7 @@ fn an_action_in_a_view_goes_to_the_owner_of_the_view() {
     let mut h = Harness::new();
     h.event(Event::Rendered {
         owner: "clipboard".into(),
+        context: Context::default(),
         invocation: 4,
         tree: list_tree(vec![list_item(1)]),
     });
@@ -823,6 +832,7 @@ fn template_fields_are_inspected_on_arrival_and_on_every_edit() {
     let mut h = Harness::root(1);
     let effects = h.event(Event::Rendered {
         owner: "fixture".into(),
+        context: Context::default(),
         invocation: 1,
         tree: mixed_form(),
     });
@@ -1408,6 +1418,14 @@ fn a_failure_toast_stays_until_a_key() {
     assert_eq!(h.failure().as_deref(), Some("Nope"));
     h.press("ArrowDown");
     assert!(h.failure().is_none());
+}
+
+#[test]
+fn the_footer_names_the_extension_at_root_and_the_command_in_a_view() {
+    let mut h = Harness::root(3);
+    assert_eq!(h.snapshot().footer.context.title, "Fixture");
+    h.render(1, list_tree(vec![list_item(1)]));
+    assert_eq!(h.snapshot().footer.context.title, "Fixture Command");
 }
 
 #[test]

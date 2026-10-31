@@ -2,7 +2,7 @@ use serde::Serialize;
 
 use crate::protocol::{Action, FieldKind, ListItem, View};
 
-use super::input::{Chord, ResultItem};
+use super::input::{Chord, Context, ResultItem};
 use super::state::{Launcher, Mode, PushedView, ToastStyle};
 
 macro_rules! snapshot_types {
@@ -156,6 +156,9 @@ snapshot_types! {
 
     #[serde(rename_all = "camelCase")]
     pub struct Footer {
+        /// In root search the selected result's extension, in a view its
+        /// command.
+        pub context: Context,
         /// What Enter runs. Nothing when there is nothing to confirm.
         pub primary_label: Option<String>,
         /// The confirm key is Cmd or Ctrl with Enter, because Enter makes a
@@ -393,6 +396,10 @@ impl Launcher {
         let Some(view) = self.stack.last() else {
             // A command result carries no actions and is invoked instead.
             return Footer {
+                context: self
+                    .root_selected()
+                    .map(|item| item.context.clone())
+                    .unwrap_or_default(),
                 primary_label: self.root_selected().map(|item| {
                     item.actions
                         .first()
@@ -402,6 +409,7 @@ impl Launcher {
             };
         };
         Footer {
+            context: view.context.clone(),
             primary_label: self
                 .available_actions()
                 .first()

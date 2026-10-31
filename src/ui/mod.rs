@@ -10,6 +10,6 @@ mod state;
 mod tests;
 
 pub use effect::{ActionRequest, Effect, Origin};
-pub use input::{Chord, Event, Input, Intent, ResultItem, TemplateInspection};
+pub use input::{Chord, Context, Event, Input, Intent, ResultItem, TemplateInspection};
 pub use snapshot::Snapshot;
 pub use state::{Launcher, ToastStyle};

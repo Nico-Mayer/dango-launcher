@@ -140,6 +140,12 @@ impl ExtensionHost {
         &self.registry
     }
 
+    pub fn manifests(&self) -> impl Iterator<Item = &Manifest> {
+        self.extensions
+            .values()
+            .map(|extension| extension.manifest())
+    }
+
     pub fn is_active(&self, extension_id: &str) -> bool {
         self.active.contains_key(extension_id)
     }

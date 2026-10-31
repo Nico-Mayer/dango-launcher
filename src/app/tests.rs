@@ -30,6 +30,7 @@ fn core(config_json: &str) -> (Arc<Core>, Arc<RecordingShell>) {
         Arc::new(DangoRanker::new(frecency.clone(), learned.clone())),
         RESULT_LIMIT,
     );
+    let contexts = super::extension_contexts(&host);
     let host = Arc::new(Mutex::new(host));
     let services = Services {
         invoker: Arc::new(Invoker::new(Arc::new(HostResolver(host.clone())))),
@@ -37,6 +38,7 @@ fn core(config_json: &str) -> (Arc<Core>, Arc<RecordingShell>) {
         pipeline,
         frecency,
         learned,
+        contexts,
         applications: None,
         ai: None,
         hotkeys: Registry::new(Box::new(FakeGrab::default()), launcher),
