@@ -904,6 +904,25 @@ mod form {
     }
 
     #[test]
+    fn leaving_a_form_from_a_textarea_gives_enter_back() {
+        let h = Harness::root(results(1));
+        h.view(every_kind());
+        h.key("\t");
+        h.key("\t");
+        assert!(h.shell().get_multiline_focused());
+        h.key("\u{1b}");
+        assert_eq!(h.shell().get_screen(), ScreenKind::Root);
+        h.intents.borrow_mut().clear();
+        h.key("\n");
+        assert_eq!(
+            h.intents(),
+            [Intent::Key {
+                chord: crate::ui::Chord::plain("Enter")
+            }]
+        );
+    }
+
+    #[test]
     fn choosing_a_dropdown_option_edits_the_field() {
         let h = Harness::root(results(1));
         h.view(every_kind());

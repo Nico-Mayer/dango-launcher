@@ -29,6 +29,10 @@ pub fn write(
 ) {
     let shell = ui.global::<Shell>();
     shell.set_screen(kind);
+    // The textarea's focus handler may not run when its form is torn down.
+    if kind != ScreenKind::Form {
+        shell.set_multiline_focused(false);
+    }
     shell.set_typing(typing);
     shell.set_can_go_back(!matches!(snapshot.screen, Screen::Root(_)));
     shell.set_loading(matches!(&snapshot.screen, Screen::View(view) if view.busy));
