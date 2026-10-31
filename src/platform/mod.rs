@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 pub use raw_window_handle::RawWindowHandle;
 
 #[cfg(target_os = "macos")]
@@ -361,6 +363,42 @@ pub fn attribution() -> std::sync::Arc<dyn crate::extensions::clipboard::Attribu
     }
 }
 
+/// Text with the line breaks the system clipboard expects. Windows expects
+/// CRLF, and classic edit controls show a bare LF as no break at all.
+pub fn text_to_clipboard(text: &str) -> Cow<'_, str> {
+    if cfg!(target_os = "windows") {
+        crlf(text)
+    } else {
+        Cow::Borrowed(text)
+    }
+}
+
+/// Text from the system clipboard with LF line breaks, the form Dango keeps
+/// and compares against what it wrote.
+pub fn text_from_clipboard(text: String) -> String {
+    if cfg!(target_os = "windows") {
+        lf(text)
+    } else {
+        text
+    }
+}
+
+fn crlf(text: &str) -> Cow<'_, str> {
+    if text.contains('\n') {
+        Cow::Owned(text.replace("\r\n", "\n").replace('\n', "\r\n"))
+    } else {
+        Cow::Borrowed(text)
+    }
+}
+
+fn lf(text: String) -> String {
+    if text.contains("\r\n") {
+        text.replace("\r\n", "\n")
+    } else {
+        text
+    }
+}
+
 /// Renders the icon the system shows for something, at the requested size.
 /// `locator` is a filesystem path on macOS and a shell parsing name on Windows,
 /// which is what lets one helper serve both the application index and the list
@@ -457,7 +495,22 @@ pub fn launcher_origin(
 
 #[cfg(test)]
 mod tests {
-    use super::{launcher_origin, HyperkeyTrigger};
+    use super::{crlf, launcher_origin, lf, HyperkeyTrigger};
+
+    #[test]
+    fn bare_line_feeds_become_crlf_and_existing_crlf_stays() {
+        assert_eq!(
+            crlf("line end\nnext\r\nlast\n"),
+            "line end\r\nnext\r\nlast\r\n"
+        );
+        assert_eq!(crlf("one line"), "one line");
+    }
+
+    #[test]
+    fn crlf_reads_back_as_line_feeds() {
+        assert_eq!(lf("a\r\nb\r\n".into()), "a\nb\n");
+        assert_eq!(lf(crlf("a\nb\n").into_owned()), "a\nb\n");
+    }
 
     #[test]
     fn trigger_from_key_uses_an_allowlist() {

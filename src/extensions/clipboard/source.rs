@@ -13,6 +13,7 @@ use clipboard_rs::common::RustImage;
 use clipboard_rs::{Clipboard, ClipboardContent, ClipboardContext, ContentFormat, RustImageData};
 
 use super::history::Content;
+use crate::platform;
 
 /// How long to wait for another process to let go of the clipboard.
 ///
@@ -147,7 +148,9 @@ impl ClipboardSource for CrateClipboard {
     }
 
     fn text(&self) -> Option<String> {
-        until_free(|| self.context.get_text(), busy::holds_text).ok()
+        until_free(|| self.context.get_text(), busy::holds_text)
+            .ok()
+            .map(platform::text_from_clipboard)
     }
 
     fn image(&self) -> Option<Vec<u8>> {
@@ -156,6 +159,7 @@ impl ClipboardSource for CrateClipboard {
     }
 
     fn set_text(&self, text: &str) {
+        let text = platform::text_to_clipboard(text);
         let written = until_free(|| self.context.set_text(text.to_string()), busy::possible);
         if let Err(error) = written {
             crate::log::append(&format!(
@@ -209,7 +213,9 @@ impl ClipboardSource for CrateClipboard {
         let mut snapshot = Snapshot::default();
         for content in contents {
             match content {
-                ClipboardContent::Text(text) if !text.is_empty() => snapshot.text = Some(text),
+                ClipboardContent::Text(text) if !text.is_empty() => {
+                    snapshot.text = Some(platform::text_from_clipboard(text))
+                }
                 ClipboardContent::Html(html) => snapshot.html = Some(html),
                 ClipboardContent::Rtf(rtf) => snapshot.rtf = Some(rtf),
                 ClipboardContent::Files(files) => snapshot.files = files,
@@ -251,7 +257,9 @@ impl ClipboardSource for CrateClipboard {
 fn crate_contents(snapshot: &Snapshot) -> Vec<ClipboardContent> {
     let mut contents = Vec::new();
     if let Some(text) = &snapshot.text {
-        contents.push(ClipboardContent::Text(text.clone()));
+        contents.push(ClipboardContent::Text(
+            platform::text_to_clipboard(text).into_owned(),
+        ));
     }
     if let Some(html) = &snapshot.html {
         contents.push(ClipboardContent::Html(html.clone()));
