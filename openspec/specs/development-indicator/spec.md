@@ -95,7 +95,7 @@ product name only.
 - **WHEN** the pointer rests on the tray icon of a release build
 - **THEN** the tooltip reads "Dango"
 
-### Requirement: Both states are testable without a Tauri process
+### Requirement: Both states are testable without a window
 
 The automated UI tests SHALL be able to mount the launcher in either the
 development or the release state without a visible window, so each

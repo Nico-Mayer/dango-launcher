@@ -213,7 +213,7 @@ Every request to a provider SHALL be made by the application core. No key and
 no request SHALL be handed to the code that draws the interface, and no
 provider endpoint SHALL be called from it.
 
-#### Scenario: The webview never holds a key
+#### Scenario: The interface never holds a key
 
 - **WHEN** an AI command runs
 - **THEN** the key and the request stay inside the application core
