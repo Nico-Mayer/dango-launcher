@@ -1,8 +1,8 @@
 ## 1. Parser
 
 - [x] 1.1 Add `f13` to `f20` to `KEY_TOKENS` in `src/config/hotkey.rs`. Verify: `every_token_in_the_tables_parses` passes under `cargo test`.
-- [ ] 1.2 Add `HotkeyError::NoModifier` and return it from `parse_with_hyper` when the modifier set is empty and the key is not F1 to F20. Verify: new `cargo test` cases in `hotkey.rs` - `a`, `space`, `k` refused with `NoModifier`; `f1`, `f13`, `f20` accepted with no modifiers; `f21` refused as `UnknownKey`; `win` and `cmd` refused as `NoKey`.
-- [ ] 1.3 Add a test in `src/hotkeys.rs` that a launcher hotkey of `space` falls back to the default with a problem line, and one that a command bound to `k` yields a conflict line naming it while other bindings stay. Verify: `cargo test hotkeys`.
+- [x] 1.2 Add `HotkeyError::NoModifier` and return it from `parse_with_hyper` when the modifier set is empty and the key is not F1 to F20. Verify: new `cargo test` cases in `hotkey.rs` - `a`, `space`, `k` refused with `NoModifier`; `f1`, `f13`, `f20` accepted with no modifiers; `f21` refused as `UnknownKey`; `win` and `cmd` refused as `NoKey`.
+- [x] 1.3 Add a test in `src/hotkeys.rs` that a launcher hotkey of `space` falls back to the default with a problem line, and one that a command bound to `k` yields a conflict line naming it while other bindings stay. Verify: `cargo test hotkeys`.
 
 ## 2. Schema and reference
 

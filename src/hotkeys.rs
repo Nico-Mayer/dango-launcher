@@ -517,6 +517,36 @@ mod tests {
     }
 
     #[test]
+    fn a_bare_launcher_hotkey_falls_back_and_says_why() {
+        let (chord, problem) = super::launcher(&config(r#"{ "launcher": { "hotkey": "space" } }"#));
+        assert_eq!(chord, launcher());
+        assert!(problem.unwrap().contains("no modifier"));
+    }
+
+    #[test]
+    fn a_command_on_a_bare_key_is_reported_and_others_stay() {
+        let c = config(
+            r#"{ "extensions": { "x": { "commands": {
+                "alpha": { "hotkey": "k" },
+                "beta": { "hotkey": "ctrl+alt+j" },
+                "gamma": { "hotkey": "f19" }
+            } } } }"#,
+        );
+        let result = bindings(&c, launcher());
+        let targets: Vec<_> = result.bindings.iter().map(|b| b.target.clone()).collect();
+        assert_eq!(
+            targets,
+            [
+                Target::Command("x.beta".into()),
+                Target::Command("x.gamma".into())
+            ]
+        );
+        assert_eq!(result.conflicts.len(), 1);
+        assert!(result.conflicts[0].contains("x.alpha"));
+        assert!(result.conflicts[0].contains("no modifier"));
+    }
+
+    #[test]
     fn a_disabled_command_gets_no_binding() {
         let c = config(
             r#"{ "extensions": { "x": { "commands": {

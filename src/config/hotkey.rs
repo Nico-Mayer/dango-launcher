@@ -93,6 +93,8 @@ pub enum HotkeyError {
     UnknownKey(String),
     #[error("no hotkey is set for this platform")]
     NoValueForPlatform,
+    #[error("the hotkey has no modifier; only F1 to F20 can stand alone")]
+    NoModifier,
 }
 
 /// Parses a `mod+shift+k` style chord into modifiers and a physical key,
@@ -120,7 +122,37 @@ pub fn parse_with_hyper(spec: &str, hyper: Modifiers) -> Result<ParsedHotkey, Ho
     }
 
     let code = key_code(&key.to_ascii_lowercase())?;
+    if modifiers.is_empty() && !stands_alone(code) {
+        return Err(HotkeyError::NoModifier);
+    }
     Ok(ParsedHotkey { modifiers, code })
+}
+
+/// Whether a key is a hotkey without a modifier: the function keys F1 to F20.
+pub fn stands_alone(code: Code) -> bool {
+    matches!(
+        code,
+        Code::F1
+            | Code::F2
+            | Code::F3
+            | Code::F4
+            | Code::F5
+            | Code::F6
+            | Code::F7
+            | Code::F8
+            | Code::F9
+            | Code::F10
+            | Code::F11
+            | Code::F12
+            | Code::F13
+            | Code::F14
+            | Code::F15
+            | Code::F16
+            | Code::F17
+            | Code::F18
+            | Code::F19
+            | Code::F20
+    )
 }
 
 /// What a modifier token stands for. `Primary` is Cmd on macOS and Ctrl on
@@ -374,6 +406,29 @@ mod tests {
     #[test]
     fn only_modifiers_is_no_key() {
         assert!(matches!(parse("ctrl+shift"), Err(HotkeyError::NoKey)));
+    }
+
+    #[test]
+    fn a_bare_key_needs_a_modifier() {
+        for spec in ["a", "space", "k"] {
+            assert_eq!(parse(spec), Err(HotkeyError::NoModifier), "{spec}");
+        }
+    }
+
+    #[test]
+    fn a_function_key_stands_alone() {
+        for (spec, code) in [("f1", Code::F1), ("f13", Code::F13), ("f20", Code::F20)] {
+            let parsed = parse(spec).unwrap();
+            assert!(parsed.modifiers.is_empty(), "{spec}");
+            assert_eq!(parsed.code, code, "{spec}");
+        }
+        assert_eq!(parse("f21"), Err(HotkeyError::UnknownKey("f21".into())));
+    }
+
+    #[test]
+    fn a_lone_modifier_is_no_key() {
+        assert_eq!(parse("win"), Err(HotkeyError::NoKey));
+        assert_eq!(parse("cmd"), Err(HotkeyError::NoKey));
     }
 
     #[test]
