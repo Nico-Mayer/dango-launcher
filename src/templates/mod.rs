@@ -162,7 +162,11 @@ pub fn is_reserved(name: &str) -> bool {
 fn environment() -> &'static Environment<'static> {
     static ENVIRONMENT: OnceLock<Environment<'static>> = OnceLock::new();
     // No loader is installed, so `include` and `extends` have nothing to reach.
-    ENVIRONMENT.get_or_init(Environment::new)
+    ENVIRONMENT.get_or_init(|| {
+        let mut environment = Environment::new();
+        environment.set_keep_trailing_newline(true);
+        environment
+    })
 }
 
 fn today() -> String {
@@ -271,6 +275,11 @@ mod tests {
         let source = "fn main() { let x = Foo { a: 1 }; }";
         assert_eq!(arguments(source), Vec::<String>::new());
         assert_eq!(render(source, &Values::default()).text, source);
+    }
+
+    #[test]
+    fn a_final_newline_is_kept() {
+        assert_eq!(render("Regards\n", &Values::default()).text, "Regards\n");
     }
 
     #[test]
