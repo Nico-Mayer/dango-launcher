@@ -15,6 +15,7 @@ fn main() {
         println!(
             "cargo:rustc-link-arg=/MANIFESTDEPENDENCY:type='win32' name='Microsoft.Windows.Common-Controls' version='6.0.0.0' processorArchitecture='*' publicKeyToken='6595b64144ccf1df' language='*'"
         );
+        println!("cargo:rerun-if-changed=icons/icon.ico");
         let mut resource = winresource::WindowsResource::new();
         resource.set_icon("icons/icon.ico");
         resource.set("ProductName", "Dango");
