@@ -36,7 +36,7 @@ and the code is wrong. Their spec rule stays, and the bug is an issue:
 | #19 | global-activation, interface-copy | Notice names the configured chord |
 | #20 | ai-providers | No credential to a local provider |
 | #21 | keyword-expansion | Expansion recovers on Windows |
-| #22 | root-search | A typed query shows no section headings |
+| #22 | root-search | A typed query shows no headings and does not put pinned items first |
 
 Alternative rejected: weaken those rules to match the bugs. That would hide
 the bugs and lose the intent.
@@ -67,6 +67,16 @@ rules with it.
 
 Alternative rejected: keep the rules as a future contract. Specs describe
 the app as it is, and a contract with no caller cannot be tested.
+
+### Reasons kept out of the spec text
+
+Two platform gaps are stated in the specs without their cause, which is
+implementation:
+
+- macOS keeps a fixed launcher height because resizing there moves the top
+  edge, and keeping it in place is not built (AGENTS.md platform traps).
+- On macOS, CapsLock does nothing where the hyperkey cannot see input, because
+  it is remapped to F18 below the level Dango observes.
 
 ### Open points, left as they are
 

@@ -35,8 +35,7 @@ registration the launcher and command hotkeys already use.
 The hyperkey SHALL act only on input the operating system delivers to Dango.
 Where the platform withholds input, the hyperkey SHALL NOT modify it. On
 Windows, CapsLock SHALL then behave as the system delivers it. On macOS,
-CapsLock is remapped below the level Dango sees, so there it SHALL do nothing
-rather than act as a lock key.
+CapsLock SHALL then do nothing rather than act as a lock key.
 
 #### Scenario: A higher-integrity window on Windows
 

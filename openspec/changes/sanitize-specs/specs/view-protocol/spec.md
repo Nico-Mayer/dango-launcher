@@ -56,8 +56,8 @@ going back restores them.
 
 #### Scenario: Reopening starts at root
 
-- **WHEN** the user is three views deep, the launcher session ends with a
-  deliberate hide or when the grace period runs out, and the user reopens the
+- **WHEN** the user is three views deep, the launcher resets through a
+  deliberate hide or the grace period running out, and the user reopens the
   launcher
 - **THEN** the root view is shown with an empty query
 
@@ -171,8 +171,8 @@ Busy state SHALL be exposed to assistive technology.
 
 #### Scenario: Loading feedback is abandoned
 
-- **WHEN** the user leaves a loading view, or the launcher session ends with a
-  deliberate hide or when the grace period runs out (see launcher-shell)
+- **WHEN** the user leaves a loading view, or the launcher resets through a
+  deliberate hide or the grace period running out (see launcher-shell)
 - **THEN** its loading marks are removed
 - **AND** a late update from an abandoned invocation does not restore them
 

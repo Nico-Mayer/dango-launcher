@@ -34,7 +34,7 @@ the answer is complete.
 
 The user SHALL be able to stop a request that is running. Escape SHALL leave the
 view the way it leaves any view, and an abandoned request's later output SHALL
-NOT appear. When the launcher session ends, the request SHALL be abandoned;
+NOT appear. When the launcher resets its state, the request SHALL be abandoned;
 when that happens is in `openspec/specs/launcher-shell`.
 
 #### Scenario: Escape abandons the request
@@ -45,8 +45,8 @@ when that happens is in `openspec/specs/launcher-shell`.
 
 #### Scenario: Hiding the launcher abandons the request
 
-- **WHEN** an answer is streaming and the launcher session ends, through a
-  deliberate hide or the end of the hold after an interrupting hide
+- **WHEN** an answer is streaming and the launcher resets, through a deliberate
+  hide or the grace period running out after an interrupting hide
 - **THEN** the request is abandoned and nothing from it is shown later
 
 #### Scenario: Running another command supersedes it

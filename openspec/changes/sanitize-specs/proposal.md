@@ -9,7 +9,7 @@ source of truth, so they must describe the app as it is.
 ## What Changes
 
 Spec text only. No code changes. Where spec and code disagree, the spec
-follows the code, except for six code bugs, which keep their spec rule and
+follows the code, except for seven code bugs, which keep their spec rule and
 are tracked as issues #16-#22.
 
 - Remove WebView-era wording: "frontend", WebView2/WebKit, "every renderer",

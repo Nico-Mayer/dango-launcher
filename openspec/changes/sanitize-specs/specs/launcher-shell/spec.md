@@ -298,8 +298,7 @@ receiving results for a query, the window SHALL grow with them but SHALL NOT
 shrink until every provider has answered.
 
 On macOS, the window SHALL stay 480 logical pixels tall for every view, and a
-list or grid SHALL scroll beyond that. Resizing a window on macOS moves its top
-edge, and keeping the top edge in place is not built there yet.
+list or grid SHALL scroll beyond that.
 
 On both platforms, "No results" SHALL NOT show while root search is still
 receiving results for a query, until every provider has answered.
