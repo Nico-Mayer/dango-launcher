@@ -101,6 +101,11 @@ impl Shell for SlintShell {
         if let Some(window) = self.window.upgrade() {
             let _ = window.hide();
         }
+        RENDERER.with(|renderer| {
+            if let Some(renderer) = renderer.borrow().as_ref() {
+                renderer.borrow_mut().forget_images();
+            }
+        });
         if restore_focus {
             self.platform.lock().unwrap().restore_previous_focus();
         }

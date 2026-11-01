@@ -713,6 +713,27 @@ mod list_view {
     }
 
     #[test]
+    fn hiding_lets_go_of_file_images() {
+        let h = Harness::root(results(3));
+        let icon = concat!(env!("CARGO_MANIFEST_DIR"), "/icons/32x32.png");
+        h.view(tree(
+            vec![ListItem {
+                icon: Some(icon.into()),
+                ..item(1)
+            }],
+            false,
+        ));
+        let rows = || h.ui.global::<ListData>().get_rows().row_count();
+        assert_eq!(rows(), 1);
+        assert!(h.renderer.borrow().holds_images());
+
+        h.renderer.borrow_mut().forget_images();
+
+        assert_eq!(rows(), 0);
+        assert!(!h.renderer.borrow().holds_images());
+    }
+
+    #[test]
     fn a_row_is_forty_pixels_high() {
         let h = Harness::root(results(3));
         assert_eq!(h.row("Result 1").size().height, 40.0);

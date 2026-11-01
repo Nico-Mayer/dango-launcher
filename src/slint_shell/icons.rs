@@ -59,6 +59,11 @@ impl Icons {
         *self.shown.borrow_mut() = self.rendering.take();
     }
 
+    pub fn forget_files(&self) {
+        self.shown.borrow_mut().clear();
+        self.rendering.borrow_mut().clear();
+    }
+
     fn file(&self, path: &str) -> Option<Image> {
         if let Some(image) = self.rendering.borrow().get(path) {
             return Some(image.clone());
@@ -75,6 +80,11 @@ impl Icons {
             .borrow_mut()
             .insert(path.to_string(), image.clone());
         Some(image)
+    }
+
+    #[cfg(test)]
+    pub fn holds_files(&self) -> bool {
+        !self.shown.borrow().is_empty() || !self.rendering.borrow().is_empty()
     }
 }
 

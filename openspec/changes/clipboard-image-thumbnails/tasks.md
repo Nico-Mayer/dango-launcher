@@ -11,7 +11,7 @@
 ## 3. Render-scoped file-image cache
 
 - [x] 3.1 `Icons` keeps the file images the last render used and drops the rest at the end of each render. Verify with `cargo test` in `icons.rs`: a path asked for in two renders in a row is decoded once, and a path a render did not ask for is gone after it
-- [ ] 3.2 Hiding the launcher empties the cache and the list and grid models. Verify with a UI test in `src/slint_shell/tests.rs` that shows a list with a file icon, hides, and finds both the cache and the rows empty
+- [x] 3.2 Hiding the launcher empties the cache and the list and grid models. Verify with a UI test in `src/slint_shell/tests.rs` that shows a list with a file icon, hides, and finds both the cache and the rows empty
 
 ## 4. Debug build speed
 

@@ -141,6 +141,19 @@ impl Renderer {
         self.last = Some(snapshot);
     }
 
+    /// The list and grid models hold their images too, so both go with the
+    /// cache.
+    pub fn forget_images(&mut self) {
+        self.list.clear();
+        self.grid.clear();
+        self.icons.forget_files();
+    }
+
+    #[cfg(test)]
+    pub fn holds_images(&self) -> bool {
+        self.icons.holds_files()
+    }
+
     /// Writes the field only when the revision moved, so an answer to an older
     /// keystroke never overwrites newer typing.
     fn write_query(&mut self, ui: &LauncherWindow, root: bool, text: &str, revision: u64) {

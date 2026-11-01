@@ -36,6 +36,7 @@ impl Writer {
 
     pub fn clear(&mut self) {
         self.rows.set_vec(Vec::new());
+        self.selected = None;
     }
 
     pub fn root(&mut self, ui: &LauncherWindow, root: &RootScreen, icons: &Icons) {

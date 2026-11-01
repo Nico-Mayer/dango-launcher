@@ -28,6 +28,11 @@ impl Writer {
         }
     }
 
+    pub fn clear(&mut self) {
+        self.tiles.set_vec(Vec::new());
+        self.selected = None;
+    }
+
     pub fn write(&mut self, ui: &LauncherWindow, grid: &GridBody, icons: &Icons) {
         let Layout {
             columns,
