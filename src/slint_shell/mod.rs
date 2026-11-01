@@ -13,6 +13,7 @@ mod tests;
 
 use std::cell::RefCell;
 use std::rc::Rc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
 use slint::winit_030::{winit, EventResult, WinitWindowAccessor};
@@ -37,9 +38,16 @@ struct SlintShell {
     window: slint::Weak<LauncherWindow>,
     tray: slint::Weak<Tray>,
     platform: Platform,
+    attached: AtomicBool,
 }
 
 impl SlintShell {
+    fn attach_once(&self, platform: &mut dyn PlatformWindow, handle: RawWindowHandle) {
+        if !self.attached.swap(true, Ordering::Relaxed) {
+            platform.attach(handle);
+        }
+    }
+
     fn handle(window: &LauncherWindow) -> Option<RawWindowHandle> {
         use raw_window_handle::HasWindowHandle;
         Some(
@@ -78,9 +86,10 @@ impl Shell for SlintShell {
         };
         let mut platform = self.platform.lock().unwrap();
         platform.will_show();
-        // winit creates the native window on the first show.
+        // The native window may not exist before the first show.
         let existing = Self::handle(&window);
         if let Some(handle) = existing {
+            self.attach_once(platform.as_mut(), handle);
             platform.position_on_active_display(handle);
         }
         if let Err(error) = window.show() {
@@ -91,7 +100,7 @@ impl Shell for SlintShell {
             return;
         };
         if existing.is_none() {
-            platform.attach(handle);
+            self.attach_once(platform.as_mut(), handle);
             platform.position_on_active_display(handle);
         }
         platform.did_show(handle);
@@ -203,6 +212,7 @@ pub fn run() {
         window: window.as_weak(),
         tray: tray.as_weak(),
         platform: Arc::new(Mutex::new(platform::launcher_window())),
+        attached: AtomicBool::new(false),
     });
 
     // The hotkeys and the tray need the event loop running on this thread.

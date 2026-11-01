@@ -753,6 +753,7 @@ mod list_view {
             window: h.ui.as_weak(),
             tray: slint::Weak::default(),
             platform: std::sync::Arc::new(std::sync::Mutex::new(Box::new(NoPlatform))),
+            attached: Default::default(),
         };
         shell.hide(false);
         super::super::RENDERER.with(|slot| *slot.borrow_mut() = None);

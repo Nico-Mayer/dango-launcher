@@ -149,8 +149,6 @@ extension. Built-in features are extensions too. The contract is in
 Keep the UI snappy. Speed comes from structure, not from timing numbers:
 
 - The launcher component is built at startup and only shown and hidden after.
-  winit creates its native window on the first show, which costs that first
-  activation a little more.
 - Search never blocks. Providers are async, slow ones appear late, and each
   keystroke cancels the previous search instead of debouncing.
 - View updates replace the full tree. No reconciler, no diffing.
@@ -240,6 +238,11 @@ load and are not reliable.
   the foreground and has the keyboard, yet `has_focus` stays false and no
   `Focused` event arrives. Focus loss is watched with a
   `SetWinEventHook(EVENT_SYSTEM_FOREGROUND)` in `platform/windows` instead.
+- On macOS the launcher's native window already exists before the first
+  show, so a missing window handle does not mean "first show". The one-time
+  `attach` (panel reclass, non-activating mask, level, Spaces) runs from a
+  flag in `SlintShell`. Without it the launcher never gets the keyboard and
+  typing goes to the app behind it.
 - Slint's winit backend probes for OpenGL 2 on Windows and silently falls back
   to the software renderer without it. That renderer refuses
   `set_rendering_notifier`, so paint timing hangs off `RedrawRequested` in the

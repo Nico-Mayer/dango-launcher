@@ -23,7 +23,7 @@ compile_error!("Dango targets macOS and Windows only. Linux is out of scope.");
 /// The platform half of showing the launcher. The shell shows and hides the
 /// window itself; this does what its toolkit cannot.
 pub trait LauncherWindow: Send {
-    /// Once, after the first show has created the native window.
+    /// Once, on the first show that has a native window.
     fn attach(&mut self, _window: RawWindowHandle) {}
     /// Before the shell shows the window.
     fn will_show(&mut self);
