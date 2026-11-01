@@ -23,7 +23,8 @@ The second command registers git hooks for this clone. Committing runs
 the push if it fails. `mise run check` runs the same checks on every file.
 Use `git push --no-verify` to skip the push checks once.
 
-`mise tasks` lists the project commands.
+Rust is pinned in `rust-toolchain.toml`. `mise tasks` lists the project
+commands.
 
 ## Building and running
 

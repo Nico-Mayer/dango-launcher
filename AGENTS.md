@@ -95,6 +95,9 @@ spend design on honouring old values.
 - Node, the OpenSpec CLI, hk, git-cliff, cargo-release, and cargo-packager
   are pinned via mise (`mise.toml`). Node runs only the OpenSpec CLI and
   `scripts/*.mjs`.
+- Rust is pinned in `rust-toolchain.toml`. A global mise `rust` entry exports
+  `RUSTUP_TOOLCHAIN`, which beats that file, so `mise.toml` tells mise to read
+  it. Bump the channel there and nowhere else.
 
 ### Off the shelf before hand-rolled
 
@@ -295,7 +298,8 @@ load and are not reliable.
   `target/dango-ui-mcp.log`. `launch_dango` fails while another Dango runs.
   The first session after a clean checkout compiles the proxy; if Claude
   Code times out on it, build it once with
-  `cargo build --manifest-path tools/dango-ui-mcp/Cargo.toml`.
+  `cargo build --manifest-path tools/dango-ui-mcp/Cargo.toml`. The proxy
+  builds with the pinned toolchain, so do the same after a toolchain bump.
 - For hand checks on Windows, an agent can press keys with `mise run keys`
   (for example `mise run keys alt+space 'text:fire' escape`) and capture
   every display with `mise run shot`, which prints the PNG path. Both wrap
