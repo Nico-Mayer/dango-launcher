@@ -22,8 +22,8 @@ Windows checks were run by the author on the installed build and reported passin
 - [x] 4.1 Windows, release build: type `c`, note the top item, type `cal`, confirm Calendar; clear and type `c` and verify Calendar is now first; type `calc` and verify the learned pair has no effect
 - [x] 4.2 Windows: confirm Calculator for `cal` three times and verify `cal` now ranks Calculator first; restart and verify it still does
 - [x] 4.3 Windows: open an application by its global hotkey and press a command chord such as Maximize, and verify neither creates an `input_history` row nor changes its `frecency` row; run an action inside a pushed view and verify its frecency rises with no `input_history` row
-- [ ] 4.4 macOS, release build: repeat 4.1 and verify the same behaviour; verify the empty query suggestions are unchanged before and after
-- [ ] 4.5 macOS: repeat 4.3
+- [x] 4.4 macOS, release build: repeat 4.1 and verify the same behaviour; verify the empty query suggestions are unchanged before and after
+- [x] 4.5 macOS: repeat 4.3
 
 ## 5. Wrap up
 

@@ -24,12 +24,12 @@
 
 ## 5. macOS verification
 
-- [ ] 5.1 Install the `.dmg` build into `/Applications`, set `launcher.autostart` to true, and verify `~/Library/LaunchAgents/Dango.plist` exists with `ProgramArguments` pointing inside `/Applications/Dango.app` and `RunAtLoad` true, and that Dango is listed under System Settings > General > Login Items & Extensions as allowed in the background
-- [ ] 5.2 Log out and in; verify Dango is running with its menu bar icon, no launcher window is visible, and the launcher hotkey works
-- [ ] 5.3 Set the key to false and save; verify the plist is removed without a restart
-- [ ] 5.4 Launch the app from the mounted `.dmg` with the setting on, then from `/Applications`; verify the plist path is corrected by the second launch
-- [ ] 5.5 Run `tauri dev` with the setting on; verify no plist is created and `dango.log` has the development-build line
-- [ ] 5.6 Make `~/Library/LaunchAgents` unwritable, start a release build with the setting on; verify the tray shows `Autostart couldn't be applied, see dango.log` and the log names the write that failed, then restore permissions
+- [x] 5.1 Install the `.dmg` build into `/Applications`, set `launcher.autostart` to true, and verify `~/Library/LaunchAgents/Dango.plist` exists with `ProgramArguments` pointing inside `/Applications/Dango.app` and `RunAtLoad` true, and that Dango is listed under System Settings > General > Login Items & Extensions as allowed in the background
+- [x] 5.2 Log out and in; verify Dango is running with its menu bar icon, no launcher window is visible, and the launcher hotkey works
+- [x] 5.3 Set the key to false and save; verify the plist is removed without a restart
+- [x] 5.4 Launch the app from the mounted `.dmg` with the setting on, then from `/Applications`; verify the plist path is corrected by the second launch
+- [x] 5.5 Run `tauri dev` with the setting on; verify no plist is created and `dango.log` has the development-build line
+- [x] 5.6 Make `~/Library/LaunchAgents` unwritable, start a release build with the setting on; verify the tray shows `Autostart couldn't be applied, see dango.log` and the log names the write that failed, then restore permissions
 
 ## 6. Wrap up
 

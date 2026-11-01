@@ -12,7 +12,7 @@
 3.1 was run by the author on the installed Windows build and reported passing. 3.2 is carried forward unverified.
 
 - [x] 3.1 Windows, release build with frecency reset: type `ze` and verify Zed ranks above Maximize; type `code` and verify a title starting with it ranks above one where the letters are scattered
-- [ ] 3.2 macOS, release build: repeat 3.1; type `cafe` against an item titled with an accent, such as a snippet named "Café", and verify it matches and highlights the four characters
+- [x] 3.2 macOS, release build: repeat 3.1; type `cafe` against an item titled with an accent, such as a snippet named "Café", and verify it matches and highlights the four characters
 
 ## 4. Wrap up
 
