@@ -2,7 +2,7 @@
 //! is written again, so it follows the installed path; off removes it only when
 //! one exists.
 
-use auto_launch::{AutoLaunch, AutoLaunchBuilder};
+use auto_launch::{AutoLaunch, AutoLaunchBuilder, MacOSLaunchMode, WindowsEnableMode};
 
 const APP_NAME: &str = "Dango";
 
@@ -31,7 +31,9 @@ fn entry() -> Result<AutoLaunch, String> {
     AutoLaunchBuilder::new()
         .set_app_name(APP_NAME)
         .set_app_path(&exe.display().to_string())
-        .set_use_launch_agent(true)
+        .set_macos_launch_mode(MacOSLaunchMode::LaunchAgent)
+        .set_bundle_identifiers(&[crate::app::IDENTIFIER])
+        .set_windows_enable_mode(WindowsEnableMode::CurrentUser)
         .build()
         .map_err(|error| error.to_string())
 }
