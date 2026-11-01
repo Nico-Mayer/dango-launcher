@@ -9,3 +9,6 @@ hk = "2.0.0"
 [tasks.release]
 description = "Cut a release: derive version, changelog, commit, tag, push"
 run = "node scripts/release.mjs"
+
+[settings]
+idiomatic_version_file_enable_tools = ["rust"]
