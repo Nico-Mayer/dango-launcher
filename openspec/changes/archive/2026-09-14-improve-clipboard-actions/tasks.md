@@ -77,10 +77,10 @@
 
 ## 5. Verify on Windows
 
-- [ ] 5.1 Repeat 4.1 through 4.4 with Ctrl+K in place of Cmd+K, in Notepad and
+- [x] 5.1 Repeat 4.1 through 4.4 with Ctrl+K in place of Cmd+K, in Notepad and
       in a browser text field, and confirm the same results.
-- [ ] 5.2 Confirm pasting needs no permission step and that the previous window
+- [x] 5.2 Confirm pasting needs no permission step and that the previous window
       is the foreground window before the paste lands.
-- [ ] 5.3 Repeat 4.6 on Windows.
-- [ ] 5.4 Confirm CI is green on `windows-latest` and `macos-latest`, including
+- [x] 5.3 Dropped: no timing checks (AGENTS.md, Performance).
+- [x] 5.4 Confirm CI is green on `windows-latest` and `macos-latest`, including
       clippy, before the change is considered done.

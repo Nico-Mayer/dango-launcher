@@ -34,7 +34,7 @@
 
 - [x] 4.1 On macOS, confirm the whole suite and the lints pass: 411 Rust tests,
       `cargo clippy -- -D warnings`, `npm run check`, `npm run build`.
-- [ ] 4.2 On Windows, open the clipboard history by its hotkey, confirm an entry
+- [x] 4.2 On Windows, open the clipboard history by its hotkey, confirm an entry
       with Enter, and confirm one from the action panel; then make a paste fail
       and confirm the message is readable on the next activation.
-- [ ] 4.3 Confirm CI is green on `windows-latest` and `macos-latest`.
+- [x] 4.3 Confirm CI is green on `windows-latest` and `macos-latest`.
