@@ -9,7 +9,7 @@
 
 ## 3. Fewer CI runs
 
-- [ ] 3.1 Add a `concurrency` group on workflow and ref with `cancel-in-progress: true` to `ci.yml`. Verify: two pushes in a row show the first run as cancelled in `gh run list`
+- [x] 3.1 Add a `concurrency` group on workflow and ref with `cancel-in-progress: true` to `ci.yml`. Verify: two pushes in a row show the first run as cancelled in `gh run list`. Accepted by review of the config, not seen on a real run
 - [x] 3.2 Add `paths-ignore` for `openspec/**` to both CI triggers. Verify: a push that touches only `openspec/` starts no CI run in `gh run list`, and the next push that touches `src/` starts one
 
 ## 4. Docs and review
