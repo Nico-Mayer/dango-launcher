@@ -2,6 +2,12 @@
 
 All notable changes to Dango. Generated from commit history at release time.
 
+## [3.0.2] - 2026-11-01
+
+### Fixes
+
+- **macos:** Show the launcher on reopen
+- Name the login entry in autostart errors
 ## [3.0.1] - 2026-11-01
 
 ### Fixes
@@ -19,6 +25,7 @@ All notable changes to Dango. Generated from commit history at release time.
 ### Maintenance
 
 - Let the release task prompt and skip publishing
+- Install rust before cargo-packager
 ## [3.0.0] - 2026-11-01
 
 ### Features
