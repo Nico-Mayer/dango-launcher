@@ -179,6 +179,10 @@ objc2-application-services = { version = "0.3", default-features = false, featur
 ] }
 
 
+# Keeps file and line in backtraces at a fraction of full debug info.
+[profile.dev]
+debug = "line-tables-only"
+
 # Hand checks run in debug builds, and unoptimised inflate makes image rows
 # lag there in a way release builds never do.
 [profile.dev.package.png]
