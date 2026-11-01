@@ -62,9 +62,9 @@ gets no concurrency group: a release must never be cancelled.
 
 ### 4. Skip CI for docs-only pushes
 
-`paths-ignore` on both triggers: `openspec/**`, `docs/**`, `**/*.md`. A
-release commit still runs CI, because it touches `Cargo.toml` and
-`Cargo.lock`.
+`paths-ignore: openspec/**` on both triggers. `docs/` and Markdown stay in:
+`docs/config.md` is checked by a test. A release commit still runs CI,
+because it touches `Cargo.toml` and `Cargo.lock`.
 
 - Rejected: a job-level path filter action. There is no required status
   check to keep green, so the built-in filter is enough.
@@ -76,8 +76,8 @@ release commit still runs CI, because it touches `Cargo.toml` and
   build fact records why.
 - [Cancelling a `main` run also cancels its cache save] -> the next run saves
   it. The cost is one colder run at most.
-- [A docs-only push leaves no CI result] -> acceptable: those files do not
-  reach the build.
+- [An `openspec/`-only push leaves no CI result] -> acceptable: those files
+  do not reach the build or the tests.
 
 ## Migration Plan
 

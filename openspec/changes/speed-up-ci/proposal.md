@@ -20,7 +20,7 @@ build. Measured on the runs of 2026-11-01:
   under tags: it neither restores CI's debug cache nor writes caches no later
   run can read.
 - A new push cancels the older CI run on the same branch or pull request.
-- CI skips pushes that touch only `openspec/`, `docs/`, or Markdown files.
+- CI skips pushes that touch only `openspec/`.
 
 ## Capabilities
 
