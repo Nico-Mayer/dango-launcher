@@ -348,6 +348,17 @@ mod search_bar {
     }
 
     #[test]
+    fn going_back_leaves_the_text_cursor_after_the_query() {
+        let h = Harness::root(results(3));
+        h.type_text("clip");
+        h.view(list_tree());
+        h.key("\u{1b}");
+        assert_eq!(h.shell().get_screen(), ScreenKind::Root);
+        h.type_text("x");
+        assert_eq!(h.query(), "clipx");
+    }
+
+    #[test]
     fn a_loading_view_shows_the_loading_bar() {
         let h = Harness::root(results(3));
         h.view(detail_tree("Working"));

@@ -8,6 +8,10 @@ export component SearchBar inherits Rectangle {
 
     public function set-text(text: string) {
         input.text = text;
+        // Slint keeps the old cursor offset, so a query restored after an
+        // empty view would get the cursor at its start.
+        input.select-all();
+        input.clear-selection();
     }
 
     public function take-focus(select: bool) {
