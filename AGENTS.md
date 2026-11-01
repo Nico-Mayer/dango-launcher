@@ -282,7 +282,13 @@ load and are not reliable.
   `scripts/send-keys.ps1` (for example `alt+space 'text:fire' escape`) and
   capture every display with `scripts/screenshot.ps1`, which prints the PNG
   path. Run both with
-  `powershell.exe -NoProfile -ExecutionPolicy Bypass -File`.
+  `powershell.exe -NoProfile -ExecutionPolicy Bypass -File`. A `down:` held
+  through SendInput does not auto-repeat: send the key many times to mimic
+  holding it. Keys go to whatever is in front, so check the foreground
+  window is Dango before sending Enter, Escape, or Ctrl chords.
+- The Slint MCP `dispatch_key_event` cannot send Arrow keys from the agent,
+  and a newline inside a longer text is typed into the field. Send Enter on
+  its own, and pick list rows with `set_element_value` on the search field.
 - Packaging is `cargo-packager`, configured in `[package.metadata.packager]`
   in `Cargo.toml` with camelCase keys. Windows packages with
   `cargo packager --release --formats nsis`, macOS with `--formats app,dmg`.
