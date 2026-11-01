@@ -12,13 +12,19 @@ use std::time::{Duration, Instant};
 use async_trait::async_trait;
 
 use crate::extension::{
-    ActionOutcome, ActivationResult, Extension, FormValues, Manifest, Service, NAMED_ICON,
+    ActionOutcome, ActivationResult, CommandDecl, Extension, FormValues, InvocationMode, Manifest,
+    Service, NAMED_ICON,
 };
 use crate::extensions::snippets::OpenUrl;
-use crate::protocol::Action;
+use crate::invocation::{Command, InvocationContext};
+use crate::protocol::{
+    Action, EmptyState, GridItem, GridView, TileContent, View, ViewTree, PROTOCOL_VERSION,
+};
 use crate::search::{Candidate, RootProvider, Source};
 
 pub const EXTENSION_ID: &str = "dango.games";
+
+pub const COMMAND_SEARCH: &str = "search";
 
 pub const ACTION_LAUNCH: &str = "launch";
 
@@ -38,7 +44,18 @@ pub(crate) fn manifest() -> Manifest {
         id: EXTENSION_ID.into(),
         name: "Games".into(),
         icon: Some(format!("{NAMED_ICON}{FALLBACK_ICON}")),
-        commands: vec![],
+        commands: vec![CommandDecl {
+            id: COMMAND_SEARCH.into(),
+            title: "Search Games".into(),
+            mode: InvocationMode::View,
+            subtitle: Some("Games".into()),
+            icon: Some(fallback_icon()),
+            keywords: ["steam", "games", "play", "library"]
+                .iter()
+                .map(|k| (*k).to_string())
+                .collect(),
+            alias: None,
+        }],
         preferences: vec![],
         root_items: true,
         services: true,
@@ -134,6 +151,11 @@ impl Extension for GamesExtension {
         Some(self.provider.clone())
     }
 
+    fn command(&self, command_id: &str) -> Option<Arc<dyn Command>> {
+        (command_id == COMMAND_SEARCH)
+            .then(|| Arc::new(SearchCommand(self.list.clone())) as Arc<dyn Command>)
+    }
+
     fn perform_action(
         &self,
         item_id: &str,
@@ -173,6 +195,43 @@ impl RootProvider for GameProvider {
                 pinned: false,
             })
             .collect()
+    }
+}
+
+struct SearchCommand(Arc<GameList>);
+
+impl Command for SearchCommand {
+    fn invoke(&self, ctx: &InvocationContext) {
+        ctx.push_view(grid(&self.0.snapshot()));
+    }
+}
+
+/// Five columns of Steam's 2/3 portrait capsules.
+pub fn grid(games: &[Game]) -> ViewTree {
+    ViewTree {
+        protocol_version: PROTOCOL_VERSION,
+        view: View::Grid(GridView {
+            columns: 5,
+            aspect: 2.0 / 3.0,
+            empty_state: Some(EmptyState {
+                title: "No Steam games installed".into(),
+                description: Some("Games you install with Steam will show up here".into()),
+                ..Default::default()
+            }),
+            items: games
+                .iter()
+                .map(|game| GridItem {
+                    id: game.app_id.to_string(),
+                    title: game.name.clone(),
+                    content: TileContent::Image {
+                        image: game.cover.clone().unwrap_or_else(fallback_icon),
+                    },
+                    actions: vec![open()],
+                    ..Default::default()
+                })
+                .collect(),
+            ..Default::default()
+        }),
     }
 }
 
@@ -422,5 +481,50 @@ mod tests {
             assert!(text.starts_with(char::is_uppercase), "{text}");
             assert!(!text.ends_with('.') && !text.contains(". "), "{text}");
         }
+    }
+
+    #[test]
+    fn search_games_shows_a_portrait_grid_of_covers() {
+        let source = FakeSource::with(&[(1, "Brawlhalla")]);
+        let View::Grid(grid) = grid(&source.games()).view else {
+            panic!("not a grid");
+        };
+        assert_eq!((grid.columns, grid.aspect), (5, 2.0 / 3.0));
+        assert_eq!(grid.items[0].title, "Brawlhalla");
+        assert_eq!(
+            grid.items[0].content,
+            TileContent::Image {
+                image: "/cache/1/library_600x900.jpg".into()
+            }
+        );
+        assert_eq!(grid.items[0].actions[0].title, "Open");
+    }
+
+    #[test]
+    fn a_game_without_a_cover_shows_a_gamepad_tile() {
+        let source = FakeSource::with(&[(1, "Brawlhalla")]);
+        source.strip_art();
+        let View::Grid(grid) = grid(&source.games()).view else {
+            panic!("not a grid");
+        };
+        assert_eq!(
+            grid.items[0].content,
+            TileContent::Image {
+                image: "icon:gamepad-2".into()
+            }
+        );
+    }
+
+    #[test]
+    fn no_games_shows_how_they_get_there() {
+        let View::Grid(grid) = grid(&[]).view else {
+            panic!("not a grid");
+        };
+        let empty = grid.empty_state.unwrap();
+        assert_eq!(empty.title, "No Steam games installed");
+        assert_eq!(
+            empty.description.as_deref(),
+            Some("Games you install with Steam will show up here")
+        );
     }
 }

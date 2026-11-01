@@ -12,7 +12,7 @@
 
 ## 3. Search Games grid
 
-- [ ] 3.1 Add the "Search Games" command: a grid with 5 columns, `aspect` 2/3, each tile's content the cover path or `icon:gamepad-2`, primary action "Open", empty state "No Steam games installed" / "Games you install with Steam will show up here"; verify with extension tests for the tiles and the empty state (`cargo test games`)
+- [x] 3.1 Add the "Search Games" command: a grid with 5 columns, `aspect` 2/3, each tile's content the cover path or `icon:gamepad-2`, primary action "Open", empty state "No Steam games installed" / "Games you install with Steam will show up here"; verify with extension tests for the tiles and the empty state (`cargo test games`)
 - [ ] 3.2 UI test in `src/slint_shell/tests.rs`: run "Search Games" with a fake source, type part of a name, confirm only matching tiles remain, press Enter, and confirm the launch intent and the hidden launcher (`cargo test slint_shell`)
 
 ## 4. No duplicates from applications on Windows
