@@ -18,6 +18,7 @@ pub fn builtin_manifests() -> Vec<Manifest> {
     vec![
         applications::manifest(),
         clipboard::manifest(),
+        games::manifest(),
         permissions::manifest(),
         system::manifest(),
         updates::manifest(),
