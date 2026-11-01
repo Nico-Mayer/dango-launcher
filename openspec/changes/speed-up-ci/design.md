@@ -41,7 +41,7 @@ toolchain. Local runs keep auto-install.
 - Rejected: `install: true` without args, so mise-action installs and caches
   all tools. CI would still pay for tools it never uses on each cache miss.
 
-### 2. No Rust build cache in the release workflow
+### 2. No cache saves in the release workflow
 
 Remove `swatinem/rust-cache` from `release.yml`, and set `cache_save: false`
 on its mise-action step, whose tool cache would also land under the tag.
@@ -60,7 +60,7 @@ cancel-in-progress: true }` in `ci.yml`, for pushes to `main` and for pull
 requests. The newest commit's result covers the older ones. `release.yml`
 gets no concurrency group: a release must never be cancelled.
 
-### 4. Skip CI for docs-only pushes
+### 4. Skip CI for openspec-only pushes
 
 `paths-ignore: openspec/**` on both triggers. `docs/` and Markdown stay in:
 `docs/config.md` is checked by a test. A release commit still runs CI,
