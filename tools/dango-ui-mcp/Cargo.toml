@@ -1,0 +1,19 @@
+[package]
+name = "dango-ui-mcp"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+# Its own workspace and target folder, so building the app never waits on it
+# and Claude Code starting it never waits on the app's build lock.
+[workspace]
+
+[dependencies]
+rmcp = { version = "3.8", default-features = false, features = [
+  "server",
+  "transport-io",
+  "client",
+  "transport-streamable-http-client-reqwest",
+] }
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "process", "time", "sync"] }
+interprocess = "2"

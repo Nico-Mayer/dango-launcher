@@ -5,8 +5,14 @@
       "url": "https://docs.slint.dev/mcp"
     },
     "dango-ui": {
-      "type": "http",
-      "url": "http://localhost:9315/mcp"
+      "type": "stdio",
+      "command": "cargo",
+      "args": [
+        "run",
+        "--quiet",
+        "--manifest-path",
+        "tools/dango-ui-mcp/Cargo.toml"
+      ]
     }
   }
 }

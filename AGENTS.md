@@ -280,9 +280,16 @@ load and are not reliable.
 - The Slint MCP server is for debug builds only, and never enabled in
   `Cargo.toml`, so a release cannot open the port:
   `env SLINT_MCP_PORT=9315 cargo run --features slint/mcp`. It starts
-  listening on the first window show; `.mcp.json` points `dango-ui` at it.
-  A session started before the app shows `dango-ui` as failed: reconnect it
-  with `/mcp`.
+  listening on the first window show.
+- `dango-ui` in `.mcp.json` is a stdio proxy in `tools/dango-ui-mcp`, its
+  own crate and target folder, so it is always connected. With no debug
+  build up it lists only `launch_dango`, which runs the command above, shows
+  the launcher once, and waits; Slint's tools then appear on their own, and
+  also when a build was started by hand. The build's output goes to
+  `target/dango-ui-mcp.log`. `launch_dango` fails while another Dango runs.
+  The first session after a clean checkout compiles the proxy; if Claude
+  Code times out on it, build it once with
+  `cargo build --manifest-path tools/dango-ui-mcp/Cargo.toml`.
 - For hand checks on Windows, an agent can press keys with
   `scripts/send-keys.ps1` (for example `alt+space 'text:fire' escape`) and
   capture every display with `scripts/screenshot.ps1`, which prints the PNG
