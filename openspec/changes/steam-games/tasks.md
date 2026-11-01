@@ -17,7 +17,7 @@
 
 ## 4. No duplicates from applications on Windows
 
-- [ ] 4.1 In `is_launchable` in `src/platform/windows/apps.rs`, return false for targets starting with `steam://rungameid/`; replace `custom_url_schemes_are_launchable` with a test that keeps another `steam://` link and drops a game link, and keep a test that `steam.exe` stays (`cargo test apps`)
+- [x] 4.1 In `is_launchable` in `src/platform/windows/apps.rs`, return false for targets starting with `steam://rungameid/`; replace `custom_url_schemes_are_launchable` with a test that keeps another `steam://` link and drops a game link, and keep a test that `steam.exe` stays (`cargo test apps`)
 
 ## 5. Hand checks on Windows
 
