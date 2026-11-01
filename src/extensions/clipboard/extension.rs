@@ -291,7 +291,10 @@ fn item(entry: &Entry, primary: PrimaryAction) -> ListItem {
         ),
         // The thumbnail is the entry's own file, which is the only way to tell
         // one copied image from another.
-        Kind::Image => ("Image".to_string(), entry.path.clone()),
+        Kind::Image => (
+            "Image".to_string(),
+            entry.thumbnail.clone().or_else(|| entry.path.clone()),
+        ),
     };
     let paste = Action {
         id: ACTION_INSERT.into(),
@@ -607,7 +610,22 @@ mod tests {
     }
 
     #[test]
-    fn an_image_entry_shows_its_own_file_as_its_thumbnail() {
+    fn an_image_entry_shows_its_own_thumbnail() {
+        let (extension, history, _) = setup();
+        let png = std::fs::read(concat!(env!("CARGO_MANIFEST_DIR"), "/icons/32x32.png")).unwrap();
+        history
+            .record(Content::Image(png), Bounds::default(), 1)
+            .unwrap();
+
+        let tree = extension.list();
+        let item = &list_of(&tree).items[0];
+        let path = item.icon.clone().expect("an image entry has a thumbnail");
+        assert!(path.ends_with(".thumb.png"));
+        assert!(std::path::Path::new(&path).exists());
+    }
+
+    #[test]
+    fn an_image_entry_without_a_thumbnail_shows_the_full_image() {
         let (extension, history, _) = setup();
         history
             .record(Content::Image(vec![1, 2, 3]), Bounds::default(), 1)
@@ -615,8 +633,8 @@ mod tests {
 
         let tree = extension.list();
         let item = &list_of(&tree).items[0];
-        let path = item.icon.clone().expect("an image entry has a thumbnail");
-        assert!(path.ends_with(".png"));
+        let path = item.icon.clone().expect("an image entry has an icon");
+        assert!(path.ends_with(".png") && !path.ends_with(".thumb.png"));
         assert!(std::path::Path::new(&path).exists());
     }
 

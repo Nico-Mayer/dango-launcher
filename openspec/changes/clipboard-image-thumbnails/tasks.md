@@ -6,7 +6,7 @@
 
 ## 2. Rows show the thumbnail
 
-- [ ] 2.1 The image row's icon is the thumbnail, falling back to the full image when there is none. Verify with `cargo test` in `extension.rs`, extending the existing "an image entry has a thumbnail" test to expect the `.thumb.png` path and adding the fallback case
+- [x] 2.1 The image row's icon is the thumbnail, falling back to the full image when there is none. Verify with `cargo test` in `extension.rs`, extending the existing "an image entry has a thumbnail" test to expect the `.thumb.png` path and adding the fallback case
 
 ## 3. Render-scoped file-image cache
 
