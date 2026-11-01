@@ -62,7 +62,9 @@ applications directory, and their immediate subdirectories.
 
 On Windows the extension SHALL enumerate the applications known to the shell so
 that packaged applications from the Microsoft Store and conventional desktop
-applications both appear, with the identifier needed to launch each.
+applications both appear, with the identifier needed to launch each. Shortcuts
+that start a Steam game SHALL be left out, because the `games` extension lists
+those games.
 
 #### Scenario: Desktop application is found
 
@@ -87,6 +89,17 @@ applications both appear, with the identifier needed to launch each.
 
 - **WHEN** the shell exposes uninstall or maintenance entries alongside real applications
 - **THEN** they do not appear as launchable results
+
+#### Scenario: Steam game shortcuts are excluded
+
+- **WHEN** the shell lists a shortcut that starts a Steam game
+- **THEN** it does not appear in the index
+- **AND** the game appears once in root search, from the `games` extension
+
+#### Scenario: Steam itself is still found
+
+- **WHEN** Steam is installed
+- **THEN** Steam appears in the index as an application
 
 ### Requirement: Icons are shown and cached
 
