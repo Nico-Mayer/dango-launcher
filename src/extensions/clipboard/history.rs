@@ -74,13 +74,14 @@ pub struct Entry {
 impl Entry {
     /// What the detail pane shows of an image. Never one larger than the
     /// preview, so moving the selection stays cheap; a row from before sizes
-    /// were stored falls back to its thumbnail.
+    /// were stored falls back to its thumbnail, or itself when it was too
+    /// small to get one.
     pub fn pane_image(&self) -> Option<String> {
         let path = self.path.as_deref()?;
         match self.size {
             Some(size) if fits(size, PREVIEW_SIZE) => Some(path.to_string()),
             Some(_) => Some(preview_path(path).to_string_lossy().into_owned()),
-            None => self.thumbnail.clone(),
+            None => self.thumbnail.clone().or_else(|| self.path.clone()),
         }
     }
 }
@@ -148,9 +149,11 @@ impl From<rusqlite::Error> for HistoryError {
 pub(super) const LISTED_CHARS: usize = 2000;
 
 /// The columns after the text that `entry` reads. The counts are of the whole
-/// text, however little of it is read.
+/// text, however little of it is read. A trailing line break, as an editor
+/// copying a whole line adds, starts no line of its own.
 const DETAILS: &str = "path, copied_at, source, width, height, length(text), \
-     length(text) - length(replace(text, char(10), '')) + 1";
+     length(rtrim(text, char(13, 10))) \
+     - length(replace(rtrim(text, char(13, 10)), char(10), '')) + 1";
 
 /// Sharp in a list row and in a grid tile at 200 % scaling.
 const THUMBNAIL_SIZE: u32 = 384;
@@ -686,6 +689,25 @@ mod tests {
     }
 
     #[test]
+    fn the_pane_shows_a_small_row_without_a_size_itself() {
+        let history = history();
+        history
+            .record(png(100, 100), None, Bounds::default(), 1)
+            .unwrap();
+        history
+            .store
+            .with(|c| {
+                c.execute(
+                    "UPDATE local_clipboard_history SET width = NULL, height = NULL",
+                    [],
+                )
+            })
+            .unwrap();
+        let entry = history.entries().unwrap().remove(0);
+        assert_eq!(entry.pane_image(), entry.path);
+    }
+
+    #[test]
     fn the_pane_shows_the_thumbnail_of_a_row_without_a_size() {
         let history = history();
         history
@@ -998,6 +1020,21 @@ mod tests {
             (entries[2].lines, entries[2].characters),
             (Some(1), Some(8))
         );
+    }
+
+    #[test]
+    fn a_trailing_line_break_starts_no_line() {
+        let history = history();
+        history
+            .record(text("one line\r\n"), None, Bounds::default(), 1)
+            .unwrap();
+        history
+            .record(text("a\nb\n"), None, Bounds::default(), 2)
+            .unwrap();
+        let entries = history.entries().unwrap();
+        assert_eq!(entries[0].lines, Some(2));
+        assert_eq!(entries[1].lines, Some(1));
+        assert_eq!(entries[1].characters, Some(10));
     }
 
     #[test]
