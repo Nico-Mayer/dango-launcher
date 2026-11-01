@@ -263,6 +263,10 @@ load and are not reliable.
 - A release build applies `launcher.autostart`, so running one from `target/`
   with the author's config points the login entry at that build. Test release
   builds with `DANGO_CONFIG_DIR` set to a scratch directory.
+- `DANGO_CONFIG_DIR` moves only the config file. The database (data dir) and
+  clipboard images (cache dir) stay in the author's real
+  `com.nimayer.dango` folders, so a hand check that copies things lands in
+  the real clipboard history.
 - `DANGO_MEASURE=1` enables activation timing logs (stderr) in a release build.
   A `windows_subsystem = "windows"` build shows stderr only when it is
   redirected.
