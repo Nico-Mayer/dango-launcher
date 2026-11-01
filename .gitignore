@@ -9,6 +9,9 @@
 
 # Machine-specific agent permissions
 .claude/settings.local.json
+
+# Agent worktrees
+.claude/worktrees/
 .design
 
 # Local audit reports
