@@ -22,9 +22,16 @@ pub enum Icon {
 }
 
 /// Lives on the UI thread, as `Image` does.
+///
+/// File images are kept only from one render to the next, so a key press that
+/// keeps the rows decodes nothing, yet no image outlives the screen showing it.
 #[derive(Default)]
 pub struct Icons {
     named: RefCell<HashMap<String, Option<Image>>>,
+    shown: RefCell<HashMap<String, Image>>,
+    rendering: RefCell<HashMap<String, Image>>,
+    #[cfg(test)]
+    decoded: std::cell::Cell<usize>,
 }
 
 impl Icons {
@@ -33,7 +40,7 @@ impl Icons {
             return Icon::Missing;
         };
         let Some(name) = icon.strip_prefix(NAMED_ICON) else {
-            return Image::load_from_path(Path::new(icon)).map_or(Icon::Missing, Icon::File);
+            return self.file(icon).map_or(Icon::Missing, Icon::File);
         };
         let image = self
             .named
@@ -45,6 +52,29 @@ impl Icons {
             Some(image) => Icon::Named(image),
             None => Icon::Missing,
         }
+    }
+
+    /// Ends a render: the file images it did not ask for are let go.
+    pub fn rendered(&self) {
+        *self.shown.borrow_mut() = self.rendering.take();
+    }
+
+    fn file(&self, path: &str) -> Option<Image> {
+        if let Some(image) = self.rendering.borrow().get(path) {
+            return Some(image.clone());
+        }
+        let image = match self.shown.borrow_mut().remove(path) {
+            Some(image) => image,
+            None => {
+                #[cfg(test)]
+                self.decoded.set(self.decoded.get() + 1);
+                Image::load_from_path(Path::new(path)).ok()?
+            }
+        };
+        self.rendering
+            .borrow_mut()
+            .insert(path.to_string(), image.clone());
+        Some(image)
     }
 }
 
@@ -157,6 +187,43 @@ mod tests {
             Icon::Missing
         ));
         assert!(matches!(icons.get(None), Icon::Missing));
+    }
+
+    fn file_icon(name: &str) -> String {
+        let path =
+            std::env::temp_dir().join(format!("dango-icon-{}-{name}.png", uuid::Uuid::new_v4()));
+        std::fs::copy(
+            concat!(env!("CARGO_MANIFEST_DIR"), "/icons/32x32.png"),
+            &path,
+        )
+        .unwrap();
+        path.to_string_lossy().into_owned()
+    }
+
+    #[test]
+    fn a_file_asked_for_in_two_renders_in_a_row_is_decoded_once() {
+        let icons = Icons::default();
+        let path = file_icon("kept");
+        for _ in 0..2 {
+            assert!(matches!(icons.get(Some(&path)), Icon::File(_)));
+            assert!(matches!(icons.get(Some(&path)), Icon::File(_)));
+            icons.rendered();
+        }
+        assert_eq!(icons.decoded.get(), 1);
+    }
+
+    #[test]
+    fn a_file_a_render_did_not_ask_for_is_let_go() {
+        let icons = Icons::default();
+        let (first, second) = (file_icon("first"), file_icon("second"));
+        icons.get(Some(&first));
+        icons.rendered();
+        icons.get(Some(&second));
+        icons.rendered();
+        assert!(!icons.shown.borrow().contains_key(&first));
+
+        icons.get(Some(&first));
+        assert_eq!(icons.decoded.get(), 3);
     }
 
     #[test]

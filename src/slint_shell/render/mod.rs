@@ -137,6 +137,7 @@ impl Renderer {
         self.list.reveal(ui, selected);
         self.panel.write(ui, &snapshot.panel);
         self.place_focus(ui, &snapshot);
+        self.icons.rendered();
         self.last = Some(snapshot);
     }
 
