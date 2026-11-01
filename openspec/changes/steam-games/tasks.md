@@ -1,7 +1,7 @@
 ## 1. Steam library source
 
 - [x] 1.1 Check the `steamlocate` 2.x API on docs.rs against design.md and add it to `Cargo.toml` with the minor version pinned; if it cannot list installed apps per library with name and install state, stop and update design.md; verify `cargo build` passes
-- [ ] 1.2 Add `src/extensions/games/steam.rs` with a `GameSource` trait (list games, fingerprint) and a `SteamSource` that walks every library, keeps fully installed apps, drops the deny list (`228980`), and finds each game's icon (the hash-named `.jpg`) and cover (`library_600x900.jpg` or `library_capsule.jpg`, top level or in a hash subfolder) in `appcache/librarycache/<appid>/`; verify with tests in `steam.rs` over a temp folder that mimics Steam's layout: two libraries, a deny-listed app, a game with no cached art, a cover in a subfolder, and a fingerprint that changes when a manifest is added (`cargo test games`)
+- [x] 1.2 Add `src/extensions/games/steam.rs` with a `GameSource` trait (list games, fingerprint) and a `SteamSource` that walks every library, keeps fully installed apps, drops the deny list (`228980`), and finds each game's icon (the hash-named `.jpg`) and cover (`library_600x900.jpg` or `library_capsule.jpg`, top level or in a hash subfolder) in `appcache/librarycache/<appid>/`; verify with tests in `steam.rs` over a temp folder that mimics Steam's layout: two libraries, a deny-listed app, a game with no cached art, a cover in a subfolder, and a fingerprint that changes when a manifest is added (`cargo test games`)
 
 ## 2. Games extension in root search
 

@@ -1,6 +1,7 @@
 pub mod ai;
 pub mod applications;
 pub mod clipboard;
+pub mod games;
 pub mod permissions;
 pub mod snippets;
 pub mod system;
