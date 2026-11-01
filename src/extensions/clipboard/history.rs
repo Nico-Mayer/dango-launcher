@@ -360,15 +360,15 @@ fn thumbnail_path(image: impl AsRef<Path>) -> PathBuf {
 }
 
 /// Writes a thumbnail of `png` and answers its size, or 0 when there is none.
-/// An image without one is still worth keeping: its row shows the full image.
+/// An image without one is still worth keeping: its row shows the full image,
+/// which for an image within the thumbnail size is just as cheap.
 fn write_thumbnail(png: &[u8], path: &Path) -> usize {
-    let encoded = RustImageData::from_bytes(png).and_then(|image| {
+    let written = RustImageData::from_bytes(png).and_then(|image| {
         let (width, height) = image.get_size();
-        image
-            .thumbnail(width.min(THUMBNAIL_SIZE), height.min(THUMBNAIL_SIZE))?
-            .to_png()
-    });
-    let written = encoded.and_then(|thumbnail| {
+        if width <= THUMBNAIL_SIZE && height <= THUMBNAIL_SIZE {
+            return Ok(0);
+        }
+        let thumbnail = image.thumbnail(THUMBNAIL_SIZE, THUMBNAIL_SIZE)?.to_png()?;
         let bytes = thumbnail.get_bytes();
         std::fs::write(path, bytes)?;
         Ok(bytes.len())
@@ -485,11 +485,10 @@ mod tests {
     }
 
     #[test]
-    fn a_small_image_is_not_enlarged_for_its_thumbnail() {
+    fn an_image_within_the_thumbnail_size_gets_no_thumbnail() {
         let history = history();
-        history.record(png(40, 20), Bounds::default(), 1).unwrap();
-        let thumbnail = history.entries().unwrap()[0].thumbnail.clone().unwrap();
-        assert_eq!(png_size(&thumbnail), (40, 20));
+        history.record(png(384, 20), Bounds::default(), 1).unwrap();
+        assert!(history.entries().unwrap()[0].thumbnail.is_none());
     }
 
     #[test]
@@ -524,7 +523,7 @@ mod tests {
     #[test]
     fn an_entry_whose_thumbnail_file_is_missing_reports_none() {
         let history = history();
-        history.record(png(10, 10), Bounds::default(), 1).unwrap();
+        history.record(png(400, 10), Bounds::default(), 1).unwrap();
         let thumbnail = history.entries().unwrap()[0].thumbnail.clone().unwrap();
         std::fs::remove_file(thumbnail).unwrap();
 
@@ -621,12 +620,12 @@ mod tests {
             entries: 1,
             ..Bounds::default()
         };
-        history.record(png(10, 10), bounds, 1).unwrap();
+        history.record(png(400, 10), bounds, 1).unwrap();
         let entry = history.entries().unwrap().remove(0);
         let path = entry.path.unwrap();
         let thumbnail = entry.thumbnail.unwrap();
 
-        history.record(png(20, 20), bounds, 2).unwrap();
+        history.record(png(400, 20), bounds, 2).unwrap();
         assert!(
             !Path::new(&path).exists(),
             "the discarded image must not stay on disk"
@@ -637,7 +636,7 @@ mod tests {
     #[test]
     fn removing_an_entry_deletes_its_file_too() {
         let history = history();
-        history.record(png(10, 10), Bounds::default(), 1).unwrap();
+        history.record(png(400, 10), Bounds::default(), 1).unwrap();
         let entry = history.entries().unwrap().remove(0);
         let path = entry.path.clone().unwrap();
         let thumbnail = entry.thumbnail.clone().unwrap();
@@ -679,7 +678,7 @@ mod tests {
         let store = Arc::new(Store::in_memory().unwrap());
         let dir = std::env::temp_dir().join(format!("dango-clip-{}", uuid::Uuid::new_v4()));
         let history = History::new(store.clone(), dir.clone());
-        history.record(png(10, 10), Bounds::default(), 1).unwrap();
+        history.record(png(400, 10), Bounds::default(), 1).unwrap();
         let entry = history.entries().unwrap().remove(0);
         let orphan = dir.join("orphan.png");
         std::fs::write(&orphan, [1, 2, 3]).unwrap();

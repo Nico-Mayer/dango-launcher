@@ -612,7 +612,7 @@ mod tests {
     #[test]
     fn an_image_entry_shows_its_own_thumbnail() {
         let (extension, history, _) = setup();
-        let png = std::fs::read(concat!(env!("CARGO_MANIFEST_DIR"), "/icons/32x32.png")).unwrap();
+        let png = std::fs::read(concat!(env!("CARGO_MANIFEST_DIR"), "/icons/icon.png")).unwrap();
         history
             .record(Content::Image(png), Bounds::default(), 1)
             .unwrap();
