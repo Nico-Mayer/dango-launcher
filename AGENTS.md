@@ -285,7 +285,8 @@ load and are not reliable.
   mise-action's `install_args`. A CI task that needs a new tool fails until
   the tool is added there.
 - A cache saved by a tag run can be read only by that same tag, so release
-  runs use no Rust build cache. They would only fill the 10 GB cache limit.
+  runs save no cache, neither Rust's nor mise's. They would only fill the
+  10 GB cache limit.
 - On the Mac the shell is fish: `VAR=value cmd` is invalid. Use
   `env VAR=value cmd`.
 - A release build applies `launcher.autostart`, so running one from `target/`

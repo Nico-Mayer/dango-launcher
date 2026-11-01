@@ -43,7 +43,8 @@ toolchain. Local runs keep auto-install.
 
 ### 2. No Rust build cache in the release workflow
 
-Remove `swatinem/rust-cache` from `release.yml`.
+Remove `swatinem/rust-cache` from `release.yml`, and set `cache_save: false`
+on its mise-action step, whose tool cache would also land under the tag.
 
 - Rejected: `save-if: false`. It stops the useless save, but the restore still
   downloads CI's whole debug cache (about 1 GB) for nothing usable.

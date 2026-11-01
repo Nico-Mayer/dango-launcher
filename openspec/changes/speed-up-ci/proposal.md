@@ -16,8 +16,9 @@ build. Measured on the runs of 2026-11-01:
 
 - CI installs only the tools the check needs, and `mise run` no longer
   installs the rest of `mise.toml` on its own.
-- The release workflow stops using the Rust build cache: it neither restores
-  CI's debug cache nor saves caches under tags.
+- The release workflow stops using the Rust build cache and saves no caches
+  under tags: it neither restores CI's debug cache nor writes caches no later
+  run can read.
 - A new push cancels the older CI run on the same branch or pull request.
 - CI skips pushes that touch only `openspec/`, `docs/`, or Markdown files.
 
