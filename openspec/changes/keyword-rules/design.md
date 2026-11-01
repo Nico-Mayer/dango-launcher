@@ -63,9 +63,10 @@ the worker clears the buffer and skips the character, so
 `note_insertion_target` is never called with the launcher.
 
 macOS: the frontmost-app check cannot see the non-activating panel, so the
-check sits in the tap instead. `translate` reads the event's
-`EventTargetUnixProcessID` field and returns `Clear` when it equals Dango's own
-process id. The worker then holds nothing. `foreground_is_dango()` on macOS
+check sits in the tap instead. The panel subclass built in `reclass_as_panel`
+overrides `becomeKeyWindow` and `resignKeyWindow` to set an `AtomicBool` in
+`platform/macos`, next to `MUTED`. `translate` returns `Clear` while the flag
+is set. The worker then holds nothing. `foreground_is_dango()` on macOS
 returns false: the panel never makes Dango frontmost.
 
 Rejected:
@@ -74,6 +75,11 @@ Rejected:
   macOS, for the panel reason above.
 - A "launcher is shown" flag set by `Core`. It couples the snippets service to
   the app core, and "shown" is not the same as "has the keyboard".
+- The event's `EventTargetUnixProcessID` compared with Dango's own process id.
+  It passed the first hand check only because the launcher was still a plain
+  window (#12) and a click made Dango the active app. As a real non-activating
+  panel, the event does not name Dango, and the keyword expanded in the
+  search field (#14).
 - Filtering in the Windows hook. The hook stays as small as possible on the
   input path; the worker already does the per-character checks.
 
@@ -112,11 +118,10 @@ hand-rolled, so no crate was evaluated.
 
 ## Risks / Trade-offs
 
-- [macOS: at a session-level listen-only tap, `EventTargetUnixProcessID` may
-  still be 0 because the event is not yet routed] -> The macOS hand check
-  proves it on a Mac. If the field is empty, fall back to a flag the macOS
-  window code sets when the panel becomes and stops being the key window, and
-  update this design before applying.
+- [macOS: the key-window flag is written on the main thread and read on the
+  tap thread, so a key typed at the moment the panel becomes key can be seen
+  with the old value] -> Accepted; at worst one keystroke is buffered or
+  skipped.
 - [Windows: Dango may also have a hidden window that is foreground briefly
   during a paste] -> Skipping keystrokes then is harmless; Dango sends those
   keys itself and the monitor already ignores injected ones.

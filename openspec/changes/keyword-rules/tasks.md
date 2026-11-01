@@ -10,8 +10,8 @@
 
 ## 3. Skip keystrokes aimed at Dango on macOS
 
-- [x] 3.1 In `translate` in `src/platform/macos/keymonitor.rs`, return `Clear` when the event's `EventTargetUnixProcessID` equals Dango's own process id, with the comparison in a pure function tested next to `characters`; verify `cargo test` on a Mac
-- [x] 3.2 Hand check on macOS: type a snippet's keyword into the launcher over another app and confirm it stays unexpanded, then type it in TextEdit and confirm it expands. If the target process id is 0 at the tap, stop and update design.md (see Risks) before going on. Done 2026-11-01 with `brb`: expands in TextEdit, stays `brb` in the launcher search field, so the target process id is set at the tap. The launcher only took the keys after a click on its field (see #5).
+- [ ] 3.1 In the panel subclass built by `reclass_as_panel` in `src/platform/macos/mod.rs`, override `becomeKeyWindow` and `resignKeyWindow` to set an `AtomicBool` next to `MUTED`; in `translate` in `src/platform/macos/keymonitor.rs`, return `Clear` while it is set, and remove the `EventTargetUnixProcessID` check and `is_own_process` with its test; verify `cargo clippy --all-targets -- -D warnings` and `cargo test` on a Mac
+- [ ] 3.2 Hand check on macOS: open the launcher with the hotkey over TextEdit, without clicking it, type a snippet's keyword, and confirm it stays unexpanded; then type it in TextEdit and confirm it expands (#14)
 
 ## 4. AltGr characters on Windows
 
