@@ -1,6 +1,6 @@
 ## 1. CI installs only what the check needs
 
-- [ ] 1.1 In `ci.yml`, set `MISE_TASK_RUN_AUTO_INSTALL: "false"` in the workflow `env`, keeping mise-action `install_args: hk`. Verify: in the CI run's Check step log, mise installs no tools, and both jobs pass
+- [x] 1.1 In `ci.yml`, set `MISE_TASK_RUN_AUTO_INSTALL: "false"` in the workflow `env`, keeping mise-action `install_args: hk`. Verify: in the CI run's Check step log, mise installs no tools, and both jobs pass
 
 ## 2. Release workflow without cache saves
 
