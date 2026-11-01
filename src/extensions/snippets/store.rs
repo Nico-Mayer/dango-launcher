@@ -18,6 +18,7 @@ use std::sync::{Arc, Mutex, RwLock};
 
 use serde_json::{Map, Value};
 
+use crate::browser::Browser;
 use crate::templates::{Template, TemplateError, Values};
 
 use super::favicons::site_of;
@@ -59,6 +60,9 @@ pub struct Record {
     /// The snippet's expansion keyword, if it has one. Always `None` for a
     /// quicklink.
     pub keyword: Option<String>,
+    /// The browser id a quicklink opens in, as stored. Always `None` for a
+    /// snippet.
+    pub browser: Option<String>,
 }
 
 /// Which of the two kinds a store instance owns. They are identical in shape,
@@ -239,25 +243,7 @@ impl Records {
         body: &str,
         keyword: Option<&str>,
     ) -> Result<String, RecordError> {
-        self.writable()?;
-        self.validate(name, body)?;
-        let keyword = self.validate_keyword(keyword, body, None)?;
-        let id = uuid::Uuid::new_v4().to_string();
-        let mut record = Map::new();
-        record.insert("id".into(), Value::String(id.clone()));
-        record.insert("name".into(), Value::String(name.trim().to_string()));
-        record.insert(
-            self.kind.body_field().into(),
-            Value::String(body.to_string()),
-        );
-        if let Some(keyword) = keyword {
-            record.insert("keyword".into(), Value::String(keyword));
-        }
-        self.change(|cache| {
-            cache.push(record);
-            Ok(())
-        })?;
-        Ok(id)
+        self.save(None, name, body, keyword, None)
     }
 
     pub fn update(
@@ -267,28 +253,52 @@ impl Records {
         body: &str,
         keyword: Option<&str>,
     ) -> Result<(), RecordError> {
+        self.save(Some(id), name, body, keyword, None).map(|_| ())
+    }
+
+    /// Creates the record when `id` is `None`, else updates it, and returns its
+    /// id. `browser` is the form's value: `None` leaves the field as it is,
+    /// `default` or empty removes it, and anything else is stored as given, so a
+    /// browser this platform does not offer survives an edit.
+    pub fn save(
+        &self,
+        id: Option<&str>,
+        name: &str,
+        body: &str,
+        keyword: Option<&str>,
+        browser: Option<&str>,
+    ) -> Result<String, RecordError> {
         self.writable()?;
         self.validate(name, body)?;
-        let keyword = self.validate_keyword(keyword, body, Some(id))?;
+        let keyword = self.validate_keyword(keyword, body, id)?;
+        let existing = id.is_some();
+        let id = id.map_or_else(|| uuid::Uuid::new_v4().to_string(), str::to_string);
         self.change(|cache| {
-            let Some(record) = cache.iter_mut().find(|r| record_id(r) == Some(id)) else {
-                return Err(RecordError::Gone);
+            let record = if existing {
+                cache
+                    .iter_mut()
+                    .find(|r| record_id(r) == Some(&id))
+                    .ok_or(RecordError::Gone)?
+            } else {
+                cache.push(Map::new());
+                let record = cache.last_mut().unwrap();
+                record.insert("id".into(), Value::String(id.clone()));
+                record
             };
             record.insert("name".into(), Value::String(name.trim().to_string()));
             record.insert(
                 self.kind.body_field().into(),
                 Value::String(body.to_string()),
             );
-            match keyword {
-                Some(keyword) => {
-                    record.insert("keyword".into(), Value::String(keyword));
-                }
-                None => {
-                    record.remove("keyword");
-                }
+            set_or_remove(record, "keyword", keyword);
+            match browser.map(str::trim) {
+                None => {}
+                Some("") | Some(Browser::DEFAULT_ID) => set_or_remove(record, "browser", None),
+                Some(browser) => set_or_remove(record, "browser", Some(browser.to_string())),
             }
             Ok(())
-        })
+        })?;
+        Ok(id)
     }
 
     /// Removes the record's entry outright. There is no tombstone: git remembers
@@ -387,11 +397,19 @@ impl Records {
                 .map(str::to_string),
             Kind::Quicklink => None,
         };
+        let browser = match self.kind {
+            Kind::Snippet => None,
+            Kind::Quicklink => record
+                .get("browser")
+                .and_then(Value::as_str)
+                .map(str::to_string),
+        };
         Some(Record {
             id,
             name,
             body,
             keyword,
+            browser,
         })
     }
 
@@ -409,6 +427,17 @@ impl Records {
             *self.own_write.lock().unwrap() = None;
             let _ = std::fs::remove_file(&temp);
         })
+    }
+}
+
+fn set_or_remove(record: &mut Map<String, Value>, key: &str, value: Option<String>) {
+    match value {
+        Some(value) => {
+            record.insert(key.into(), Value::String(value));
+        }
+        None => {
+            record.remove(key);
+        }
     }
 }
 
@@ -744,6 +773,76 @@ mod tests {
             .create("Search", "https://example.com?q={{ query }}", None)
             .unwrap();
         assert_eq!(records.all().unwrap().len(), 1);
+    }
+
+    const DOCS: &str = "https://example.com/docs";
+
+    #[test]
+    fn a_quicklink_browser_survives_reopening_the_store() {
+        let dir = std::env::temp_dir().join(format!("dango-records-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let id = Records::open(&dir, Kind::Quicklink)
+            .0
+            .save(None, "Docs", DOCS, None, Some("firefox"))
+            .unwrap();
+
+        let reopened = Records::open(&dir, Kind::Quicklink).0;
+        assert_eq!(
+            reopened.get(&id).unwrap().browser.as_deref(),
+            Some("firefox")
+        );
+    }
+
+    #[test]
+    fn choosing_the_default_browser_removes_the_field() {
+        let records = records(Kind::Quicklink);
+        let id = records
+            .save(None, "Docs", DOCS, None, Some("firefox"))
+            .unwrap();
+
+        records
+            .save(Some(&id), "Docs", DOCS, None, Some(Browser::DEFAULT_ID))
+            .unwrap();
+
+        assert_eq!(records.get(&id).unwrap().browser, None);
+        let on_disk = std::fs::read_to_string(records.path()).unwrap();
+        assert!(!on_disk.contains("browser"), "no browser field: {on_disk}");
+    }
+
+    #[test]
+    fn a_browser_this_platform_does_not_offer_is_written_back() {
+        let records = records(Kind::Quicklink);
+        records
+            .reload(&format!(
+                r#"[{{ "id": "a", "name": "Docs", "url": "{DOCS}", "browser": "safari" }}]"#
+            ))
+            .unwrap();
+
+        records
+            .save(Some("a"), "Docs", DOCS, None, Some("safari"))
+            .unwrap();
+
+        assert_eq!(records.get("a").unwrap().browser.as_deref(), Some("safari"));
+    }
+
+    #[test]
+    fn an_edit_without_a_browser_keeps_the_stored_one() {
+        let records = records(Kind::Quicklink);
+        let id = records
+            .save(None, "Docs", DOCS, None, Some("brave"))
+            .unwrap();
+
+        records.update(&id, "Docs renamed", DOCS, None).unwrap();
+
+        assert_eq!(records.get(&id).unwrap().browser.as_deref(), Some("brave"));
+    }
+
+    #[test]
+    fn updating_a_removed_record_says_it_is_gone() {
+        let records = records(Kind::Quicklink);
+        let error = records.update("missing", "Docs", DOCS, None).unwrap_err();
+        assert!(matches!(error, RecordError::Gone));
+        assert!(records.all().unwrap().is_empty());
     }
 
     #[test]

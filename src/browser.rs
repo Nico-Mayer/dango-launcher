@@ -11,6 +11,9 @@ pub enum Browser {
 }
 
 impl Browser {
+    /// The form's id for "Default browser", which stores no browser.
+    pub const DEFAULT_ID: &str = "default";
+
     pub const ALL: [Browser; 5] = [
         Browser::Chrome,
         Browser::Edge,

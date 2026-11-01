@@ -492,6 +492,7 @@ mod tests {
             name: "Example".into(),
             body: body.into(),
             keyword: None,
+            browser: None,
         }
     }
 

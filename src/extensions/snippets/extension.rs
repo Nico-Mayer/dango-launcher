@@ -9,14 +9,15 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 
+use crate::browser::Browser;
 use crate::extension::{
     ActionOutcome, CommandDecl, Extension, FormValues, InvocationMode, Manifest, PreferenceDecl,
     PreferenceKind, Service, NAMED_ICON,
 };
 use crate::invocation::{Command, InvocationContext};
 use crate::protocol::{
-    Action, ActionStyle, EmptyState, FieldKind, FormField, FormView, ListItem, ListView, View,
-    ViewTree, PROTOCOL_VERSION,
+    Action, ActionStyle, EmptyState, FieldKind, FieldOption, FormField, FormView, ListItem,
+    ListView, View, ViewTree, PROTOCOL_VERSION,
 };
 use crate::search::{Candidate, RootProvider, Source};
 use crate::templates::{Rendered, Template, Values};
@@ -55,6 +56,7 @@ pub const ACTION_SAVE: &str = "save";
 const FIELD_NAME: &str = "name";
 const FIELD_BODY: &str = "body";
 const FIELD_KEYWORD: &str = "keyword";
+const FIELD_BROWSER: &str = "browser";
 /// Prefix for the fields an argument form asks about, so an argument called
 /// "name" cannot collide with the snippet's own name field.
 const ARGUMENT_PREFIX: &str = "arg:";
@@ -205,7 +207,7 @@ impl SnippetsExtension {
         let Some(opener) = &self.opener else {
             return ActionOutcome::Failed("Dango can't open URLs on this platform".into());
         };
-        match opener.open(&url) {
+        match opener.open_in(&url, record.browser.as_deref()) {
             Ok(()) => ActionOutcome::Done,
             Err(error) => ActionOutcome::Failed(error),
         }
@@ -252,13 +254,11 @@ impl Extension for SnippetsExtension {
                 let body = values.get(FIELD_BODY).map(String::as_str).unwrap_or("");
                 // Absent for a quicklink form, which has no keyword field.
                 let keyword = values.get(FIELD_KEYWORD).map(String::as_str);
-                let saved = if item_id.is_empty() {
-                    self.records.create(name, body, keyword).map(|_| ())
-                } else {
-                    self.records.update(item_id, name, body, keyword)
-                };
-                match saved {
-                    Ok(()) => ActionOutcome::Replaced(Box::new(self.list_tree())),
+                // Absent for a snippet form, which has no browser field.
+                let browser = values.get(FIELD_BROWSER).map(String::as_str);
+                let id = (!item_id.is_empty()).then_some(item_id);
+                match self.records.save(id, name, body, keyword, browser) {
+                    Ok(_) => ActionOutcome::Replaced(Box::new(self.list_tree())),
                     Err(error) => ActionOutcome::Failed(error.to_string()),
                 }
             }
@@ -486,6 +486,9 @@ fn form_tree(record: Option<&Record>, kind: Kind) -> ViewTree {
             ..Default::default()
         });
     }
+    if kind == Kind::Quicklink {
+        fields.push(browser_field(record));
+    }
     ViewTree {
         protocol_version: PROTOCOL_VERSION,
         view: View::Form(FormView {
@@ -498,6 +501,28 @@ fn form_tree(record: Option<&Record>, kind: Kind) -> ViewTree {
                 ..Default::default()
             }],
         }),
+    }
+}
+
+/// The stored id is the value even when this platform does not offer it: the
+/// dropdown then shows "Default browser" but submits the id unchanged, so an
+/// edit does not drop it.
+fn browser_field(record: Option<&Record>) -> FormField {
+    let default = FieldOption {
+        id: Browser::DEFAULT_ID.into(),
+        title: "Default browser".into(),
+    };
+    FormField {
+        id: FIELD_BROWSER.into(),
+        label: "Browser".into(),
+        kind: FieldKind::Dropdown,
+        value: record.and_then(|record| record.browser.clone()),
+        options: std::iter::once(default)
+            .chain(Browser::offered().map(|browser| FieldOption {
+                id: browser.id().into(),
+                title: browser.title().into(),
+            }))
+            .collect(),
     }
 }
 
@@ -701,11 +726,15 @@ mod tests {
     }
 
     #[derive(Default)]
-    struct FakeOpener(Mutex<Vec<String>>);
+    struct FakeOpener(Mutex<Vec<String>>, Mutex<Vec<Option<String>>>);
 
     impl FakeOpener {
         fn opened(&self) -> Vec<String> {
             self.0.lock().unwrap().clone()
+        }
+
+        fn browsers(&self) -> Vec<Option<String>> {
+            self.1.lock().unwrap().clone()
         }
     }
 
@@ -713,6 +742,11 @@ mod tests {
         fn open(&self, url: &str) -> Result<(), String> {
             self.0.lock().unwrap().push(url.to_string());
             Ok(())
+        }
+
+        fn open_in(&self, url: &str, browser: Option<&str>) -> Result<(), String> {
+            self.1.lock().unwrap().push(browser.map(str::to_string));
+            self.open(url)
         }
     }
 
@@ -1087,6 +1121,142 @@ mod tests {
         assert_eq!(outcome, ActionOutcome::Done);
         assert_eq!(f.opener.opened(), vec!["https://example.com/docs"]);
         assert!(f.target.inserted().is_empty(), "a quicklink is not pasted");
+    }
+
+    #[test]
+    fn a_quicklink_without_a_browser_opens_in_the_default() {
+        let f = fixture(Kind::Quicklink);
+        let id = f
+            .records
+            .create("Docs", "https://example.com/docs", None)
+            .unwrap();
+
+        f.extension.perform_action(&id, ACTION_INSERT, &no_values());
+
+        assert_eq!(f.opener.browsers(), vec![None]);
+    }
+
+    #[test]
+    fn a_quicklink_opens_in_its_browser() {
+        let f = fixture(Kind::Quicklink);
+        let id = f
+            .records
+            .save(
+                None,
+                "Docs",
+                "https://example.com/docs",
+                None,
+                Some("firefox"),
+            )
+            .unwrap();
+
+        f.extension.perform_action(&id, ACTION_INSERT, &no_values());
+
+        assert_eq!(f.opener.browsers(), vec![Some("firefox".to_string())]);
+    }
+
+    #[test]
+    fn a_quicklink_with_a_query_opens_in_its_browser() {
+        let f = fixture(Kind::Quicklink);
+        let id = f
+            .records
+            .save(
+                None,
+                "Search",
+                "https://example.com/s?q={{ query }}",
+                None,
+                Some("brave"),
+            )
+            .unwrap();
+
+        f.extension
+            .perform_action(&id, ACTION_INSERT, &values(&[("arg:query", "dango")]));
+
+        assert_eq!(f.opener.opened(), vec!["https://example.com/s?q=dango"]);
+        assert_eq!(f.opener.browsers(), vec![Some("brave".to_string())]);
+    }
+
+    fn browser_field(tree: &ViewTree) -> Option<FormField> {
+        fields(tree)
+            .into_iter()
+            .find(|field| field.id == FIELD_BROWSER)
+    }
+
+    #[test]
+    fn the_quicklink_form_offers_the_browsers_of_this_platform() {
+        let field = browser_field(&form_tree(None, Kind::Quicklink)).unwrap();
+
+        assert_eq!(field.label, "Browser");
+        assert_eq!(field.kind, FieldKind::Dropdown);
+        assert_eq!(field.value, None, "the first option, the default, shows");
+        let titles: Vec<_> = field.options.iter().map(|o| o.title.as_str()).collect();
+        let expected = if cfg!(target_os = "macos") {
+            vec![
+                "Default browser",
+                "Google Chrome",
+                "Microsoft Edge",
+                "Firefox",
+                "Brave",
+                "Safari",
+            ]
+        } else {
+            vec![
+                "Default browser",
+                "Google Chrome",
+                "Microsoft Edge",
+                "Firefox",
+                "Brave",
+            ]
+        };
+        assert_eq!(titles, expected);
+        assert_eq!(field.options[0].id, Browser::DEFAULT_ID);
+    }
+
+    #[test]
+    fn the_edit_form_holds_the_stored_browser() {
+        let f = fixture(Kind::Quicklink);
+        let id = f
+            .records
+            .save(
+                None,
+                "Docs",
+                "https://example.com/docs",
+                None,
+                Some("safari"),
+            )
+            .unwrap();
+
+        let ActionOutcome::Replaced(tree) =
+            f.extension.perform_action(&id, ACTION_EDIT, &no_values())
+        else {
+            panic!("expected the edit form");
+        };
+
+        let field = browser_field(&tree).unwrap();
+        assert_eq!(field.value.as_deref(), Some("safari"));
+    }
+
+    #[test]
+    fn saving_the_form_stores_the_chosen_browser() {
+        let f = fixture(Kind::Quicklink);
+
+        f.extension.perform_action(
+            "",
+            ACTION_SAVE,
+            &values(&[
+                (FIELD_NAME, "Docs"),
+                (FIELD_BODY, "https://example.com/docs"),
+                (FIELD_BROWSER, "edge"),
+            ]),
+        );
+
+        let all = f.records.all().unwrap();
+        assert_eq!(all[0].browser.as_deref(), Some("edge"));
+    }
+
+    #[test]
+    fn the_snippet_form_has_no_browser() {
+        assert!(browser_field(&form_tree(None, Kind::Snippet)).is_none());
     }
 
     #[test]
