@@ -15,7 +15,7 @@
 
 ## 4. Debug build speed
 
-- [ ] 4.1 Add `[profile.dev.package]` `opt-level = 3` for `png`, `fdeflate`, `miniz_oxide`, and `image` in `Cargo.toml`. Verify that `hk check` and `cargo test` pass
+- [x] 4.1 Add `[profile.dev.package]` `opt-level = 3` for `png`, `fdeflate`, `miniz_oxide`, and `image` in `Cargo.toml`. Verify that `hk check` and `cargo test` pass
 
 ## 5. Hand checks
 

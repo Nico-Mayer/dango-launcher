@@ -177,6 +177,20 @@ objc2-application-services = { version = "0.3", default-features = false, featur
 ] }
 
 
+# Hand checks run in debug builds, and unoptimised inflate makes image rows
+# lag there in a way release builds never do.
+[profile.dev.package.png]
+opt-level = 3
+
+[profile.dev.package.fdeflate]
+opt-level = 3
+
+[profile.dev.package.miniz_oxide]
+opt-level = 3
+
+[profile.dev.package.image]
+opt-level = 3
+
 [profile.release]
 codegen-units = 1
 lto = true
