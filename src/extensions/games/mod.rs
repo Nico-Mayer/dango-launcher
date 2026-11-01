@@ -7,7 +7,6 @@ pub use steam::{Game, GameSource, SteamSource};
 
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, RwLock};
-use std::time::{Duration, Instant};
 
 use async_trait::async_trait;
 
@@ -247,15 +246,6 @@ fn fallback_icon() -> String {
     format!("{NAMED_ICON}{FALLBACK_ICON}")
 }
 
-/// The longest the list may go without a read, for a change the fingerprint
-/// misses.
-const REFRESH_INTERVAL: Duration = Duration::from_secs(180);
-
-const TICK: Duration = Duration::from_millis(200);
-
-/// Steam writes the manifest before it finishes the files around it.
-const SETTLE: Duration = Duration::from_secs(1);
-
 /// Reads the list off the activation path, then again whenever the library
 /// folders change or the sweep is due.
 struct RefreshService {
@@ -271,7 +261,7 @@ impl Service for RefreshService {
         std::thread::spawn(move || {
             while running.load(Ordering::SeqCst) {
                 list.reload();
-                wait_for_refresh(&list, &running);
+                super::refresh::wait_for_change(|| list.fingerprint(), &running);
             }
         });
         Ok(())
@@ -279,18 +269,6 @@ impl Service for RefreshService {
 
     fn stop(&self) {
         self.running.store(false, Ordering::SeqCst);
-    }
-}
-
-fn wait_for_refresh(list: &GameList, running: &AtomicBool) {
-    let baseline = list.fingerprint();
-    let started = Instant::now();
-    while running.load(Ordering::SeqCst) && started.elapsed() < REFRESH_INTERVAL {
-        std::thread::sleep(TICK);
-        if baseline.is_some() && list.fingerprint() != baseline {
-            std::thread::sleep(SETTLE);
-            return;
-        }
     }
 }
 
@@ -366,6 +344,7 @@ pub mod fake {
 mod tests {
     use super::fake::{FakeOpener, FakeSource};
     use super::*;
+    use std::time::{Duration, Instant};
 
     fn extension(source: Arc<FakeSource>) -> GamesExtension {
         launcher(source).0
