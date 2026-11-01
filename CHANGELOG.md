@@ -2,6 +2,239 @@
 
 All notable changes to Dango. Generated from commit history at release time.
 
+## [3.0.0] - 2026-11-01
+
+### Features
+
+- **ui:** Add Theme global following the OS scheme
+- **ui:** Add Icon, Kbd, Tag, Accessory, Dot atoms
+- **protocol:** [**breaking**] Move the view protocol to version 2
+- **protocol:** Add list sections, accessories, keywords
+- **protocol:** Add action sections and danger style
+- **protocol:** Add empty state icon and actions
+- **ui:** [**breaking**] Show status and failures as toasts
+- **extensions:** Mark delete actions as danger
+- **ui:** Carry the ActionBar context in snapshots
+- **ui:** Add the list detail pane and item details
+- **ui:** Add the action panel filter
+- **ui:** Render detail markdown and metadata
+- **ui:** Build form controls on primitives
+- **protocol:** Add the grid view
+- **protocol:** Add the view filter dropdown
+- **shell:** Size the launcher to its content
+- **ui:** Bundle the Geist variable fonts
+- **ui:** Show at most 50 items in a view
+- **config:** Read per-command enabled state
+- **extension:** Skip disabled commands on activate
+- **extension:** Re-sync commands on config reload
+- **hotkeys:** Skip hotkeys of disabled commands
+- **ui:** [**breaking**] Refuse Shift or Alt on non-letter keys
+- **ui:** Allow Shift or Alt on named keys
+- **config:** Accept F13 to F20 in hotkeys
+- **config:** Refuse a hotkey without a modifier
+- **config:** Let a lone F1 to F20 match the schema
+- **snippets:** Refuse a keyword that overlaps another
+- **snippets:** Skip keystrokes typed into Dango
+- **clipboard:** Store a thumbnail of each image
+- **clipboard:** Show the thumbnail in image rows
+- **protocol:** Let a detail carry an image and text
+- **ui:** Show an image and plain text in a detail
+- **store:** Add clipboard source and size columns
+- **clipboard:** Record the copying application
+- **clipboard:** Store image size and re-copy source
+- **clipboard:** Keep a pane-sized image preview
+- **clipboard:** Choose the image the pane shows
+- **clipboard:** Count lines and characters
+- **clipboard:** Detect text kinds and format times
+- **clipboard:** Show entries in a detail pane
+- **ui:** Pin detail metadata to the bottom
+- **games:** Read installed games from Steam
+- **icons:** Add gamepad-2
+- **games:** List Steam games in root search
+- **games:** Refresh the list when Steam changes
+- **games:** Launch games through Steam
+- **games:** Add a Search Games cover grid
+- **opener:** Open a URL in a named browser
+- **quicklinks:** Let a quicklink name its browser
+
+### Fixes
+
+- **copy:** Cut failure messages to one toast sentence
+- **ui:** Round the ActionBar's bottom corners
+- **shell:** Set the component height before resizing
+- **ui:** Keep Tab from moving focus off the prompt
+- **ui:** Drop the ActionBar icon gap without an icon
+- **ui:** Keep list rows clear of the scrollbar
+- **ui:** Let root search settle before shrinking
+- **apps:** Keep a running app's window maximized
+- **apps:** Raise a running app via force_foreground
+- **hyperkey:** Stop a lone tap opening Microsoft 365
+- **hyperkey:** Refuse a tap key that needs Shift
+- **system:** Check the image path before quitting
+- **windows:** Forget the target on a null foreground
+- **shell:** Remember the target on the first show
+- **app:** Reset at once on a deliberate dismiss
+- **app:** Keep the hold when hidden for work
+- **app:** Do not show a visible launcher again
+- **config:** Skip watched files that fail to read
+- **snippets:** Refuse saves while file is broken
+- **snippets:** Report a save that failed to write
+- **snippets:** Write the records file atomically
+- **app:** Keep autostart when config is broken
+- **snippets:** Derive missing ids from the name
+- **snippets:** Note target before selection read
+- **text:** Restore the clipboard when a key fails
+- **templates:** Keep a snippet's final newline
+- **apps:** Write cached icons atomically
+- **window:** Keep Make Smaller from growing windows
+- **apps:** Raise packaged apps found by process
+- **ui:** Clear multiline focus outside a form
+- **ui:** Label rows and tiles with their titles
+- **hotkeys:** Keep the old launcher chord if refused
+- **app:** Report a hotkey for an unavailable command
+- **app:** Keep reported problems across reloads
+- **app:** Copy through the shared clipboard source
+- **app:** Report extension load problems on reload
+- **app:** Write startup problems to dango.log
+- **hotkeys:** Report an invalid launcher hotkey
+- **log:** Rotate dango.log at 1 MB
+- **updates:** Stop update checks when disabled
+- **updates:** Match error texts to the spec
+- **ai:** Redact the key in Request's Debug output
+- **ai:** Need no key for a server on this machine
+- **ai:** Say a refused request was refused
+- **ai:** Count thinking as activity for the timeout
+- **ai:** Report a bad command value, keep the config
+- **hotkeys:** Log a hotkey on a disabled command
+- **clipboard:** Log failures to dango.log
+- **clipboard:** Skip a change with unreadable formats
+- **clipboard:** Stop the old watch on a quick restart
+- **clipboard:** Delete orphaned images on start
+- **clipboard:** Fingerprint with a stable hash
+- **text:** Restore files, HTML and RTF after a paste
+- **clipboard:** Write CRLF line breaks on Windows
+- **quicklinks:** Keep favicon when refetch fails
+- **quicklinks:** Give each favicon sweep its own flag
+- **shell:** Keep a silent client from blocking launches
+- **shell:** Stop caching file icons forever
+- **store:** Roll back a failed app reindex
+- **ranking:** Trim spaces around the query
+- **ranking:** Key usage by extension and item id
+- **ai:** Tell server errors apart from refusals
+- **app:** Record no use for an action without item
+- **ui:** Check trees returned by actions
+- **keymonitor:** Treat AltGr characters as text
+- **clipboard:** Skip thumbnails for small images
+- **clipboard:** Honour CanIncludeInClipboardHistory
+- **clipboard:** Count lines and old images right
+- **clipboard:** Require a TLD for email addresses
+- **applications:** Leave Steam games to games
+- **games:** Notice a finished download sooner
+- **examples:** Drop the removed cli request field
+- **ui:** Keep the cursor after a restored query
+- **opener:** Pass browsers by path on Windows
+- **snippets:** Skip keys aimed at Dango on macOS
+- **shell:** Attach the macOS panel on first show
+
+### Performance
+
+- **windows:** Stop broadcasting foreground lock change
+- **windows:** Cache the foreground app's name
+- **app:** Release the host before an action runs
+- **snippets:** Read keywords without cloning
+- **snippets:** Work out quicklink hosts on load
+- **apps:** Skip persisting an unchanged index
+- **apps:** Look up cached icons in memory
+- **ui:** Skip unchanged form rows
+- **app:** Restart the hyperkey only on change
+- **ui:** Group a pushed list once per snapshot
+- **clipboard:** Read one history entry by id
+- **ui:** Keep file icons from one render to the next
+- **ui:** Let go of images when the launcher hides
+
+### Refactoring
+
+- **ui:** Replace Palette with Theme
+- [**breaking**] Remove extension tints
+- [**breaking**] Remove the development build marker
+- **ui:** Split the launcher into globals and parts
+- **shell:** Pass the resize into render::publish
+- **shell:** Keep one tray menu definition
+- **snippets:** Reuse templates Rendered
+- **text:** Drop unused permission calls
+- **apps:** Drop the test-only provider copy
+- **ui:** Drop dead open-panel click guards
+- **ui:** Delete unused Theme.max-height
+- **ui:** Keep layout sizes in one place
+- **updates:** Drop DisabledSource
+- **ai:** Drop the unused Chunks cleanup hook
+- **ui:** Remove dead webview-era seams
+- **invocation:** Run built-ins without a host map
+- **extension:** Drop serde from manifest types
+- **protocol:** Delete unused CommandOutcome
+- **ui:** Share the result limit with views
+- **clipboard:** Move busy probe into platform
+- **platform:** Add is_main_thread
+- **platform:** Move OS labels into platform
+- **windows:** Share process_aumid with system
+- **platform:** Name the inline main-thread check
+- **extension:** Drop required preference flag
+- **config:** Drop command-scoped preferences
+- **protocol:** [**breaking**] Drop command-owned filtering
+- Share the refresh wait between extensions
+- **snippets:** Keep create and update for tests
+
+### Documentation
+
+- Describe the design system UI in AGENTS.md
+- Drop the GitHub issue rule from AGENTS.md
+- Match the clippy command to CI
+- Keep open hand checks in tasks.md
+- Point to the unarchived design-system spec
+- List the Windows hand check tools
+- Point to the main design-system spec
+- **agents:** Note the item limit for every list
+- **protocol:** Document the shortcut letter rule
+- Note the AltGr chord trap on Windows
+- **platform:** Say the macOS check is still open
+- Note what DANGO_CONFIG_DIR does not move
+- **agents:** Note hand check key limits
+- **agents:** Note hk drops the merge state
+- Note the Rust toolchain pin
+
+### Maintenance
+
+- **ui:** Check theme contrast in both schemes
+- Drop contrast checks from specs and tests
+- **ui:** Cover the SearchBar, ActionBar, and toasts
+- Vendor the rust-best-practices skill
+- Drop the duplicate OpenSpec skills
+- Ignore local audit reports
+- **ranking:** Pin the clock in a persistence test
+- **app:** Cover held command views and hides for work
+- **ui:** Cover panel and grid window heights
+- **ui:** Cover match underlining with punctuation
+- **ui:** Cover the item limit in sections and grids
+- **ui:** Render fifty rows of a long pushed list
+- Rebuild the resource when the icon changes
+- **app:** Cover a command disabled by reload
+- **ui:** Rewrap the group doc comment
+- **ui:** Refuse a root action's bad shortcut tree
+- Optimise image decoding in debug builds
+- **ui:** Hide through the shell in the image test
+- **deps:** Add steamlocate
+- **games:** Filter and launch from the cover grid
+- **games:** Drop the duplicate launch check
+- Ignore agent worktrees
+- Keep the dango-ui MCP server connected
+- Pin the Rust toolchain
+- Add mise tasks for repeated commands
+- Pin the exact Rust patch release
+- Check through mise and the toolchain pin
+- Keep agent skills only in .claude/skills
+- Keep only line tables in dev debug info
+- **ui:** Pick a quicklink browser in the form
+- **opener:** Drop a test that checks nothing
 ## [2.0.0] - 2026-10-31
 
 ### Features
