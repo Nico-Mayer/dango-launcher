@@ -279,6 +279,13 @@ load and are not reliable.
   too. Two lints that bite in platform code:
   an inner `unsafe` block inside an `unsafe fn` (`unused_unsafe`) and casting a
   value to its own type (`unnecessary_cast`, easy with `HWND`).
+- `mise run` installs every missing tool in `mise.toml` before a task runs,
+  cargo-packager compiled from source included. CI sets
+  `MISE_TASK_RUN_AUTO_INSTALL=false` and installs what it needs through
+  mise-action's `install_args`. A CI task that needs a new tool fails until
+  the tool is added there.
+- A cache saved by a tag run can be read only by that same tag, so release
+  runs use no Rust build cache. They would only fill the 10 GB cache limit.
 - On the Mac the shell is fish: `VAR=value cmd` is invalid. Use
   `env VAR=value cmd`.
 - A release build applies `launcher.autostart`, so running one from `target/`
