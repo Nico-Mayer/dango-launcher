@@ -3,7 +3,15 @@ name: CI
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - "openspec/**"
+      - "docs/**"
+      - "**/*.md"
   pull_request:
+    paths-ignore:
+      - "openspec/**"
+      - "docs/**"
+      - "**/*.md"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
