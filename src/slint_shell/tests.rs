@@ -712,6 +712,28 @@ mod list_view {
         }
     }
 
+    struct NoPlatform;
+
+    impl crate::platform::LauncherWindow for NoPlatform {
+        fn will_show(&mut self) {}
+        fn did_show(&mut self, _window: crate::platform::RawWindowHandle) {}
+        fn position_on_active_display(&self, _window: crate::platform::RawWindowHandle) {}
+        fn restore_previous_focus(&mut self) {}
+    }
+
+    fn hide(h: &Harness) {
+        use crate::shell::Shell as _;
+
+        super::super::RENDERER.with(|slot| *slot.borrow_mut() = Some(h.renderer.clone()));
+        let shell = super::super::SlintShell {
+            window: h.ui.as_weak(),
+            tray: slint::Weak::default(),
+            platform: std::sync::Arc::new(std::sync::Mutex::new(Box::new(NoPlatform))),
+        };
+        shell.hide(false);
+        super::super::RENDERER.with(|slot| *slot.borrow_mut() = None);
+    }
+
     #[test]
     fn hiding_lets_go_of_file_images() {
         let h = Harness::root(results(3));
@@ -727,7 +749,7 @@ mod list_view {
         assert_eq!(rows(), 1);
         assert!(h.renderer.borrow().holds_images());
 
-        h.renderer.borrow_mut().forget_images();
+        hide(&h);
 
         assert_eq!(rows(), 0);
         assert!(!h.renderer.borrow().holds_images());
