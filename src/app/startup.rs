@@ -185,7 +185,11 @@ fn build_services(
     register(&mut host, "applications", applications.clone());
 
     let games = GameList::new(Arc::new(SteamSource::default()));
-    register(&mut host, "games", Arc::new(GamesExtension::new(games)));
+    register(
+        &mut host,
+        "games",
+        Arc::new(GamesExtension::new(games, Arc::new(SystemOpener))),
+    );
 
     // Registering for application activations needs the main thread, which
     // this is; the watcher itself runs on its own.

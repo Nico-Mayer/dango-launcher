@@ -96,8 +96,10 @@ The service reuses the `applications` loop shape: read, then wait until a
 fingerprint changes or the sweep interval passes. The fingerprint hashes the
 modification times of `libraryfolders.vdf` and each library's `steamapps`
 folder. Steam adds or removes an `appmanifest_*.acf` file there on install
-and uninstall, which changes the folder's mtime. A launch of an id that is
-no longer listed re-reads once before failing, as `applications` does.
+and uninstall, which changes the folder's mtime. A launch reads the list
+first and fails when the game is gone. Unlike `applications`, it cannot wait
+for the launch to fail: Steam takes a link to an uninstalled game as a
+request to install it.
 
 ### Launch through `steam://rungameid/<appid>`
 

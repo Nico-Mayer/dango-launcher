@@ -11,7 +11,10 @@ use std::time::{Duration, Instant};
 
 use async_trait::async_trait;
 
-use crate::extension::{ActivationResult, Extension, Manifest, Service, NAMED_ICON};
+use crate::extension::{
+    ActionOutcome, ActivationResult, Extension, FormValues, Manifest, Service, NAMED_ICON,
+};
+use crate::extensions::snippets::OpenUrl;
 use crate::protocol::Action;
 use crate::search::{Candidate, RootProvider, Source};
 
@@ -20,6 +23,14 @@ pub const EXTENSION_ID: &str = "dango.games";
 pub const ACTION_LAUNCH: &str = "launch";
 
 const FALLBACK_ICON: &str = "gamepad-2";
+
+#[derive(Debug, thiserror::Error)]
+pub enum LaunchError {
+    #[error("That game is no longer installed")]
+    Gone,
+    #[error("Couldn't start the game through Steam")]
+    Steam,
+}
 
 pub(crate) fn manifest() -> Manifest {
     Manifest {
@@ -75,16 +86,35 @@ impl GameList {
 pub struct GamesExtension {
     manifest: Manifest,
     list: Arc<GameList>,
+    opener: Arc<dyn OpenUrl>,
     provider: Arc<GameProvider>,
 }
 
 impl GamesExtension {
-    pub fn new(list: Arc<GameList>) -> Self {
+    pub fn new(list: Arc<GameList>, opener: Arc<dyn OpenUrl>) -> Self {
         Self {
             manifest: manifest(),
             provider: Arc::new(GameProvider(list.clone())),
             list,
+            opener,
         }
+    }
+
+    /// Reads the list first: Steam takes a link to an uninstalled game as a
+    /// request to install it, so a result shown before an uninstall must not
+    /// reach it.
+    fn launch(&self, app_id: &str) -> Result<(), LaunchError> {
+        self.list.reload();
+        let game = self.list.get(app_id).ok_or(LaunchError::Gone)?;
+        self.opener
+            .open(&format!("steam://rungameid/{}", game.app_id))
+            .map_err(|error| {
+                eprintln!(
+                    "[dango] could not open {} through Steam: {error}",
+                    game.name
+                );
+                LaunchError::Steam
+            })
     }
 }
 
@@ -102,6 +132,21 @@ impl Extension for GamesExtension {
 
     fn root_provider(&self) -> Option<Arc<dyn RootProvider>> {
         Some(self.provider.clone())
+    }
+
+    fn perform_action(
+        &self,
+        item_id: &str,
+        action_id: &str,
+        _values: &FormValues,
+    ) -> ActionOutcome {
+        if action_id != ACTION_LAUNCH {
+            return ActionOutcome::Failed("That action isn't available".into());
+        }
+        match self.launch(item_id) {
+            Ok(()) => ActionOutcome::Done,
+            Err(error) => ActionOutcome::Failed(error.to_string()),
+        }
     }
 }
 
@@ -193,7 +238,24 @@ fn wait_for_refresh(list: &GameList, running: &AtomicBool) {
 #[cfg(test)]
 pub mod fake {
     use super::*;
-    use std::sync::atomic::{AtomicU64, Ordering};
+    use std::sync::atomic::AtomicU64;
+    use std::sync::Mutex;
+
+    #[derive(Default)]
+    pub struct FakeOpener {
+        pub opened: Mutex<Vec<String>>,
+        pub fails: AtomicBool,
+    }
+
+    impl OpenUrl for FakeOpener {
+        fn open(&self, url: &str) -> Result<(), String> {
+            if self.fails.load(Ordering::SeqCst) {
+                return Err("no handler".into());
+            }
+            self.opened.lock().unwrap().push(url.into());
+            Ok(())
+        }
+    }
 
     #[derive(Default)]
     pub struct FakeSource {
@@ -243,13 +305,22 @@ pub mod fake {
 
 #[cfg(test)]
 mod tests {
-    use super::fake::FakeSource;
+    use super::fake::{FakeOpener, FakeSource};
     use super::*;
 
     fn extension(source: Arc<FakeSource>) -> GamesExtension {
+        launcher(source).0
+    }
+
+    fn launcher(source: Arc<FakeSource>) -> (GamesExtension, Arc<FakeOpener>) {
         let list = GameList::new(source);
         list.reload();
-        GamesExtension::new(list)
+        let opener = Arc::new(FakeOpener::default());
+        (GamesExtension::new(list, opener.clone()), opener)
+    }
+
+    fn launch(extension: &GamesExtension, app_id: &str) -> ActionOutcome {
+        extension.perform_action(app_id, ACTION_LAUNCH, &FormValues::new())
     }
 
     async fn root_items(extension: &GamesExtension) -> Vec<Candidate> {
@@ -276,7 +347,8 @@ mod tests {
     fn the_service_reads_again_when_the_library_changes() {
         let source = FakeSource::with(&[(1, "Brawlhalla")]);
         let list = GameList::new(source.clone());
-        let service = &GamesExtension::new(list.clone()).services()[0];
+        let opener = Arc::new(FakeOpener::default());
+        let service = &GamesExtension::new(list.clone(), opener).services()[0];
         service.start().unwrap();
         let read = |count: usize| {
             let deadline = Instant::now() + Duration::from_secs(5);
@@ -300,5 +372,55 @@ mod tests {
             root_items(&ext).await[0].icon.as_deref(),
             Some("icon:gamepad-2")
         );
+    }
+
+    #[test]
+    fn opening_a_game_asks_steam_to_run_it() {
+        let (ext, opener) = launcher(FakeSource::with(&[(1091500, "Cyberpunk 2077")]));
+        assert_eq!(launch(&ext, "1091500"), ActionOutcome::Done);
+        assert_eq!(
+            *opener.opened.lock().unwrap(),
+            ["steam://rungameid/1091500"]
+        );
+    }
+
+    #[test]
+    fn a_game_installed_since_the_last_read_still_opens() {
+        let source = FakeSource::with(&[(1, "Brawlhalla")]);
+        let (ext, _) = launcher(source.clone());
+        source.set(&[(1, "Brawlhalla"), (2, "Cyberpunk 2077")]);
+        assert_eq!(launch(&ext, "2"), ActionOutcome::Done);
+    }
+
+    #[test]
+    fn an_uninstalled_game_is_read_again_and_reported_gone() {
+        let source = FakeSource::with(&[(1, "Brawlhalla"), (2, "Cyberpunk 2077")]);
+        let (ext, opener) = launcher(source.clone());
+        source.set(&[(1, "Brawlhalla")]);
+        assert_eq!(
+            launch(&ext, "2"),
+            ActionOutcome::Failed("That game is no longer installed".into())
+        );
+        assert!(ext.list.get("2").is_none());
+        assert!(opener.opened.lock().unwrap().is_empty());
+    }
+
+    #[test]
+    fn steam_failing_to_open_is_reported() {
+        let (ext, opener) = launcher(FakeSource::with(&[(1, "Brawlhalla")]));
+        opener.fails.store(true, Ordering::SeqCst);
+        assert_eq!(
+            launch(&ext, "1"),
+            ActionOutcome::Failed("Couldn't start the game through Steam".into())
+        );
+    }
+
+    #[test]
+    fn every_message_is_a_sentence() {
+        for error in [LaunchError::Gone, LaunchError::Steam] {
+            let text = error.to_string();
+            assert!(text.starts_with(char::is_uppercase), "{text}");
+            assert!(!text.ends_with('.') && !text.contains(". "), "{text}");
+        }
     }
 }
