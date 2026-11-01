@@ -14,8 +14,8 @@
 
 ## 3. Hand checks on Windows
 
-- [ ] 3.1 With a debug build up through the `dango-ui` MCP server, set three quicklinks to Edge, Firefox, and Brave, open each from root search, and confirm with `mise run shot` that each opens in its browser
-- [ ] 3.2 Set a quicklink to Google Chrome (not installed here) and edit `quicklinks.json` to give another one `safari`; open both and confirm each opens in the default browser with no message, and that editing and saving the Safari one keeps `safari` in the file
+- [x] 3.1 With a debug build up through the `dango-ui` MCP server, set three quicklinks to Edge, Firefox, and Brave, open each from root search, and confirm with `mise run shot` that each opens in its browser
+- [x] 3.2 Set a quicklink to Google Chrome (not installed here) and edit `quicklinks.json` to give another one `safari`; open both and confirm each opens in the default browser with no message, and that editing and saving the Safari one keeps `safari` in the file
 
 ## 4. Hand checks on macOS
 
