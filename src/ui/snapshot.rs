@@ -141,7 +141,9 @@ snapshot_types! {
 
     #[derive(Default)]
     pub struct DetailBody {
+        pub image: Option<String>,
         pub markdown: String,
+        pub text: Option<String>,
         pub metadata: Vec<Metadata>,
     }
 
@@ -377,7 +379,9 @@ impl Launcher {
                         list_selected
                             .and_then(|item| item.detail.as_ref())
                             .map(|detail| DetailBody {
+                                image: detail.image.clone(),
                                 markdown: detail.markdown.clone(),
+                                text: detail.text.clone(),
                                 metadata: detail.metadata.clone(),
                             })
                             .unwrap_or_default()
@@ -416,7 +420,9 @@ impl Launcher {
                 })
             }
             View::Detail(detail) => ViewBody::Detail(DetailBody {
+                image: detail.image.clone(),
                 markdown: detail.markdown.clone(),
+                text: detail.text.clone(),
                 metadata: detail.metadata.clone(),
             }),
             View::Form(form) => ViewBody::Form(FormBody {

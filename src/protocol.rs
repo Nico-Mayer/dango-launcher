@@ -142,10 +142,17 @@ protocol_types! {
         pub actions: Vec<Action>,
     }
 
+    #[derive(Default)]
     #[serde(rename_all = "camelCase")]
     pub struct ItemDetail {
+        /// `icon:<name>` or a path to an image file, shown above the body.
+        #[serde(default)]
+        pub image: Option<String>,
         #[serde(default)]
         pub markdown: String,
+        /// Shown as written in place of `markdown`.
+        #[serde(default)]
+        pub text: Option<String>,
         #[serde(default)]
         pub metadata: Vec<Metadata>,
     }
@@ -181,7 +188,13 @@ protocol_types! {
     #[serde(rename_all = "camelCase")]
     #[derive(Default)]
     pub struct DetailView {
+        /// `icon:<name>` or a path to an image file, shown above the body.
+        #[serde(default)]
+        pub image: Option<String>,
         pub markdown: String,
+        /// Shown as written in place of `markdown`.
+        #[serde(default)]
+        pub text: Option<String>,
         #[serde(default)]
         pub metadata: Vec<Metadata>,
         #[serde(default)]
@@ -321,5 +334,20 @@ impl ViewTree {
             protocol_version: PROTOCOL_VERSION,
             view,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_detail_without_image_or_text_still_reads() {
+        let detail: ItemDetail = serde_json::from_str(r#"{"markdown":"Hi"}"#).unwrap();
+        assert_eq!(detail.image, None);
+        assert_eq!(detail.text, None);
+        let view: DetailView = serde_json::from_str(r#"{"markdown":"Hi"}"#).unwrap();
+        assert_eq!(view.image, None);
+        assert_eq!(view.text, None);
     }
 }

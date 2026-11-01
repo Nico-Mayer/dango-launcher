@@ -817,7 +817,7 @@ mod list_view {
         let detailed = |n: usize, body: &str| ListItem {
             detail: Some(ItemDetail {
                 markdown: body.into(),
-                metadata: Vec::new(),
+                ..Default::default()
             }),
             ..item(n)
         };

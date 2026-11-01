@@ -1,7 +1,7 @@
 use crate::extension::ActionOutcome;
 use crate::protocol::{
-    Action, DetailView, FieldKind, FormField, FormView, ListItem, ListView, Modifier, Shortcut,
-    View, ViewTree,
+    Action, DetailView, FieldKind, FormField, FormView, ItemDetail, ListItem, ListView, Modifier,
+    Shortcut, View, ViewTree,
 };
 
 use super::snapshot::{DetailBody, Focus, ListBody, RootScreen, Screen, ViewBody};
@@ -443,6 +443,26 @@ fn list_replacement_keeps_identity_and_falls_back_to_the_first_row() {
     let items: Vec<_> = (1..=18).filter(|n| *n != 2).map(list_item).collect();
     h.render(1, list_tree(items));
     assert_eq!(h.selected(), item_id(1));
+}
+
+#[test]
+fn the_pane_carries_the_image_and_plain_text() {
+    let item = ListItem {
+        detail: Some(ItemDetail {
+            image: Some("C:/img.png".into()),
+            text: Some("# raw".into()),
+            ..Default::default()
+        }),
+        ..list_item(1)
+    };
+    let mut tree = list_tree(vec![item]);
+    if let View::List(list) = &mut tree.view {
+        list.detail_pane = true;
+    }
+    let h = Harness::view(tree);
+    let pane = h.list().pane.expect("a pane");
+    assert_eq!(pane.image.as_deref(), Some("C:/img.png"));
+    assert_eq!(pane.text.as_deref(), Some("# raw"));
 }
 
 #[test]
