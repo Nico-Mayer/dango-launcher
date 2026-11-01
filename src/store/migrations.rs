@@ -8,6 +8,7 @@ pub const MIGRATIONS: &[&str] = &[
     include_str!("migrations/0005_drop_records_tables.sql"),
     include_str!("migrations/0006_input_history.sql"),
     include_str!("migrations/0007_rank_by_extension.sql"),
+    include_str!("migrations/0008_clipboard_metadata.sql"),
 ];
 
 #[derive(Debug, thiserror::Error)]
@@ -112,6 +113,29 @@ mod tests {
             )
             .unwrap();
         assert_eq!(kept, 5, "the upgrade must not touch existing rows");
+    }
+
+    #[test]
+    fn clipboard_rows_gain_source_and_size_without_values() {
+        let mut connection = Connection::open_in_memory().unwrap();
+        run_all(&mut connection, &MIGRATIONS[..7]).unwrap();
+        connection
+            .execute(
+                "INSERT INTO local_clipboard_history                  (entry_id, kind, text, bytes, fingerprint, copied_at)                  VALUES ('a', 'text', 'hi', 2, 'f', 1)",
+                [],
+            )
+            .unwrap();
+
+        run(&mut connection).unwrap();
+
+        let row: (Option<String>, Option<i64>, Option<i64>) = connection
+            .query_row(
+                "SELECT source, width, height FROM local_clipboard_history",
+                [],
+                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
+            )
+            .unwrap();
+        assert_eq!(row, (None, None, None));
     }
 
     #[test]
