@@ -73,7 +73,7 @@
 
 ## 11. Operating system theme
 
-- [ ] 11.1 Windows manual check: switch the app mode between dark and light while Dango runs and show the launcher after each switch; it uses the matching theme
+- [x] 11.1 Windows manual check: switch the app mode between dark and light while Dango runs and show the launcher after each switch; it uses the matching theme
 - [ ] 11.2 macOS manual check: switch the appearance between dark and light while Dango runs and show the launcher after each switch; it uses the matching theme
 
 ## 12. Docs
