@@ -893,6 +893,38 @@ mod detail {
     }
 
     #[test]
+    fn arrow_down_changes_the_clipboard_pane() {
+        use crate::extensions::clipboard::{history_view, Entry, Kind, PrimaryAction};
+
+        let text = |id: &str, text: &str, source: &str| Entry {
+            id: id.into(),
+            kind: Kind::Text,
+            text: Some(text.into()),
+            path: None,
+            thumbnail: None,
+            source: Some(source.into()),
+            size: None,
+            characters: Some(text.chars().count() as u32),
+            lines: Some(1),
+            copied_at: 0,
+        };
+        let h = Harness::root(results(1));
+        h.view(history_view(
+            &[
+                text("a", "# first entry", "Notepad"),
+                text("b", "second entry", "Code"),
+            ],
+            PrimaryAction::Paste,
+            time::OffsetDateTime::now_utc(),
+        ));
+        assert!(h.find("Notepad").is_some());
+        assert!(h.ui.global::<DetailData>().get_plain());
+        h.arrow_down();
+        assert!(h.find("Code").is_some());
+        assert!(h.find("Notepad").is_none());
+    }
+
+    #[test]
     fn a_keystroke_keeping_the_selection_loads_no_new_image() {
         let h = Harness::root(results(1));
         let item = |n: usize| ListItem {

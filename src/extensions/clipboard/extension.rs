@@ -10,12 +10,14 @@ use crate::extension::{
 };
 use crate::invocation::{Command, InvocationContext};
 use crate::protocol::{
-    Action, ActionStyle, EmptyState, ListItem, ListView, Modifier, Shortcut, View, ViewTree,
-    PROTOCOL_VERSION,
+    Action, ActionStyle, EmptyState, ItemDetail, ListItem, ListView, Metadata, Modifier, Shortcut,
+    View, ViewTree, PROTOCOL_VERSION,
 };
 use crate::text::{TextError, TextTarget};
+use time::OffsetDateTime;
 
-use super::history::{Bounds, Entry, History, Kind};
+use super::history::{Bounds, Entry, History, Kind, LISTED_CHARS};
+use super::metadata;
 use super::watcher::{Policy, WatchService, Watcher};
 use super::DEFAULT_EXCLUDED_APPLICATIONS;
 
@@ -63,10 +65,10 @@ impl ClipboardExtension {
 
     fn list(&self) -> ViewTree {
         match self.history.entries() {
-            Ok(entries) => history_view(&entries, primary_action(&self.preferences)),
+            Ok(entries) => history_view(&entries, primary_action(&self.preferences), local_now()),
             Err(error) => {
                 crate::log::append(&format!("could not read the clipboard history: {error}"));
-                history_view(&[], primary_action(&self.preferences))
+                history_view(&[], primary_action(&self.preferences), local_now())
             }
         }
     }
@@ -261,13 +263,21 @@ struct HistoryCommand {
 impl Command for HistoryCommand {
     fn invoke(&self, ctx: &InvocationContext) {
         match self.history.entries() {
-            Ok(entries) => ctx.push_view(history_view(&entries, primary_action(&self.preferences))),
+            Ok(entries) => ctx.push_view(history_view(
+                &entries,
+                primary_action(&self.preferences),
+                local_now(),
+            )),
             Err(error) => ctx.fail(error.to_string()),
         }
     }
 }
 
-pub fn history_view(entries: &[Entry], primary: PrimaryAction) -> ViewTree {
+fn local_now() -> OffsetDateTime {
+    OffsetDateTime::now_local().unwrap_or_else(|_| OffsetDateTime::now_utc())
+}
+
+pub fn history_view(entries: &[Entry], primary: PrimaryAction, now: OffsetDateTime) -> ViewTree {
     ViewTree {
         protocol_version: PROTOCOL_VERSION,
         view: View::List(ListView {
@@ -277,13 +287,17 @@ pub fn history_view(entries: &[Entry], primary: PrimaryAction) -> ViewTree {
                 description: Some("Text and images you copy will show up here".into()),
                 ..Default::default()
             }),
-            items: entries.iter().map(|entry| item(entry, primary)).collect(),
+            items: entries
+                .iter()
+                .map(|entry| item(entry, primary, now))
+                .collect(),
+            detail_pane: true,
             ..Default::default()
         }),
     }
 }
 
-fn item(entry: &Entry, primary: PrimaryAction) -> ListItem {
+fn item(entry: &Entry, primary: PrimaryAction, now: OffsetDateTime) -> ListItem {
     let (title, icon) = match entry.kind {
         Kind::Text => (
             preview(entry.text.as_deref().unwrap_or_default()),
@@ -327,8 +341,53 @@ fn item(entry: &Entry, primary: PrimaryAction) -> ListItem {
         title,
         subtitle: None,
         icon,
+        detail: Some(detail(entry, now)),
         actions,
         ..Default::default()
+    }
+}
+
+fn detail(entry: &Entry, now: OffsetDateTime) -> ItemDetail {
+    let pair = |label: &str, value: String| Metadata {
+        label: label.into(),
+        value,
+    };
+    let mut metadata = Vec::new();
+    if let Some(source) = &entry.source {
+        metadata.push(pair("Source", source.clone()));
+    }
+    metadata.push(pair("Copied", metadata::copied(entry.copied_at, now)));
+    match entry.kind {
+        Kind::Text => {
+            let text = entry.text.as_deref().unwrap_or_default();
+            metadata.push(pair("Type", metadata::text_kind(text).into()));
+            if let Some(lines) = entry.lines.filter(|lines| *lines > 1) {
+                metadata.push(pair("Lines", lines.to_string()));
+            }
+            let characters = entry.characters.unwrap_or_default();
+            metadata.push(pair("Characters", characters.to_string()));
+            let cut = characters as usize > LISTED_CHARS;
+            ItemDetail {
+                text: Some(if cut {
+                    format!("{text}…")
+                } else {
+                    text.into()
+                }),
+                metadata,
+                ..Default::default()
+            }
+        }
+        Kind::Image => {
+            metadata.push(pair("Type", "Image".into()));
+            if let Some((width, height)) = entry.size {
+                metadata.push(pair("Size", format!("{width} × {height}")));
+            }
+            ItemDetail {
+                image: entry.pane_image(),
+                metadata,
+                ..Default::default()
+            }
+        }
     }
 }
 
@@ -636,6 +695,135 @@ mod tests {
         let path = item.icon.clone().expect("an image entry has an icon");
         assert!(path.ends_with(".png") && !path.ends_with(".thumb.png"));
         assert!(std::path::Path::new(&path).exists());
+    }
+
+    const NOW: OffsetDateTime = time::macros::datetime!(2026-11-01 16:00 UTC);
+
+    fn entry(kind: Kind) -> Entry {
+        Entry {
+            id: "e".into(),
+            kind,
+            text: None,
+            path: None,
+            thumbnail: None,
+            source: Some("Notepad".into()),
+            size: None,
+            characters: None,
+            lines: None,
+            copied_at: (NOW.unix_timestamp() - 60) * 1000,
+        }
+    }
+
+    fn pairs(detail: &ItemDetail) -> Vec<(&str, &str)> {
+        detail
+            .metadata
+            .iter()
+            .map(|pair| (pair.label.as_str(), pair.value.as_str()))
+            .collect()
+    }
+
+    #[test]
+    fn the_history_shows_a_detail_pane() {
+        let tree = history_view(&[entry(Kind::Text)], PrimaryAction::Paste, NOW);
+        let list = list_of(&tree);
+        assert!(list.detail_pane);
+        assert!(list.items[0].detail.is_some());
+    }
+
+    #[test]
+    fn a_text_entry_shows_its_text_and_metadata() {
+        let text = Entry {
+            text: Some("one\n  two\nthree".into()),
+            characters: Some(15),
+            lines: Some(3),
+            ..entry(Kind::Text)
+        };
+        let detail = detail(&text, NOW);
+        assert_eq!(detail.text.as_deref(), Some("one\n  two\nthree"));
+        assert_eq!(detail.image, None);
+        assert_eq!(
+            pairs(&detail),
+            [
+                ("Source", "Notepad"),
+                ("Copied", "Today, 15:59"),
+                ("Type", "Text"),
+                ("Lines", "3"),
+                ("Characters", "15"),
+            ]
+        );
+    }
+
+    #[test]
+    fn a_single_line_has_no_line_count() {
+        let link = Entry {
+            text: Some("https://example.com".into()),
+            characters: Some(19),
+            lines: Some(1),
+            ..entry(Kind::Text)
+        };
+        let detail = detail(&link, NOW);
+        assert!(pairs(&detail).contains(&("Type", "Link")));
+        assert!(!pairs(&detail).iter().any(|(label, _)| *label == "Lines"));
+    }
+
+    #[test]
+    fn a_cut_text_ends_with_an_ellipsis_and_counts_in_full() {
+        let long = Entry {
+            text: Some("x".repeat(LISTED_CHARS)),
+            characters: Some(5000),
+            lines: Some(1),
+            ..entry(Kind::Text)
+        };
+        let detail = detail(&long, NOW);
+        assert!(detail.text.as_deref().unwrap().ends_with("x…"));
+        assert!(pairs(&detail).contains(&("Characters", "5000")));
+    }
+
+    #[test]
+    fn markup_stays_plain_text() {
+        let markup = Entry {
+            text: Some("# heading *stars*".into()),
+            characters: Some(17),
+            lines: Some(1),
+            ..entry(Kind::Text)
+        };
+        let detail = detail(&markup, NOW);
+        assert_eq!(detail.text.as_deref(), Some("# heading *stars*"));
+        assert!(detail.markdown.is_empty());
+    }
+
+    #[test]
+    fn an_image_entry_shows_its_image_and_size() {
+        let image = Entry {
+            path: Some("C:/img/a.png".into()),
+            size: Some((1920, 1080)),
+            ..entry(Kind::Image)
+        };
+        let detail = detail(&image, NOW);
+        assert!(detail.image.as_deref().unwrap().ends_with("a.preview.png"));
+        assert_eq!(detail.text, None);
+        assert_eq!(
+            pairs(&detail),
+            [
+                ("Source", "Notepad"),
+                ("Copied", "Today, 15:59"),
+                ("Type", "Image"),
+                ("Size", "1920 × 1080"),
+            ]
+        );
+    }
+
+    #[test]
+    fn an_entry_without_a_source_leaves_it_out() {
+        let unknown = Entry {
+            source: None,
+            text: Some("hi".into()),
+            characters: Some(2),
+            lines: Some(1),
+            ..entry(Kind::Text)
+        };
+        let detail = detail(&unknown, NOW);
+        assert_eq!(pairs(&detail)[0], ("Copied", "Today, 15:59"));
     }
 
     #[test]

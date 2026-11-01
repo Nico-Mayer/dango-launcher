@@ -7,6 +7,8 @@ mod source;
 mod watcher;
 
 pub(crate) use extension::manifest;
+#[cfg(test)]
+pub(crate) use extension::{history_view, PrimaryAction};
 pub use extension::{preference_declarations, ClipboardExtension, PreferencePolicy, EXTENSION_ID};
 pub use history::{Bounds, Content, Entry, History, HistoryError, Kind};
 pub use source::{Attribution, ClipboardSource, CrateClipboard, Snapshot};
