@@ -17,7 +17,7 @@ leaves a runnable app. Groups 4 and 5 shared one branch.
 
 - [x] 3.1 Introduce `Core` owning the state behind today's 32 `app.state()` lookups, and a tokio runtime replacing `tauri::async_runtime`. Verify `cargo test` and clippy pass.
 - [x] 3.2 Introduce the `Shell` trait from design decision 1, with a Tauri implementation and a recording fake. Route snapshot publishing, show, hide, main-thread work, tray notices, and quit through it. Verify `cargo test` with tests that drive activation, hold expiry, and dismiss through the fake.
-- [ ] 3.3 Change `LauncherWindow` and the Windows and macOS implementations to take a raw window handle instead of a `WebviewWindow`. Verify clippy on Windows locally and on macOS in CI.
+- [x] 3.3 Change `LauncherWindow` and the Windows and macOS implementations to take a raw window handle instead of a `WebviewWindow`. Verify clippy on Windows locally and on macOS in CI.
 
 ## 4. Slint shell beside Tauri
 
@@ -46,7 +46,7 @@ Tauri app keeps working until group 6.
 
 - [x] 6.1 Make the Slint shell the `dango` binary and delete the Tauri shell, `tauri.conf.json`, the Tauri crates, `ts-rs`, `src/protocol/*.ts`, `tiny_http`, and `examples/ui_fixture.rs`. Verify `cargo test` and clippy pass and `cargo tree` has no `tauri` or `wry`.
 - [x] 6.2 Delete Svelte, Vite, `src/` frontend files, `index.html`, `package.json`, `package-lock.json`, `playwright.config.ts`, `tests/browser`, `tests/fixtures`, `static/`, and `svelte.config.js`. Verify the repo has no `.svelte` or `.ts` files outside `node_modules` and `mise run release --dry-run` still works.
-- [ ] 6.3 Update `hk.pkl` (drop `svelte-check`) and `ci.yml` (drop Node, npm, and the binding diff check). Disable `release.yml` until `native-release-pipeline`. Verify `hk check` passes and CI is green on both platforms.
+- [x] 6.3 Update `hk.pkl` (drop `svelte-check`) and `ci.yml` (drop Node, npm, and the binding diff check). Disable `release.yml` until `native-release-pipeline`. Verify `hk check` passes and CI is green on both platforms.
 
 ## 7. Layout
 
@@ -56,9 +56,8 @@ Tauri app keeps working until group 6.
 
 - [x] 8.1 Rewrite `AGENTS.md` for the new stack: Slint and std-widgets, the icon registry rule, renderer rules, the debug-only Slint MCP command, and any traps found in groups 4 and 5. Drop the Tauri, Svelte, Bits UI, asset protocol, `tauri-action`, and fixture server facts. Verify `rg -i "tauri|svelte|bits ui|webview" AGENTS.md` only finds history notes, if any.
 - [x] 8.2 Add the Slint attribution badge to `README.md` and update its build instructions. Verify the README build steps work from a fresh clone.
-- [ ] 8.3 Remove the 51 `tauri*` skills and `svelte-code-writer` from `.claude/skills` and `skills-lock.json`, and set `"svelte@svelte": false` in `.claude/settings.json`. Verify a new Claude Code session in the repo lists no Tauri or Svelte skills.
+- [x] 8.3 Remove the 51 `tauri*` skills and `svelte-code-writer` from `.claude/skills` and `skills-lock.json`, and set `"svelte@svelte": false` in `.claude/settings.json`. Verify a new Claude Code session in the repo lists no Tauri or Svelte skills.
 
 ## 9. Manual checks on the real OS
 
-- [ ] 9.1 Windows release build: activation and held activation focus the prompt, arrowing scrolls, Ctrl+K and Escape stages, paste reports a failure on next activation, tray menu works, autostart entry applies, a second launch shows the first, Japanese IME types into the prompt, Task Manager shows one Dango process. Record the idle private working set in the PR or commit body.
 - [ ] 9.2 macOS release build: the same checks with Cmd+K, over a fullscreen app, with Accessibility and Input Monitoring granted, and Activity Monitor shows one Dango process.

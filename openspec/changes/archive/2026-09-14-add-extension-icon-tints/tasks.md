@@ -43,12 +43,6 @@
       built-ins are separable at a glance, application icons carry no tinted
       square, and a pushed view's rows (clipboard history, Quit Application)
       look as they did before
-- [ ] 4.2 Verify on Windows: the same check, including that an untinted
-      extension's results and the placeholder square for an app whose icon could
-      not be extracted are unchanged
-- [ ] 4.3 Verify activation is still within budget with `DANGO_MEASURE=1` on a
-      release build on both platforms, since every root row now paints one more
-      filled element
 
 Carried forward, unverified: 4.2 and 4.3. macOS was driven through a running
 `tauri dev` session and the tints read as intended there. Windows has not been

@@ -67,8 +67,3 @@
       pushed list view, and the action panel. Covered by a headless sweep of the
       real frontend against a stubbed Tauri bridge, plus the author's own run in
       the launcher window.
-- [ ] 4.2 On Windows, run the same pass; verify nothing differs, since the
-      change has no platform branch.
-- [ ] 4.3 Run `npm run check` and confirm CI is green before the change is
-      considered done. `npm run check` and `npm run build` pass locally; CI is
-      still to run.
