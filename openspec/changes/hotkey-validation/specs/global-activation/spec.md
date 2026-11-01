@@ -58,3 +58,8 @@ that the configured hotkey is invalid and the default is in use.
 - **WHEN** on macOS the hyperkey is on and a hotkey is set to `f18`
 - **THEN** pressing F18 does not trigger that hotkey
 - **AND** the settings reference says the hyperkey uses F18 on macOS
+
+#### Scenario: F18 with the hyperkey on Windows
+
+- **WHEN** on Windows the hyperkey is on and a hotkey is set to `f18`
+- **THEN** pressing F18 triggers that hotkey
