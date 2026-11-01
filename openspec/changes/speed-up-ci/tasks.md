@@ -4,7 +4,7 @@
 
 ## 2. Release workflow without cache saves
 
-- [ ] 2.1 Remove `swatinem/rust-cache` from `release.yml` and set `cache_save: false` on its mise-action step. Verify: a `workflow_dispatch` dry run has no cache restore or save steps, both jobs upload their assets, and `gh cache list` shows no new `refs/tags` or dry-run entry
+- [x] 2.1 Remove `swatinem/rust-cache` from `release.yml` and set `cache_save: false` on its mise-action step. Verify: a `workflow_dispatch` dry run has no cache restore or save steps, both jobs upload their assets, and `gh cache list` shows no new `refs/tags` or dry-run entry
 - [ ] 2.2 Delete the existing caches under `refs/tags/*` with `gh cache delete`, then delete the dry-run draft release from 2.1. Verify: `gh cache list` shows only `refs/heads/main` entries and the total stays under 10 GB
 
 ## 3. Fewer CI runs
