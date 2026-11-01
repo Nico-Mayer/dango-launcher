@@ -849,6 +849,40 @@ mod detail {
         }]
     }
 
+    fn metadata_bottom(h: &Harness, text: &str) -> (f32, f32) {
+        h.view(ViewTree::new(View::Detail(DetailView {
+            text: Some(text.into()),
+            metadata: source(),
+            ..Default::default()
+        })));
+        let value = h.find("Terminal").expect("the metadata is drawn");
+        (
+            value.absolute_position().y + value.size().height,
+            LIST_BOTTOM + 6.0,
+        )
+    }
+
+    #[test]
+    fn a_short_body_leaves_the_metadata_at_the_bottom() {
+        let h = Harness::root(results(1));
+        let (bottom, detail_bottom) = metadata_bottom(&h, "One line");
+        let body = h.find("One line").unwrap();
+        assert!(
+            bottom > detail_bottom - 40.0,
+            "{bottom} near {detail_bottom}"
+        );
+        assert!(bottom - body.absolute_position().y > 200.0);
+    }
+
+    #[test]
+    fn a_long_body_scrolls_above_the_metadata() {
+        let h = Harness::root(results(1));
+        let long = (1..=200).map(|n| format!("line {n}\n")).collect::<String>();
+        let (bottom, detail_bottom) = metadata_bottom(&h, &long);
+        assert!(bottom <= detail_bottom, "{bottom} within {detail_bottom}");
+        assert!(bottom > detail_bottom - 40.0);
+    }
+
     #[test]
     fn plain_text_is_shown_as_written_in_the_monospace_face() {
         let h = Harness::root(results(1));

@@ -2,58 +2,67 @@ import { ScrollView } from "std-widgets.slint";
 import { Theme } from "../theme.slint";
 import { DetailData } from "../globals.slint";
 
-/// An image, a body, and its metadata, standalone or in a list's pane.
+/// An image and a body that scroll, over metadata pinned to the bottom,
+/// standalone or in a list's pane.
 export component Detail inherits Rectangle {
     property <length> inset: 16px;
     property <length> image-width: DetailData.image.width * 1phx;
     property <length> image-height: DetailData.image.height * 1phx;
     property <float> image-scale: min(1, (root.width - 2 * root.inset) / root.image-width, Theme.detail-image-height / root.image-height);
 
-    ScrollView {
-        VerticalLayout {
-            padding: root.inset;
-            spacing: 16px;
-            alignment: start;
-            if DetailData.has-image: HorizontalLayout {
+    VerticalLayout {
+        ScrollView {
+            vertical-stretch: 1;
+            VerticalLayout {
+                padding: root.inset;
+                spacing: 16px;
                 alignment: start;
-                Rectangle {
-                    width: root.image-width * root.image-scale;
-                    height: root.image-height * root.image-scale;
-                    border-radius: Theme.radius;
-                    border-width: 1px;
-                    border-color: Theme.border;
-                    clip: true;
-                    accessible-role: image;
-                    accessible-label: "Image";
-                    Image {
-                        width: parent.width;
-                        height: parent.height;
-                        source: DetailData.image;
-                        image-fit: contain;
-                        colorize: DetailData.image-named ? Theme.muted : transparent;
+                if DetailData.has-image: HorizontalLayout {
+                    alignment: start;
+                    Rectangle {
+                        width: root.image-width * root.image-scale;
+                        height: root.image-height * root.image-scale;
+                        border-radius: Theme.radius;
+                        border-width: 1px;
+                        border-color: Theme.border;
+                        clip: true;
+                        accessible-role: image;
+                        accessible-label: "Image";
+                        Image {
+                            width: parent.width;
+                            height: parent.height;
+                            source: DetailData.image;
+                            image-fit: contain;
+                            colorize: DetailData.image-named ? Theme.muted : transparent;
+                        }
                     }
                 }
+                if DetailData.plain: Text {
+                    text: DetailData.text;
+                    color: Theme.text;
+                    font-family: Theme.mono;
+                    font-size: Theme.text-small;
+                    wrap: word-wrap;
+                    accessible-role: AccessibleRole.text;
+                    accessible-label: DetailData.text;
+                }
+                if !DetailData.plain: StyledText {
+                    text: DetailData.body;
+                    default-color: Theme.text;
+                    default-font-size: Theme.text-body;
+                    accessible-role: AccessibleRole.text;
+                    accessible-label: DetailData.text;
+                }
             }
-            if DetailData.plain: Text {
-                text: DetailData.text;
-                color: Theme.text;
-                font-family: Theme.mono;
-                font-size: Theme.text-small;
-                wrap: word-wrap;
-                accessible-role: AccessibleRole.text;
-                accessible-label: DetailData.text;
-            }
-            if !DetailData.plain: StyledText {
-                text: DetailData.body;
-                default-color: Theme.text;
-                default-font-size: Theme.text-body;
-                accessible-role: AccessibleRole.text;
-                accessible-label: DetailData.text;
-            }
-            if DetailData.metadata.length > 0: Rectangle {
-                height: 1px;
-                background: Theme.border;
-            }
+        }
+
+        if DetailData.metadata.length > 0: Rectangle {
+            height: 1px;
+            background: Theme.border;
+        }
+        if DetailData.metadata.length > 0: VerticalLayout {
+            padding: root.inset;
+            spacing: 6px;
             for pair in DetailData.metadata: HorizontalLayout {
                 spacing: 12px;
                 Text {
