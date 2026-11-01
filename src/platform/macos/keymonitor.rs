@@ -64,6 +64,11 @@ fn is_injected(event: &CGEvent) -> bool {
 /// Modifier keys themselves never reach here: macOS reports them as
 /// `FlagsChanged`, which this tap does not ask for.
 fn translate(event: &CGEvent) -> Option<KeyStroke> {
+    let target = CGEvent::integer_value_field(Some(event), CGEventField::EventTargetUnixProcessID);
+    if is_own_process(target, std::process::id()) {
+        return Some(KeyStroke::Clear);
+    }
+
     let flags = CGEvent::flags(Some(event));
     if flags.intersects(
         CGEventFlags::MaskControl | CGEventFlags::MaskAlternate | CGEventFlags::MaskCommand,
@@ -98,9 +103,15 @@ fn characters(units: &[u16]) -> KeyStroke {
     }
 }
 
+/// The launcher is a non-activating panel, so Dango is never frontmost while
+/// it has the keyboard; the event's target process is the only way to tell.
+fn is_own_process(target: i64, own: u32) -> bool {
+    target == i64::from(own)
+}
+
 #[cfg(test)]
 mod tests {
-    use super::characters;
+    use super::{characters, is_own_process};
     use crate::platform::KeyStroke;
 
     #[test]
@@ -119,5 +130,12 @@ mod tests {
     fn nothing_and_more_than_one_unit_clear() {
         assert_eq!(characters(&[]), KeyStroke::Clear);
         assert_eq!(characters(&['a' as u16, 'b' as u16]), KeyStroke::Clear);
+    }
+
+    #[test]
+    fn only_a_key_aimed_at_dango_is_its_own() {
+        assert!(is_own_process(4242, 4242));
+        assert!(!is_own_process(17, 4242));
+        assert!(!is_own_process(0, 4242));
     }
 }
