@@ -62,4 +62,5 @@ None.
 - `src/platform/macos/clipboard.rs`, `src/platform/windows/clipboard.rs`:
   attribution is asked on every recorded change, not only when the exclusion
   list is set.
-- No new dependency: `time` and `url` are already in the tree.
+- One new dependency, `email_address`, for the email check. `time` and `url`
+  are already in the tree.
