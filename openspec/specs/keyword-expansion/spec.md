@@ -85,8 +85,25 @@ them anywhere.
 
 #### Scenario: A key that is not a character clears what is held
 
-- **WHEN** the user presses Enter, Tab, Escape, an arrow key, or a chord with a modifier other than Shift
+- **WHEN** the user presses Enter, Tab, Escape, an arrow key, or a chord with a modifier other than Shift, except the AltGr chords described below
 - **THEN** what was held is discarded
+
+#### Scenario: An AltGr character on Windows is text
+
+- **WHEN** on Windows the user types a character that the keyboard layout makes with AltGr, such as `@`, `{`, `\` or the euro sign on a German keyboard
+- **THEN** that character is held like any other typed character
+- **AND** a keyword containing it expands
+
+#### Scenario: AltGr with a key that makes no character on Windows
+
+- **WHEN** on Windows the user presses AltGr with a key the layout gives no character
+- **THEN** what was held is discarded
+
+#### Scenario: An Option chord on macOS clears what is held
+
+- **WHEN** on macOS the user presses a key with Option held, including a key that types a character such as `@` on a German keyboard
+- **THEN** what was held is discarded
+- **AND** a keyword containing such a character does not expand, a known gap left for a change made and checked on a Mac
 
 #### Scenario: Switching application clears what is held
 
@@ -100,8 +117,8 @@ them anywhere.
 
 ### Requirement: Expansion is skipped where it should not happen
 
-Dango SHALL NOT observe or expand in contexts the user has excluded or the
-system marks as sensitive.
+Dango SHALL NOT observe or expand in contexts the user has excluded, the
+system marks as sensitive, or that belong to Dango itself.
 
 #### Scenario: A password field on macOS
 
@@ -123,6 +140,18 @@ system marks as sensitive.
 
 - **WHEN** the user changes the exclusion list
 - **THEN** the change takes effect on the next keystroke observed
+
+#### Scenario: Typing in the launcher on Windows
+
+- **WHEN** on Windows the user types a snippet's keyword into the launcher's search field
+- **THEN** nothing expands and nothing is held
+- **AND** the search field shows exactly what the user typed
+
+#### Scenario: Typing in the launcher on macOS
+
+- **WHEN** on macOS the user types a snippet's keyword into the launcher's search field, while the previous app is still the frontmost application
+- **THEN** nothing expands and nothing is held
+- **AND** the search field shows exactly what the user typed
 
 ### Requirement: Observing never delays the machine
 
