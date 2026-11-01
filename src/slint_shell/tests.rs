@@ -16,7 +16,7 @@ use crate::protocol::{
     Action, DetailView, FieldKind, FormField, FormView, ListItem, ListView, View, ViewTree,
 };
 use crate::shell::TrayStatus;
-use crate::ui::{Context, Event, Input, Intent, Launcher, ResultItem, TemplateInspection};
+use crate::ui::{Context, Effect, Event, Input, Intent, Launcher, ResultItem, TemplateInspection};
 
 const LIST_TOP: f32 = 56.0 + 6.0;
 const LIST_BOTTOM: f32 = 480.0 - 40.0 - 6.0;
@@ -26,6 +26,7 @@ struct Harness {
     launcher: Rc<RefCell<Launcher>>,
     renderer: Rc<RefCell<Renderer>>,
     intents: Rc<RefCell<Vec<Intent>>>,
+    effects: Rc<RefCell<Vec<Effect>>>,
     /// Records intents without feeding them to the state machine, so what is
     /// on screen can only change through a snapshot.
     frozen: Rc<RefCell<bool>>,
@@ -41,6 +42,7 @@ impl Harness {
         let renderer = Rc::new(RefCell::new(Renderer::new(&ui)));
         let launcher = Rc::new(RefCell::new(Launcher::new()));
         let intents = Rc::new(RefCell::new(Vec::new()));
+        let effects = Rc::new(RefCell::new(Vec::new()));
         let frozen = Rc::new(RefCell::new(false));
         let height = Rc::new(Cell::new(None));
         let dispatch = {
@@ -49,13 +51,15 @@ impl Harness {
             let launcher = launcher.clone();
             let renderer = renderer.clone();
             let intents = intents.clone();
+            let effects = effects.clone();
             let frozen = frozen.clone();
             Rc::new(move |intent: Intent| {
                 intents.borrow_mut().push(intent.clone());
                 if *frozen.borrow() {
                     return;
                 }
-                launcher.borrow_mut().apply(Input::Intent(intent));
+                let fx = launcher.borrow_mut().apply(Input::Intent(intent));
+                effects.borrow_mut().extend(fx);
                 let snapshot = launcher.borrow().snapshot();
                 render::publish(&mut renderer.borrow_mut(), &weak.unwrap(), snapshot, |h| {
                     height.set(Some(h))
@@ -68,6 +72,7 @@ impl Harness {
             launcher,
             renderer,
             intents,
+            effects,
             frozen,
             height,
         };
@@ -104,8 +109,12 @@ impl Harness {
     }
 
     fn view(&self, tree: ViewTree) {
+        self.view_of("fixture", tree);
+    }
+
+    fn view_of(&self, owner: &str, tree: ViewTree) {
         self.event(Event::Rendered {
-            owner: "fixture".into(),
+            owner: owner.into(),
             context: Context {
                 title: "Fixture Command".into(),
                 icon: None,
@@ -129,6 +138,10 @@ impl Harness {
 
     fn intents(&self) -> Vec<Intent> {
         self.intents.borrow().clone()
+    }
+
+    fn effects(&self) -> Vec<Effect> {
+        self.effects.borrow().clone()
     }
 
     fn type_text(&self, text: &str) {
@@ -1057,6 +1070,49 @@ mod grid {
         let last = h.row("Tile 7");
         let bottom = last.absolute_position().y + last.size().height;
         assert!(bottom <= h.height() - 40.0, "the last row is not cut off");
+    }
+}
+
+mod games {
+    use super::*;
+    use crate::extension::{ActionOutcome, Extension, FormValues};
+    use crate::extensions::games::fake::{FakeOpener, FakeSource};
+    use crate::extensions::games::{self, GameList, GameSource, GamesExtension};
+
+    #[test]
+    fn typing_filters_the_covers_and_enter_launches_the_game() {
+        let source = FakeSource::with(&[(291550, "Brawlhalla"), (1091500, "Cyberpunk 2077")]);
+        let h = Harness::root(results(1));
+        h.view_of(games::EXTENSION_ID, games::grid(&source.games()));
+        assert_eq!(h.shell().get_screen(), ScreenKind::Grid);
+
+        h.type_text("cyber");
+        h.row("Cyberpunk 2077");
+        assert!(h.find("Brawlhalla").is_none());
+
+        h.key(
+            "
+",
+        );
+        let Some(Effect::RunAction(request)) = h.effects().pop() else {
+            panic!("Enter runs the tile's action");
+        };
+        assert_eq!(
+            (request.extension_id.as_str(), request.item_id.as_str()),
+            (games::EXTENSION_ID, "1091500")
+        );
+
+        let list = GameList::new(source);
+        let opener = std::sync::Arc::new(FakeOpener::default());
+        let extension = GamesExtension::new(list, opener.clone());
+        assert_eq!(
+            extension.perform_action(&request.item_id, &request.action_id, &FormValues::new()),
+            ActionOutcome::Done
+        );
+        assert_eq!(
+            *opener.opened.lock().unwrap(),
+            ["steam://rungameid/1091500"]
+        );
     }
 }
 

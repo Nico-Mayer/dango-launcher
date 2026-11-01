@@ -6,7 +6,7 @@ use tokio::runtime::Handle;
 
 use super::{Core, Services, ViewRunner, RESULT_LIMIT};
 use crate::config::{Config, FileConfig};
-use crate::extension::{ExtensionHost, HostResolver};
+use crate::extension::{Extension, ExtensionHost, HostResolver};
 use crate::hotkeys::{self, testing::FakeGrab, Registry};
 use crate::invocation::{InvocationContext, Invoker, Runner};
 use crate::protocol::{ListView, View, ViewTree};
@@ -21,13 +21,24 @@ fn core(config_json: &str) -> (Arc<Core>, Arc<RecordingShell>) {
 }
 
 fn core_with_grab(config_json: &str, grab: FakeGrab) -> (Arc<Core>, Arc<RecordingShell>) {
+    core_with(config_json, grab, Vec::new())
+}
+
+fn core_with(
+    config_json: &str,
+    grab: FakeGrab,
+    extensions: Vec<Arc<dyn Extension>>,
+) -> (Arc<Core>, Arc<RecordingShell>) {
     let config = Config::parse(config_json).unwrap();
     let (launcher, _) = hotkeys::launcher(&config);
     let config = Arc::new(FileConfig::new(
         std::env::temp_dir().join("dango-core-test.json"),
         config,
     ));
-    let host = ExtensionHost::new(config.clone());
+    let mut host = ExtensionHost::new(config.clone());
+    for extension in extensions {
+        host.register(extension).unwrap();
+    }
     let frecency = Arc::new(FrecencyTable::in_memory());
     let learned = Arc::new(InputHistory::in_memory());
     let pipeline = SearchPipeline::new(
@@ -485,4 +496,39 @@ async fn a_command_disabled_by_a_reload_leaves_search_and_a_stale_result_fails()
     type_query(&core, "fir");
     settle().await;
     assert_eq!(root_ids(&shell), ["x.keep"]);
+}
+
+#[tokio::test]
+async fn launching_a_game_hides_the_launcher() {
+    use crate::extensions::games::fake::{FakeOpener, FakeSource};
+    use crate::extensions::games::{self, GameList, GamesExtension};
+
+    let list = GameList::new(FakeSource::with(&[(1091500, "Cyberpunk 2077")]));
+    let opener = Arc::new(FakeOpener::default());
+    let extension = Arc::new(GamesExtension::new(list, opener.clone()));
+    let (core, shell) = core_with("{}", FakeGrab::default(), vec![extension]);
+    core.toggle();
+    let outcome = core.run_action(&crate::ui::ActionRequest {
+        origin: crate::ui::Origin::View,
+        extension_id: games::EXTENSION_ID.into(),
+        item_id: "1091500".into(),
+        action_id: games::ACTION_LAUNCH.into(),
+        values: None,
+        query: None,
+    });
+    settle().await;
+    assert_eq!(outcome, crate::extension::ActionOutcome::Done);
+    assert_eq!(
+        *opener.opened.lock().unwrap(),
+        ["steam://rungameid/1091500"]
+    );
+    assert_eq!(
+        shell.calls(),
+        [
+            Call::Show,
+            Call::Hide {
+                restore_focus: false
+            }
+        ]
+    );
 }
