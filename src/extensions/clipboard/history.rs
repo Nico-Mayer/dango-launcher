@@ -65,6 +65,9 @@ pub struct Entry {
     pub source: Option<String>,
     /// An image's width and height in pixels, when it could be decoded.
     pub size: Option<(u32, u32)>,
+    /// Of the whole text, for text.
+    pub characters: Option<u32>,
+    pub lines: Option<u32>,
     pub copied_at: i64,
 }
 
@@ -143,6 +146,11 @@ impl From<rusqlite::Error> for HistoryError {
 /// Enough of each text for a one-line preview, so listing the history never
 /// loads every copied text in full.
 const LISTED_CHARS: usize = 2000;
+
+/// The columns after the text that `entry` reads. The counts are of the whole
+/// text, however little of it is read.
+const DETAILS: &str = "path, copied_at, source, width, height, length(text), \
+     length(text) - length(replace(text, char(10), '')) + 1";
 
 /// Sharp in a list row and in a grid tile at 200 % scaling.
 const THUMBNAIL_SIZE: u32 = 384;
@@ -264,7 +272,7 @@ impl History {
     pub fn entries(&self) -> Result<Vec<Entry>, HistoryError> {
         let entries = self.store.with(|c| {
             let mut stmt = c.prepare(&format!(
-                "SELECT entry_id, kind, substr(text, 1, {LISTED_CHARS}), path, copied_at, source, width, height \
+                "SELECT entry_id, kind, substr(text, 1, {LISTED_CHARS}), {DETAILS} \
                  FROM local_clipboard_history ORDER BY copied_at DESC, rowid DESC"
             ))?;
             let rows = stmt.query_map([], entry)?;
@@ -276,8 +284,10 @@ impl History {
     pub fn get(&self, id: &str) -> Result<Entry, HistoryError> {
         let found = self.store.with(|c| {
             c.query_row(
-                "SELECT entry_id, kind, text, path, copied_at, source, width, height FROM local_clipboard_history \
-                 WHERE entry_id = ?1",
+                &format!(
+                    "SELECT entry_id, kind, text, {DETAILS} FROM local_clipboard_history \
+                     WHERE entry_id = ?1"
+                ),
                 [id],
                 entry,
             )
@@ -336,7 +346,8 @@ impl History {
     ) -> Result<bool, HistoryError> {
         let changed = self.store.with(|c| {
             c.execute(
-                "UPDATE local_clipboard_history SET copied_at = ?2, source = ?3                  WHERE fingerprint = ?1",
+                "UPDATE local_clipboard_history SET copied_at = ?2, source = ?3 \
+                 WHERE fingerprint = ?1",
                 rusqlite::params![fingerprint, now, source],
             )
         })?;
@@ -396,6 +407,8 @@ fn entry(row: &rusqlite::Row) -> rusqlite::Result<Entry> {
         size: row
             .get::<_, Option<u32>>(6)?
             .zip(row.get::<_, Option<u32>>(7)?),
+        characters: row.get(8)?,
+        lines: row.get(9)?,
         copied_at: row.get(4)?,
     })
 }
@@ -956,6 +969,46 @@ mod tests {
 
         assert_eq!(entry.text.unwrap().len(), LISTED_CHARS);
         assert_eq!(history.content(&entry.id).unwrap(), text(&long));
+    }
+
+    #[test]
+    fn the_listing_counts_lines_and_characters() {
+        let history = history();
+        history
+            .record(text("one line"), None, Bounds::default(), 1)
+            .unwrap();
+        history
+            .record(
+                text("first\nsecond\nthird ünïcode"),
+                None,
+                Bounds::default(),
+                2,
+            )
+            .unwrap();
+        history
+            .record(png(10, 10), None, Bounds::default(), 3)
+            .unwrap();
+        let entries = history.entries().unwrap();
+        assert_eq!((entries[0].lines, entries[0].characters), (None, None));
+        assert_eq!(
+            (entries[1].lines, entries[1].characters),
+            (Some(3), Some(26))
+        );
+        assert_eq!(
+            (entries[2].lines, entries[2].characters),
+            (Some(1), Some(8))
+        );
+    }
+
+    #[test]
+    fn a_long_text_counts_in_full() {
+        let history = history();
+        let long = "x".repeat(LISTED_CHARS + 10);
+        history
+            .record(text(&long), None, Bounds::default(), 1)
+            .unwrap();
+        let entry = history.entries().unwrap().remove(0);
+        assert_eq!(entry.characters, Some(LISTED_CHARS as u32 + 10));
     }
 
     #[test]

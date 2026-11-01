@@ -17,7 +17,7 @@
 
 ## 4. History as a list with a detail pane
 
-- [ ] 4.1 Read line and character counts in the listing query in `History::entries`; verify with history tests for one line, three lines, and text longer than `LISTED_CHARS` counting in full (`cargo test clipboard`)
+- [x] 4.1 Read line and character counts in the listing query in `History::entries`; verify with history tests for one line, three lines, and text longer than `LISTED_CHARS` counting in full (`cargo test clipboard`)
 - [ ] 4.2 Add kind detection (Link via `url`, Email address via the `email_address` crate, hex Colour, File path via `Path::is_absolute`, else Text) as a pure function in `src/extensions/clipboard/`; verify with unit tests for each kind, a sentence containing a link, the word `red`, and a `::{GUID}` identifier (`cargo test clipboard`)
 - [ ] 4.3 Add "Copied" formatting with `time` as a pure function of the entry time, now, and the local offset; verify with unit tests for today, yesterday, earlier this year, and an earlier year (`cargo test clipboard`)
 - [ ] 4.4 Set `detail_pane: true` in `history_view` and give each item a detail: plain text (with "…" when cut) or the pane image, and the metadata pairs in the spec's order with the strings from design.md; verify with extension tests for a text entry, an image entry, an entry without source, and a markup text staying plain, plus a UI test that Arrow Down changes the pane (`cargo test`)
