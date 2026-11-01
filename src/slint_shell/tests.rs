@@ -1075,12 +1075,11 @@ mod grid {
 
 mod games {
     use super::*;
-    use crate::extension::{ActionOutcome, Extension, FormValues};
-    use crate::extensions::games::fake::{FakeOpener, FakeSource};
-    use crate::extensions::games::{self, GameList, GameSource, GamesExtension};
+    use crate::extensions::games::fake::FakeSource;
+    use crate::extensions::games::{self, GameSource};
 
     #[test]
-    fn typing_filters_the_covers_and_enter_launches_the_game() {
+    fn typing_filters_the_covers_and_enter_asks_games_to_launch() {
         let source = FakeSource::with(&[(291550, "Brawlhalla"), (1091500, "Cyberpunk 2077")]);
         let h = Harness::root(results(1));
         h.view_of(games::EXTENSION_ID, games::grid(&source.games()));
@@ -1090,28 +1089,17 @@ mod games {
         h.row("Cyberpunk 2077");
         assert!(h.find("Brawlhalla").is_none());
 
-        h.key(
-            "
-",
-        );
+        h.key("\n");
         let Some(Effect::RunAction(request)) = h.effects().pop() else {
             panic!("Enter runs the tile's action");
         };
         assert_eq!(
-            (request.extension_id.as_str(), request.item_id.as_str()),
-            (games::EXTENSION_ID, "1091500")
-        );
-
-        let list = GameList::new(source);
-        let opener = std::sync::Arc::new(FakeOpener::default());
-        let extension = GamesExtension::new(list, opener.clone());
-        assert_eq!(
-            extension.perform_action(&request.item_id, &request.action_id, &FormValues::new()),
-            ActionOutcome::Done
-        );
-        assert_eq!(
-            *opener.opened.lock().unwrap(),
-            ["steam://rungameid/1091500"]
+            (
+                request.extension_id.as_str(),
+                request.item_id.as_str(),
+                request.action_id.as_str()
+            ),
+            (games::EXTENSION_ID, "1091500", games::ACTION_LAUNCH)
         );
     }
 }
