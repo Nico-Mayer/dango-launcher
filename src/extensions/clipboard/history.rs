@@ -133,6 +133,10 @@ const LISTED_CHARS: usize = 2000;
 /// Sharp in a list row and in a grid tile at 200 % scaling.
 const THUMBNAIL_SIZE: u32 = 384;
 
+/// Sharp in the detail pane at 200 % scaling, where the image is at most about
+/// 370 logical pixels wide.
+const PREVIEW_SIZE: u32 = 800;
+
 pub struct History {
     store: Arc<Store>,
     images: PathBuf,
@@ -158,11 +162,12 @@ impl History {
         let Ok(mut paths) = paths else {
             return;
         };
-        let thumbnails: Vec<String> = paths
+        let copies: Vec<String> = paths
             .iter()
-            .map(|path| thumbnail_path(path).to_string_lossy().into_owned())
+            .flat_map(|path| [thumbnail_path(path), preview_path(path)])
+            .map(|copy| copy.to_string_lossy().into_owned())
             .collect();
-        paths.extend(thumbnails);
+        paths.extend(copies);
         let Ok(files) = std::fs::read_dir(&self.images) else {
             return;
         };
@@ -210,7 +215,7 @@ impl History {
                     crate::log::append(&format!("clipboard history image: {error}"));
                     HistoryError::Failed(error.to_string())
                 })?;
-                let (written, decoded) = write_thumbnail(image, &thumbnail_path(&path));
+                let (written, decoded) = write_smaller_copies(image, &path);
                 bytes += written;
                 size = decoded;
                 (Kind::Image, None, Some(path.to_string_lossy().into_owned()))
@@ -385,11 +390,14 @@ fn thumbnail_path(image: impl AsRef<Path>) -> PathBuf {
     image.as_ref().with_extension("thumb.png")
 }
 
-/// Writes a thumbnail of `png` and answers its size in bytes, or 0 when there
-/// is none, with the image's size in pixels when it decodes. An image without
-/// one is still worth keeping: its row shows the full image, which for an
-/// image within the thumbnail size is just as cheap.
-fn write_thumbnail(png: &[u8], path: &Path) -> (usize, Option<(u32, u32)>) {
+fn preview_path(image: impl AsRef<Path>) -> PathBuf {
+    image.as_ref().with_extension("preview.png")
+}
+
+/// Writes the smaller copies of `png` it needs and answers their size in
+/// bytes, with the image's size in pixels when it decodes. An image within a
+/// copy's size gets no copy: showing it instead is just as cheap.
+fn write_smaller_copies(png: &[u8], path: &Path) -> (usize, Option<(u32, u32)>) {
     let image = match RustImageData::from_bytes(png) {
         Ok(image) => image,
         Err(error) => {
@@ -397,23 +405,47 @@ fn write_thumbnail(png: &[u8], path: &Path) -> (usize, Option<(u32, u32)>) {
             return (0, None);
         }
     };
-    let (width, height) = image.get_size();
-    if width <= THUMBNAIL_SIZE && height <= THUMBNAIL_SIZE {
-        return (0, Some((width, height)));
-    }
-    let written = image
-        .thumbnail(THUMBNAIL_SIZE, THUMBNAIL_SIZE)
-        .and_then(|thumbnail| thumbnail.to_png())
-        .and_then(|thumbnail| {
-            let bytes = thumbnail.get_bytes();
-            std::fs::write(path, bytes)?;
-            Ok(bytes.len())
+    let size = image.get_size();
+    let mut written = 0;
+    let preview = (!fits(size, PREVIEW_SIZE))
+        .then(|| shrink(&image, PREVIEW_SIZE, &preview_path(path)))
+        .and_then(|shrunk| logged(shrunk, "preview"))
+        .map(|(bytes, preview)| {
+            written += bytes;
+            preview
         });
-    let written = written.unwrap_or_else(|error| {
-        crate::log::append(&format!("clipboard history thumbnail: {error}"));
-        0
-    });
-    (written, Some((width, height)))
+    if !fits(size, THUMBNAIL_SIZE) {
+        let from = preview.as_ref().unwrap_or(&image);
+        if let Some((bytes, _)) = logged(
+            shrink(from, THUMBNAIL_SIZE, &thumbnail_path(path)),
+            "thumbnail",
+        ) {
+            written += bytes;
+        }
+    }
+    (written, Some(size))
+}
+
+fn fits((width, height): (u32, u32), within: u32) -> bool {
+    width <= within && height <= within
+}
+
+fn shrink(
+    image: &RustImageData,
+    within: u32,
+    path: &Path,
+) -> clipboard_rs::Result<(usize, RustImageData)> {
+    let smaller = image.thumbnail(within, within)?;
+    let png = smaller.to_png()?;
+    let bytes = png.get_bytes();
+    std::fs::write(path, bytes)?;
+    Ok((bytes.len(), smaller))
+}
+
+fn logged<T>(result: clipboard_rs::Result<T>, copy: &str) -> Option<T> {
+    result
+        .inspect_err(|error| crate::log::append(&format!("clipboard history {copy}: {error}")))
+        .ok()
 }
 
 /// Discarding an image has to actually reclaim its space, or the size bound
@@ -422,6 +454,7 @@ fn delete_file(path: Option<&str>) {
     if let Some(path) = path {
         let _ = std::fs::remove_file(Path::new(path));
         let _ = std::fs::remove_file(thumbnail_path(path));
+        let _ = std::fs::remove_file(preview_path(path));
     }
 }
 
@@ -558,6 +591,49 @@ mod tests {
             })
             .unwrap();
         assert_eq!(stored, image_bytes + thumbnail_bytes);
+    }
+
+    fn stored_bytes(history: &History) -> i64 {
+        history
+            .store
+            .with(|c| {
+                c.query_row("SELECT bytes FROM local_clipboard_history", [], |row| {
+                    row.get(0)
+                })
+            })
+            .unwrap()
+    }
+
+    #[test]
+    fn a_large_image_gets_a_preview_that_is_counted_and_deleted_with_it() {
+        let history = history();
+        let image = png(1600, 1000);
+        let image_bytes = image.bytes() as u64;
+        history.record(image, None, Bounds::default(), 1).unwrap();
+        let entry = history.entries().unwrap().remove(0);
+        let path = entry.path.clone().unwrap();
+        let preview = preview_path(&path);
+        let thumbnail = entry.thumbnail.clone().unwrap();
+
+        assert_eq!(png_size(preview.to_str().unwrap()), (800, 500));
+        assert_eq!(png_size(&thumbnail), (384, 240));
+        let copies = std::fs::metadata(&preview).unwrap().len()
+            + std::fs::metadata(&thumbnail).unwrap().len();
+        assert_eq!(stored_bytes(&history), (image_bytes + copies) as i64);
+
+        history.remove(&entry.id).unwrap();
+        assert!(!preview.exists());
+    }
+
+    #[test]
+    fn an_image_within_the_preview_size_gets_no_preview() {
+        let history = history();
+        history
+            .record(png(800, 600), None, Bounds::default(), 1)
+            .unwrap();
+        let entry = history.entries().unwrap().remove(0);
+        assert!(!preview_path(entry.path.unwrap()).exists());
+        assert!(entry.thumbnail.is_some());
     }
 
     #[test]
@@ -778,19 +854,24 @@ mod tests {
         let dir = std::env::temp_dir().join(format!("dango-clip-{}", uuid::Uuid::new_v4()));
         let history = History::new(store.clone(), dir.clone());
         history
-            .record(png(400, 10), None, Bounds::default(), 1)
+            .record(png(1000, 10), None, Bounds::default(), 1)
             .unwrap();
         let entry = history.entries().unwrap().remove(0);
         let orphan = dir.join("orphan.png");
         std::fs::write(&orphan, [1, 2, 3]).unwrap();
         let orphan_thumbnail = dir.join("orphan.thumb.png");
         std::fs::write(&orphan_thumbnail, [1, 2, 3]).unwrap();
+        let orphan_preview = dir.join("orphan.preview.png");
+        std::fs::write(&orphan_preview, [1, 2, 3]).unwrap();
 
         History::new(store, dir);
 
         assert!(!orphan.exists());
         assert!(!orphan_thumbnail.exists());
-        assert!(Path::new(&entry.path.unwrap()).exists());
+        assert!(!orphan_preview.exists());
+        let path = entry.path.unwrap();
+        assert!(Path::new(&path).exists());
+        assert!(preview_path(&path).exists());
         assert!(Path::new(&entry.thumbnail.unwrap()).exists());
     }
 

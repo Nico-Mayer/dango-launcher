@@ -12,7 +12,7 @@
 
 ## 3. Preview file
 
-- [ ] 3.1 Write `<id>.preview.png` fitting 800 x 800 in `record` when the image is larger, make the thumbnail from it, count it in `bytes`, delete it in `remove`, `trim`, and the "file has gone" path, and keep it in the orphan sweep; verify with history tests for a large image (preview written, counted, deleted with the entry), a small one (no preview), and the sweep (`cargo test clipboard`)
+- [x] 3.1 Write `<id>.preview.png` fitting 800 x 800 in `record` when the image is larger, make the thumbnail from it, count it in `bytes`, delete it in `remove`, `trim`, and the "file has gone" path, and keep it in the orphan sweep; verify with history tests for a large image (preview written, counted, deleted with the entry), a small one (no preview), and the sweep (`cargo test clipboard`)
 - [ ] 3.2 Add the pane image choice to `Entry` (preview, else the original when the stored size fits, else the thumbnail); verify with history tests for each of the three cases, including a row with no stored size (`cargo test clipboard`)
 
 ## 4. History as a list with a detail pane
