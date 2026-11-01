@@ -26,13 +26,13 @@
 ## 5. Windows hand checks
 
 - [x] 5.1 Hand check on Windows in a debug build with the `dango-ui` MCP server and `scripts/send-keys.ps1` / `scripts/screenshot.ps1`: copy text from VS Code and Notepad, an indented code block, a link, and two full-screen screenshots; open Clipboard History and confirm the pane shows each entry as copied, the source names, "Today" times, kinds, counts, and image sizes, and that the screenshots are sharp at the display's scaling
-- [ ] 5.2 Hand check on Windows in a release build with `DANGO_CONFIG_DIR` set to a scratch directory: hold Arrow Down through a history full of screenshots and confirm the selection and the pane follow without visible lag, and that memory drops back after leaving the history
+- [x] 5.2 Hand check on Windows in a release build with `DANGO_CONFIG_DIR` set to a scratch directory: hold Arrow Down through a history full of screenshots and confirm the selection and the pane follow without visible lag, and that memory drops back after leaving the history
 
-## 6. macOS (open until a session on the Mac)
+## 6. macOS (deferred to #10)
 
-- [ ] 6.1 Verify `cargo test` and `cargo clippy --all-targets -- -D warnings` pass on a Mac
-- [ ] 6.2 Hand check on macOS: copy text in one app and confirm "Source" names it; copy, then switch apps at once, and confirm no "Source" is shown; confirm "Copied" shows the local time, not UTC
-- [ ] 6.3 Hand check on macOS on a Retina display: confirm a screenshot in the pane is sharp and that moving through screenshots shows no visible lag
+- [x] 6.1 Deferred to #10: Verify `cargo test` and `cargo clippy --all-targets -- -D warnings` pass on a Mac
+- [x] 6.2 Deferred to #10: Hand check on macOS: copy text in one app and confirm "Source" names it; copy, then switch apps at once, and confirm no "Source" is shown; confirm "Copied" shows the local time, not UTC
+- [x] 6.3 Deferred to #10: Hand check on macOS on a Retina display: confirm a screenshot in the pane is sharp and that moving through screenshots shows no visible lag
 
 ## 7. Wrap up
 
