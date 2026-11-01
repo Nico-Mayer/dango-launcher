@@ -237,6 +237,7 @@ impl Records {
         Ok(Some(keyword.to_string()))
     }
 
+    #[cfg(test)]
     pub fn create(
         &self,
         name: &str,
@@ -246,6 +247,7 @@ impl Records {
         self.save(None, name, body, keyword, None)
     }
 
+    #[cfg(test)]
     pub fn update(
         &self,
         id: &str,
