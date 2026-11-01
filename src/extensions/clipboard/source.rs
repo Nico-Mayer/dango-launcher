@@ -58,6 +58,10 @@ pub trait ClipboardSource: Send + Sync {
     /// cannot be read. Asked before any content is read, so excluded content
     /// never enters memory.
     fn formats(&self) -> Option<Vec<String>>;
+    /// The raw bytes of one named format, for flags rather than content.
+    fn buffer(&self, _format: &str) -> Option<Vec<u8>> {
+        None
+    }
     fn text(&self) -> Option<String>;
     /// The contents as encoded PNG bytes, when there is an image.
     fn image(&self) -> Option<Vec<u8>>;
@@ -146,6 +150,10 @@ impl ClipboardSource for CrateClipboard {
             busy::holds_anything,
         )
         .ok()
+    }
+
+    fn buffer(&self, format: &str) -> Option<Vec<u8>> {
+        until_free(|| self.context.get_buffer(format), busy::holds_anything).ok()
     }
 
     fn text(&self) -> Option<String> {
