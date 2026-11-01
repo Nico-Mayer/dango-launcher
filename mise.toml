@@ -33,6 +33,7 @@ run_windows = "powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/s
 [tasks.release]
 description = "Cut a release: derive version, changelog, commit, tag, push"
 run = "node scripts/release.mjs"
+interactive = true
 
 [settings]
 idiomatic_version_file_enable_tools = ["rust"]
