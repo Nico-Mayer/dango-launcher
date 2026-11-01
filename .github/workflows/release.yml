@@ -65,7 +65,7 @@ jobs:
 
       - uses: jdx/mise-action@v5
         with:
-          install_args: cargo:cargo-packager
+          install_args: rust cargo:cargo-packager
 
       # cargo-packager reads the identity only from its config, and a
       # --config replaces the Cargo.toml table instead of merging into it.
