@@ -5,11 +5,13 @@ pub mod steam;
 
 pub use steam::{Game, GameSource, SteamSource};
 
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, RwLock};
+use std::time::{Duration, Instant};
 
 use async_trait::async_trait;
 
-use crate::extension::{Extension, Manifest, NAMED_ICON};
+use crate::extension::{ActivationResult, Extension, Manifest, Service, NAMED_ICON};
 use crate::protocol::Action;
 use crate::search::{Candidate, RootProvider, Source};
 
@@ -64,10 +66,15 @@ impl GameList {
         let games = self.source.games();
         *self.games.write().unwrap() = games;
     }
+
+    fn fingerprint(&self) -> Option<u64> {
+        self.source.fingerprint()
+    }
 }
 
 pub struct GamesExtension {
     manifest: Manifest,
+    list: Arc<GameList>,
     provider: Arc<GameProvider>,
 }
 
@@ -75,7 +82,8 @@ impl GamesExtension {
     pub fn new(list: Arc<GameList>) -> Self {
         Self {
             manifest: manifest(),
-            provider: Arc::new(GameProvider(list)),
+            provider: Arc::new(GameProvider(list.clone())),
+            list,
         }
     }
 }
@@ -83,6 +91,13 @@ impl GamesExtension {
 impl Extension for GamesExtension {
     fn manifest(&self) -> &Manifest {
         &self.manifest
+    }
+
+    fn services(&self) -> Vec<Arc<dyn Service>> {
+        vec![Arc::new(RefreshService {
+            list: self.list.clone(),
+            running: Arc::new(AtomicBool::new(false)),
+        })]
     }
 
     fn root_provider(&self) -> Option<Arc<dyn RootProvider>> {
@@ -126,6 +141,53 @@ fn open() -> Action {
 
 fn fallback_icon() -> String {
     format!("{NAMED_ICON}{FALLBACK_ICON}")
+}
+
+/// The longest the list may go without a read, for a change the fingerprint
+/// misses.
+const REFRESH_INTERVAL: Duration = Duration::from_secs(180);
+
+const TICK: Duration = Duration::from_millis(200);
+
+/// Steam writes the manifest before it finishes the files around it.
+const SETTLE: Duration = Duration::from_secs(1);
+
+/// Reads the list off the activation path, then again whenever the library
+/// folders change or the sweep is due.
+struct RefreshService {
+    list: Arc<GameList>,
+    running: Arc<AtomicBool>,
+}
+
+impl Service for RefreshService {
+    fn start(&self) -> ActivationResult {
+        self.running.store(true, Ordering::SeqCst);
+        let list = self.list.clone();
+        let running = self.running.clone();
+        std::thread::spawn(move || {
+            while running.load(Ordering::SeqCst) {
+                list.reload();
+                wait_for_refresh(&list, &running);
+            }
+        });
+        Ok(())
+    }
+
+    fn stop(&self) {
+        self.running.store(false, Ordering::SeqCst);
+    }
+}
+
+fn wait_for_refresh(list: &GameList, running: &AtomicBool) {
+    let baseline = list.fingerprint();
+    let started = Instant::now();
+    while running.load(Ordering::SeqCst) && started.elapsed() < REFRESH_INTERVAL {
+        std::thread::sleep(TICK);
+        if baseline.is_some() && list.fingerprint() != baseline {
+            std::thread::sleep(SETTLE);
+            return;
+        }
+    }
 }
 
 #[cfg(test)]
@@ -208,6 +270,25 @@ mod tests {
         assert_eq!(items[0].subtitle.as_deref(), Some("Steam"));
         assert_eq!(items[0].icon.as_deref(), Some("/cache/1091500/icon.jpg"));
         assert_eq!(items[0].actions[0].title, "Open");
+    }
+
+    #[test]
+    fn the_service_reads_again_when_the_library_changes() {
+        let source = FakeSource::with(&[(1, "Brawlhalla")]);
+        let list = GameList::new(source.clone());
+        let service = &GamesExtension::new(list.clone()).services()[0];
+        service.start().unwrap();
+        let read = |count: usize| {
+            let deadline = Instant::now() + Duration::from_secs(5);
+            while list.snapshot().len() != count && Instant::now() < deadline {
+                std::thread::sleep(Duration::from_millis(20));
+            }
+            list.snapshot().len() == count
+        };
+        assert!(read(1));
+        source.set(&[(1, "Brawlhalla"), (2, "Cyberpunk 2077")]);
+        assert!(read(2));
+        service.stop();
     }
 
     #[tokio::test]
