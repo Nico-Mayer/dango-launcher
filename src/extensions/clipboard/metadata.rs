@@ -32,8 +32,21 @@ fn is_link(text: &str) -> bool {
     url::Url::parse(text).is_ok_and(|url| matches!(url.scheme(), "http" | "https"))
 }
 
+/// A letter in the last label keeps a package version such as
+/// `lodash@4.17.21` from reading as an address.
 fn is_email(text: &str) -> bool {
-    !text.starts_with("mailto:") && email_address::EmailAddress::is_valid(text)
+    use email_address::{EmailAddress, Options};
+
+    !text.starts_with("mailto:")
+        && EmailAddress::parse_with_options(text, Options::default().with_required_tld()).is_ok_and(
+            |address| {
+                address
+                    .domain()
+                    .rsplit('.')
+                    .next()
+                    .is_some_and(|tld| tld.chars().any(|c| c.is_ascii_alphabetic()))
+            },
+        )
 }
 
 fn is_hex_colour(text: &str) -> bool {
@@ -90,6 +103,8 @@ mod tests {
     fn an_address_is_an_email_address() {
         assert_eq!(text_kind("someone@example.com"), "Email address");
         assert_eq!(text_kind("mailto:someone@example.com"), "Text");
+        assert_eq!(text_kind("user@host"), "Text");
+        assert_eq!(text_kind("lodash@4.17.21"), "Text");
     }
 
     #[test]
