@@ -2,6 +2,24 @@
 
 All notable changes to Dango. Generated from commit history at release time.
 
+## [3.0.3] - 2026-11-01
+
+### Fixes
+
+- **macos:** Tie the login item to the Dango bundle
+
+### Documentation
+
+- Record CI mise and tag cache facts
+
+### Maintenance
+
+- Stop mise run installing every tool
+- Drop the Rust cache from releases
+- Cancel superseded CI runs
+- Skip CI for docs-only pushes
+- Save no mise cache from releases
+- Run CI for docs changes
 ## [3.0.2] - 2026-11-01
 
 ### Fixes
