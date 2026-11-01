@@ -59,6 +59,19 @@ pub fn watch_focus_loss(lost: Box<dyn Fn()>) {
     drop(lost);
 }
 
+/// Calls `reopened` when the user opens Dango again from Finder or the Dock.
+/// Main thread only, and once.
+///
+/// macOS does not start a second process for a running app: it sends the
+/// running one a reopen Apple event. Windows starts a second process, which
+/// the single instance socket handles.
+pub fn watch_reopen(reopened: Box<dyn Fn()>) {
+    #[cfg(target_os = "macos")]
+    macos::watch_reopen(reopened);
+    #[cfg(target_os = "windows")]
+    drop(reopened);
+}
+
 /// Whether work meant for the main thread runs inline here. Only macOS, where
 /// AppKit work from another thread aborts, checks the thread; Windows always
 /// queues it.

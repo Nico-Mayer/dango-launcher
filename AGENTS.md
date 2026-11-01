@@ -335,6 +335,10 @@ load and are not reliable.
   lands in the working directory: `/` and read-only for an app opened from
   Finder or at login, where Dango then exits silently. The lock lives in the
   data dir (`platform::instance_lock`).
+- Opening a running app from Finder or the Dock starts no second process on
+  macOS: the running one gets a reopen Apple event (`aevt`/`rapp`), handled
+  by `platform::watch_reopen`. Only a launch from the shell reaches the
+  single instance socket.
 - On macOS the updater swaps the bundle in place and returns. Dango then
   releases its single instance lock and starts the bundle again with
   `open -n`. On Windows the NSIS installer exits Dango and starts it again.
