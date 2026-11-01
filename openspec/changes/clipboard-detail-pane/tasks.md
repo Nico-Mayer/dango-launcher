@@ -7,7 +7,7 @@
 ## 2. Record source and image size
 
 - [x] 2.1 Add migration `0008` with nullable `source`, `width`, and `height` columns on `local_clipboard_history`; verify with a store test that the migration applies to a database at `0007` (`cargo test store`)
-- [ ] 2.2 Ask `candidate_applications` once per change in `Watcher::handle_change`, use the answer for the exclusion check, and pass the single candidate (or none) to `History::record`; verify with watcher tests that one candidate is stored, several store none, and excluded content still records nothing (`cargo test clipboard`)
+- [x] 2.2 Ask `candidate_applications` once per change in `Watcher::handle_change`, use the answer for the exclusion check, and pass the single candidate (or none) to `History::record`; verify with watcher tests that one candidate is stored, several store none, and excluded content still records nothing (`cargo test clipboard`)
 - [ ] 2.3 Store `width` and `height` in `record`, and make `touch` update `source` with `copied_at`; verify with history tests that a re-copy from another application updates source and time, and an image row has its size (`cargo test clipboard`)
 
 ## 3. Preview file

@@ -61,6 +61,8 @@ pub struct Entry {
     pub path: Option<String>,
     /// A small copy of the image for listing, when one was made.
     pub thumbnail: Option<String>,
+    /// The application it was copied from, when exactly one could have.
+    pub source: Option<String>,
     pub copied_at: i64,
 }
 
@@ -173,7 +175,13 @@ impl History {
 
     /// Records what was copied and trims the history back inside its bounds.
     /// Already-present content is moved to newest rather than added again.
-    pub fn record(&self, content: Content, bounds: Bounds, now: i64) -> Result<(), HistoryError> {
+    pub fn record(
+        &self,
+        content: Content,
+        source: Option<&str>,
+        bounds: Bounds,
+        now: i64,
+    ) -> Result<(), HistoryError> {
         let bytes = content.bytes();
         // An entry that cannot fit the whole budget is refused rather than
         // recorded: trimming discards oldest first until it fits, and for
@@ -207,8 +215,8 @@ impl History {
         self.store.with(|c| {
             c.execute(
                 "INSERT INTO local_clipboard_history \
-                 (entry_id, kind, text, path, bytes, fingerprint, copied_at) \
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+                 (entry_id, kind, text, path, bytes, fingerprint, copied_at, source) \
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
                 rusqlite::params![
                     id,
                     kind.as_str(),
@@ -216,7 +224,8 @@ impl History {
                     path,
                     bytes as i64,
                     fingerprint,
-                    now
+                    now,
+                    source
                 ],
             )?;
             Ok(())
@@ -229,7 +238,7 @@ impl History {
     pub fn entries(&self) -> Result<Vec<Entry>, HistoryError> {
         let entries = self.store.with(|c| {
             let mut stmt = c.prepare(&format!(
-                "SELECT entry_id, kind, substr(text, 1, {LISTED_CHARS}), path, copied_at \
+                "SELECT entry_id, kind, substr(text, 1, {LISTED_CHARS}), path, copied_at, source \
                  FROM local_clipboard_history ORDER BY copied_at DESC, rowid DESC"
             ))?;
             let rows = stmt.query_map([], entry)?;
@@ -241,7 +250,7 @@ impl History {
     pub fn get(&self, id: &str) -> Result<Entry, HistoryError> {
         let found = self.store.with(|c| {
             c.query_row(
-                "SELECT entry_id, kind, text, path, copied_at FROM local_clipboard_history \
+                "SELECT entry_id, kind, text, path, copied_at, source FROM local_clipboard_history \
                  WHERE entry_id = ?1",
                 [id],
                 entry,
@@ -351,6 +360,7 @@ fn entry(row: &rusqlite::Row) -> rusqlite::Result<Entry> {
         text: row.get(2)?,
         path,
         thumbnail,
+        source: row.get(5)?,
         copied_at: row.get(4)?,
     })
 }
@@ -443,7 +453,9 @@ mod tests {
     #[test]
     fn a_text_entry_is_recorded_and_read_back() {
         let history = history();
-        history.record(text("hello"), Bounds::default(), 1).unwrap();
+        history
+            .record(text("hello"), None, Bounds::default(), 1)
+            .unwrap();
         let entries = history.entries().unwrap();
         assert_eq!(entries.len(), 1);
         assert_eq!(entries[0].kind, Kind::Text);
@@ -454,16 +466,24 @@ mod tests {
     #[test]
     fn entries_come_back_newest_first() {
         let history = history();
-        history.record(text("one"), Bounds::default(), 1).unwrap();
-        history.record(text("two"), Bounds::default(), 2).unwrap();
-        history.record(text("three"), Bounds::default(), 3).unwrap();
+        history
+            .record(text("one"), None, Bounds::default(), 1)
+            .unwrap();
+        history
+            .record(text("two"), None, Bounds::default(), 2)
+            .unwrap();
+        history
+            .record(text("three"), None, Bounds::default(), 3)
+            .unwrap();
         assert_eq!(titles(&history), ["three", "two", "one"]);
     }
 
     #[test]
     fn an_image_entry_is_a_file_and_a_row() {
         let history = history();
-        history.record(image(64), Bounds::default(), 1).unwrap();
+        history
+            .record(image(64), None, Bounds::default(), 1)
+            .unwrap();
         let entries = history.entries().unwrap();
         assert_eq!(entries[0].kind, Kind::Image);
         let path = entries[0].path.clone().expect("an image has a path");
@@ -475,7 +495,7 @@ mod tests {
     fn an_image_entry_has_a_thumbnail_that_keeps_its_aspect_ratio() {
         let history = history();
         history
-            .record(png(1600, 900), Bounds::default(), 1)
+            .record(png(1600, 900), None, Bounds::default(), 1)
             .unwrap();
         let entry = history.entries().unwrap().remove(0);
 
@@ -487,7 +507,9 @@ mod tests {
     #[test]
     fn an_image_within_the_thumbnail_size_gets_no_thumbnail() {
         let history = history();
-        history.record(png(384, 20), Bounds::default(), 1).unwrap();
+        history
+            .record(png(384, 20), None, Bounds::default(), 1)
+            .unwrap();
         assert!(history.entries().unwrap()[0].thumbnail.is_none());
     }
 
@@ -496,7 +518,7 @@ mod tests {
         let history = history();
         let image = png(800, 800);
         let image_bytes = image.bytes() as i64;
-        history.record(image, Bounds::default(), 1).unwrap();
+        history.record(image, None, Bounds::default(), 1).unwrap();
         let entry = history.entries().unwrap().remove(0);
         let thumbnail_bytes = std::fs::metadata(entry.thumbnail.unwrap()).unwrap().len() as i64;
 
@@ -514,7 +536,9 @@ mod tests {
     #[test]
     fn an_image_that_does_not_decode_is_recorded_without_a_thumbnail() {
         let history = history();
-        history.record(image(64), Bounds::default(), 1).unwrap();
+        history
+            .record(image(64), None, Bounds::default(), 1)
+            .unwrap();
         let entry = history.entries().unwrap().remove(0);
         assert!(entry.path.is_some());
         assert!(entry.thumbnail.is_none());
@@ -523,7 +547,9 @@ mod tests {
     #[test]
     fn an_entry_whose_thumbnail_file_is_missing_reports_none() {
         let history = history();
-        history.record(png(400, 10), Bounds::default(), 1).unwrap();
+        history
+            .record(png(400, 10), None, Bounds::default(), 1)
+            .unwrap();
         let thumbnail = history.entries().unwrap()[0].thumbnail.clone().unwrap();
         std::fs::remove_file(thumbnail).unwrap();
 
@@ -533,9 +559,15 @@ mod tests {
     #[test]
     fn copying_the_same_thing_twice_reorders_instead_of_duplicating() {
         let history = history();
-        history.record(text("one"), Bounds::default(), 1).unwrap();
-        history.record(text("two"), Bounds::default(), 2).unwrap();
-        history.record(text("one"), Bounds::default(), 3).unwrap();
+        history
+            .record(text("one"), None, Bounds::default(), 1)
+            .unwrap();
+        history
+            .record(text("two"), None, Bounds::default(), 2)
+            .unwrap();
+        history
+            .record(text("one"), None, Bounds::default(), 3)
+            .unwrap();
 
         assert_eq!(titles(&history), ["one", "two"]);
         assert_eq!(history.entries().unwrap().len(), 2);
@@ -550,7 +582,7 @@ mod tests {
         };
         for (index, value) in ["a", "b", "c", "d", "e"].iter().enumerate() {
             history
-                .record(text(value), bounds, index as i64 + 1)
+                .record(text(value), None, bounds, index as i64 + 1)
                 .unwrap();
         }
         assert_eq!(titles(&history), ["e", "d", "c"]);
@@ -565,7 +597,7 @@ mod tests {
         };
         for index in 0..4u8 {
             history
-                .record(distinct_image(index, 100), bounds, index as i64 + 1)
+                .record(distinct_image(index, 100), None, bounds, index as i64 + 1)
                 .unwrap();
         }
         assert_eq!(
@@ -578,13 +610,15 @@ mod tests {
     #[test]
     fn an_item_over_the_per_entry_ceiling_is_refused() {
         let history = history();
-        history.record(text("kept"), Bounds::default(), 1).unwrap();
+        history
+            .record(text("kept"), None, Bounds::default(), 1)
+            .unwrap();
         let bounds = Bounds {
             entry_bytes: 10,
             ..Bounds::default()
         };
 
-        let error = history.record(image(4096), bounds, 2).unwrap_err();
+        let error = history.record(image(4096), None, bounds, 2).unwrap_err();
         assert!(matches!(error, HistoryError::TooLarge));
         assert_eq!(
             titles(&history),
@@ -600,10 +634,12 @@ mod tests {
             total_bytes: 500,
             ..Bounds::default()
         };
-        history.record(text("worth keeping"), bounds, 1).unwrap();
+        history
+            .record(text("worth keeping"), None, bounds, 1)
+            .unwrap();
 
         let error = history
-            .record(distinct_image(9, 4096), bounds, 2)
+            .record(distinct_image(9, 4096), None, bounds, 2)
             .unwrap_err();
         assert!(matches!(error, HistoryError::TooLarge));
         assert_eq!(
@@ -620,12 +656,12 @@ mod tests {
             entries: 1,
             ..Bounds::default()
         };
-        history.record(png(400, 10), bounds, 1).unwrap();
+        history.record(png(400, 10), None, bounds, 1).unwrap();
         let entry = history.entries().unwrap().remove(0);
         let path = entry.path.unwrap();
         let thumbnail = entry.thumbnail.unwrap();
 
-        history.record(png(400, 20), bounds, 2).unwrap();
+        history.record(png(400, 20), None, bounds, 2).unwrap();
         assert!(
             !Path::new(&path).exists(),
             "the discarded image must not stay on disk"
@@ -636,7 +672,9 @@ mod tests {
     #[test]
     fn removing_an_entry_deletes_its_file_too() {
         let history = history();
-        history.record(png(400, 10), Bounds::default(), 1).unwrap();
+        history
+            .record(png(400, 10), None, Bounds::default(), 1)
+            .unwrap();
         let entry = history.entries().unwrap().remove(0);
         let path = entry.path.clone().unwrap();
         let thumbnail = entry.thumbnail.clone().unwrap();
@@ -650,7 +688,9 @@ mod tests {
     #[test]
     fn an_entry_whose_file_has_gone_is_reported_and_removed() {
         let history = history();
-        history.record(image(32), Bounds::default(), 1).unwrap();
+        history
+            .record(image(32), None, Bounds::default(), 1)
+            .unwrap();
         let entry = history.entries().unwrap().remove(0);
         std::fs::remove_file(entry.path.as_deref().unwrap()).unwrap();
 
@@ -665,8 +705,12 @@ mod tests {
     #[test]
     fn content_comes_back_as_it_went_in() {
         let history = history();
-        history.record(text("hello"), Bounds::default(), 1).unwrap();
-        history.record(image(16), Bounds::default(), 2).unwrap();
+        history
+            .record(text("hello"), None, Bounds::default(), 1)
+            .unwrap();
+        history
+            .record(image(16), None, Bounds::default(), 2)
+            .unwrap();
         let entries = history.entries().unwrap();
 
         assert_eq!(history.content(&entries[1].id).unwrap(), text("hello"));
@@ -678,7 +722,9 @@ mod tests {
         let store = Arc::new(Store::in_memory().unwrap());
         let dir = std::env::temp_dir().join(format!("dango-clip-{}", uuid::Uuid::new_v4()));
         let history = History::new(store.clone(), dir.clone());
-        history.record(png(400, 10), Bounds::default(), 1).unwrap();
+        history
+            .record(png(400, 10), None, Bounds::default(), 1)
+            .unwrap();
         let entry = history.entries().unwrap().remove(0);
         let orphan = dir.join("orphan.png");
         std::fs::write(&orphan, [1, 2, 3]).unwrap();
@@ -702,7 +748,9 @@ mod tests {
     fn the_list_holds_a_preview_and_the_content_is_whole() {
         let history = history();
         let long = "x".repeat(LISTED_CHARS + 10);
-        history.record(text(&long), Bounds::default(), 1).unwrap();
+        history
+            .record(text(&long), None, Bounds::default(), 1)
+            .unwrap();
         let entry = history.entries().unwrap().remove(0);
 
         assert_eq!(entry.text.unwrap().len(), LISTED_CHARS);

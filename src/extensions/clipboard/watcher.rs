@@ -117,7 +117,11 @@ impl Watcher {
             return false;
         }
         // Both checks run before a single byte of content is read.
-        if self.is_marked_excluded() || self.copied_from_excluded_application() {
+        if self.is_marked_excluded() {
+            return false;
+        }
+        let candidates = self.attribution.candidate_applications();
+        if self.copied_from_excluded_application(&candidates) {
             return false;
         }
         let Some(content) = self.read() else {
@@ -126,7 +130,16 @@ impl Watcher {
         if self.was_ours(&content) {
             return false;
         }
-        match self.history.record(content, self.policy.bounds(), now) {
+        // Several candidates means a guess, and a wrong source is worse than
+        // none.
+        let source = match candidates.as_slice() {
+            [only] => Some(only.as_str()),
+            _ => None,
+        };
+        match self
+            .history
+            .record(content, source, self.policy.bounds(), now)
+        {
             Ok(()) => true,
             Err(error) => {
                 crate::log::append(&format!("could not record what was copied: {error}"));
@@ -157,19 +170,13 @@ impl Watcher {
     /// Any candidate being excluded is enough. Deliberately asymmetric: this
     /// will sometimes decline to record something it could have kept, which is
     /// a nuisance, rather than keep a password, which is a liability.
-    fn copied_from_excluded_application(&self) -> bool {
+    fn copied_from_excluded_application(&self, candidates: &[String]) -> bool {
         let excluded = self.policy.excluded_applications();
-        if excluded.is_empty() {
-            return false;
-        }
-        self.attribution
-            .candidate_applications()
-            .iter()
-            .any(|name| {
-                excluded
-                    .iter()
-                    .any(|candidate| candidate.eq_ignore_ascii_case(name))
-            })
+        candidates.iter().any(|name| {
+            excluded
+                .iter()
+                .any(|candidate| candidate.eq_ignore_ascii_case(name))
+        })
     }
 
     /// Declares a write Dango is about to make, so the change it causes is not
@@ -638,6 +645,35 @@ mod tests {
 
         assert!(f.watcher.handle_change(1));
         assert_eq!(texts(&f.history), ["something ordinary"]);
+    }
+
+    fn sources(history: &History) -> Vec<Option<String>> {
+        history
+            .entries()
+            .unwrap()
+            .into_iter()
+            .map(|e| e.source)
+            .collect()
+    }
+
+    #[test]
+    fn the_one_candidate_is_stored_as_the_source() {
+        let f = setup();
+        f.attribution.from("Notes");
+        f.clipboard.copy_text("hello");
+
+        assert!(f.watcher.handle_change(1));
+        assert_eq!(sources(&f.history), [Some("Notes".to_string())]);
+    }
+
+    #[test]
+    fn several_candidates_store_no_source() {
+        let f = setup();
+        f.attribution.copied_in_then_switched_to("Notes", "Ghostty");
+        f.clipboard.copy_text("hello");
+
+        assert!(f.watcher.handle_change(1));
+        assert_eq!(sources(&f.history), [None]);
     }
 
     #[test]

@@ -484,7 +484,7 @@ mod tests {
 
     fn record_text(history: &History, text: &str) -> String {
         history
-            .record(Content::Text(text.into()), Bounds::default(), 1)
+            .record(Content::Text(text.into()), None, Bounds::default(), 1)
             .unwrap();
         history.entries().unwrap()[0].id.clone()
     }
@@ -571,10 +571,10 @@ mod tests {
     fn the_history_lists_newest_first() {
         let (extension, history, _) = setup();
         history
-            .record(Content::Text("one".into()), Bounds::default(), 1)
+            .record(Content::Text("one".into()), None, Bounds::default(), 1)
             .unwrap();
         history
-            .record(Content::Text("two".into()), Bounds::default(), 2)
+            .record(Content::Text("two".into()), None, Bounds::default(), 2)
             .unwrap();
 
         let tree = extension.list();
@@ -614,7 +614,7 @@ mod tests {
         let (extension, history, _) = setup();
         let png = std::fs::read(concat!(env!("CARGO_MANIFEST_DIR"), "/icons/icon.png")).unwrap();
         history
-            .record(Content::Image(png), Bounds::default(), 1)
+            .record(Content::Image(png), None, Bounds::default(), 1)
             .unwrap();
 
         let tree = extension.list();
@@ -628,7 +628,7 @@ mod tests {
     fn an_image_entry_without_a_thumbnail_shows_the_full_image() {
         let (extension, history, _) = setup();
         history
-            .record(Content::Image(vec![1, 2, 3]), Bounds::default(), 1)
+            .record(Content::Image(vec![1, 2, 3]), None, Bounds::default(), 1)
             .unwrap();
 
         let tree = extension.list();
@@ -697,7 +697,7 @@ mod tests {
     fn pasting_an_image_entry_hands_the_image_to_the_target() {
         let f = build(Some(Arc::new(FakeTarget::default())));
         f.history
-            .record(Content::Image(vec![9, 9, 9]), Bounds::default(), 1)
+            .record(Content::Image(vec![9, 9, 9]), None, Bounds::default(), 1)
             .unwrap();
         let id = f.history.entries().unwrap()[0].id.clone();
 
@@ -754,7 +754,7 @@ mod tests {
     fn choosing_a_text_entry_puts_it_back_on_the_clipboard() {
         let (extension, history, clipboard) = setup();
         history
-            .record(Content::Text("hello".into()), Bounds::default(), 1)
+            .record(Content::Text("hello".into()), None, Bounds::default(), 1)
             .unwrap();
         let id = history.entries().unwrap()[0].id.clone();
 
@@ -772,7 +772,7 @@ mod tests {
     fn choosing_an_image_entry_puts_it_back_on_the_clipboard() {
         let (extension, history, clipboard) = setup();
         history
-            .record(Content::Image(vec![9, 9, 9]), Bounds::default(), 1)
+            .record(Content::Image(vec![9, 9, 9]), None, Bounds::default(), 1)
             .unwrap();
         let id = history.entries().unwrap()[0].id.clone();
 
@@ -790,10 +790,10 @@ mod tests {
     fn removing_an_entry_hands_back_the_list_without_it() {
         let (extension, history, _) = setup();
         history
-            .record(Content::Text("one".into()), Bounds::default(), 1)
+            .record(Content::Text("one".into()), None, Bounds::default(), 1)
             .unwrap();
         history
-            .record(Content::Text("two".into()), Bounds::default(), 2)
+            .record(Content::Text("two".into()), None, Bounds::default(), 2)
             .unwrap();
         let id = history.entries().unwrap()[0].id.clone();
 
@@ -831,7 +831,7 @@ mod tests {
     fn an_image_entry_whose_file_has_gone_is_reported_and_dropped() {
         let (extension, history, _) = setup();
         history
-            .record(Content::Image(vec![4, 5]), Bounds::default(), 1)
+            .record(Content::Image(vec![4, 5]), None, Bounds::default(), 1)
             .unwrap();
         let entry = history.entries().unwrap().remove(0);
         std::fs::remove_file(entry.path.as_deref().unwrap()).unwrap();
