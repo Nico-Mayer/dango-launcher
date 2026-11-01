@@ -82,6 +82,19 @@ pub fn runs_inline_on_main_thread() -> bool {
     return false;
 }
 
+/// Where `auto-launch` writes the login entry for `app_name`, for messages.
+pub fn login_entry(app_name: &str) -> String {
+    #[cfg(target_os = "windows")]
+    return format!(r"HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Run\{app_name}");
+    #[cfg(target_os = "macos")]
+    return dirs::home_dir()
+        .unwrap_or_default()
+        .join("Library/LaunchAgents")
+        .join(format!("{app_name}.plist"))
+        .display()
+        .to_string();
+}
+
 /// What `single-instance` locks on. Windows takes a mutex name; macOS takes a
 /// file path and resolves a bare name against the working directory, which
 /// is the read-only `/` for an app opened from Finder or at login.

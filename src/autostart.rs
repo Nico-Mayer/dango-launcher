@@ -37,11 +37,17 @@ fn entry() -> Result<AutoLaunch, String> {
 }
 
 fn enable_failure(error: &dyn std::fmt::Display) -> String {
-    format!("autostart: could not register Dango to start at login: {error}")
+    format!(
+        "autostart: could not register Dango to start at login ({}): {error}",
+        crate::platform::login_entry(APP_NAME)
+    )
 }
 
 fn disable_failure(error: &dyn std::fmt::Display) -> String {
-    format!("autostart: could not remove the login entry: {error}")
+    format!(
+        "autostart: could not remove the login entry ({}): {error}",
+        crate::platform::login_entry(APP_NAME)
+    )
 }
 
 #[cfg(test)]
