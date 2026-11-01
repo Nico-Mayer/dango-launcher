@@ -53,7 +53,8 @@ pub struct Config {
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub extensions: BTreeMap<String, Extension>,
     /// A physical key remapped to act as the hyper modifier system-wide.
-    /// Present means on; leave it out to turn it off.
+    /// Present means on; leave it out to turn it off. On macOS it uses F18,
+    /// so a hotkey with `f18` does not work while it is on.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub hyperkey: Option<Hyperkey>,
     /// How Dango reads the text you have selected.
