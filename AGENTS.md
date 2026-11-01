@@ -198,6 +198,10 @@ load and are not reliable.
 - Windows reports AltGr as left Ctrl plus right Alt, so a chord check must
   look at `VK_RMENU` before treating Ctrl+Alt as a shortcut, or every AltGr
   character (`@`, `{`, `\` on a German layout) reads as one.
+- `open::with` and `open::with_detached` on Windows look a bare app name up
+  under App Paths but can keep a trailing NUL (5.4.5), so `Command` refuses
+  the path. Pass a full exe path; the browser opener reads it with
+  `windows-registry` in `platform/windows/browser.rs`.
 - A non-elevated process cannot hook or manage elevated windows on Windows.
   Accept the limit.
 - On Windows, `WS_EX_TOOLWINDOW` is re-applied after each show: tao rewrote

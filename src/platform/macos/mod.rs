@@ -12,7 +12,7 @@ mod text;
 mod window;
 
 pub use apps::MacAppIndexer;
-pub use browser::browser_app;
+pub use browser::{browser_app, browser_target};
 pub use clipboard::MacAttribution;
 pub use hyperkey::MacHyperkey;
 pub use icons::icon_for;

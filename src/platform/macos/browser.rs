@@ -10,3 +10,8 @@ pub fn browser_app(browser: Browser) -> Option<&'static str> {
         Browser::Safari => Some("Safari"),
     }
 }
+
+/// `open -a` finds the app by name itself, and fails when there is none.
+pub fn browser_target(app: &str) -> Option<String> {
+    Some(app.to_string())
+}

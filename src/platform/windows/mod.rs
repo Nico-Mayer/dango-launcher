@@ -10,7 +10,7 @@ mod text;
 mod window;
 
 pub use apps::{icon_for, WindowsAppIndexer};
-pub use browser::browser_app;
+pub use browser::{browser_app, browser_target};
 pub use clipboard::{
     clipboard_holds_anything, clipboard_holds_image, clipboard_holds_text, WindowsAttribution,
 };

@@ -14,7 +14,11 @@ impl snippets::OpenUrl for SystemOpener {
 
     fn open_in(&self, url: &str, browser: Option<&str>) -> Result<(), String> {
         if let Some(app) = app_for(browser) {
-            match open::with_detached(url, app) {
+            let opened = match crate::platform::browser_target(app) {
+                Some(target) => open::with_detached(url, target).map_err(|e| e.to_string()),
+                None => Err("it is not installed".into()),
+            };
+            match opened {
                 Ok(()) => return Ok(()),
                 Err(error) => crate::log::append(&format!(
                     "{app} did not open {url}, using the default browser: {error}"

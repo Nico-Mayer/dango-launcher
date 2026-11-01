@@ -24,15 +24,26 @@ protocol already has a dropdown field with options.
 ### Open with the `open` crate's `with_detached`, fall back to `that_detached`
 
 `open::with_detached(url, app)` is already in the dependency tree, and it
-reports a missing browser as an error on both platforms:
+reports a browser that does not start as an error on both platforms:
 
-- Windows: the app name is looked up in the registry's App Paths keys (HKCU,
-  then HKLM), then started. A name it cannot find fails to spawn. On the
+- Windows: Dango reads the browser's exe path from the registry's App Paths
+  keys (HKCU, then HKLM) with `windows-registry`, and passes that full path. No
+  entry means the browser is not installed, and nothing is started. On the
   author's machine `firefox.exe`, `msedge.exe`, and `brave.exe` are registered
   there. Chrome registers `chrome.exe` there too, which still needs a check on a
   machine that has it.
 - macOS: it runs `open -a "<App>" -- <url>` and waits for the exit code, which
   is not zero when no app has that name.
+
+`open` does its own App Paths lookup when given a bare name, but in 5.4.4 and
+5.4.5 (the latest) it sizes the buffer from the first `RegGetValueW` call and
+strips only one trailing NUL. A padded value keeps a NUL, and `Command` refuses
+the path ("strings passed to WinAPI cannot contain NULs"), so every named browser
+fell back in the hand check. Given a path with a backslash, `open` skips the
+lookup. `windows-registry` 0.6 was already in `Cargo.lock` through another crate
+and trims the NULs, so it becomes a direct Windows dependency with no new
+download. Once `open` is fixed upstream, passing the bare name works again, but
+nothing forces that change.
 
 On an error, the opener calls `open::that_detached(url)`, as today. Only when
 that also fails does the quicklink show the existing failure message.
@@ -41,6 +52,10 @@ Rejected:
 
 - `webbrowser` crate: its `Browser` enum has no Edge or Brave, and on Windows it
   supports only `Browser::Default` (checked in 1.2.6, `src/windows.rs`).
+- `open`'s `shellexecute-on-windows` feature, which lets Windows resolve App
+  Paths: it changes every open in the app, not only quicklinks, and calls
+  `ShellExecuteExW` without `SEE_MASK_FLAG_NO_UI`, so a missing browser could
+  show a Windows error dialog instead of falling back silently.
 - Our own `ShellExecuteExW` on Windows, or `NSWorkspace` with bundle ids on
   macOS: they do the same job as the `open` crate with more code. Bundle ids
   would survive a renamed `.app`, but the five browsers keep their names.
@@ -53,7 +68,8 @@ Rejected:
 id (`chrome`, `edge`, `firefox`, `brave`, `safari`) and its title. The app name
 for each browser comes from one function in `platform/windows` and
 `platform/macos`, returning `None` where the platform has no such browser
-(Safari on Windows). That keeps `cfg` out of the quicklinks extension, as
+(Safari on Windows). A second function turns that name into what `open` is
+given: the App Paths exe path on Windows, the name itself on macOS. That keeps `cfg` out of the quicklinks extension, as
 AGENTS.md asks.
 
 | id      | Windows       | macOS            |

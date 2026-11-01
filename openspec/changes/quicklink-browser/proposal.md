@@ -50,5 +50,7 @@ None.
 - `src/opener.rs`: open a URL in a named browser and fall back.
 - `src/platform/windows`, `src/platform/macos`: each platform's app name per
   browser.
-- No new dependency: the `open` crate already has `with_detached`.
+- `open` crate's `with_detached` opens the browser. `windows-registry`, already
+  in `Cargo.lock`, becomes a direct Windows dependency to read the browser's
+  path (see design.md).
 - `quicklinks.json`: a new optional field. Old files load unchanged.
