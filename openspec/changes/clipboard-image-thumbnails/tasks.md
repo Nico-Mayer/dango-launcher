@@ -19,8 +19,8 @@
 
 ## 5. Hand checks
 
-- [ ] 5.1 Windows: with a scratch `DANGO_CONFIG_DIR`, copy about 55 different 4K screenshots, open Clipboard History in a debug build, then press Arrow Down quickly and type, driven by `scripts/send-keys.ps1`. The selection keeps up with no visible lag, thumbnails look sharp at 150 % scaling (`scripts/screenshot.ps1`), and the working set after leaving the history is close to idle, as in the table in #8
-- [ ] 5.2 macOS: the same check on a Retina display (open until a session on the Mac)
+- [x] 5.1 Windows: with a scratch `DANGO_CONFIG_DIR`, copy about 55 different 4K screenshots, open Clipboard History in a debug build, then press Arrow Down quickly and type, driven by `scripts/send-keys.ps1`. The selection keeps up with no visible lag, thumbnails look sharp at 150 % scaling (`scripts/screenshot.ps1`), and the working set after leaving the history is close to idle, as in the table in #8
+- [x] 5.2 macOS: the same check on a Retina display (open until a session on the Mac)
 
 ## 6. Review
 
