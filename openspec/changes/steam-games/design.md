@@ -110,11 +110,14 @@ options, DRM, and overlay, and the executable is not in the manifest.
 
 ### Icons and cover art come from the library cache, read lazily
 
-- Root result icon: the `<sha1>.jpg` in `librarycache/<appid>/` that is not
-  one of the named files. Steam names the icon by hash, so pick the single
-  remaining `.jpg`. Missing: `icon:gamepad-2`.
-- Grid tile: `library_600x900.jpg`, as an image path. Missing:
-  `icon:gamepad-2`.
+- Root result icon: the `<sha1>.jpg` directly in `librarycache/<appid>/`.
+  Steam names the icon by hash, so pick the `.jpg` whose stem is 40 hex
+  digits. Missing: `icon:gamepad-2`.
+- Grid tile: `library_600x900.jpg` or `library_capsule.jpg`, directly in
+  `librarycache/<appid>/` or in one of its hash-named subfolders, as an image
+  path. Newer Steam clients write the cover into a subfolder, and some name it
+  `library_capsule.jpg`; on the author's machine 6 of 13 games have only
+  those. Both are the same 2/3 portrait capsule. Missing: `icon:gamepad-2`.
 
 Both are image paths given straight to the view, so no extraction or icon
 cache is needed. Slint builds with `image-default-formats`, which loads JPEG.
