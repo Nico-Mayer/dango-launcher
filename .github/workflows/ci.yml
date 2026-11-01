@@ -24,17 +24,17 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          components: clippy, rustfmt
+      - name: Install Rust
+        run: rustup toolchain install --no-self-update
 
       - uses: swatinem/rust-cache@v2
 
-      - name: Check formatting
-        run: cargo fmt --check
+      - uses: jdx/mise-action@v5
+        with:
+          install_args: hk
 
-      - name: Clippy
-        run: cargo clippy --all-targets -- -D warnings
+      - name: Check
+        run: mise run check
 
       - name: Test
         run: cargo test
