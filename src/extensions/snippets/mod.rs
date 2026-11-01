@@ -8,7 +8,7 @@ mod store;
 
 pub(crate) use extension::manifest;
 pub use extension::{
-    extension_id, preference_declarations, OpenUrl, SnippetsExtension, PREF_FAVICONS,
+    extension_id, preference_declarations, OpenUrl, SnippetsExtension, ACTION_EDIT, PREF_FAVICONS,
     QUICKLINKS_ID, SNIPPETS_ID,
 };
 pub use favicons::{FaviconCache, FaviconService, FaviconsEnabled, HttpFavicons};

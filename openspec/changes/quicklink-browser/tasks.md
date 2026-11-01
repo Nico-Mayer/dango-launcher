@@ -10,7 +10,7 @@
 - [x] 2.1 Add `browser: Option<String>` to `Record`, read from and written to the `browser` field of a quicklink; saving `default` or nothing removes the field; verify with store tests that a browser survives a reload, `default` clears it, and an id the platform does not offer is written back unchanged (`cargo test snippets`)
 - [x] 2.2 Add the "Browser" dropdown to the quicklink form only: "Default browser", then each browser with an app name on this platform; the edit form passes the stored id as the value; verify with extension tests for the options on this platform, the selected value on edit, and that the snippet form has no such field (`cargo test snippets`)
 - [x] 2.3 Pass the quicklink's browser to the opener on open, with and without a query; verify with `FakeOpener` tests that record the browser id for both paths and `None` for a quicklink without one (`cargo test snippets`)
-- [ ] 2.4 UI test in `src/slint_shell/tests.rs`: create a quicklink, pick "Firefox" in the "Browser" dropdown, save, and confirm the stored record names `firefox` (`cargo test slint_shell`)
+- [x] 2.4 UI test in `src/slint_shell/tests.rs`: create a quicklink, pick "Firefox" in the "Browser" dropdown, save, and confirm the stored record names `firefox` (`cargo test slint_shell`)
 
 ## 3. Hand checks on Windows
 

@@ -1257,6 +1257,56 @@ mod games {
     }
 }
 
+mod quicklink_browser {
+    use std::sync::Arc;
+
+    use super::*;
+    use crate::extension::{ActionOutcome, Extension, FormValues};
+    use crate::extensions::snippets::{self, Kind, Records, SnippetsExtension};
+    use crate::ui::Chord;
+
+    #[test]
+    fn picking_firefox_in_the_form_stores_it() {
+        let dir = std::env::temp_dir().join(format!("dango-ui-ql-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let records = Records::open(&dir, Kind::Quicklink).0;
+        let id = records
+            .create("Docs", "https://example.com/docs", None)
+            .unwrap();
+        let extension = SnippetsExtension::new(records.clone(), None, None, Arc::new(Vec::new));
+        let ActionOutcome::Replaced(form) =
+            extension.perform_action(&id, snippets::ACTION_EDIT, &FormValues::new())
+        else {
+            panic!("expected the edit form");
+        };
+        let h = Harness::root(results(1));
+        h.view_of(snippets::QUICKLINKS_ID, *form);
+
+        h.find("Browser")
+            .unwrap()
+            .invoke_accessible_default_action();
+        h.find("Firefox")
+            .expect("the option")
+            .invoke_accessible_default_action();
+        let effects = h.launcher.borrow_mut().apply(Input::Intent(Intent::Key {
+            chord: Chord::command("Enter"),
+        }));
+
+        let Some(Effect::RunAction(request)) = effects.into_iter().last() else {
+            panic!("the form is submitted");
+        };
+        extension.perform_action(
+            &request.item_id,
+            &request.action_id,
+            &request.values.unwrap(),
+        );
+        assert_eq!(
+            records.get(&id).unwrap().browser.as_deref(),
+            Some("firefox")
+        );
+    }
+}
+
 mod filter_dropdown {
     use super::*;
     use crate::protocol::{FieldOption, Filter};
