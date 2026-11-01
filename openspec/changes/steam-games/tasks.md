@@ -5,7 +5,7 @@
 
 ## 2. Games extension in root search
 
-- [ ] 2.1 Add `gamepad-2` (`LuGamepad2`) to the registry in `src/slint_shell/icons.rs`; verify the registry's own tests pass (`cargo test icons`)
+- [x] 2.1 Add `gamepad-2` (`LuGamepad2`) to the registry in `src/slint_shell/icons.rs`; verify the registry's own tests pass (`cargo test icons`)
 - [ ] 2.2 Add `src/extensions/games/mod.rs`: `dango.games` manifest named "Games" with `root_items` and `services`, an in-memory game list, a root provider that yields each game with subtitle "Steam", its icon or `icon:gamepad-2`, and primary action "Open"; register it in `src/extensions/mod.rs` and in startup; verify with tests using a fake `GameSource` for the results, the fallback icon, and `every_built_in_manifest_validates` (`cargo test games`)
 - [ ] 2.3 Add the background service: read on start, then wait for a fingerprint change or the sweep interval, reusing the `applications` loop shape; verify with a test that a changed fake fingerprint triggers a re-read (`cargo test games`)
 - [ ] 2.4 Launch opens `steam://rungameid/<appid>` through the existing URL opener and hides the launcher; an id no longer listed re-reads once, then fails with "That game is no longer installed"; an opener error fails with "Couldn't start the game through Steam"; verify with tests on the fake source for both failures and the opened URL, and add both messages to the fixed-message sentence test (`cargo test games`)
