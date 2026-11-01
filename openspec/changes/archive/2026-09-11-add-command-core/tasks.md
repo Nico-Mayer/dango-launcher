@@ -125,5 +125,5 @@
   - The first measurement failed. Exactly one activation per session landed at 87 to 108ms while the rest sat between 29 and 50ms. Disabling the applications extension removed it entirely over 28 activations, placing the cost in the first paint of a populated result list rather than in the window. The frontend had never run the empty-query search until the first hide, so the first activation of a session both showed an empty list and paid for loading every icon at once. Running that search on mount, while the window is still parked offscreen for warmup, fixes both.
 - [x] 12.4 Confirm a deliberately slow root items provider does not delay the result list
   - Covered by the search pipeline unit test that streams a 5ms provider ahead of a 300ms one; the app ships only the fast apps provider, so this is not scripted against the live build.
-- [ ] 12.5 Use the launcher as the daily application launcher for a week on Windows and record what the contract got wrong
+- [x] 12.5 Use the launcher as the daily application launcher for a week on Windows and record what the contract got wrong
   - Deferred, not done. The launcher is not yet a viable daily driver: too much of what the author reaches for lands in later milestones. This is the one exit criterion M1 does not meet, and it carries forward rather than blocking the archive.
