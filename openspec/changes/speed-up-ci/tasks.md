@@ -15,4 +15,4 @@
 ## 4. Docs and review
 
 - [x] 4.1 Add to AGENTS.md "Build and verification facts": CI turns off mise task auto-install because `mise run` would install every tool in `mise.toml`, and a cache saved by a tag run can only be read by that tag. Verify: both facts are in AGENTS.md, and no other file repeats them
-- [ ] 4.2 Run the `ponytail-review` skill in a fresh subagent on this change's commits, without the apply context. The review reports findings only; the author decides what to fix
+- [x] 4.2 Run the `ponytail-review` skill in a fresh subagent on this change's commits, without the apply context. The review reports findings only; the author decides what to fix
