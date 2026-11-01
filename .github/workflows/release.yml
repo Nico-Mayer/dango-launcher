@@ -61,8 +61,6 @@ jobs:
       - name: Install Rust
         run: rustup toolchain install --no-self-update
 
-      - uses: swatinem/rust-cache@v2
-
       - uses: jdx/mise-action@v5
         with:
           install_args: rust cargo:cargo-packager
