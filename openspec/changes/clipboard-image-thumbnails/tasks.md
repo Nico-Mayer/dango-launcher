@@ -1,8 +1,8 @@
 ## 1. Thumbnails in the history
 
-- [ ] 1.1 `History::record` writes `<id>.thumb.png`, fitting in 384 x 384 with `RustImageData::thumbnail`, and counts its bytes in the `bytes` column; an image that does not decode is still recorded without one. Verify with `cargo test` in `history.rs`: an image entry has a thumbnail no larger than 384 px on either side with the image's aspect ratio, and an undecodable image is recorded with none
-- [ ] 1.2 `Entry` carries the thumbnail path when the file exists. Verify with a `cargo test` that an entry whose thumbnail file is missing reports none
-- [ ] 1.3 `remove`, `trim`, the "file has gone" path, and the orphan sweep handle the thumbnail with its image. Verify with `cargo test`: discarding and removing an image delete both files, and `History::new` keeps a live entry's thumbnail and deletes an orphaned one
+- [x] 1.1 `History::record` writes `<id>.thumb.png`, fitting in 384 x 384 with `RustImageData::thumbnail`, and counts its bytes in the `bytes` column; an image that does not decode is still recorded without one. Verify with `cargo test` in `history.rs`: an image entry has a thumbnail no larger than 384 px on either side with the image's aspect ratio, and an undecodable image is recorded with none
+- [x] 1.2 `Entry` carries the thumbnail path when the file exists. Verify with a `cargo test` that an entry whose thumbnail file is missing reports none
+- [x] 1.3 `remove`, `trim`, the "file has gone" path, and the orphan sweep handle the thumbnail with its image. Verify with `cargo test`: discarding and removing an image delete both files, and `History::new` keeps a live entry's thumbnail and deletes an orphaned one
 
 ## 2. Rows show the thumbnail
 

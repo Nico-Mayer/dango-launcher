@@ -11,6 +11,8 @@ use std::hash::Hasher;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
+use clipboard_rs::common::RustImage;
+use clipboard_rs::RustImageData;
 use rusqlite::OptionalExtension;
 use siphasher::sip::SipHasher13;
 
@@ -57,6 +59,8 @@ pub struct Entry {
     pub text: Option<String>,
     /// Where the image is, or `None` for text.
     pub path: Option<String>,
+    /// A small copy of the image for listing, when one was made.
+    pub thumbnail: Option<String>,
     pub copied_at: i64,
 }
 
@@ -122,6 +126,9 @@ impl From<rusqlite::Error> for HistoryError {
 /// loads every copied text in full.
 const LISTED_CHARS: usize = 2000;
 
+/// Sharp in a list row and in a grid tile at 200 % scaling.
+const THUMBNAIL_SIZE: u32 = 384;
+
 pub struct History {
     store: Arc<Store>,
     images: PathBuf,
@@ -144,9 +151,14 @@ impl History {
             let rows = stmt.query_map([], |row| row.get::<_, String>(0))?;
             rows.collect::<rusqlite::Result<HashSet<_>>>()
         });
-        let Ok(paths) = paths else {
+        let Ok(mut paths) = paths else {
             return;
         };
+        let thumbnails: Vec<String> = paths
+            .iter()
+            .map(|path| thumbnail_path(path).to_string_lossy().into_owned())
+            .collect();
+        paths.extend(thumbnails);
         let Ok(files) = std::fs::read_dir(&self.images) else {
             return;
         };
@@ -178,6 +190,7 @@ impl History {
         }
 
         let id = uuid::Uuid::new_v4().to_string();
+        let mut bytes = bytes;
         let (kind, text, path) = match &content {
             Content::Text(text) => (Kind::Text, Some(text.clone()), None),
             Content::Image(image) => {
@@ -186,6 +199,7 @@ impl History {
                     crate::log::append(&format!("clipboard history image: {error}"));
                     HistoryError::Failed(error.to_string())
                 })?;
+                bytes += write_thumbnail(image, &thumbnail_path(&path));
                 (Kind::Image, None, Some(path.to_string_lossy().into_owned()))
             }
         };
@@ -325,12 +339,43 @@ impl History {
 }
 
 fn entry(row: &rusqlite::Row) -> rusqlite::Result<Entry> {
+    let path: Option<String> = row.get(3)?;
+    let thumbnail = path
+        .as_deref()
+        .map(thumbnail_path)
+        .filter(|thumbnail| thumbnail.exists())
+        .map(|thumbnail| thumbnail.to_string_lossy().into_owned());
     Ok(Entry {
         id: row.get(0)?,
         kind: Kind::parse(&row.get::<_, String>(1)?),
         text: row.get(2)?,
-        path: row.get(3)?,
+        path,
+        thumbnail,
         copied_at: row.get(4)?,
+    })
+}
+
+fn thumbnail_path(image: impl AsRef<Path>) -> PathBuf {
+    image.as_ref().with_extension("thumb.png")
+}
+
+/// Writes a thumbnail of `png` and answers its size, or 0 when there is none.
+/// An image without one is still worth keeping: its row shows the full image.
+fn write_thumbnail(png: &[u8], path: &Path) -> usize {
+    let encoded = RustImageData::from_bytes(png).and_then(|image| {
+        let (width, height) = image.get_size();
+        image
+            .thumbnail(width.min(THUMBNAIL_SIZE), height.min(THUMBNAIL_SIZE))?
+            .to_png()
+    });
+    let written = encoded.and_then(|thumbnail| {
+        let bytes = thumbnail.get_bytes();
+        std::fs::write(path, bytes)?;
+        Ok(bytes.len())
+    });
+    written.unwrap_or_else(|error| {
+        crate::log::append(&format!("clipboard history thumbnail: {error}"));
+        0
     })
 }
 
@@ -339,6 +384,7 @@ fn entry(row: &rusqlite::Row) -> rusqlite::Result<Entry> {
 fn delete_file(path: Option<&str>) {
     if let Some(path) = path {
         let _ = std::fs::remove_file(Path::new(path));
+        let _ = std::fs::remove_file(thumbnail_path(path));
     }
 }
 
@@ -363,6 +409,26 @@ mod tests {
     /// identity: identical bytes would deduplicate into one entry.
     fn distinct_image(fill: u8, size: usize) -> Content {
         Content::Image(vec![fill; size])
+    }
+
+    fn png(width: u32, height: u32) -> Content {
+        let mut bytes = Vec::new();
+        let mut encoder = png::Encoder::new(&mut bytes, width, height);
+        encoder.set_color(png::ColorType::Rgba);
+        encoder.set_depth(png::BitDepth::Eight);
+        let mut writer = encoder.write_header().unwrap();
+        writer
+            .write_image_data(&vec![200; (width * height * 4) as usize])
+            .unwrap();
+        writer.finish().unwrap();
+        Content::Image(bytes)
+    }
+
+    fn png_size(path: &str) -> (u32, u32) {
+        let decoder =
+            png::Decoder::new(std::io::BufReader::new(std::fs::File::open(path).unwrap()));
+        let info = decoder.read_info().unwrap();
+        (info.info().width, info.info().height)
     }
 
     fn titles(history: &History) -> Vec<String> {
@@ -403,6 +469,66 @@ mod tests {
         let path = entries[0].path.clone().expect("an image has a path");
         assert!(Path::new(&path).exists(), "the row must point at a file");
         assert!(entries[0].text.is_none());
+    }
+
+    #[test]
+    fn an_image_entry_has_a_thumbnail_that_keeps_its_aspect_ratio() {
+        let history = history();
+        history
+            .record(png(1600, 900), Bounds::default(), 1)
+            .unwrap();
+        let entry = history.entries().unwrap().remove(0);
+
+        let thumbnail = entry.thumbnail.expect("a decodable image has a thumbnail");
+        assert!(thumbnail.ends_with(".thumb.png"));
+        assert_eq!(png_size(&thumbnail), (384, 216));
+    }
+
+    #[test]
+    fn a_small_image_is_not_enlarged_for_its_thumbnail() {
+        let history = history();
+        history.record(png(40, 20), Bounds::default(), 1).unwrap();
+        let thumbnail = history.entries().unwrap()[0].thumbnail.clone().unwrap();
+        assert_eq!(png_size(&thumbnail), (40, 20));
+    }
+
+    #[test]
+    fn the_thumbnail_counts_toward_the_size_bound() {
+        let history = history();
+        let image = png(800, 800);
+        let image_bytes = image.bytes() as i64;
+        history.record(image, Bounds::default(), 1).unwrap();
+        let entry = history.entries().unwrap().remove(0);
+        let thumbnail_bytes = std::fs::metadata(entry.thumbnail.unwrap()).unwrap().len() as i64;
+
+        let stored: i64 = history
+            .store
+            .with(|c| {
+                c.query_row("SELECT bytes FROM local_clipboard_history", [], |row| {
+                    row.get(0)
+                })
+            })
+            .unwrap();
+        assert_eq!(stored, image_bytes + thumbnail_bytes);
+    }
+
+    #[test]
+    fn an_image_that_does_not_decode_is_recorded_without_a_thumbnail() {
+        let history = history();
+        history.record(image(64), Bounds::default(), 1).unwrap();
+        let entry = history.entries().unwrap().remove(0);
+        assert!(entry.path.is_some());
+        assert!(entry.thumbnail.is_none());
+    }
+
+    #[test]
+    fn an_entry_whose_thumbnail_file_is_missing_reports_none() {
+        let history = history();
+        history.record(png(10, 10), Bounds::default(), 1).unwrap();
+        let thumbnail = history.entries().unwrap()[0].thumbnail.clone().unwrap();
+        std::fs::remove_file(thumbnail).unwrap();
+
+        assert!(history.entries().unwrap()[0].thumbnail.is_none());
     }
 
     #[test]
@@ -495,27 +621,31 @@ mod tests {
             entries: 1,
             ..Bounds::default()
         };
-        history.record(distinct_image(1, 32), bounds, 1).unwrap();
-        let path = history.entries().unwrap()[0].path.clone().unwrap();
-        assert!(Path::new(&path).exists());
+        history.record(png(10, 10), bounds, 1).unwrap();
+        let entry = history.entries().unwrap().remove(0);
+        let path = entry.path.unwrap();
+        let thumbnail = entry.thumbnail.unwrap();
 
-        history.record(distinct_image(2, 32), bounds, 2).unwrap();
+        history.record(png(20, 20), bounds, 2).unwrap();
         assert!(
             !Path::new(&path).exists(),
             "the discarded image must not stay on disk"
         );
+        assert!(!Path::new(&thumbnail).exists());
     }
 
     #[test]
     fn removing_an_entry_deletes_its_file_too() {
         let history = history();
-        history.record(image(32), Bounds::default(), 1).unwrap();
+        history.record(png(10, 10), Bounds::default(), 1).unwrap();
         let entry = history.entries().unwrap().remove(0);
         let path = entry.path.clone().unwrap();
+        let thumbnail = entry.thumbnail.clone().unwrap();
 
         history.remove(&entry.id).unwrap();
         assert!(history.entries().unwrap().is_empty());
         assert!(!Path::new(&path).exists());
+        assert!(!Path::new(&thumbnail).exists());
     }
 
     #[test]
@@ -549,15 +679,19 @@ mod tests {
         let store = Arc::new(Store::in_memory().unwrap());
         let dir = std::env::temp_dir().join(format!("dango-clip-{}", uuid::Uuid::new_v4()));
         let history = History::new(store.clone(), dir.clone());
-        history.record(image(32), Bounds::default(), 1).unwrap();
-        let kept = history.entries().unwrap()[0].path.clone().unwrap();
+        history.record(png(10, 10), Bounds::default(), 1).unwrap();
+        let entry = history.entries().unwrap().remove(0);
         let orphan = dir.join("orphan.png");
         std::fs::write(&orphan, [1, 2, 3]).unwrap();
+        let orphan_thumbnail = dir.join("orphan.thumb.png");
+        std::fs::write(&orphan_thumbnail, [1, 2, 3]).unwrap();
 
         History::new(store, dir);
 
         assert!(!orphan.exists());
-        assert!(Path::new(&kept).exists());
+        assert!(!orphan_thumbnail.exists());
+        assert!(Path::new(&entry.path.unwrap()).exists());
+        assert!(Path::new(&entry.thumbnail.unwrap()).exists());
     }
 
     #[test]
