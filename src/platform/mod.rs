@@ -7,6 +7,11 @@ mod macos;
 #[cfg(target_os = "windows")]
 mod windows;
 
+#[cfg(target_os = "macos")]
+pub use macos::browser_app;
+#[cfg(target_os = "windows")]
+pub use windows::browser_app;
+
 /// What the walkthrough harness needs to point the exchange at a window of its
 /// own and to bring that window forward the same way an insertion does.
 #[cfg(target_os = "windows")]

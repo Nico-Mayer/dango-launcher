@@ -81,6 +81,12 @@ pub struct SnippetsExtension {
 /// extension can be tested without opening a browser.
 pub trait OpenUrl: Send + Sync {
     fn open(&self, url: &str) -> Result<(), String>;
+
+    /// Opens in `browser` when it is a browser this platform can start, and in
+    /// the default browser when it is not or fails to start.
+    fn open_in(&self, url: &str, _browser: Option<&str>) -> Result<(), String> {
+        self.open(url)
+    }
 }
 
 impl SnippetsExtension {

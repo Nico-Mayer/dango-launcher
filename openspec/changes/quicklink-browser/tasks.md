@@ -1,9 +1,9 @@
 ## 1. Browser list and opener
 
-- [ ] 1.1 Add a `Browser` enum (Chrome, Edge, Firefox, Brave, Safari) with its stored id and form title, and a lookup from id; verify with unit tests that every id round-trips and an unknown id gives `None` (`cargo test`)
-- [ ] 1.2 Add the Windows app name per browser in `src/platform/windows` (`chrome.exe`, `msedge.exe`, `firefox.exe`, `brave.exe`, none for Safari); verify with a unit test that Safari has no app name and the others do (`cargo test` on Windows)
+- [x] 1.1 Add a `Browser` enum (Chrome, Edge, Firefox, Brave, Safari) with its stored id and form title, and a lookup from id; verify with unit tests that every id round-trips and an unknown id gives `None` (`cargo test`)
+- [x] 1.2 Add the Windows app name per browser in `src/platform/windows` (`chrome.exe`, `msedge.exe`, `firefox.exe`, `brave.exe`, none for Safari); verify with a unit test that Safari has no app name and the others do (`cargo test` on Windows)
 - [ ] 1.3 Add the macOS app name per browser in `src/platform/macos` (`Google Chrome`, `Microsoft Edge`, `Firefox`, `Brave Browser`, `Safari`); verify `cargo clippy --all-targets -- -D warnings` passes on macOS, or CI's macOS job when working from Windows
-- [ ] 1.4 Let `OpenUrl::open` take an optional browser id; `SystemOpener` tries `open::with_detached` with the platform's app name, logs the error and falls back to `open::that_detached` when it fails or there is no app name; verify with an opener test that an unknown id and a browser with no app name both take the default path (`cargo test opener`)
+- [x] 1.4 Let `OpenUrl::open` take an optional browser id; `SystemOpener` tries `open::with_detached` with the platform's app name, logs the error and falls back to `open::that_detached` when it fails or there is no app name; verify with an opener test that an unknown id and a browser with no app name both take the default path (`cargo test opener`)
 
 ## 2. Quicklink record and form
 

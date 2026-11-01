@@ -1,5 +1,6 @@
 pub mod app;
 mod autostart;
+pub mod browser;
 pub mod config;
 pub mod extension;
 pub mod extensions;

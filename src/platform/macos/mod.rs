@@ -1,4 +1,5 @@
 mod apps;
+mod browser;
 mod clipboard;
 mod eventtap;
 mod hyperkey;
@@ -11,6 +12,7 @@ mod text;
 mod window;
 
 pub use apps::MacAppIndexer;
+pub use browser::browser_app;
 pub use clipboard::MacAttribution;
 pub use hyperkey::MacHyperkey;
 pub use icons::icon_for;
