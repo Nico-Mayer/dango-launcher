@@ -23,12 +23,12 @@ pub use text::{MacHandoff, MacKeys, MacSelection};
 pub use window::MacWindowManager;
 
 use std::ptr::NonNull;
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::OnceLock;
 
 use objc2::rc::Retained;
 use objc2::runtime::{AnyClass, AnyObject, Bool, ClassBuilder, Sel};
-use objc2::sel;
+use objc2::{msg_send, sel};
 use objc2_app_kit::{
     NSEvent, NSScreen, NSView, NSWindow, NSWindowCollectionBehavior, NSWindowStyleMask,
 };
@@ -93,6 +93,15 @@ impl Drop for Mute {
     fn drop(&mut self) {
         MUTED.fetch_sub(1, Ordering::SeqCst);
     }
+}
+
+/// Whether the launcher panel is the key window. The panel never makes Dango
+/// frontmost and the key event does not name Dango as its target, so this is
+/// how the key monitor tells that keys are aimed at the launcher.
+static PANEL_IS_KEY: AtomicBool = AtomicBool::new(false);
+
+pub(super) fn panel_is_key() -> bool {
+    PANEL_IS_KEY.load(Ordering::SeqCst)
 }
 
 /// The frontmost application's name, resolved the same way the clipboard names
@@ -196,6 +205,20 @@ extern "C" fn can_become_key_window(_this: NonNull<AnyObject>, _cmd: Sel) -> Boo
     Bool::YES
 }
 
+extern "C" fn become_key_window(this: NonNull<AnyObject>, _cmd: Sel) {
+    PANEL_IS_KEY.store(true, Ordering::SeqCst);
+    if let Some(superclass) = AnyClass::get(c"NSPanel") {
+        let _: () = unsafe { msg_send![super(this.as_ref(), superclass), becomeKeyWindow] };
+    }
+}
+
+extern "C" fn resign_key_window(this: NonNull<AnyObject>, _cmd: Sel) {
+    PANEL_IS_KEY.store(false, Ordering::SeqCst);
+    if let Some(superclass) = AnyClass::get(c"NSPanel") {
+        let _: () = unsafe { msg_send![super(this.as_ref(), superclass), resignKeyWindow] };
+    }
+}
+
 /// NSPanel accepts the non-activating style mask that a plain NSWindow rejects.
 /// The subclass exists because reclassing drops the toolkit's `canBecomeKeyWindow`
 /// override, and a borderless window answers NO by default, which would leave
@@ -212,6 +235,14 @@ fn panel_class() -> Option<&'static AnyClass> {
             builder.add_method(
                 sel!(canBecomeKeyWindow),
                 can_become_key_window as extern "C" fn(NonNull<AnyObject>, Sel) -> Bool,
+            );
+            builder.add_method(
+                sel!(becomeKeyWindow),
+                become_key_window as extern "C" fn(NonNull<AnyObject>, Sel),
+            );
+            builder.add_method(
+                sel!(resignKeyWindow),
+                resign_key_window as extern "C" fn(NonNull<AnyObject>, Sel),
             );
         }
         Some(builder.register())

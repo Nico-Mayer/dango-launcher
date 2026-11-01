@@ -10,7 +10,7 @@
 
 ## 3. Skip keystrokes aimed at Dango on macOS
 
-- [ ] 3.1 In the panel subclass built by `reclass_as_panel` in `src/platform/macos/mod.rs`, override `becomeKeyWindow` and `resignKeyWindow` to set an `AtomicBool` next to `MUTED`; in `translate` in `src/platform/macos/keymonitor.rs`, return `Clear` while it is set, and remove the `EventTargetUnixProcessID` check and `is_own_process` with its test; verify `cargo clippy --all-targets -- -D warnings` and `cargo test` on a Mac
+- [x] 3.1 In the panel subclass built by `reclass_as_panel` in `src/platform/macos/mod.rs`, override `becomeKeyWindow` and `resignKeyWindow` to set an `AtomicBool` next to `MUTED`; in `translate` in `src/platform/macos/keymonitor.rs`, return `Clear` while it is set, and remove the `EventTargetUnixProcessID` check and `is_own_process` with its test; verify `cargo clippy --all-targets -- -D warnings` and `cargo test` on a Mac
 - [ ] 3.2 Hand check on macOS: open the launcher with the hotkey over TextEdit, without clicking it, type a snippet's keyword, and confirm it stays unexpanded; then type it in TextEdit and confirm it expands (#14)
 
 ## 4. AltGr characters on Windows
