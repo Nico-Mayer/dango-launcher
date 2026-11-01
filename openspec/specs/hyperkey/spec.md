@@ -2,10 +2,9 @@
 
 ## Purpose
 
-A configured physical key acts system-wide as the hyper modifier
-(Ctrl+Alt+Shift+Super), so a single key reaches the large collision-free chord
-space that launcher and command hotkeys can bind, configured entirely from the
-config file.
+CapsLock acts system-wide as the hyper modifier (Ctrl+Alt+Shift+Super), so a
+single key reaches the large collision-free chord space that launcher and
+command hotkeys can bind, configured entirely from the config file.
 
 ## Requirements
 

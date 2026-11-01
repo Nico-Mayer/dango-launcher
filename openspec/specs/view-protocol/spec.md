@@ -3,7 +3,7 @@
 ## Purpose
 
 The versioned declarative contract describing what a command puts on screen and
-which actions it offers, so that the frontend renders any command, built-in or
+which actions it offers, so that the launcher renders any command, built-in or
 otherwise, without knowing anything about it.
 
 ## Requirements
