@@ -63,6 +63,8 @@ pub struct Entry {
     pub thumbnail: Option<String>,
     /// The application it was copied from, when exactly one could have.
     pub source: Option<String>,
+    /// An image's width and height in pixels, when it could be decoded.
+    pub size: Option<(u32, u32)>,
     pub copied_at: i64,
 }
 
@@ -193,12 +195,13 @@ impl History {
         }
 
         let fingerprint = content.fingerprint();
-        if self.touch(&fingerprint, now)? {
+        if self.touch(&fingerprint, source, now)? {
             return Ok(());
         }
 
         let id = uuid::Uuid::new_v4().to_string();
         let mut bytes = bytes;
+        let mut size = None;
         let (kind, text, path) = match &content {
             Content::Text(text) => (Kind::Text, Some(text.clone()), None),
             Content::Image(image) => {
@@ -207,7 +210,9 @@ impl History {
                     crate::log::append(&format!("clipboard history image: {error}"));
                     HistoryError::Failed(error.to_string())
                 })?;
-                bytes += write_thumbnail(image, &thumbnail_path(&path));
+                let (written, decoded) = write_thumbnail(image, &thumbnail_path(&path));
+                bytes += written;
+                size = decoded;
                 (Kind::Image, None, Some(path.to_string_lossy().into_owned()))
             }
         };
@@ -215,8 +220,8 @@ impl History {
         self.store.with(|c| {
             c.execute(
                 "INSERT INTO local_clipboard_history \
-                 (entry_id, kind, text, path, bytes, fingerprint, copied_at, source) \
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+                 (entry_id, kind, text, path, bytes, fingerprint, copied_at, source, width, height) \
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
                 rusqlite::params![
                     id,
                     kind.as_str(),
@@ -225,7 +230,9 @@ impl History {
                     bytes as i64,
                     fingerprint,
                     now,
-                    source
+                    source,
+                    size.map(|(width, _)| width),
+                    size.map(|(_, height)| height)
                 ],
             )?;
             Ok(())
@@ -238,7 +245,7 @@ impl History {
     pub fn entries(&self) -> Result<Vec<Entry>, HistoryError> {
         let entries = self.store.with(|c| {
             let mut stmt = c.prepare(&format!(
-                "SELECT entry_id, kind, substr(text, 1, {LISTED_CHARS}), path, copied_at, source \
+                "SELECT entry_id, kind, substr(text, 1, {LISTED_CHARS}), path, copied_at, source, width, height \
                  FROM local_clipboard_history ORDER BY copied_at DESC, rowid DESC"
             ))?;
             let rows = stmt.query_map([], entry)?;
@@ -250,7 +257,7 @@ impl History {
     pub fn get(&self, id: &str) -> Result<Entry, HistoryError> {
         let found = self.store.with(|c| {
             c.query_row(
-                "SELECT entry_id, kind, text, path, copied_at, source FROM local_clipboard_history \
+                "SELECT entry_id, kind, text, path, copied_at, source, width, height FROM local_clipboard_history \
                  WHERE entry_id = ?1",
                 [id],
                 entry,
@@ -300,12 +307,18 @@ impl History {
         Ok(())
     }
 
-    /// Moves existing content to newest. Answers whether it was there.
-    fn touch(&self, fingerprint: &str, now: i64) -> Result<bool, HistoryError> {
+    /// Moves existing content to newest, from its new source. Answers whether
+    /// it was there.
+    fn touch(
+        &self,
+        fingerprint: &str,
+        source: Option<&str>,
+        now: i64,
+    ) -> Result<bool, HistoryError> {
         let changed = self.store.with(|c| {
             c.execute(
-                "UPDATE local_clipboard_history SET copied_at = ?2 WHERE fingerprint = ?1",
-                rusqlite::params![fingerprint, now],
+                "UPDATE local_clipboard_history SET copied_at = ?2, source = ?3                  WHERE fingerprint = ?1",
+                rusqlite::params![fingerprint, now, source],
             )
         })?;
         Ok(changed > 0)
@@ -361,6 +374,9 @@ fn entry(row: &rusqlite::Row) -> rusqlite::Result<Entry> {
         path,
         thumbnail,
         source: row.get(5)?,
+        size: row
+            .get::<_, Option<u32>>(6)?
+            .zip(row.get::<_, Option<u32>>(7)?),
         copied_at: row.get(4)?,
     })
 }
@@ -369,24 +385,35 @@ fn thumbnail_path(image: impl AsRef<Path>) -> PathBuf {
     image.as_ref().with_extension("thumb.png")
 }
 
-/// Writes a thumbnail of `png` and answers its size, or 0 when there is none.
-/// An image without one is still worth keeping: its row shows the full image,
-/// which for an image within the thumbnail size is just as cheap.
-fn write_thumbnail(png: &[u8], path: &Path) -> usize {
-    let written = RustImageData::from_bytes(png).and_then(|image| {
-        let (width, height) = image.get_size();
-        if width <= THUMBNAIL_SIZE && height <= THUMBNAIL_SIZE {
-            return Ok(0);
+/// Writes a thumbnail of `png` and answers its size in bytes, or 0 when there
+/// is none, with the image's size in pixels when it decodes. An image without
+/// one is still worth keeping: its row shows the full image, which for an
+/// image within the thumbnail size is just as cheap.
+fn write_thumbnail(png: &[u8], path: &Path) -> (usize, Option<(u32, u32)>) {
+    let image = match RustImageData::from_bytes(png) {
+        Ok(image) => image,
+        Err(error) => {
+            crate::log::append(&format!("clipboard history thumbnail: {error}"));
+            return (0, None);
         }
-        let thumbnail = image.thumbnail(THUMBNAIL_SIZE, THUMBNAIL_SIZE)?.to_png()?;
-        let bytes = thumbnail.get_bytes();
-        std::fs::write(path, bytes)?;
-        Ok(bytes.len())
-    });
-    written.unwrap_or_else(|error| {
+    };
+    let (width, height) = image.get_size();
+    if width <= THUMBNAIL_SIZE && height <= THUMBNAIL_SIZE {
+        return (0, Some((width, height)));
+    }
+    let written = image
+        .thumbnail(THUMBNAIL_SIZE, THUMBNAIL_SIZE)
+        .and_then(|thumbnail| thumbnail.to_png())
+        .and_then(|thumbnail| {
+            let bytes = thumbnail.get_bytes();
+            std::fs::write(path, bytes)?;
+            Ok(bytes.len())
+        });
+    let written = written.unwrap_or_else(|error| {
         crate::log::append(&format!("clipboard history thumbnail: {error}"));
         0
-    })
+    });
+    (written, Some((width, height)))
 }
 
 /// Discarding an image has to actually reclaim its space, or the size bound
@@ -554,6 +581,34 @@ mod tests {
         std::fs::remove_file(thumbnail).unwrap();
 
         assert!(history.entries().unwrap()[0].thumbnail.is_none());
+    }
+
+    #[test]
+    fn copying_again_from_another_application_updates_source_and_time() {
+        let history = history();
+        history
+            .record(text("one"), Some("Notepad"), Bounds::default(), 1)
+            .unwrap();
+        history
+            .record(text("one"), Some("Code"), Bounds::default(), 2)
+            .unwrap();
+        let entry = history.entries().unwrap().remove(0);
+        assert_eq!(entry.source.as_deref(), Some("Code"));
+        assert_eq!(entry.copied_at, 2);
+    }
+
+    #[test]
+    fn an_image_row_has_its_size() {
+        let history = history();
+        history
+            .record(png(400, 30), None, Bounds::default(), 1)
+            .unwrap();
+        history
+            .record(text("t"), None, Bounds::default(), 2)
+            .unwrap();
+        let entries = history.entries().unwrap();
+        assert_eq!(entries[1].size, Some((400, 30)));
+        assert_eq!(entries[0].size, None);
     }
 
     #[test]
