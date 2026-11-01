@@ -7,14 +7,18 @@ use std::sync::Arc;
 use interprocess::local_socket::{prelude::*, GenericNamespaced, ListenerOptions, Stream};
 use single_instance::SingleInstance;
 
-pub const NAME: &str = "com.nimayer.dango";
+pub const NAME: &str = crate::app::IDENTIFIER;
 
 const SHOW: &str = "show";
 
 /// Held for as long as this process is the one Dango. `None` when another
 /// instance already runs.
 pub fn claim() -> Option<SingleInstance> {
-    let lock = match SingleInstance::new(&crate::platform::instance_lock(NAME)) {
+    let Some(data_dir) = crate::app::data_dir() else {
+        crate::log::append("cannot take the single instance lock: no data directory");
+        return None;
+    };
+    let lock = match SingleInstance::new(&crate::platform::instance_lock(NAME, &data_dir)) {
         Ok(lock) => lock,
         Err(error) => {
             crate::log::append(&format!("cannot take the single instance lock: {error}"));

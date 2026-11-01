@@ -269,22 +269,11 @@ fn ns_window(window: RawWindowHandle) -> Option<Retained<NSWindow>> {
     view.window()
 }
 
-pub fn instance_lock(identifier: &str) -> String {
-    let dir = dirs::data_dir()
-        .unwrap_or_else(std::env::temp_dir)
-        .join(identifier);
+pub fn instance_lock(data_dir: &std::path::Path) -> String {
     // A failure here surfaces when the lock file cannot be created.
-    let _ = std::fs::create_dir_all(&dir);
-    dir.join("instance.lock").to_string_lossy().into_owned()
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn instance_lock_is_absolute() {
-        let lock = instance_lock("com.nimayer.dango");
-        assert!(std::path::Path::new(&lock).is_absolute(), "{lock}");
-    }
+    let _ = std::fs::create_dir_all(data_dir);
+    data_dir
+        .join("instance.lock")
+        .to_string_lossy()
+        .into_owned()
 }

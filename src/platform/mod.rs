@@ -72,11 +72,17 @@ pub fn runs_inline_on_main_thread() -> bool {
 /// What `single-instance` locks on. Windows takes a mutex name; macOS takes a
 /// file path and resolves a bare name against the working directory, which
 /// is the read-only `/` for an app opened from Finder or at login.
-pub fn instance_lock(identifier: &str) -> String {
+pub fn instance_lock(name: &str, data_dir: &std::path::Path) -> String {
     #[cfg(target_os = "windows")]
-    return identifier.to_owned();
+    return {
+        let _ = data_dir;
+        name.to_owned()
+    };
     #[cfg(target_os = "macos")]
-    return macos::instance_lock(identifier);
+    return {
+        let _ = name;
+        macos::instance_lock(data_dir)
+    };
 }
 
 pub fn launcher_window() -> Box<dyn LauncherWindow> {

@@ -27,7 +27,7 @@ use crate::shell::{self, Shell, TrayCommand, TrayStatus};
 use crate::{templates, text, ui};
 use global_hotkey::hotkey::Modifiers;
 
-pub use startup::{cache_dir, start, Startup};
+pub use startup::{cache_dir, data_dir, start, Startup, IDENTIFIER};
 
 /// The most results streamed to the renderer for one query.
 const RESULT_LIMIT: usize = ui::ITEM_LIMIT;

@@ -35,7 +35,7 @@ use crate::shell::{Shell, TrayStatus};
 use crate::store::{Opened, Store};
 use crate::text;
 
-const IDENTIFIER: &str = "com.nimayer.dango";
+pub const IDENTIFIER: &str = "com.nimayer.dango";
 
 pub struct Startup {
     pub shell: Arc<dyn Shell>,
@@ -50,7 +50,7 @@ pub fn cache_dir() -> PathBuf {
         .unwrap_or_else(std::env::temp_dir)
 }
 
-fn data_dir() -> Option<PathBuf> {
+pub fn data_dir() -> Option<PathBuf> {
     dirs::data_dir().map(|dir| dir.join(IDENTIFIER))
 }
 
