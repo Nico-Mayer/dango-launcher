@@ -24,12 +24,16 @@ pub struct Game {
     pub cover: Option<String>,
 }
 
+/// Gives a signature of the library, cheap enough to poll. `None` when there
+/// is nothing to watch, which leaves freshness to the sweep.
+pub type Watcher = Box<dyn Fn() -> Option<u64>>;
+
 pub trait GameSource: Send + Sync {
     fn games(&self) -> Vec<Game>;
 
-    /// A signature of the library folders, cheap enough to poll. `None` when
-    /// there is nothing to watch, which leaves freshness to the sweep.
-    fn fingerprint(&self) -> Option<u64>;
+    /// Built once per read, so finding what to watch is not repeated on
+    /// every poll.
+    fn watcher(&self) -> Watcher;
 }
 
 /// Steam found where it installs itself, looked up on every read so a Steam
@@ -80,22 +84,45 @@ impl GameSource for SteamSource {
         games
     }
 
-    /// Steam adds or removes an `appmanifest_*.acf` in a library's `steamapps`
-    /// folder on install and uninstall, which changes that folder's mtime.
-    fn fingerprint(&self) -> Option<u64> {
-        let steam = self.steam()?;
+    /// Watches each `appmanifest_*.acf`, not only the folders: Steam creates
+    /// the manifest when a download starts and may only rewrite it when the
+    /// download finishes, which leaves the folder's mtime alone.
+    fn watcher(&self) -> Watcher {
+        let Some(steam) = self.steam() else {
+            return Box::new(|| None);
+        };
         let folders = steam.path().join("steamapps").join("libraryfolders.vdf");
-        let libraries = steam.library_paths().unwrap_or_default();
-        let watched = std::iter::once(folders).chain(libraries.iter().map(|l| l.join("steamapps")));
-        let mut hasher = DefaultHasher::new();
-        for path in watched {
-            if let Ok(modified) = std::fs::metadata(&path).and_then(|m| m.modified()) {
-                path.hash(&mut hasher);
-                modified.hash(&mut hasher);
+        let steamapps: Vec<PathBuf> = steam
+            .library_paths()
+            .unwrap_or_default()
+            .iter()
+            .map(|library| library.join("steamapps"))
+            .collect();
+        Box::new(move || {
+            let manifests = steamapps.iter().flat_map(|dir| {
+                std::fs::read_dir(dir)
+                    .into_iter()
+                    .flatten()
+                    .filter_map(|entry| entry.ok())
+                    .map(|entry| entry.path())
+                    .filter(|path| is_manifest(path))
+            });
+            let mut hasher = DefaultHasher::new();
+            for path in std::iter::once(folders.clone()).chain(manifests) {
+                if let Ok(modified) = std::fs::metadata(&path).and_then(|m| m.modified()) {
+                    path.hash(&mut hasher);
+                    modified.hash(&mut hasher);
+                }
             }
-        }
-        Some(hasher.finish())
+            Some(hasher.finish())
+        })
     }
+}
+
+fn is_manifest(path: &Path) -> bool {
+    path.file_name()
+        .and_then(|name| name.to_str())
+        .is_some_and(|name| name.starts_with("appmanifest_") && name.ends_with(".acf"))
 }
 
 fn fully_installed(app: &App) -> bool {
@@ -280,17 +307,28 @@ mod tests {
     fn no_steam_means_no_games_and_nothing_to_watch() {
         let source = SteamSource::at(std::env::temp_dir().join("dango-no-steam-7f3a"));
         assert!(source.games().is_empty());
-        assert!(source.fingerprint().is_none());
+        assert!(source.watcher()().is_none());
     }
 
     #[test]
     fn the_fingerprint_changes_when_a_game_is_installed() {
         let steam = Fixture::new();
-        let source = steam.source();
-        let before = source.fingerprint();
-        assert_eq!(before, source.fingerprint());
+        let fingerprint = steam.source().watcher();
+        let before = fingerprint();
+        assert_eq!(before, fingerprint());
         std::thread::sleep(std::time::Duration::from_millis(20));
         steam.install(&steam.second, 2, "Cyberpunk 2077", 4);
-        assert_ne!(before, source.fingerprint());
+        assert_ne!(before, fingerprint());
+    }
+
+    #[test]
+    fn the_fingerprint_changes_when_a_download_finishes() {
+        let steam = Fixture::new();
+        steam.install(&steam.second, 2, "Cyberpunk 2077", 1026);
+        let fingerprint = steam.source().watcher();
+        let before = fingerprint();
+        std::thread::sleep(std::time::Duration::from_millis(20));
+        steam.install(&steam.second, 2, "Cyberpunk 2077", 4);
+        assert_ne!(before, fingerprint());
     }
 }

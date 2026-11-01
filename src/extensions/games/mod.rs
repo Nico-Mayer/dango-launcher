@@ -3,7 +3,7 @@
 
 pub mod steam;
 
-pub use steam::{Game, GameSource, SteamSource};
+pub use steam::{Game, GameSource, SteamSource, Watcher};
 
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, RwLock};
@@ -94,8 +94,8 @@ impl GameList {
         *self.games.write().unwrap() = games;
     }
 
-    fn fingerprint(&self) -> Option<u64> {
-        self.source.fingerprint()
+    fn watcher(&self) -> Watcher {
+        self.source.watcher()
     }
 }
 
@@ -261,7 +261,7 @@ impl Service for RefreshService {
         std::thread::spawn(move || {
             while running.load(Ordering::SeqCst) {
                 list.reload();
-                super::refresh::wait_for_change(|| list.fingerprint(), &running);
+                super::refresh::wait_for_change(list.watcher(), &running);
             }
         });
         Ok(())
@@ -279,6 +279,12 @@ pub mod fake {
     use std::sync::Mutex;
 
     #[derive(Default)]
+    pub struct FakeSource {
+        games: RwLock<Vec<Game>>,
+        fingerprint: Arc<AtomicU64>,
+    }
+
+    #[derive(Default)]
     pub struct FakeOpener {
         pub opened: Mutex<Vec<String>>,
         pub fails: AtomicBool,
@@ -292,12 +298,6 @@ pub mod fake {
             self.opened.lock().unwrap().push(url.into());
             Ok(())
         }
-    }
-
-    #[derive(Default)]
-    pub struct FakeSource {
-        games: RwLock<Vec<Game>>,
-        fingerprint: AtomicU64,
     }
 
     impl FakeSource {
@@ -334,8 +334,9 @@ pub mod fake {
             self.games.read().unwrap().clone()
         }
 
-        fn fingerprint(&self) -> Option<u64> {
-            Some(self.fingerprint.load(Ordering::SeqCst))
+        fn watcher(&self) -> Watcher {
+            let fingerprint = self.fingerprint.clone();
+            Box::new(move || Some(fingerprint.load(Ordering::SeqCst)))
         }
     }
 }

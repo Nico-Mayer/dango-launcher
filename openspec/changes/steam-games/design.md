@@ -92,11 +92,14 @@ cover a few milliseconds after start.
 
 ### Freshness by fingerprint poll
 
-The service reuses the `applications` loop shape: read, then wait until a
-fingerprint changes or the sweep interval passes. The fingerprint hashes the
-modification times of `libraryfolders.vdf` and each library's `steamapps`
-folder. Steam adds or removes an `appmanifest_*.acf` file there on install
-and uninstall, which changes the folder's mtime. A launch reads the list
+The service shares the `applications` wait (`src/extensions/refresh.rs`):
+read, then wait until a fingerprint changes or the sweep interval passes. The
+fingerprint hashes the modification times of `libraryfolders.vdf` and of
+each `appmanifest_*.acf` in every library's `steamapps` folder. Steam creates
+the manifest when a download starts and may only rewrite it when the
+download finishes, which a folder's mtime would miss. Steam and its library
+paths are found once per read, so each poll only lists the `steamapps`
+folders and reads modification times. A launch reads the list
 first and fails when the game is gone. Unlike `applications`, it cannot wait
 for the launch to fail: Steam takes a link to an uninstalled game as a
 request to install it.
@@ -161,5 +164,5 @@ clipboard history's "will show up here".
   gamepad icon, so a change costs looks, not launches.
 - [Deny list misses a tool such as a dedicated server or SDK] -> Add the id
   when it shows up. Cheap, and specific to the author's library.
-- [Folder mtime does not change on some file systems] -> The sweep interval
+- [File mtime does not change on some file systems] -> The sweep interval
   still catches the change, only later.
