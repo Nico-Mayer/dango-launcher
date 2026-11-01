@@ -14,7 +14,13 @@ const SHOW: &str = "show";
 /// Held for as long as this process is the one Dango. `None` when another
 /// instance already runs.
 pub fn claim() -> Option<SingleInstance> {
-    let lock = SingleInstance::new(NAME).ok()?;
+    let lock = match SingleInstance::new(&crate::platform::instance_lock(NAME)) {
+        Ok(lock) => lock,
+        Err(error) => {
+            crate::log::append(&format!("cannot take the single instance lock: {error}"));
+            return None;
+        }
+    };
     lock.is_single().then_some(lock)
 }
 

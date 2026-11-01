@@ -331,6 +331,10 @@ load and are not reliable.
   bundle is not codesigned and carries no entitlements. To test a signed build,
   add `signingIdentity` locally with the identity from
   `security find-identity -v -p codesigning`, and do not commit it.
+- `single-instance` on macOS treats its name as a file path, so a bare name
+  lands in the working directory: `/` and read-only for an app opened from
+  Finder or at login, where Dango then exits silently. The lock lives in the
+  data dir (`platform::instance_lock`).
 - On macOS the updater swaps the bundle in place and returns. Dango then
   releases its single instance lock and starts the bundle again with
   `open -n`. On Windows the NSIS installer exits Dango and starts it again.
