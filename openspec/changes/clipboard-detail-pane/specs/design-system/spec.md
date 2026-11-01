@@ -10,9 +10,11 @@
   ratio, each with its title below, under optional section headings. The
   selected tile SHALL be outlined in the accent role.
 - A detail SHALL show its image, when declared, framed above its body, then
-  its body, and, when declared, its metadata as label and value pairs below
-  the body, labels in the muted role. A plain text body SHALL use the
-  monospace face.
+  its body, and, when declared, its metadata as label and value pairs at the
+  bottom of the detail, labels in the muted role. The metadata SHALL stay in
+  view while a long body scrolls above it. A plain text body SHALL use the
+  monospace face; the metadata SHALL keep the interface face, so it does not
+  read as part of the body.
 - A form SHALL show a label column and a control column. A field's error SHALL
   be shown under the field in the danger role and be its accessible
   description.
@@ -29,7 +31,18 @@
 
 - **WHEN** a detail declares an image, a body, and metadata
 - **THEN** the image is framed at the top, the body follows, and the metadata
-  is below the body
+  is at the bottom of the detail
+
+#### Scenario: A short body leaves the metadata at the bottom
+
+- **WHEN** a detail declares a one-line body and metadata
+- **THEN** the metadata sits at the bottom of the detail, not directly under
+  the body
+
+#### Scenario: A long body scrolls above the metadata
+
+- **WHEN** a detail declares a body taller than the detail, and metadata
+- **THEN** the body scrolls and the metadata stays in view at the bottom
 
 #### Scenario: A plain text body
 

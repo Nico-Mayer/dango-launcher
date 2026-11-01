@@ -66,6 +66,13 @@ gains, above the body:
 - For a plain text body, a `Text` in `Theme.mono` with `wrap: word-wrap`,
   instead of the `StyledText`.
 
+The metadata moves out of the `ScrollView` into a block pinned to the bottom
+of the detail: the divider, then the pairs with 6 px between rows instead of
+16 px. Only the image and body scroll. A metadata block directly under a
+short body read as part of the copied text in the hand check. The pairs keep
+`Theme.font`: with the body now in `Theme.mono`, the change of face is what
+sets them apart. Monospace pairs were considered and rejected for that reason.
+
 `DetailData` gains `image`, `has-image`, and `plain`. The detail writer gets
 the image through `Icons`, so it joins the render-scoped cache: an Arrow Down
 decodes the newly selected preview once, and a keystroke that keeps the
