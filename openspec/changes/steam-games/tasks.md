@@ -21,9 +21,9 @@
 
 ## 5. Hand checks on Windows
 
-- [ ] 5.1 Start a debug build with the Slint MCP server; with `scripts/send-keys.ps1` open the launcher and type "cyber", and confirm with `scripts/screenshot.ps1` that Cyberpunk 2077 (no shortcut) shows once with its icon; type "brawl" and confirm Brawlhalla (has a shortcut) shows once; confirm "Steamworks" shows nothing
-- [ ] 5.2 Close Steam, launch a game from root search, and confirm Steam starts and starts the game
-- [ ] 5.3 Run "Search Games" and confirm with a screenshot that the covers fill portrait tiles without stretching
+- [x] 5.1 Start a debug build with the Slint MCP server; with `scripts/send-keys.ps1` open the launcher and type "cyber", and confirm with `scripts/screenshot.ps1` that Cyberpunk 2077 (no shortcut) shows once with its icon; type "brawl" and confirm Brawlhalla (has a shortcut) shows once; confirm "Steamworks" shows nothing
+- [x] 5.2 Close Steam, launch a game from root search, and confirm Steam starts and starts the game
+- [x] 5.3 Run "Search Games" and confirm with a screenshot that the covers fill portrait tiles without stretching
 
 ## 6. Hand checks on macOS
 
