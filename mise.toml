@@ -6,6 +6,30 @@ hk = "2.0.0"
 "github:crate-ci/cargo-release" = "1.1.6"
 "cargo:cargo-packager" = "0.11.8"
 
+[tasks.check]
+description = "Check formatting and run clippy on every file, as CI does"
+run = "hk check --all"
+
+[tasks.ui]
+description = "Run a debug build with the Slint MCP server on port 9315"
+env = { SLINT_MCP_PORT = "9315" }
+run = "cargo run --features slint/mcp"
+
+[tasks.package]
+description = "Build the installer for this platform"
+run = "cargo packager --release --formats app,dmg"
+run_windows = "cargo packager --release --formats nsis"
+
+[tasks.keys]
+description = "Press keys through SendInput (Windows only)"
+run = "echo 'keys is Windows only' >&2; exit 1"
+run_windows = "powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/send-keys.ps1"
+
+[tasks.shot]
+description = "Capture every display and print the PNG path (Windows only)"
+run = "echo 'shot is Windows only' >&2; exit 1"
+run_windows = "powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/screenshot.ps1"
+
 [tasks.release]
 description = "Cut a release: derive version, changelog, commit, tag, push"
 run = "node scripts/release.mjs"

@@ -20,8 +20,10 @@ hk install --mise
 The second command registers git hooks for this clone. Committing runs
 `cargo fmt` on the staged Rust files and stages the result. Pushing runs
 `cargo clippy --all-targets -- -D warnings`, the same check CI runs, and aborts
-the push if it fails. `hk check` and `hk fix` run the
-same steps on demand. Use `git push --no-verify` to skip the push checks once.
+the push if it fails. `mise run check` runs the same checks on every file.
+Use `git push --no-verify` to skip the push checks once.
+
+`mise tasks` lists the project commands.
 
 ## Building and running
 
@@ -29,11 +31,11 @@ same steps on demand. Use `git push --no-verify` to skip the push checks once.
 cargo run                    # development build, marked "dev" in the launcher
 cargo test                   # every test, the UI included
 cargo build --release        # target/release/dango(.exe)
+mise run ui                  # debug build with the Slint MCP server
 ```
 
 Releases come from CI (see below). To build an installer locally, run
-`cargo packager --release --formats nsis` on Windows or
-`cargo packager --release --formats app,dmg` on macOS. Starting Dango again
+`mise run package`. Starting Dango again
 while it runs shows the launcher.
 
 ## Configuration

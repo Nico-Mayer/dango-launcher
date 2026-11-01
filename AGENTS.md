@@ -28,9 +28,14 @@ spec.
 - Agents commit their own work as they go, without asking: atomic
   conventional commits, each one building and passing its tests. Pushing
   still waits for the author.
-- Run `hk check` before pushing: `cargo fmt` and
-  `cargo clippy --all-targets -- -D warnings`, which also compiles the
-  `.slint` files. Tests, UI included: `cargo test`.
+- Run `mise run check` before pushing: `cargo fmt` and
+  `cargo clippy --all-targets -- -D warnings` on every file, which also
+  compiles the `.slint` files. Tests, UI included: `cargo test`. Plain
+  `hk check` only looks at changed files, so on a clean tree it checks
+  nothing.
+- Repeated commands are mise tasks (`mise tasks` lists them). They set
+  their own env vars and pick the platform's command, so they run the same
+  in fish, PowerShell, and bash.
 - Work one platform at a time. Finish and verify on the machine at hand, and
   leave the other platform's hand checks as open tasks in the change's
   `tasks.md` until a session on that machine. Do not archive a change with
@@ -87,8 +92,9 @@ spend design on honouring old values.
   an SVG: add the name to that registry. An extension names one as
   `icon:<name>`; a value without that prefix is a path to an image file.
 - SQLite for local persistence.
-- Node, the OpenSpec CLI, hk, git-cliff, and cargo-release are pinned via mise
-  (`mise.toml`). Node runs only the OpenSpec CLI and `scripts/*.mjs`.
+- Node, the OpenSpec CLI, hk, git-cliff, cargo-release, and cargo-packager
+  are pinned via mise (`mise.toml`). Node runs only the OpenSpec CLI and
+  `scripts/*.mjs`.
 
 ### Off the shelf before hand-rolled
 
@@ -279,8 +285,8 @@ load and are not reliable.
   console, so a panic there is a silent exit.
 - The Slint MCP server is for debug builds only, and never enabled in
   `Cargo.toml`, so a release cannot open the port:
-  `env SLINT_MCP_PORT=9315 cargo run --features slint/mcp`. It starts
-  listening on the first window show.
+  `mise run ui`, which is `cargo run --features slint/mcp` with
+  `SLINT_MCP_PORT=9315`. It starts listening on the first window show.
 - `dango-ui` in `.mcp.json` is a stdio proxy in `tools/dango-ui-mcp`, its
   own crate and target folder, so it is always connected. With no debug
   build up it lists only `launch_dango`, which runs the command above, shows
@@ -290,11 +296,10 @@ load and are not reliable.
   The first session after a clean checkout compiles the proxy; if Claude
   Code times out on it, build it once with
   `cargo build --manifest-path tools/dango-ui-mcp/Cargo.toml`.
-- For hand checks on Windows, an agent can press keys with
-  `scripts/send-keys.ps1` (for example `alt+space 'text:fire' escape`) and
-  capture every display with `scripts/screenshot.ps1`, which prints the PNG
-  path. Run both with
-  `powershell.exe -NoProfile -ExecutionPolicy Bypass -File`. A `down:` held
+- For hand checks on Windows, an agent can press keys with `mise run keys`
+  (for example `mise run keys alt+space 'text:fire' escape`) and capture
+  every display with `mise run shot`, which prints the PNG path. Both wrap
+  `scripts/*.ps1` and exist only on Windows. A `down:` held
   through SendInput does not auto-repeat: send the key many times to mimic
   holding it. Keys go to whatever is in front, so check the foreground
   window is Dango before sending Enter, Escape, or Ctrl chords.
@@ -302,8 +307,8 @@ load and are not reliable.
   and a newline inside a longer text is typed into the field. Send Enter on
   its own, and pick list rows with `set_element_value` on the search field.
 - Packaging is `cargo-packager`, configured in `[package.metadata.packager]`
-  in `Cargo.toml` with camelCase keys. Windows packages with
-  `cargo packager --release --formats nsis`, macOS with `--formats app,dmg`.
+  in `Cargo.toml` with camelCase keys. `mise run package` builds `nsis` on
+  Windows and `app,dmg` on macOS.
   With `CARGO_PACKAGER_SIGN_PRIVATE_KEY` set, it writes a minisign `.sig` next
   to each output and tars the `.app` into the `.app.tar.gz` the updater
   installs.
