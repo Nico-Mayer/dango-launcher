@@ -10,6 +10,10 @@ other key without a modifier, and a modifier alone (such as the Windows key or
 the Command key), SHALL be refused and never registered with the operating
 system.
 
+On macOS the hyperkey is built on F18, so while the hyperkey is on, a hotkey
+that uses F18 SHALL NOT be expected to fire. Dango does not refuse it; the
+settings reference SHALL state the clash.
+
 When the launcher hotkey is refused, Dango SHALL summon the launcher with the
 platform default instead, write the reason to the log, and show a tray notice
 that the configured hotkey is invalid and the default is in use.
@@ -48,3 +52,9 @@ that the configured hotkey is invalid and the default is in use.
 - **WHEN** the configuration file sets the launcher hotkey to `win` or `cmd`
 - **THEN** the hotkey is refused because it has no key
 - **AND** the platform default summons the launcher
+
+#### Scenario: F18 with the hyperkey on macOS
+
+- **WHEN** on macOS the hyperkey is on and a hotkey is set to `f18`
+- **THEN** pressing F18 does not trigger that hotkey
+- **AND** the settings reference says the hyperkey uses F18 on macOS
