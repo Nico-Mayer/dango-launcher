@@ -708,7 +708,6 @@ impl Harness {
             thinking: Thinking::Off,
             prompt: rendered.text,
             key: None,
-            cli: None,
         });
 
         let mut answer = String::new();
