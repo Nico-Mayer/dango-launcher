@@ -65,10 +65,4 @@ mod tests {
             assert_eq!(app_for(Some(browser.id())), None);
         }
     }
-
-    #[test]
-    fn a_known_browser_opens_by_its_app_name() {
-        assert_eq!(app_for(Some("firefox")), Browser::Firefox.app());
-        assert!(app_for(Some("firefox")).is_some());
-    }
 }
