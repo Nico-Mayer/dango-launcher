@@ -24,7 +24,7 @@
 
 ## 5. Windows hand checks
 
-- [ ] 5.1 Hand check on Windows in a debug build with the `dango-ui` MCP server and `scripts/send-keys.ps1` / `scripts/screenshot.ps1`: copy text from VS Code and Notepad, an indented code block, a link, and two full-screen screenshots; open Clipboard History and confirm the pane shows each entry as copied, the source names, "Today" times, kinds, counts, and image sizes, and that the screenshots are sharp at the display's scaling
+- [x] 5.1 Hand check on Windows in a debug build with the `dango-ui` MCP server and `scripts/send-keys.ps1` / `scripts/screenshot.ps1`: copy text from VS Code and Notepad, an indented code block, a link, and two full-screen screenshots; open Clipboard History and confirm the pane shows each entry as copied, the source names, "Today" times, kinds, counts, and image sizes, and that the screenshots are sharp at the display's scaling
 - [ ] 5.2 Hand check on Windows in a release build with `DANGO_CONFIG_DIR` set to a scratch directory: hold Arrow Down through a history full of screenshots and confirm the selection and the pane follow without visible lag, and that memory drops back after leaving the history
 
 ## 6. macOS (open until a session on the Mac)
