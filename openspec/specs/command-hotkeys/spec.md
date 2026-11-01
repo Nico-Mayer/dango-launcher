@@ -14,7 +14,14 @@ A command MAY declare a global hotkey in the configuration file at
 `extensions.<id>.commands.<id>.hotkey`, written in the same grammar as the
 launcher hotkey. Dango SHALL register the hotkey of each bound command that is
 enabled, so that pressing it invokes that command regardless of which
-application has focus. A disabled command's hotkey SHALL NOT be registered.
+application has focus. A disabled command's hotkey SHALL NOT be registered,
+and Dango SHALL write one line to its log for each disabled command that has a
+hotkey, naming the command.
+
+A command or application hotkey MAY be one chord for both platforms or an
+object with `macos` and `windows` chords. With the object, each platform SHALL
+register its own chord and ignore the other's. A platform with no value SHALL
+register no chord for that binding and SHALL surface it as a refused hotkey.
 
 Bindings SHALL be read at startup and SHALL be re-applied when the configuration
 file changes, without a restart.
@@ -40,6 +47,19 @@ file changes, without a restart.
 - **WHEN** a command has a hotkey in the config and `"enabled": false`
 - **THEN** its chord is not registered and pressing it does not invoke the command
 - **AND** the log notes that the command has a hotkey but is disabled
+
+#### Scenario: A per-platform command chord
+
+- **WHEN** a command's hotkey is written as an object with `macos` and
+  `windows` chords
+- **THEN** each platform registers its own chord and ignores the other's
+
+#### Scenario: A chord for the other platform only
+
+- **WHEN** a hotkey object has a value only for the other platform
+- **THEN** no chord is registered for that binding on this platform
+- **AND** it is surfaced through the tray status line and the log as a refused
+  hotkey, naming the command or application
 
 ### Requirement: A hotkey invokes a command the same way root search does
 
@@ -143,7 +163,8 @@ file at `extensions.dango.applications.apps.<name>.hotkey`, in the same grammar
 as every other hotkey. Dango SHALL register each bound chord so that pressing
 it launches that application, or brings it to the front when it is already
 running, regardless of which application has focus, and without the launcher
-appearing.
+appearing. How an entry names its application, including a name per platform
+and a name that matches more than one application, is in applications.
 
 Application bindings SHALL be read at startup and re-applied when the
 configuration file changes, without a restart, and SHALL take part in the same

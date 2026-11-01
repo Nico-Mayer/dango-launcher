@@ -61,16 +61,14 @@ a local provider SHALL NOT leave the machine.
 
 - **WHEN** a command uses a local provider and nothing is listening at its
   endpoint
-- **THEN** the command fails with a message saying the local model could not be
-  reached
-- **AND** the message says to check that the local model server is running
+- **THEN** the command fails with "Couldn't reach your local model server"
 
 ### Requirement: Keys live in a plain file in the config directory
 
 Keys for hosted providers SHALL be read from `auth.json` in the configuration
-directory, `~/.config/dango/` on both platforms, honouring `$DANGO_CONFIG_DIR`.
-The file SHALL map a provider's name to its key. It SHALL be optional: with no
-file, only providers needing no key work.
+directory described in `openspec/specs/configuration`. The file SHALL map a
+provider's name to its key. It SHALL be optional: with no file, only providers
+needing no key work.
 
 Dango SHALL only read this file; it SHALL NOT write keys into it. A key SHALL
 NOT be written into `config.json`, into the local database, into a log, or into
@@ -92,10 +90,17 @@ Dango SHALL keep the file readable only by its owner.
 
 #### Scenario: The key file cannot be read
 
-- **WHEN** `auth.json` exists but does not parse
-- **THEN** Dango keeps running and surfaces the problem the way a bad
-  configuration file is surfaced
-- **AND** commands using a local provider still work
+- **WHEN** `auth.json` exists but does not parse and a command uses a hosted
+  provider
+- **THEN** the problem is written to the log
+- **AND** the command fails with "auth.json couldn't be read. Check the file in
+  your config folder."
+
+#### Scenario: A local provider works with an unreadable key file
+
+- **WHEN** `auth.json` exists but does not parse and a command uses a local
+  provider
+- **THEN** the command runs normally
 
 #### Scenario: A key never appears anywhere else
 
@@ -127,7 +132,8 @@ Dango SHALL keep the file readable only by its owner.
 Each command SHALL be able to name the provider it uses, the model, and how much
 the model should think before answering. Anything a command does not name SHALL
 fall back to the configured default, and the default provider's own default
-model SHALL be used when no model is named anywhere.
+model SHALL be used when no model is named anywhere. With exactly one provider
+configured and no default named, that provider SHALL be the default.
 
 The thinking level SHALL be one of off, low, medium, or high. A model that
 cannot think SHALL ignore the level rather than failing.
@@ -159,6 +165,12 @@ cannot think SHALL ignore the level rather than failing.
 - **WHEN** a command sets a thinking level and the model does not support one
 - **THEN** the request is made anyway and the answer arrives normally
 
+#### Scenario: One provider and no default
+
+- **WHEN** exactly one provider is configured, no default is named, and a
+  command names none either
+- **THEN** that provider is used
+
 #### Scenario: Several providers and no default
 
 - **WHEN** more than one provider is configured, no default is named, and a
@@ -170,6 +182,13 @@ cannot think SHALL ignore the level rather than failing.
 
 - **WHEN** a command names a provider with no entry in the configuration
 - **THEN** it fails with a message saying that provider is not set up
+- **AND** no request is made
+
+#### Scenario: No model is named anywhere
+
+- **WHEN** neither the command nor its provider names a model
+- **THEN** it fails with "Set a model for {provider} in your config file", with
+  the provider's name in place of `{provider}`
 - **AND** no request is made
 
 ### Requirement: A request failure is explained in the user's terms
@@ -206,15 +225,3 @@ for debugging SHALL go to the log.
 - **WHEN** no part of an answer has arrived within 30 seconds of the request
 - **THEN** the request is abandoned
 - **AND** the message says the model did not answer in time
-
-### Requirement: Requests are made by the application core, never the UI layer
-
-Every request to a provider SHALL be made by the application core. No key and
-no request SHALL be handed to the code that draws the interface, and no
-provider endpoint SHALL be called from it.
-
-#### Scenario: The interface never holds a key
-
-- **WHEN** an AI command runs
-- **THEN** the key and the request stay inside the application core
-- **AND** the interface receives only the text of the answer

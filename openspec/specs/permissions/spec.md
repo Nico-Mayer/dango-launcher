@@ -13,8 +13,9 @@ fails silently for want of a permission.
 On macOS Dango SHALL track two permissions: Accessibility, which pasting,
 inserting snippets, reading the selection, AI paste, and window management need,
 and Input Monitoring, which keyword expansion and the hyperkey need. Dango SHALL
-re-check both each time the launcher is shown, and SHALL re-check at least every
-2 seconds while it runs. Checking SHALL NOT show a system prompt.
+re-check both each time the launcher is shown, and SHALL keep re-checking while
+it runs, so a change is noticed within a few seconds without the launcher being
+opened. Checking SHALL NOT show a system prompt.
 
 #### Scenario: Both permissions are granted on macOS
 
@@ -29,7 +30,7 @@ re-check both each time the launcher is shown, and SHALL re-check at least every
 #### Scenario: A grant is noticed without opening the launcher on macOS
 
 - **WHEN** a permission is missing and the user grants it in System Settings without opening the launcher
-- **THEN** Dango notices the grant within 2 seconds
+- **THEN** Dango notices the grant within a few seconds, without the launcher being opened
 
 #### Scenario: Checking never prompts on macOS
 
@@ -46,12 +47,14 @@ searching for the permission's name or for "permission".
 #### Scenario: Accessibility is missing on macOS
 
 - **WHEN** Accessibility is not granted and the user opens the launcher
-- **THEN** the first item reads that Accessibility is off and names pasting, snippets, AI paste, and window management
+- **THEN** the first item reads "Accessibility is off"
+- **AND** its subtitle reads "Pasting, snippets, AI paste, and window management don't work without it"
 
 #### Scenario: Input Monitoring is missing on macOS
 
 - **WHEN** Input Monitoring is not granted and the user opens the launcher
-- **THEN** the first item reads that Input Monitoring is off and names keyword expansion and the hyperkey
+- **THEN** the first item reads "Input Monitoring is off"
+- **AND** its subtitle reads "Keyword expansion and the hyperkey don't work without it"
 
 #### Scenario: Both are missing on macOS
 
@@ -102,7 +105,7 @@ SHALL disappear when the permission is granted, without a restart.
 #### Scenario: The tray item goes away after a grant on macOS
 
 - **WHEN** the user grants the permission while Dango runs
-- **THEN** within 2 seconds the tray menu no longer has that item
+- **THEN** within a few seconds, without the launcher being opened, the tray menu no longer has that item
 
 ### Requirement: A grant takes effect as macOS allows
 

@@ -11,9 +11,12 @@ holes in it.
 
 ### Requirement: A template renders its placeholders
 
-A template SHALL be plain text containing placeholders written as a name between
-double braces. Rendering SHALL replace each placeholder with its value and leave
-all other text exactly as written.
+A template SHALL be text in Jinja syntax. A placeholder SHALL be a name between
+double braces, as in `{{ name }}`. `{% ... %}` SHALL mark a statement and
+`{# ... #}` a comment, filters such as `{{ name | upper }}` SHALL apply to a
+value, and text between `{% raw %}` and `{% endraw %}` SHALL be kept as
+written. Rendering SHALL replace each placeholder with its value and leave all
+text outside these delimiters exactly as written.
 
 #### Scenario: A placeholder is replaced
 
@@ -29,6 +32,18 @@ all other text exactly as written.
 
 - **WHEN** a template contains single braces, such as a block of code
 - **THEN** they appear unchanged in the result
+
+#### Scenario: A filter changes a value
+
+- **WHEN** a template containing `{{ name | upper }}` is rendered with `name`
+  set to "dango"
+- **THEN** the result contains "DANGO"
+
+#### Scenario: Double braces can be kept as text
+
+- **WHEN** a template contains `{% raw %}${{ matrix.os }}{% endraw %}`
+- **THEN** the result contains `${{ matrix.os }}`
+- **AND** no argument is reported for it
 
 #### Scenario: Rendering is fast enough to be invisible
 
@@ -54,7 +69,7 @@ except `query`, which is supplied by the caller.
 #### Scenario: The date placeholder
 
 - **WHEN** a template using `date` is rendered
-- **THEN** the current date appears in its place
+- **THEN** the current local date appears in its place, written as `YYYY-MM-DD`
 
 #### Scenario: The uuid placeholder
 

@@ -11,9 +11,9 @@ application, and the registry that holds the result.
 ### Requirement: Versioned extension manifest
 
 Every extension SHALL declare a manifest carrying a `manifestVersion`, a stable
-identifier unique across extensions, a display name, and an icon. Dango SHALL
-refuse to load an extension whose `manifestVersion` it does not support, and
-SHALL continue running without it.
+identifier unique across extensions, a display name, and optionally an icon.
+Dango SHALL refuse to load an extension whose `manifestVersion` it does not
+support, and SHALL continue running without it.
 
 #### Scenario: Manifest version is supported
 
@@ -119,7 +119,7 @@ unregister its commands, release its hotkeys, remove its root items provider
 from the search pipeline, and stop its services. Enabling SHALL restore all of
 them without restarting the application. Turning off a single command of an
 enabled extension is narrower and SHALL affect only that command, as the
-requirement "A single command can be disabled" defines.
+requirement "A command can be disabled on its own" defines.
 
 #### Scenario: Disabling removes commands from search
 
@@ -206,34 +206,22 @@ the user, including the config schema and the settings reference.
 - **THEN** the declaration lists them
 - **AND** reading a stored value outside the set returns the default
 
-### Requirement: A single command can be disabled
+### Requirement: A command can be disabled on its own
 
 A command whose entry in the configuration file at
 `extensions.<id>.commands.<id>` sets `enabled` to false SHALL be disabled, for
 every extension, built-in or not. A disabled command SHALL NOT appear in root
-search, SHALL NOT be invocable, and its configured hotkey SHALL NOT be
-registered. Dango SHALL write one line to its log for each disabled command
-that has a hotkey, naming the command. The extension's other commands, its
-root items, and its services SHALL be unaffected. An absent `enabled` SHALL
-mean enabled. A change to a command's `enabled` value SHALL apply when the
-file is reloaded, without a restart.
+search and SHALL NOT be invocable. What happens to its hotkey is in
+command-hotkeys. The extension's other commands, its root items, and its
+services SHALL be unaffected. An absent `enabled` SHALL mean enabled. A change
+to a command's `enabled` value SHALL apply when the file is reloaded, without a
+restart.
 
 #### Scenario: A disabled command leaves root search
 
 - **WHEN** the file sets `enabled` to false on a command of an enabled extension
 - **THEN** that command does not appear in root search for any query
 - **AND** the extension's other commands still appear
-
-#### Scenario: A disabled command's hotkey does nothing
-
-- **WHEN** a disabled command has a hotkey in the file and the user presses that chord
-- **THEN** the command does not run
-- **AND** the log has a line saying the command has a hotkey but is disabled
-
-#### Scenario: A disabled command's chord is free for another command
-
-- **WHEN** a disabled command and an enabled command are bound to the same chord
-- **THEN** the enabled command keeps the chord and no conflict is reported
 
 #### Scenario: A command disabled after results were produced
 

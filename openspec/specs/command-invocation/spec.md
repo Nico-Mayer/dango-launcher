@@ -25,23 +25,6 @@ two extensions declaring the same command identifier never invoke each other's.
 - **THEN** nothing is invoked
 - **AND** the launcher stays open and reports that the command is unavailable
 
-### Requirement: Every command names the host that runs it
-
-The registry SHALL record which host executes each command, and invocation SHALL
-go through that host rather than calling the extension directly. Only the
-built-in native host exists in this change.
-
-#### Scenario: Built-in command runs on the native host
-
-- **WHEN** a command contributed by a built-in extension is invoked
-- **THEN** it is executed by the built-in native host
-
-#### Scenario: Host is unavailable
-
-- **WHEN** a command names a host that this build cannot run
-- **THEN** the command is not invoked
-- **AND** the user is told the command cannot run in this build
-
 ### Requirement: A no-view command reports its outcome
 
 A command declared `no-view` SHALL perform its work and report either success or

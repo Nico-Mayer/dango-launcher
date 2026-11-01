@@ -63,12 +63,18 @@ so the configuration stays shareable.
 - **WHEN** the file does not mention a preference
 - **THEN** reading it returns the extension's declared default
 
+#### Scenario: A value of the wrong type falls back to the default
+
+- **WHEN** the file sets a preference to a value that cannot be read as the
+  type the extension declares
+- **THEN** reading it returns the declared default
+- **AND** the extension still loads
+
 #### Scenario: An application hotkey has one path
 
 - **WHEN** the file binds an application under
   `extensions.dango.applications.apps.<name>.hotkey`
 - **THEN** that binding is applied
-- **AND** writing the file back preserves it alongside every other setting
 
 #### Scenario: A command defined in the file has one path
 
@@ -80,7 +86,7 @@ so the configuration stays shareable.
 
 #### Scenario: No credential is written to the file
 
-- **WHEN** Dango writes the configuration file back
+- **WHEN** Dango creates the configuration file
 - **THEN** no key or secret appears in it
 
 ### Requirement: Configuration is versioned and forward compatible
@@ -100,8 +106,8 @@ older Dango and a newer one can share one file.
 
 Dango SHALL watch the configuration file and re-apply it when it changes, without
 a restart: the launcher hotkey, enabled state, preferences, and aliases SHALL
-reflect the new file. When Dango itself writes the file, that write SHALL NOT be
-treated as an external edit to react to.
+reflect the new file. When Dango itself creates the file, that write SHALL NOT
+be treated as an external edit to react to.
 
 #### Scenario: Editing the file re-applies it
 
@@ -110,7 +116,7 @@ treated as an external edit to react to.
 
 #### Scenario: The app's own write does not loop
 
-- **WHEN** Dango writes the file itself
+- **WHEN** Dango creates the file itself
 - **THEN** it does not re-apply its own write as though the user had edited it
 
 ### Requirement: A bad file never takes the app down
@@ -132,15 +138,14 @@ where the user can find it rather than failing silently.
 - **THEN** Dango starts on its built-in defaults
 - **AND** the error is surfaced rather than the app refusing to start
 
-### Requirement: The file survives being written back
+### Requirement: Dango writes the file only to create it
 
-The loader SHALL represent the file so that writing it back preserves settings it
-did not itself change, including keys it does not understand, so a future editor
-of the file, whether a person or a settings interface, does not lose data by
-saving.
+Dango SHALL NOT change an existing configuration file. The only write SHALL be
+creating a missing file when the user opens it (see system-commands, "Open
+config file").
 
-#### Scenario: Writing back keeps unrelated settings
+#### Scenario: Settings are never written back
 
-- **WHEN** one setting is changed and the file is written back
-- **THEN** every other setting in the file, including any unrecognised key, is
-  still present afterward
+- **WHEN** Dango runs with an existing `config.json`, including one that does
+  not parse
+- **THEN** the file's content is the same as the user last saved it

@@ -297,18 +297,18 @@ keystroke or every start.
 ### Requirement: Favicon fetching can be turned off
 
 The user SHALL be able to stop Dango making requests to the sites their
-quicklinks point at, through a `dango.quicklinks` preference that defaults to
-on.
+quicklinks point at, through the `dango.quicklinks` preference `favicons`, a
+boolean that defaults to `true`.
 
 #### Scenario: Turning it off
 
-- **WHEN** the preference is set to off
+- **WHEN** `favicons` is set to `false`
 - **THEN** Dango makes no request to any quicklink's host
 - **AND** every quicklink is shown with the launcher's quicklink icon
 
 #### Scenario: Turning it back on
 
-- **WHEN** the preference is set back to on
+- **WHEN** `favicons` is set back to `true`
 - **THEN** fetching resumes without a restart
 
 #### Scenario: The quicklinks extension is disabled

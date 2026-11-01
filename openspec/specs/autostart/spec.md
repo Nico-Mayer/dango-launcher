@@ -14,7 +14,9 @@ Dango SHALL read a boolean `launcher.autostart` from the config file. When it is
 true, Dango SHALL be registered to start at the user's login on the machine the
 file is read on. When it is false or absent, Dango SHALL NOT be registered, and
 an entry Dango created earlier SHALL be removed. The setting SHALL apply at
-startup and when the config file is reloaded, without a restart.
+startup and when the config file is reloaded, without a restart. When the
+config file does not parse at startup, Dango SHALL NOT apply the setting and
+SHALL leave the login entry as it is.
 
 #### Scenario: Setting is absent
 
@@ -40,6 +42,11 @@ startup and when the config file is reloaded, without a restart.
 
 - **WHEN** the config file is reloaded and the setting has the same value as before
 - **THEN** the login entry is left as it is and no error is reported
+
+#### Scenario: Config does not parse at startup
+
+- **WHEN** Dango starts and the config file does not parse
+- **THEN** the setting is not applied and the login entry is left as it is
 
 ### Requirement: The login entry starts Dango the way the user would
 

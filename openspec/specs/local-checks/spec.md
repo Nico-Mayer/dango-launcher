@@ -29,28 +29,6 @@ MUST be preserved unchanged.
 - **WHEN** the developer commits only non-Rust files, such as Markdown or `.slint` files
 - **THEN** no Rust tooling runs and the hook adds no noticeable time to the commit
 
-### Requirement: Pushing runs the CI lints
-
-The system SHALL run clippy with `--all-targets` and warnings denied before a
-push, using the same flags as the CI workflow, and SHALL abort the push when it
-fails. Because the build compiles the `.slint` files, an interface file that
-does not compile SHALL fail the same check.
-
-#### Scenario: Clippy warning present
-
-- **WHEN** the developer pushes a commit that produces a clippy warning under `--all-targets -- -D warnings`
-- **THEN** the push is aborted and the warning is printed in the terminal
-
-#### Scenario: Frontend type error present
-
-- **WHEN** the developer pushes a commit with a `.slint` file that does not compile
-- **THEN** the push is aborted and the compiler error is printed in the terminal
-
-#### Scenario: Clean tree
-
-- **WHEN** clippy passes
-- **THEN** the push proceeds without further prompts
-
 ### Requirement: Checks run on demand
 
 The system SHALL let the developer run the same checks against the working tree
@@ -87,4 +65,26 @@ tools even when the shell has not activated mise.
 #### Scenario: Hook runner not installed
 
 - **WHEN** the hooks have not been installed in a clone
-- **THEN** commits and pushes behave exactly as before this change and CI remains the gate
+- **THEN** commits and pushes run no checks and CI remains the gate
+
+### Requirement: Pushing runs the CI lints and the Slint compiler
+
+The system SHALL run clippy with `--all-targets` and warnings denied before a
+push, using the same flags as the CI workflow, and SHALL abort the push when it
+fails. Clippy builds the crate and the build compiles the `.slint` files, so a
+`.slint` file that does not compile SHALL fail the same check.
+
+#### Scenario: Clippy warning present
+
+- **WHEN** the developer pushes a commit that produces a clippy warning under `--all-targets -- -D warnings`
+- **THEN** the push is aborted and the warning is printed in the terminal
+
+#### Scenario: Slint file does not compile
+
+- **WHEN** the developer pushes a commit with a `.slint` file that does not compile
+- **THEN** the push is aborted and the compiler error is printed in the terminal
+
+#### Scenario: Clean tree
+
+- **WHEN** clippy passes
+- **THEN** the push proceeds without further prompts

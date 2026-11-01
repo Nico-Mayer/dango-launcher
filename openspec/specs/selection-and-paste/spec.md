@@ -15,14 +15,14 @@ Dango SHALL be able to read the text currently selected in the frontmost
 application, and SHALL report the absence of a selection distinctly from a
 failure to read one.
 
-On both platforms Dango SHALL first ask the application directly, through the
-platform's accessibility interface, and SHALL send no keystrokes to do it. The
-clipboard round trip SHALL be a fallback, used only where the application cannot
-be asked.
+On both platforms Dango SHALL first ask the application directly, and SHALL
+send no keystrokes to do it. The clipboard round trip SHALL be a fallback, used
+only where the application cannot be asked.
 
 An application that answers but reports nothing selected SHALL be treated as an
 empty selection, not as a failure to read, and SHALL NOT fall through to the
-keystroke path.
+keystroke path. The direct request SHALL be bounded in time, so an application
+that does not answer cannot hold up the read.
 
 #### Scenario: Reading a selection on macOS
 
@@ -46,7 +46,8 @@ keystroke path.
 
 #### Scenario: The application answers and has no selection
 
-- **WHEN** the frontmost application exposes its text but nothing is selected
+- **WHEN** the frontmost application exposes its text but nothing is selected,
+  on either platform
 - **THEN** an empty selection is reported
 - **AND** no keystroke is sent
 
@@ -65,7 +66,7 @@ keystroke path.
 #### Scenario: An application that does not answer in time
 
 - **WHEN** the frontmost application has not answered the direct request after
-  a short bounded wait
+  a short bounded wait, on either platform
 - **THEN** Dango stops waiting for it
 - **AND** the read completes by the fallback or reports that it could not be done
 
@@ -138,9 +139,13 @@ on the clipboard after it is pasted, ready to be pasted again.
 
 ### Requirement: Dango's own clipboard use never reaches the history
 
-No clipboard write Dango makes in order to read a selection or insert text SHALL
-appear in the clipboard history, and no such write SHALL reorder an entry that
-is already there.
+No clipboard write Dango makes, to read a selection, to insert text, or to put
+a clipboard history entry back on the clipboard, SHALL appear in the clipboard
+history, and no such write SHALL reorder an entry that is already there.
+
+A write SHALL be recognised as Dango's own even when the system does not hand
+it back unchanged. Recognition SHALL be bounded in time, so that the user
+copying the same thing later is still recorded as theirs.
 
 #### Scenario: Inserted text is not recorded
 
@@ -157,45 +162,27 @@ is already there.
 - **WHEN** Dango reads a selection by copying it
 - **THEN** the copied text does not appear in the history
 
+#### Scenario: Putting a history entry back is not recorded
+
+- **WHEN** Dango puts a clipboard history entry back on the clipboard
+- **THEN** that does not create a new entry or reorder the history
+
+#### Scenario: An image Dango wrote comes back re-encoded
+
+- **WHEN** Dango puts an image on the clipboard and the system hands it back
+  encoded differently from what was written
+- **THEN** it is still recognised as Dango's own write and no entry is created
+
+#### Scenario: The user copies an image of their own afterwards
+
+- **WHEN** the user copies an image themselves, later than the window in which
+  Dango's own write is recognised
+- **THEN** it is recorded, even if it is the same image Dango wrote
+
 #### Scenario: A genuine copy during the operation is still recorded
 
 - **WHEN** the user copies something themselves while Dango is inserting text
 - **THEN** what they copied is recorded in the history
-
-### Requirement: The macOS permission is a visible state
-
-On macOS both reading the selection and inserting text require the Accessibility
-permission. Dango SHALL detect that it is missing and SHALL explain it, rather
-than failing silently. Whether the permission was granted before or after Dango
-started SHALL make no difference.
-
-#### Scenario: Acting without the permission on macOS
-
-- **WHEN** the user invokes something that reads the selection or inserts text and the permission has not been granted
-- **THEN** nothing is sent to the other application
-- **AND** the launcher explains that the permission is needed and offers to request it
-
-#### Scenario: Requesting the permission on macOS
-
-- **WHEN** the user chooses to request the permission
-- **THEN** the system's permission prompt is shown
-- **AND** no prompt appears at any other time
-
-#### Scenario: The permission is granted on macOS
-
-- **WHEN** the permission has been granted
-- **THEN** reading the selection and inserting text work without any further prompting
-
-#### Scenario: The permission is granted after Dango started on macOS
-
-- **WHEN** Dango was started without the permission and the user grants it while Dango is running
-- **THEN** the next insertion or selection read works without restarting Dango
-
-#### Scenario: Windows needs no permission
-
-- **WHEN** the user invokes something that reads the selection or inserts text on Windows
-- **THEN** it works with no permission step
-- **AND** no message about a permission is ever shown
 
 ### Requirement: Failures are reported, never silent
 
@@ -222,19 +209,19 @@ unavailable, reading the selection and inserting text SHALL still work.
 #### Scenario: The text path could not be set up on Windows
 
 - **WHEN** Dango could not set up the text path at startup on Windows and the user invokes something that reads the selection or inserts text
-- **THEN** the launcher says Dango can't reach other apps and names `dango.log`
+- **THEN** the launcher shows "Dango can't reach other apps right now"
 - **AND** the message does not mention a permission
 
 #### Scenario: The text path could not be set up on macOS
 
 - **WHEN** Dango could not set up the text path at startup on macOS and the user invokes something that reads the selection or inserts text
-- **THEN** the launcher says Dango can't reach other apps and names `dango.log`
+- **THEN** the launcher shows "Dango can't reach other apps right now"
 - **AND** the message does not mention a permission
 
 #### Scenario: The tray reports a text path that could not be set up
 
 - **WHEN** Dango could not set up the text path at startup
-- **THEN** a disabled tray item says pasting is off and names `dango.log`
+- **THEN** a disabled tray item reads "Pasting is off, see dango.log"
 
 #### Scenario: The clipboard history is unavailable
 
@@ -244,26 +231,33 @@ unavailable, reading the selection and inserting text SHALL still work.
 
 ### Requirement: The keystroke fallback can be refused for an application
 
-A synthesized copy is a chord the target application is free to bind to
-something else, and a modal editor does: in a Helix keymap Ctrl+C toggles
-comments, so the fallback edits the user's document instead of copying it.
-
 The user SHALL be able to name applications where the clipboard fallback must
-not be attempted. For a named application Dango SHALL report that it cannot read
-the selection, and SHALL send no keystroke. Applications SHALL be named the way
-the clipboard history already names its exclusions, so one habit covers both.
+not be attempted, because the copy chord does something else there. For a
+named application Dango SHALL report that it cannot read the selection, and
+SHALL send no keystroke.
+
+The applications SHALL be set by the config key
+`selection.excluded-applications`: application names, comma separated, matched
+ignoring case, the same way as the clipboard history's exclusion list. It SHALL
+be empty by default.
 
 #### Scenario: A named application is never sent the copy chord
 
 - **WHEN** the frontmost application is one the user named, and something reads
   the selection
 - **THEN** no keystroke is sent to it
-- **AND** the failure says the selection could not be read there
+- **AND** the failure says to copy the text first, as that application does not
+  share its selection
+
+#### Scenario: Names match ignoring case
+
+- **WHEN** `selection.excluded-applications` names "helix" and the frontmost
+  application is named "Helix"
+- **THEN** it is treated as a named application
 
 #### Scenario: A named application that does expose its selection still works
 
-- **WHEN** a named application exposes its selection through the accessibility
-  interface
+- **WHEN** a named application exposes its selection directly
 - **THEN** the selection is read directly
 - **AND** the exclusion never comes into play
 
@@ -271,9 +265,34 @@ the clipboard history already names its exclusions, so one habit covers both.
 
 - **WHEN** the frontmost application is not named and does not expose its
   selection
-- **THEN** the clipboard fallback runs as before
+- **THEN** the clipboard fallback runs
 
 #### Scenario: The list is empty by default
 
-- **WHEN** the user has named no applications
-- **THEN** every application falls back as it does today
+- **WHEN** `selection.excluded-applications` is not set
+- **THEN** every application that does not expose its selection gets the
+  clipboard fallback
+
+### Requirement: Reading and inserting need Accessibility on macOS
+
+On macOS both reading the selection and inserting text require the Accessibility
+permission. Dango SHALL detect that it is missing and SHALL explain it, rather
+than failing silently. Requesting the permission and noticing a grant are in
+`openspec/specs/permissions`.
+
+#### Scenario: Acting without the permission on macOS
+
+- **WHEN** the user invokes something that reads the selection or inserts text and the permission has not been granted
+- **THEN** nothing is sent to the other application
+- **AND** the launcher shows "Allow Accessibility in System Settings"
+
+#### Scenario: The permission is granted on macOS
+
+- **WHEN** the permission has been granted
+- **THEN** reading the selection and inserting text work without any further prompting
+
+#### Scenario: Windows needs no permission
+
+- **WHEN** the user invokes something that reads the selection or inserts text on Windows
+- **THEN** it works with no permission step
+- **AND** no message about a permission is ever shown

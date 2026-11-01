@@ -132,7 +132,6 @@ the answer is complete.
 
 - **WHEN** the model is producing a long answer
 - **THEN** the text on screen grows as it arrives
-- **AND** view updates are throttled rather than sent on every fragment
 
 #### Scenario: The launcher stays responsive while streaming
 
@@ -149,7 +148,8 @@ the answer is complete.
 
 The user SHALL be able to stop a request that is running. Escape SHALL leave the
 view the way it leaves any view, and an abandoned request's later output SHALL
-NOT appear.
+NOT appear. When the launcher resets its state, the request SHALL be abandoned;
+when that happens is in `openspec/specs/launcher-shell`.
 
 #### Scenario: Escape abandons the request
 
@@ -159,7 +159,8 @@ NOT appear.
 
 #### Scenario: Hiding the launcher abandons the request
 
-- **WHEN** an answer is streaming and the launcher is hidden
+- **WHEN** an answer is streaming and the launcher resets, through a deliberate
+  hide or the grace period running out after an interrupting hide
 - **THEN** the request is abandoned and nothing from it is shown later
 
 #### Scenario: Running another command supersedes it

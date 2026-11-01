@@ -17,8 +17,8 @@ Snippets and quicklinks SHALL be stored as text files in the config directory,
 carry a name and a body (the template for a snippet, the URL for a quicklink) and
 a stable identifier.
 
-Machine-local data, the clipboard history, usage ranking, and window state, SHALL
-NOT be written to these files; it stays in the local database.
+Machine-local data, the clipboard history and usage ranking, SHALL NOT be
+written to these files; it stays in the local database.
 
 #### Scenario: A created record is written to its file
 

@@ -39,86 +39,38 @@ clipboard, whichever application put them there.
 - **WHEN** an entry is being recorded
 - **THEN** the clipboard's contents are unchanged and available to any application that reads them
 
-### Requirement: Excluded content is never recorded
-
-Content marked by the operating system as not for history, and content copied
-from an application the user has excluded, SHALL NOT be recorded. An excluded
-entry SHALL leave no trace: not in the database, not on disk, and not in memory
-beyond the check itself.
-
-Content Dango itself puts on the clipboard SHALL NOT be recorded either, and
-SHALL be recognised as its own even when the system does not hand it back
-unchanged. Recognition SHALL be bounded in time, so that the user copying the
-same thing later is still recorded as theirs.
-
-#### Scenario: Concealed content on macOS
-
-- **WHEN** an application marks clipboard content as concealed, as password managers do
-- **THEN** nothing is recorded
-
-#### Scenario: Excluded content on Windows
-
-- **WHEN** an application marks clipboard content as excluded from history, as password managers do
-- **THEN** nothing is recorded
-
-#### Scenario: Application on the exclusion list
-
-- **WHEN** content is copied from an application the user has added to the exclusion list
-- **THEN** nothing is recorded
-
-#### Scenario: Excluded application left before the copy was noticed
-
-- **WHEN** content is copied from an excluded application and the user switches to another application before the copy is noticed
-- **THEN** nothing is recorded, because any application frontmost around the copy is enough to exclude it
-
-#### Scenario: Exclusion list is populated out of the box
-
-- **WHEN** the user has never edited the exclusion list
-- **THEN** mainstream password managers are already excluded
-
-#### Scenario: Exclusion list is read at run time
-
-- **WHEN** the user changes the exclusion list while Dango is running
-- **THEN** the change takes effect without restarting Dango
-
-#### Scenario: Dango's own copying is not recorded
-
-- **WHEN** Dango puts an entry back on the clipboard
-- **THEN** that does not create a new entry or reorder the history
-
-#### Scenario: An image Dango wrote comes back re-encoded
-
-- **WHEN** Dango puts an image on the clipboard and the system hands it back
-  encoded differently from what was written
-- **THEN** it is still recognised as Dango's own write and no entry is created
-
-#### Scenario: The user copies an image of their own afterwards
-
-- **WHEN** the user copies an image themselves, later than the window in which
-  Dango's own write is recognised
-- **THEN** it is recorded, even if it is the same image Dango wrote
-
 ### Requirement: The history is bounded
 
-The history SHALL keep at most a fixed number of entries and SHALL NOT exceed a
+The history SHALL keep at most a set number of entries and SHALL NOT exceed a
 total size on disk. When either bound is reached, the oldest entries SHALL be
-discarded first.
+discarded first. A single entry larger than a per-entry ceiling SHALL NOT be
+recorded.
+
+The bounds SHALL be set by extension preferences: `entries`, the number of
+entries, default 500; `entry-megabytes`, the per-entry ceiling, default 16;
+and `total-megabytes`, the total size, default 256.
 
 #### Scenario: Entry count is capped
 
-- **WHEN** recording an entry would exceed the entry limit
+- **WHEN** recording an entry would exceed `entries`
 - **THEN** the oldest entry is discarded so the limit holds
 
 #### Scenario: Total size is capped
 
-- **WHEN** recording an entry would take the history over its size ceiling
+- **WHEN** recording an entry would take the history over `total-megabytes`
 - **THEN** the oldest entries are discarded until it fits
 
 #### Scenario: A single item too large to keep
 
-- **WHEN** a copied item is larger than the per-entry ceiling
+- **WHEN** a copied item is larger than `entry-megabytes`
 - **THEN** it is not recorded
 - **AND** the rest of the history is untouched
+
+#### Scenario: Defaults apply when nothing is set
+
+- **WHEN** the user has set none of the three preferences
+- **THEN** the history keeps at most 500 entries, refuses an entry over 16
+  megabytes, and stays within 256 megabytes
 
 #### Scenario: Discarding an image reclaims its space
 
@@ -130,7 +82,8 @@ discarded first.
 The extension SHALL contribute a command that opens the history, newest first,
 narrowable by typing. Each entry SHALL offer a paste action, which inserts the
 entry into the application the user was in, and a copy action, which places the
-entry on the clipboard. Both SHALL hide the launcher as they run.
+entry on the clipboard. Both SHALL hide the launcher as they run. What the
+clipboard holds after a paste is in `openspec/specs/selection-and-paste`.
 
 Which of the two Enter runs SHALL be set by the extension preference
 `primary-action`, with the values `paste` and `copy`. The default SHALL be
@@ -153,7 +106,6 @@ panel. A value that is neither SHALL behave as the default.
   entry while an editable field is focused in another application
 - **THEN** the launcher hides
 - **AND** the entry's text appears in that field
-- **AND** the clipboard holds the entry once the paste has finished
 
 #### Scenario: Pasting an image entry
 
@@ -161,7 +113,6 @@ panel. A value that is neither SHALL behave as the default.
   pasted images
 - **THEN** the launcher hides
 - **AND** the image is pasted into that application
-- **AND** the clipboard holds the image once the paste has finished
 
 #### Scenario: Choosing an entry restores it
 
@@ -437,3 +388,53 @@ memory its listed and shown images used.
 - **WHEN** the user leaves the history after browsing many image entries
 - **THEN** Dango's memory use returns to about what it was before the history
   was opened
+
+### Requirement: Marked and excluded content is never recorded
+
+Content marked by the operating system as not for history, and content copied
+from an application the user has excluded, SHALL NOT be recorded. An excluded
+entry SHALL leave no trace: not in the database, not on disk, and not in memory
+beyond the check itself.
+
+The excluded applications SHALL be set by the extension preference
+`excluded-applications`: application names, comma separated, matched ignoring
+case. Its default SHALL list mainstream password managers.
+
+Content Dango itself puts on the clipboard SHALL NOT be recorded either. That
+rule is in `openspec/specs/selection-and-paste`.
+
+#### Scenario: Concealed content on macOS
+
+- **WHEN** an application marks clipboard content as concealed, as password managers do
+- **THEN** nothing is recorded
+
+#### Scenario: Excluded content on Windows
+
+- **WHEN** an application marks clipboard content as excluded from history, as password managers do
+- **THEN** nothing is recorded
+
+#### Scenario: Application on the exclusion list
+
+- **WHEN** content is copied from an application named in `excluded-applications`
+- **THEN** nothing is recorded
+
+#### Scenario: Exclusion matches names ignoring case
+
+- **WHEN** `excluded-applications` names "1password" and content is copied from
+  an application named "1Password"
+- **THEN** nothing is recorded
+
+#### Scenario: Excluded application left before the copy was noticed
+
+- **WHEN** content is copied from an excluded application and the user switches to another application before the copy is noticed
+- **THEN** nothing is recorded, because any application frontmost around the copy is enough to exclude it
+
+#### Scenario: Exclusion list is populated out of the box
+
+- **WHEN** the user has never set `excluded-applications`
+- **THEN** mainstream password managers are already excluded
+
+#### Scenario: Exclusion list is read at run time
+
+- **WHEN** the user changes the exclusion list while Dango is running
+- **THEN** the change takes effect without restarting Dango

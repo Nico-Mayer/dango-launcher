@@ -24,11 +24,12 @@ ranked list.
 - **WHEN** an extension is disabled
 - **THEN** neither its commands nor its root items appear for any query
 
-### Requirement: Providers have a time budget
+### Requirement: Slow providers stream in
 
-Each root items provider SHALL be queried asynchronously with a short time
-budget. A provider exceeding its budget SHALL NOT delay results from others; its
-results SHALL be merged in when they arrive.
+Each root items provider SHALL be queried asynchronously. Results that are
+ready SHALL be shown at once, without waiting for slower providers, and a slow
+provider's results SHALL be merged in when they arrive. A provider that has not
+answered after a few seconds SHALL be dropped from that query.
 
 #### Scenario: A slow provider does not block the list
 
@@ -40,7 +41,7 @@ results SHALL be merged in when they arrive.
 
 - **WHEN** a provider does not return at all
 - **THEN** results from every other provider are still displayed
-- **AND** the pipeline does not leak the abandoned work
+- **AND** after a few seconds the query stops waiting for that provider
 
 #### Scenario: A provider fails
 
@@ -60,8 +61,8 @@ input.
 
 #### Scenario: Fast typing does not queue work
 
-- **WHEN** the user types ten characters in 300 milliseconds
-- **THEN** at most one query is in flight at any moment
+- **WHEN** the user types quickly
+- **THEN** only results for the final text are shown
 
 ### Requirement: Ranking combines match quality and frecency
 
@@ -108,7 +109,7 @@ that grows with how often and how recently that choice was made.
 
 - **WHEN** the user types characters that appear in order but not adjacently in an item's title
 - **THEN** the item matches
-- **AND** the matched characters are marked so the frontend can highlight them
+- **AND** the matched characters are marked so they can be highlighted
 
 ### Requirement: Launching an item updates its frecency
 
@@ -151,20 +152,23 @@ types to find an item, so pressing it SHALL NOT change search ranking.
 
 With an empty query the root view SHALL show a bounded list of the most
 frecently used items rather than everything available, and SHALL present that
-list in two labelled sections when there is something to suggest.
+list in labelled sections when there is something to point out.
 
-The first section SHALL be headed "Suggestions" and SHALL hold at most six
-items, chosen as the items with the highest frecency among those that have been
-launched at least once. The second section SHALL be headed "Everything else"
-and SHALL hold the remainder of the bounded list, ordered as the empty-query
-list is ordered today: highest frecency first, then by title. An item SHALL
-appear in exactly one section.
+A provider MAY mark an item as pinned, such as a missing permission warning or
+an available update. With an empty query, pinned items SHALL come first, under
+a section headed "Needs attention", in provider order, not in the order the
+providers answered. Being pinned SHALL have no effect on a typed query: there
+the item is matched and ranked like any other.
 
-When no item has been launched yet, the list SHALL be shown flat, with no
-section headings. A non-empty query SHALL never show section headings.
+The section of launched items SHALL be headed "Suggestions" and SHALL hold at
+most six items, chosen as the items with the highest frecency among those that
+have been launched at least once. The last section SHALL be headed "Everything
+else" and SHALL hold the remainder of the bounded list, highest frecency first,
+then by title. An item SHALL appear in exactly one section.
 
-The split SHALL be decided where launches are recorded, so the frontend never
-labels an item a suggestion on its own account.
+When there is no pinned item and no item has been launched yet, the list SHALL
+be shown flat, with no section headings. A non-empty query SHALL never show
+section headings.
 
 #### Scenario: Empty query shows recents
 
@@ -173,14 +177,30 @@ labels an item a suggestion on its own account.
 
 #### Scenario: Empty query on first run
 
-- **WHEN** the launcher opens with an empty query and nothing has been used yet
+- **WHEN** the launcher opens with an empty query, nothing has been used yet, and no item is pinned
 - **THEN** a bounded default list is shown rather than an empty view
 - **AND** no section heading is shown
+
+#### Scenario: Pinned items need attention first
+
+- **WHEN** the launcher opens with an empty query and a provider has a pinned item, such as a missing permission
+- **THEN** a section headed "Needs attention" is shown first, holding the pinned items
+- **AND** the rest of the list follows under "Suggestions" and "Everything else"
+
+#### Scenario: Pinned items keep provider order
+
+- **WHEN** two providers each have a pinned item and the second provider answers first
+- **THEN** the first provider's pinned item is still shown above the second's
+
+#### Scenario: A pinned item in a typed query
+
+- **WHEN** the user types a query that matches a pinned item
+- **THEN** the pinned item is ranked like any other match, not placed first
 
 #### Scenario: Suggestions sit above everything else
 
 - **WHEN** the launcher opens with an empty query and at least one item has been launched
-- **THEN** a section headed "Suggestions" is shown first, holding the launched items in frecency order
+- **THEN** a section headed "Suggestions" is shown, holding the launched items in frecency order
 - **AND** a section headed "Everything else" follows, holding the rest of the bounded list
 
 #### Scenario: The suggestions section is bounded
@@ -196,7 +216,7 @@ labels an item a suggestion on its own account.
 
 #### Scenario: The top suggestion is selected
 
-- **WHEN** the launcher opens with an empty query and a "Suggestions" section is shown
+- **WHEN** the launcher opens with an empty query, no item is pinned, and a "Suggestions" section is shown
 - **THEN** the first item of that section is the selected row
 
 #### Scenario: Typing removes the sections
@@ -217,7 +237,7 @@ labels an item a suggestion on its own account.
 #### Scenario: Arrowing back to the top shows the heading
 
 - **WHEN** the user arrows down into the scrolled empty-query list and then holds Arrow Up until the first row is selected
-- **THEN** the list is scrolled so the "Suggestions" heading and the first row are both fully visible
+- **THEN** the list is scrolled so the first section's heading and the first row are both fully visible
 
 #### Scenario: Splitting does not cost search time
 
@@ -238,7 +258,7 @@ size.
 #### Scenario: Broad query
 
 - **WHEN** a query matches more than a thousand candidates
-- **THEN** only the bounded top slice is sent to the frontend
+- **THEN** only the bounded top slice is shown
 
 ### Requirement: Confirming a result acts on it
 
@@ -277,8 +297,7 @@ frecency uses, so a pair that stops being used fades. When the user confirms
 a different item for the same text, the new pair SHALL compete on count and
 recency rather than replacing the old one, so one slip does not undo an
 established habit and a repeated correction does win. Learned inputs SHALL
-have no effect on the empty query. Recording and loading them SHALL not add
-work to the search path: ranking SHALL read them from memory.
+have no effect on the empty query.
 
 #### Scenario: Case and whitespace do not split a habit
 
@@ -303,7 +322,7 @@ work to the search path: ranking SHALL read them from memory.
 #### Scenario: The empty query is unchanged
 
 - **WHEN** the query is empty
-- **THEN** suggestions and ordering follow frecency alone, as before
+- **THEN** suggestions and ordering follow frecency alone
 
 #### Scenario: Learning does not slow search
 

@@ -199,7 +199,7 @@ minimum revealing it in the platform's file manager and copying its path.
 - **WHEN** the user chooses the copy path action
 - **THEN** the application's location is placed on the clipboard
 
-### Requirement: An application is addressable by its shown name
+### Requirement: An application is addressable by the name Dango shows
 
 An application SHALL be addressable from the configuration file by the name
 Dango shows for it in root search, compared ignoring case. An entry MAY carry a
@@ -242,7 +242,7 @@ because a chord says nothing about what the user types to find the item.
 - **THEN** the first in name order is launched
 - **AND** the ambiguity is surfaced through the tray status line and the log
 
-#### Scenario: A launch from a hotkey counts as use
+#### Scenario: A launch from a hotkey earns no frecency
 
 - **WHEN** an application is launched from its hotkey
 - **THEN** it opens
@@ -254,4 +254,3 @@ because a chord says nothing about what the user types to find the item.
   user presses its chord
 - **THEN** the failure is surfaced
 - **AND** the entry is removed from the index
-

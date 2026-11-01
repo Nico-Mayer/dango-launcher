@@ -8,21 +8,6 @@ without building any of it now.
 
 ## Requirements
 
-### Requirement: Local database in the application data directory
-
-Dango SHALL persist its data in a single database file in the per-user
-application data directory for the platform, created on first run.
-
-#### Scenario: First run creates the database
-
-- **WHEN** Dango starts and no database exists
-- **THEN** it is created and the application starts normally
-
-#### Scenario: Location is per-user
-
-- **WHEN** Dango runs on macOS or on Windows
-- **THEN** the database is stored under that platform's per-user application data directory
-
 ### Requirement: Forward-only migrations
 
 The schema SHALL be versioned and migrated forward automatically at startup.
@@ -80,8 +65,8 @@ be rebuilt from scratch.
 
 ### Requirement: Store access does not block activation
 
-Opening the database and reading settings SHALL happen during startup, not on
-the activation path. Showing the launcher SHALL NOT wait on a database query.
+Opening the database SHALL happen during startup, not on the activation path.
+Showing the launcher SHALL NOT wait on a database query.
 
 #### Scenario: Activation is independent of the database
 
@@ -101,29 +86,23 @@ overwriting it.
 - **AND** the corrupt file is preserved
 - **AND** the user is told what happened
 
-### Requirement: Extension preference values are stored and read back
+### Requirement: Local database in the per-user data directory
 
-The store SHALL persist a preference value against the extension that declares
-it. Reading a preference that has never been set SHALL yield the declared
-default, or nothing when the preference declares no default.
+Dango SHALL persist its data in a single database file in the per-user
+application data directory for the platform, created on first run.
 
-#### Scenario: Value is stored and read back
+#### Scenario: First run creates the database
 
-- **WHEN** a preference is set and later read
-- **THEN** the stored value is returned
+- **WHEN** Dango starts and no database exists
+- **THEN** it is created and the application starts normally
 
-#### Scenario: Unset preference yields its default
+#### Scenario: Location on macOS
 
-- **WHEN** a preference that has never been set is read
-- **THEN** the default declared in the manifest is returned
+- **WHEN** Dango runs on macOS
+- **THEN** the database is `dango.sqlite` in
+  `~/Library/Application Support/com.nimayer.dango/`
 
-#### Scenario: Value survives a restart
+#### Scenario: Location on Windows
 
-- **WHEN** Dango restarts after a preference was set
-- **THEN** reading it returns the value that was set
-
-#### Scenario: Stored value no longer fits its declared type
-
-- **WHEN** a stored value cannot be read as the type the manifest declares
-- **THEN** the declared default is returned
-- **AND** the extension still loads
+- **WHEN** Dango runs on Windows
+- **THEN** the database is `dango.sqlite` in `%APPDATA%\com.nimayer.dango\`

@@ -7,27 +7,6 @@ is one shell around one view and reads like every other.
 
 ## Requirements
 
-### Requirement: Every surface takes its look from one theme
-
-Every colour, corner radius, row height, gap, and type size on every launcher
-surface SHALL come from one theme. The theme SHALL have these colour roles:
-background, surface, raised, border, text, muted, accent, selection, hover, and
-danger. A surface SHALL use a role, never a colour of its own, so changing a
-role's value changes every surface that uses it, the action panel included.
-
-#### Scenario: Changing the selection role
-
-- **WHEN** the value of the selection role is changed
-- **THEN** the selected row in root search, in a pushed list, in a grid, and in
-  the action panel all use the new value
-- **AND** the hover, accent, and danger roles keep their own values
-
-#### Scenario: Floating content follows the theme
-
-- **WHEN** the radius, the surface role, or a type size is changed and the
-  action panel opens
-- **THEN** the panel uses the changed values
-
 ### Requirement: The theme follows the operating system
 
 Dango SHALL have a dark and a light theme and SHALL show the one that matches
@@ -337,22 +316,25 @@ act on the view below or dismiss the launcher.
 Dango SHALL NOT animate its interface. Showing the launcher, moving the
 selection, hovering, opening and closing the action panel, showing and removing
 a toast, changing results, and replacing a view SHALL each change in one frame.
-Busy states SHALL be shown by static marks next to text.
+Busy states SHALL be shown by static marks next to text. How fast the launcher
+appears is in launcher-shell, and how a streamed view keeps its selection is in
+view-protocol.
 
 #### Scenario: Activation on Windows
 
 - **WHEN** the launcher is shown on Windows, first or again
-- **THEN** it is painted without visible delay and without an entrance effect
+- **THEN** it appears without an entrance effect
 
 #### Scenario: Activation on macOS
 
 - **WHEN** the launcher is shown on macOS, first or again
-- **THEN** it is painted without visible delay and without an entrance effect
+- **THEN** it appears without an entrance effect
 
 #### Scenario: A streamed view stays stable
 
-- **WHEN** a command emits thirty replacements of one view over one second
-- **THEN** the content updates without flicker, and selection and focus stay
+- **WHEN** a command replaces one view many times a second
+- **THEN** each replacement shows in one frame, with no transition between the
+  old and the new content
 
 #### Scenario: Busy without motion
 

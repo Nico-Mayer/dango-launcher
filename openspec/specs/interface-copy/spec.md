@@ -39,8 +39,8 @@ tags, tray items, and messages.
 
 Command titles in root search SHALL be Title Case, because they are shown in
 one list with application names and are searched as names. Extension names
-SHALL be Title Case for the same reason. A command's title is the only Title
-Case text in the interface.
+SHALL be Title Case for the same reason. Command titles and extension names
+are the only Title Case text in the interface.
 
 Platform components keep their own names: Finder, File Explorer, Trash,
 Recycle Bin, Accessibility, Cmd, Ctrl, Option, Alt, Enter, Escape.
@@ -278,8 +278,17 @@ line SHALL say whether the config file loaded.
 
 #### Scenario: Tray menu items
 
-- **WHEN** the tray menu is open
+- **WHEN** the tray menu is open and no permission is missing, which is always
+  the case on Windows
 - **THEN** the actionable items read "Show or hide Dango" and "Quit Dango"
+
+#### Scenario: Tray menu items with a missing permission on macOS
+
+- **WHEN** the tray menu is open on macOS and a permission is missing
+- **THEN** the actionable items read "Show or hide Dango" and "Quit Dango"
+- **AND** when Accessibility is missing, an item reads "Grant Accessibility"
+- **AND** when Input Monitoring is missing, an item reads "Grant Input
+  Monitoring"
 
 ### Requirement: Terminology is consistent
 

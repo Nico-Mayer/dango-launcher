@@ -70,8 +70,8 @@ character, so that a keyword occurring inside a longer word does not expand.
 ### Requirement: What is observed is bounded and forgotten
 
 The component observing keystrokes SHALL retain no more characters than the
-longest keyword requires, SHALL keep them in memory only, and SHALL never write
-them anywhere.
+longest keyword plus the one character before it, which the whole-word check
+needs. It SHALL keep them in memory only, and SHALL never write them anywhere.
 
 #### Scenario: Nothing typed is ever stored
 
@@ -81,7 +81,7 @@ them anywhere.
 #### Scenario: What is held is bounded
 
 - **WHEN** the user types a long passage
-- **THEN** no more than the longest keyword's worth of recent characters is held at any moment
+- **THEN** no more than the longest keyword's worth of recent characters plus one is held at any moment
 
 #### Scenario: A key that is not a character clears what is held
 
@@ -117,8 +117,16 @@ them anywhere.
 
 ### Requirement: Expansion is skipped where it should not happen
 
-Dango SHALL NOT observe or expand in contexts the user has excluded, the
-system marks as sensitive, or that belong to Dango itself.
+Dango SHALL hold nothing and expand nothing in contexts the user has excluded,
+the system marks as sensitive, or that belong to Dango itself. The excluded
+applications are the clipboard extension's `excluded-applications` preference,
+at `extensions.dango.clipboard.preferences.excluded-applications`: one list
+serves both clipboard history and keyword expansion.
+
+On Windows, a password field is recognised only when it is a classic Win32
+edit control marked as a password field. A password field in a browser or in
+another custom control is not recognised, so a keyword typed there SHALL be
+expected to expand.
 
 #### Scenario: A password field on macOS
 
@@ -127,18 +135,22 @@ system marks as sensitive, or that belong to Dango itself.
 
 #### Scenario: A password field on Windows
 
-- **WHEN** the user types into a password field
-- **THEN** nothing expands
-- **AND** the limitation that the system offers no reliable way to know this is documented for the user
+- **WHEN** the user types into a classic Win32 edit control marked as a password field
+- **THEN** nothing is held and nothing expands
+
+#### Scenario: A browser password field on Windows
+
+- **WHEN** the user types a keyword into a password field in a browser or another custom control
+- **THEN** the keyword expands, because Windows offers no reliable way to know it is a password field
 
 #### Scenario: An excluded application
 
-- **WHEN** the user types in an application on the exclusion list
-- **THEN** nothing is observed and nothing expands
+- **WHEN** the user types in an application listed in the clipboard extension's `excluded-applications` preference
+- **THEN** nothing is held and nothing expands
 
 #### Scenario: The exclusion list is honoured without a restart
 
-- **WHEN** the user changes the exclusion list
+- **WHEN** the user changes the `excluded-applications` preference
 - **THEN** the change takes effect on the next keystroke observed
 
 #### Scenario: Typing in the launcher on Windows
@@ -156,7 +168,9 @@ system marks as sensitive, or that belong to Dango itself.
 ### Requirement: Observing never delays the machine
 
 Observation SHALL NOT make typing perceptibly slower in any application, and
-SHALL NOT interfere with the keystrokes it observes.
+SHALL NOT interfere with the keystrokes it observes. When the operating system
+stops Dango's observation, Dango SHALL restore it without a restart, on Windows
+and on macOS.
 
 #### Scenario: Typing stays responsive
 
@@ -170,7 +184,13 @@ SHALL NOT interfere with the keystrokes it observes.
 
 #### Scenario: The monitor recovers if the system stops it
 
-- **WHEN** the operating system disables Dango's observation
+- **WHEN** on macOS the operating system disables Dango's observation
+- **THEN** Dango restores it
+- **AND** expansion works again without a restart
+
+#### Scenario: The monitor recovers on Windows
+
+- **WHEN** on Windows the operating system stops delivering keystrokes to Dango's observation
 - **THEN** Dango restores it
 - **AND** expansion works again without a restart
 
