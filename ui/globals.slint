@@ -128,9 +128,15 @@ export global EmptyData {
 }
 
 export global DetailData {
+    in property <image> image;
+    in property <bool> has-image;
+    /// A named icon, drawn in a theme role.
+    in property <bool> image-named;
     in property <styled-text> body;
-    /// The body as plain text, for assistive technology.
+    /// The body as plain text, for assistive technology, and shown as such
+    /// when `plain`.
     in property <string> text;
+    in property <bool> plain;
     in property <[MetaData]> metadata;
 }
 

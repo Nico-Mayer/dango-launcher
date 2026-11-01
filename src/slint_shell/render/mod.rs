@@ -91,6 +91,7 @@ impl Renderer {
         shell::write(ui, &snapshot, kind, typing(&snapshot.screen), &self.icons);
 
         let mut selected = None;
+        let mut detail = false;
         match &snapshot.screen {
             Screen::Error(text) => {
                 self.list.clear();
@@ -109,7 +110,8 @@ impl Renderer {
                     self.write_query(ui, false, &body.query.text, body.query.revision);
                     self.list.view(ui, body, &self.icons);
                     if let Some(pane) = &body.pane {
-                        self.detail.write(pane);
+                        self.detail.write(pane, &self.icons);
+                        detail = true;
                     }
                     if let Some(text) = &body.empty {
                         empty::write(ui, text, &self.icons);
@@ -123,7 +125,10 @@ impl Renderer {
                         empty::write(ui, text, &self.icons);
                     }
                 }
-                ViewBody::Detail(body) => self.detail.write(body),
+                ViewBody::Detail(body) => {
+                    self.detail.write(body, &self.icons);
+                    detail = true;
+                }
                 ViewBody::Form(body) => self.form.write(body),
             },
         }
@@ -133,6 +138,9 @@ impl Renderer {
         if kind != ScreenKind::Form {
             self.form.forget();
         }
+        if !detail {
+            self.detail.clear();
+        }
 
         self.list.reveal(ui, selected);
         self.panel.write(ui, &snapshot.panel);
@@ -141,17 +149,23 @@ impl Renderer {
         self.last = Some(snapshot);
     }
 
-    /// The list and grid models hold their images too, so both go with the
-    /// cache.
+    /// The list and grid models and the detail hold their images too, so they
+    /// go with the cache.
     pub fn forget_images(&mut self) {
         self.list.clear();
         self.grid.clear();
+        self.detail.clear();
         self.icons.forget_files();
     }
 
     #[cfg(test)]
     pub fn holds_images(&self) -> bool {
         self.icons.holds_files()
+    }
+
+    #[cfg(test)]
+    pub fn decoded_images(&self) -> usize {
+        self.icons.decoded()
     }
 
     /// Writes the field only when the revision moved, so an answer to an older

@@ -83,6 +83,11 @@ impl Icons {
     }
 
     #[cfg(test)]
+    pub fn decoded(&self) -> usize {
+        self.decoded.get()
+    }
+
+    #[cfg(test)]
     pub fn holds_files(&self) -> bool {
         !self.shown.borrow().is_empty() || !self.rendering.borrow().is_empty()
     }

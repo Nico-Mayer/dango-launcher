@@ -836,8 +836,84 @@ mod list_view {
 }
 
 mod detail {
+    use super::super::generated::DetailData;
     use super::*;
-    use crate::protocol::Metadata;
+    use crate::protocol::{ItemDetail, Metadata};
+
+    const IMAGE: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/icons/32x32.png");
+
+    fn source() -> Vec<Metadata> {
+        vec![Metadata {
+            label: "Source".into(),
+            value: "Terminal".into(),
+        }]
+    }
+
+    #[test]
+    fn plain_text_is_shown_as_written_in_the_monospace_face() {
+        let h = Harness::root(results(1));
+        h.view(ViewTree::new(View::Detail(DetailView {
+            markdown: "**ignored**".into(),
+            text: Some("# not a heading".into()),
+            ..Default::default()
+        })));
+        assert!(h.find("# not a heading").is_some());
+        assert!(h.find("**ignored**").is_none());
+        assert!(h.ui.global::<DetailData>().get_plain());
+    }
+
+    #[test]
+    fn the_image_is_shown_above_the_body() {
+        let h = Harness::root(results(1));
+        h.view(ViewTree::new(View::Detail(DetailView {
+            image: Some(IMAGE.into()),
+            text: Some("Body".into()),
+            metadata: source(),
+            ..Default::default()
+        })));
+        let image = h.find("Image").expect("the image is drawn");
+        let body = h.find("Body").expect("the body is drawn");
+        assert!(image.absolute_position().y < body.absolute_position().y);
+        assert_eq!(image.size().width, 32.0);
+    }
+
+    #[test]
+    fn a_missing_image_still_shows_body_and_metadata() {
+        let h = Harness::root(results(1));
+        let missing = std::env::temp_dir().join("dango-no-such-detail-image.png");
+        h.view(ViewTree::new(View::Detail(DetailView {
+            image: Some(missing.to_string_lossy().into_owned()),
+            text: Some("Body".into()),
+            metadata: source(),
+            ..Default::default()
+        })));
+        assert!(h.find("Image").is_none());
+        assert!(h.find("Body").is_some());
+        assert!(h.find("Terminal").is_some());
+    }
+
+    #[test]
+    fn a_keystroke_keeping_the_selection_loads_no_new_image() {
+        let h = Harness::root(results(1));
+        let item = |n: usize| ListItem {
+            id: format!("item-{n}"),
+            title: format!("Item {n}"),
+            detail: Some(ItemDetail {
+                image: Some(IMAGE.into()),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+        h.view(ViewTree::new(View::List(ListView {
+            detail_pane: true,
+            items: vec![item(1), item(2)],
+            ..Default::default()
+        })));
+        let decoded = h.renderer.borrow().decoded_images();
+        h.type_text("it");
+        assert_eq!(h.renderer.borrow().decoded_images(), decoded);
+        assert!(h.find("Image").is_some());
+    }
 
     #[test]
     fn metadata_follows_the_body_in_order() {
