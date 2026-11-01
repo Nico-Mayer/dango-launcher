@@ -234,6 +234,11 @@ load and are not reliable.
 
 ## Build and verification facts
 
+- The hk pre-commit hook stashes unstaged files, which drops `MERGE_HEAD`,
+  so `git commit` after a conflicted merge fails with "could not open
+  `.git/MERGE_HEAD`". The staged tree survives: commit it with
+  `git commit-tree "$(git write-tree)" -p main -p <branch>` and fast-forward
+  to the result.
 - The software renderer clips children to a square and ignores the clipping
   element's `border-radius`. A child that fills a rounded corner, such as the
   ActionBar's background, rounds that corner itself.
