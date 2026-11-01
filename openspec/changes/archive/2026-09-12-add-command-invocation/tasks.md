@@ -103,7 +103,7 @@
 - [x] 8.4 Confirm the view stack pops back to root search on Escape and clears on hide, on both platforms
   - macOS: both confirmed. Escape pops with the root query intact, and dismissing with the trash confirmation up comes back to root search with the stack empty.
   - Windows: both confirmed. Escape pops with the root query intact, and dismissing with a view up comes back to root search with the stack empty.
-- [ ] 8.5 Confirm disabling the `system` extension removes its commands from search without a restart, on both platforms
+- [ ] 8.5 Confirm disabling the `system` extension removes its commands from search without a restart, on both platforms (Windows verified 2026-11-01; macOS open)
   - Not walkable yet on either platform: the enabled state lives in the store and is read when extensions load, and nothing in the running app calls `set_enabled`. It needs a settings surface, which is a later change.
 - [x] 8.6 Confirm application results still launch, reveal, and copy after `run_action` stopped being hardwired, on both platforms
   - Confirmed on macOS.
