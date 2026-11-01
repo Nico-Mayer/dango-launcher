@@ -68,6 +68,20 @@ pub struct Entry {
     pub copied_at: i64,
 }
 
+impl Entry {
+    /// What the detail pane shows of an image. Never one larger than the
+    /// preview, so moving the selection stays cheap; a row from before sizes
+    /// were stored falls back to its thumbnail.
+    pub fn pane_image(&self) -> Option<String> {
+        let path = self.path.as_deref()?;
+        match self.size {
+            Some(size) if fits(size, PREVIEW_SIZE) => Some(path.to_string()),
+            Some(_) => Some(preview_path(path).to_string_lossy().into_owned()),
+            None => self.thumbnail.clone(),
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Kind {
     Text,
@@ -634,6 +648,57 @@ mod tests {
         let entry = history.entries().unwrap().remove(0);
         assert!(!preview_path(entry.path.unwrap()).exists());
         assert!(entry.thumbnail.is_some());
+    }
+
+    #[test]
+    fn the_pane_shows_the_preview_of_a_large_image() {
+        let history = history();
+        history
+            .record(png(1600, 1000), None, Bounds::default(), 1)
+            .unwrap();
+        let entry = history.entries().unwrap().remove(0);
+        let pane = entry.pane_image().unwrap();
+        assert!(pane.ends_with(".preview.png"));
+        assert!(Path::new(&pane).exists());
+    }
+
+    #[test]
+    fn the_pane_shows_an_image_within_the_preview_size_itself() {
+        let history = history();
+        history
+            .record(png(800, 20), None, Bounds::default(), 1)
+            .unwrap();
+        let entry = history.entries().unwrap().remove(0);
+        assert_eq!(entry.pane_image(), entry.path);
+    }
+
+    #[test]
+    fn the_pane_shows_the_thumbnail_of_a_row_without_a_size() {
+        let history = history();
+        history
+            .record(png(1600, 1000), None, Bounds::default(), 1)
+            .unwrap();
+        history
+            .store
+            .with(|c| {
+                c.execute(
+                    "UPDATE local_clipboard_history SET width = NULL, height = NULL",
+                    [],
+                )
+            })
+            .unwrap();
+        let entry = history.entries().unwrap().remove(0);
+        assert!(entry.thumbnail.is_some());
+        assert_eq!(entry.pane_image(), entry.thumbnail);
+    }
+
+    #[test]
+    fn a_text_entry_has_no_pane_image() {
+        let history = history();
+        history
+            .record(text("a"), None, Bounds::default(), 1)
+            .unwrap();
+        assert_eq!(history.entries().unwrap()[0].pane_image(), None);
     }
 
     #[test]
