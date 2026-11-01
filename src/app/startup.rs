@@ -18,6 +18,7 @@ use crate::extensions::applications::{AppIndex, ApplicationsExtension, IconCache
 use crate::extensions::clipboard::{
     ClipboardExtension, ClipboardSource, History, PreferencePolicy, Watcher,
 };
+use crate::extensions::games::{GameList, GamesExtension, SteamSource};
 use crate::extensions::permissions::PermissionsExtension;
 use crate::extensions::snippets::{self, SnippetsExtension};
 use crate::extensions::system::SystemExtension;
@@ -182,6 +183,13 @@ fn build_services(
     let icons = IconCache::new(cache_dir().join("icons"));
     let applications = Arc::new(ApplicationsExtension::new(index, icons.clone()));
     register(&mut host, "applications", applications.clone());
+
+    let games = GameList::new(Arc::new(SteamSource::default()));
+    register(
+        &mut host,
+        "games",
+        Arc::new(GamesExtension::new(games, Arc::new(SystemOpener))),
+    );
 
     // Registering for application activations needs the main thread, which
     // this is; the watcher itself runs on its own.

@@ -120,6 +120,7 @@ fn named(name: &str) -> Option<&'static IconData> {
         "clipboard-list" => lu::LuClipboardList,
         "clipboard-type" => lu::LuClipboardType,
         "columns-3" => lu::LuColumns3,
+        "gamepad-2" => lu::LuGamepad2,
         "grid-2x2" => lu::LuGrid2x2,
         "loader-circle" => lu::LuLoaderCircle,
         "link" => lu::LuLink,
@@ -149,7 +150,7 @@ fn named(name: &str) -> Option<&'static IconData> {
 mod tests {
     use super::*;
 
-    const REGISTRY: [&str; 30] = [
+    const REGISTRY: [&str; 31] = [
         "app-window",
         "arrow-left",
         "check",
@@ -159,6 +160,7 @@ mod tests {
         "clipboard-list",
         "clipboard-type",
         "columns-3",
+        "gamepad-2",
         "grid-2x2",
         "loader-circle",
         "link",

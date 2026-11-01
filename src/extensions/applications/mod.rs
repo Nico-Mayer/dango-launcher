@@ -208,17 +208,6 @@ fn app_actions(has_path: bool) -> Vec<Action> {
     actions
 }
 
-/// The longest the index may go without being rebuilt, for platforms that
-/// cannot signal a change and as a backstop for those that can.
-const REFRESH_INTERVAL: std::time::Duration = std::time::Duration::from_secs(180);
-
-/// How often the loop wakes to check whether it should stop or re-index.
-const TICK: std::time::Duration = std::time::Duration::from_millis(200);
-
-/// Installing an application writes many files; waiting a moment after the
-/// first sign of change avoids re-indexing over a half-copied bundle.
-const SETTLE: std::time::Duration = std::time::Duration::from_secs(1);
-
 /// The background service: builds the index and extracts icons off the
 /// activation path, so the launcher stays responsive, then re-indexes on a
 /// schedule. Stops cleanly when the extension is disabled.
@@ -246,7 +235,7 @@ impl Service for IndexingService {
                     }
                     icons.ensure_with(&app.id, || indexer.icon(&app, ICON_SIZE));
                 }
-                wait_for_refresh(&index, &running);
+                super::refresh::wait_for_change(|| index.fingerprint(), &running);
             }
         });
         Ok(())
@@ -255,22 +244,6 @@ impl Service for IndexingService {
     fn stop(&self) {
         self.running
             .store(false, std::sync::atomic::Ordering::SeqCst);
-    }
-}
-
-/// Waits until the applications on disk look different or the sweep is due,
-/// whichever comes first. Sleeps in short slices so disabling the extension
-/// stops the loop promptly.
-fn wait_for_refresh(index: &AppIndex, running: &std::sync::atomic::AtomicBool) {
-    use std::sync::atomic::Ordering;
-    let baseline = index.fingerprint();
-    let started = std::time::Instant::now();
-    while running.load(Ordering::SeqCst) && started.elapsed() < REFRESH_INTERVAL {
-        std::thread::sleep(TICK);
-        if baseline.is_some() && index.fingerprint() != baseline {
-            std::thread::sleep(SETTLE);
-            return;
-        }
     }
 }
 

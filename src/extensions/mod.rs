@@ -1,7 +1,9 @@
 pub mod ai;
 pub mod applications;
 pub mod clipboard;
+pub mod games;
 pub mod permissions;
+pub mod refresh;
 pub mod snippets;
 pub mod system;
 pub mod updates;
@@ -17,6 +19,7 @@ pub fn builtin_manifests() -> Vec<Manifest> {
     vec![
         applications::manifest(),
         clipboard::manifest(),
+        games::manifest(),
         permissions::manifest(),
         system::manifest(),
         updates::manifest(),

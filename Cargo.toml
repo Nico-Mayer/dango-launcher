@@ -82,6 +82,7 @@ bytesize = "2.7.0"
 cargo-packager-updater = "0.2.3"
 rolling-file = "0.2"
 email_address = { version = "0.2.9", default-features = false }
+steamlocate = "2.1"
 
 [dev-dependencies]
 base64 = "0.22"

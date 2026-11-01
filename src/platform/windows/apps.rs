@@ -176,7 +176,11 @@ fn is_launchable(id: &str, target: Option<&str>) -> bool {
         return !id.is_empty();
     };
     let lower = target.to_lowercase();
-    if lower.starts_with("http://") || lower.starts_with("https://") {
+    // The `games` extension lists Steam games, shortcut or not.
+    if lower.starts_with("http://")
+        || lower.starts_with("https://")
+        || lower.starts_with("steam://rungameid/")
+    {
         return false;
     }
     let base = lower.rsplit(['\\', '/']).next().unwrap_or(&lower);
@@ -386,8 +390,17 @@ mod tests {
     }
 
     #[test]
-    fn custom_url_schemes_are_launchable() {
-        assert!(is_launchable("A Game", Some("steam://rungameid/1")));
+    fn custom_url_schemes_are_launchable_except_steam_games() {
+        assert!(is_launchable("Steam Store", Some("steam://store")));
+        assert!(!is_launchable("A Game", Some("steam://rungameid/1")));
+    }
+
+    #[test]
+    fn steam_itself_stays() {
+        assert!(is_launchable(
+            "Steam",
+            Some(r"C:\Program Files (x86)\Steam\steam.exe")
+        ));
     }
 
     #[test]
