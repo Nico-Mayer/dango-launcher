@@ -2,6 +2,23 @@
 
 All notable changes to Dango. Generated from commit history at release time.
 
+## [3.0.1] - 2026-11-01
+
+### Fixes
+
+- **macos:** Keep the instance lock in the data dir
+
+### Refactoring
+
+- Share the data dir with the instance lock
+
+### Documentation
+
+- **config:** Note the hyperkey takes F18 on macOS
+
+### Maintenance
+
+- Let the release task prompt and skip publishing
 ## [3.0.0] - 2026-11-01
 
 ### Features
@@ -135,6 +152,7 @@ All notable changes to Dango. Generated from commit history at release time.
 - **opener:** Pass browsers by path on Windows
 - **snippets:** Skip keys aimed at Dango on macOS
 - **shell:** Attach the macOS panel on first show
+- **snippets:** Skip keys while the panel is key
 
 ### Performance
 
@@ -317,7 +335,7 @@ All notable changes to Dango. Generated from commit history at release time.
 ### Documentation
 
 - **agents:** Note tray PATH and .cmd lookup trap
-## [0.5.0] - 2026-10-30
+## [0.4.1-rc1] - 2026-10-30
 
 ### Features
 
