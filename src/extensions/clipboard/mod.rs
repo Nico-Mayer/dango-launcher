@@ -2,6 +2,7 @@
 
 mod extension;
 mod history;
+mod metadata;
 mod source;
 mod watcher;
 

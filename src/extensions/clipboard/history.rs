@@ -145,7 +145,7 @@ impl From<rusqlite::Error> for HistoryError {
 
 /// Enough of each text for a one-line preview, so listing the history never
 /// loads every copied text in full.
-const LISTED_CHARS: usize = 2000;
+pub(super) const LISTED_CHARS: usize = 2000;
 
 /// The columns after the text that `entry` reads. The counts are of the whole
 /// text, however little of it is read.

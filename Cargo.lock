@@ -1301,6 +1301,7 @@ dependencies = [
  "cargo-packager-updater",
  "clipboard-rs",
  "dirs 6.0.0",
+ "email_address",
  "enigo",
  "favicon-picker",
  "futures",
