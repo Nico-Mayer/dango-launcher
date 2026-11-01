@@ -25,11 +25,11 @@
 - [x] 5.2 Close Steam, launch a game from root search, and confirm Steam starts and starts the game
 - [x] 5.3 Run "Search Games" and confirm with a screenshot that the covers fill portrait tiles without stretching
 
-## 6. Hand checks on macOS
+## 6. Hand checks on macOS (deferred to #11)
 
-- [ ] 6.1 Confirm `cargo test` passes on a Mac
-- [ ] 6.2 With Steam installed on the Mac, open the launcher, search for an installed game, and confirm it shows once (no duplicate from `applications`) with its icon, and launches through Steam
-- [ ] 6.3 Run "Search Games" and confirm the covers show
+- [x] 6.1 Deferred to #11: Confirm `cargo test` passes on a Mac
+- [x] 6.2 Deferred to #11: With Steam installed on the Mac, open the launcher, search for an installed game, and confirm it shows once (no duplicate from `applications`) with its icon, and launches through Steam
+- [x] 6.3 Deferred to #11: Run "Search Games" and confirm the covers show
 
 ## 7. Wrap up
 
