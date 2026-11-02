@@ -56,10 +56,9 @@ extension contributing none of them SHALL be rejected as malformed.
 ### Requirement: Command declaration
 
 Each declared command SHALL carry an identifier unique within its extension, a
-title, an invocation mode of either `view` or `no-view`, and optionally a
-subtitle, an icon, search keywords, and a user-assigned alias. Its fully
-qualified identity SHALL be the extension identifier combined with the command
-identifier.
+title, an invocation mode of either `view` or `no-view`, and optionally an
+icon, search keywords, and a user-assigned alias. Its fully qualified identity
+SHALL be the extension identifier combined with the command identifier.
 
 #### Scenario: Command is addressable
 
