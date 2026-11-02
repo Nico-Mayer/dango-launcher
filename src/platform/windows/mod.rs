@@ -33,6 +33,7 @@ pub use window::WindowsWindowManager;
 pub(super) const DANGO_INJECTED: usize = 0x44_41_4E_47;
 
 use std::cell::RefCell;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use raw_window_handle::RawWindowHandle;
 use windows_sys::Win32::Foundation::{FALSE, HWND, POINT, RECT, TRUE};
@@ -174,6 +175,15 @@ thread_local! {
     static FOCUS_LOST: RefCell<Option<Box<dyn Fn()>>> = const { RefCell::new(None) };
 }
 
+/// Set while a selection read has lent the foreground to the previous window.
+pub(super) static LENDING: AtomicBool = AtomicBool::new(false);
+
+/// The event for a lend can be handled after the foreground came back, so the
+/// current foreground is checked too.
+fn hides_on_foreground_change(lending: bool, dango_in_front: bool) -> bool {
+    !lending && !dango_in_front
+}
+
 /// Out of context, so the callback runs on this thread's message loop, and
 /// skipping Dango's own process, so taking the foreground does not count.
 pub(super) fn watch_focus_loss(lost: Box<dyn Fn()>) {
@@ -203,6 +213,9 @@ unsafe extern "system" fn foreground_changed(
     _thread: u32,
     _time: u32,
 ) {
+    if !hides_on_foreground_change(LENDING.load(Ordering::SeqCst), foreground_is_dango()) {
+        return;
+    }
     FOCUS_LOST.with(|slot| {
         if let Some(lost) = slot.borrow().as_ref() {
             lost();
@@ -400,5 +413,21 @@ pub(super) fn focused_field_is_secure() -> bool {
         let len = GetClassNameW(info.hwndFocus, class.as_mut_ptr(), class.len() as i32);
         let class = String::from_utf16_lossy(&class[..len.max(0) as usize]);
         class.eq_ignore_ascii_case("edit")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::hides_on_foreground_change;
+
+    #[test]
+    fn only_a_real_focus_loss_hides_the_launcher() {
+        assert!(hides_on_foreground_change(false, false));
+        assert!(!hides_on_foreground_change(true, false), "lent for a read");
+        assert!(
+            !hides_on_foreground_change(false, true),
+            "late event after the foreground came back"
+        );
+        assert!(!hides_on_foreground_change(true, true));
     }
 }

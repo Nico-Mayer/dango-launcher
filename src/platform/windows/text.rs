@@ -173,16 +173,17 @@ impl Handoff for WindowsHandoff {
     /// keyboard from the app the user is typing in.
     fn lend_to_previous(&self) -> Lend {
         let launcher = unsafe { GetForegroundWindow() } as isize;
-        let ready = self.yield_to_previous();
         if launcher == 0 || !super::is_own_window(launcher as HWND) {
-            return Lend::new(ready, || {});
+            return Lend::new(self.yield_to_previous(), || {});
         }
-        Lend::new(ready, move || unsafe {
+        super::LENDING.store(true, Ordering::SeqCst);
+        Lend::new(self.yield_to_previous(), move || unsafe {
             let launcher = launcher as HWND;
             super::force_foreground(launcher);
             if GetForegroundWindow() != launcher {
                 eprintln!("[dango] the launcher didn't get the foreground back after a read");
             }
+            super::LENDING.store(false, Ordering::SeqCst);
         })
     }
 
