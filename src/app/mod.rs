@@ -719,9 +719,21 @@ impl Core {
                     return;
                 };
                 core.set_missing_permissions(missing);
+                core.restart_hyperkey();
             });
         if let Err(error) = spawned {
             eprintln!("[dango] permission watching is off: {error}");
+        }
+    }
+
+    /// A running macOS hyperkey tap whose Accessibility grant is revoked stalls
+    /// all keyboard and mouse input, timing out on every event. A tap created
+    /// after the change takes the permissions as they now are.
+    fn restart_hyperkey(&self) {
+        self.services.hyperkey.lock().unwrap().running = None;
+        if let Some(message) = apply_hyperkey(&self.config, &self.services.hyperkey) {
+            crate::log::append(&message);
+            self.set_config_status(true);
         }
     }
 

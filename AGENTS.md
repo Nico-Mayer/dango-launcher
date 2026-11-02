@@ -101,7 +101,8 @@ No millisecond budgets in specs or tests. Results depend on machine load, unreli
 - On Windows, `WS_EX_TOOLWINDOW` re-applied after each show: tao rewrote extended style on every visibility change, nobody checked whether winit does. Windows positions in physical pixels, macOS in logical points. Don't share positioning code.
 - macOS gates window management, paste, snippet expansion, reading selection behind Accessibility.
 - enigo's `Enigo::new` on macOS fails with `NoPermission` without Accessibility. Create on first use, never at startup.
-- Keyboard `CGEventTap`s on macOS, listen-only and active, need Input Monitoring, not Accessibility. Input Monitoring grant applies only after restart; Accessibility grant applies at once.
+- Keyboard `CGEventTap`s on macOS need Input Monitoring to see events; active one (hyperkey) also needs Accessibility, or creation is refused. Input Monitoring grant applies only after restart; Accessibility grant applies at once.
+- Revoking Accessibility under running active tap stalls all keyboard + mouse input system-wide. Permission poller restarts hyperkey on any permission change, so new tap matches current grants.
 - Showing launcher over fullscreen apps on macOS needs NSPanel.
 - winit resizes macOS window with `setContentSize`, keeping bottom-left origin, so Slint `Window::set_size` or changed `height` grows launcher upward + moves SearchBar. Height goes through `LauncherWindow::set_height`, which keeps top edge, only where `keeps_top_edge` true. Set component's `height` before native resize: Slint sizes window back to height its component allows, within same `SetWindowPos`. Windows uses `SetWindowPos` with `SWP_NOMOVE`; macOS has no implementation yet (`setFrame:display:` with origin moved down), stays full height.
 - Reading selection direct on macOS via `AXSelectedText`. On Windows realistic path: copy, read clipboard, restore clipboard.
