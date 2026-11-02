@@ -164,8 +164,8 @@ Alternative: keep `CREATE_NO_WINDOW` on the inner command and drop
 running.
 
 `windows` moves to 0.62 for the whole crate, instead of a second renamed 0.62
-dependency. `Cargo.lock` already holds 0.62.2 for other crates, so this
-removes a duplicate from the build instead of adding one. API changes between 0.61 and 0.62 in
+dependency. `Cargo.lock` already holds 0.62.2 for other crates, so this adds
+no new version to the build. 0.61.3 stays, pulled by other crates. API changes between 0.61 and 0.62 in
 `platform/windows` are fixed in the same commit.
 
 ### The no-new-output limit

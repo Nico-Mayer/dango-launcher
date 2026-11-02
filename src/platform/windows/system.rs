@@ -52,7 +52,7 @@ impl SystemControl for WindowsSystemControl {
         let (tx, rx) = std::sync::mpsc::channel();
         std::thread::spawn(move || {
             let suspended = unsafe { SetSuspendState(false, false, false) };
-            let error = windows::core::Error::from_win32();
+            let error = windows::core::Error::from_thread();
             let _ = tx.send((suspended, error));
         });
         match rx.recv_timeout(SUSPEND_GRACE) {
