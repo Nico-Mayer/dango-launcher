@@ -154,6 +154,15 @@ pub fn launcher(config: &Config) -> (HotKey, Option<String>) {
     }
 }
 
+/// The launcher chord as the user knows it: as written in the config file when
+/// it is used, otherwise the platform default.
+pub fn launcher_label(config: &Config) -> &str {
+    match (&config.launcher.hotkey, launcher(config).1) {
+        (Some(hotkey), None) => hotkey.for_platform().unwrap_or_default(),
+        _ => crate::platform::label(crate::platform::Label::LauncherShortcut),
+    }
+}
+
 /// Taking a chord system-wide and giving it back.
 pub trait Grab: Send + Sync {
     fn register(&self, chord: HotKey) -> Result<(), String>;
@@ -521,6 +530,20 @@ mod tests {
         let (chord, problem) = super::launcher(&config(r#"{ "launcher": { "hotkey": "space" } }"#));
         assert_eq!(chord, launcher());
         assert!(problem.unwrap().contains("no modifier"));
+    }
+
+    #[test]
+    fn the_launcher_label_names_the_configured_chord() {
+        let c = config(r#"{ "launcher": { "hotkey": "ctrl+space" } }"#);
+        assert_eq!(launcher_label(&c), "ctrl+space");
+    }
+
+    #[test]
+    fn the_launcher_label_names_the_default_when_unset_or_invalid() {
+        let default = crate::platform::label(crate::platform::Label::LauncherShortcut);
+        assert_eq!(launcher_label(&config("{}")), default);
+        let invalid = config(r#"{ "launcher": { "hotkey": "ctrl+nope" } }"#);
+        assert_eq!(launcher_label(&invalid), default);
     }
 
     #[test]

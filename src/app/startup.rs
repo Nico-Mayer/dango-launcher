@@ -484,7 +484,10 @@ fn register_hotkeys(file_config: &Arc<FileConfig>, notices: &mut Vec<String>) ->
     let registry = Registry::new(grab, launcher);
     if let Err(error) = registry.register_launcher() {
         eprintln!("[dango] could not register the launcher hotkey: {error}");
-        notices.push(format!("{shortcut} is in use, set launcher.hotkey"));
+        notices.push(format!(
+            "{} is in use, set launcher.hotkey",
+            hotkeys::launcher_label(&config)
+        ));
     }
     let conflicts = registry.apply(&config);
     if !conflicts.is_empty() {
