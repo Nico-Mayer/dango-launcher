@@ -29,6 +29,15 @@ fn core_with(
     grab: FakeGrab,
     extensions: Vec<Arc<dyn Extension>>,
 ) -> (Arc<Core>, Arc<RecordingShell>) {
+    core_with_ai(config_json, grab, extensions, None)
+}
+
+fn core_with_ai(
+    config_json: &str,
+    grab: FakeGrab,
+    extensions: Vec<Arc<dyn Extension>>,
+    ai: Option<super::AiParts>,
+) -> (Arc<Core>, Arc<RecordingShell>) {
     let config = Config::parse(config_json).unwrap();
     let (launcher, _) = hotkeys::launcher(&config);
     let config = Arc::new(FileConfig::new(
@@ -57,7 +66,7 @@ fn core_with(
         learned,
         contexts,
         applications: None,
-        ai: None,
+        ai,
         clipboard: None,
         hotkeys: Registry::new(Box::new(grab), launcher),
         hyperkey: Mutex::default(),
@@ -300,6 +309,45 @@ async fn focus_loss_hides_without_taking_focus_back() {
             }
         ]
     );
+}
+
+/// Counts how often it is told to stop everything.
+#[derive(Default)]
+struct StopCounter(std::sync::atomic::AtomicUsize);
+
+impl crate::extensions::ai::Completions for StopCounter {
+    fn stream(&self, _request: crate::extensions::ai::Request) -> crate::extensions::ai::Chunks {
+        crate::extensions::ai::Chunks::new(std::sync::mpsc::channel().1)
+    }
+
+    fn stop_all(&self) {
+        self.0.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+    }
+}
+
+struct NoRunner;
+
+impl Runner for NoRunner {
+    fn start(&self) -> Option<Arc<InvocationContext>> {
+        None
+    }
+}
+
+#[tokio::test]
+async fn quitting_stops_running_agent_programs() {
+    let client = Arc::new(StopCounter::default());
+    let ai = super::AiParts {
+        keys: Arc::new(crate::extensions::ai::AuthFile::new(
+            std::env::temp_dir().join("dango-no-auth.json"),
+        )),
+        client: client.clone(),
+        text: None,
+        clipboard: None,
+        runner: Arc::new(NoRunner),
+    };
+    let (core, _) = core_with_ai("{}", FakeGrab::default(), Vec::new(), Some(ai));
+    core.quit();
+    assert_eq!(client.0.load(std::sync::atomic::Ordering::SeqCst), 1);
 }
 
 #[tokio::test]

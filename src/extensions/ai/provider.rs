@@ -18,7 +18,11 @@ pub struct Request {
     pub provider: String,
     pub kind: ProviderKind,
     pub base_url: Option<String>,
-    pub model: String,
+    /// Always set for a service. An agent program without one uses its own
+    /// default.
+    pub model: Option<String>,
+    /// The program to run for an agent kind, when the user named one.
+    pub path: Option<std::path::PathBuf>,
     pub thinking: Thinking,
     pub prompt: String,
     pub key: Option<String>,
@@ -31,6 +35,7 @@ impl std::fmt::Debug for Request {
             .field("kind", &self.kind)
             .field("base_url", &self.base_url)
             .field("model", &self.model)
+            .field("path", &self.path)
             .field("thinking", &self.thinking)
             .field("prompt", &self.prompt)
             .field("key", &self.key.as_ref().map(|_| "<redacted>"))
@@ -43,6 +48,11 @@ impl Request {
     /// message when it cannot be reached and means no key is needed.
     pub fn is_local(&self) -> bool {
         self.kind == ProviderKind::Ollama || self.base_url.as_deref().is_some_and(is_loopback)
+    }
+
+    /// An agent program brings its own sign-in, and a local server takes none.
+    pub fn needs_key(&self) -> bool {
+        !self.kind.is_agent() && !self.is_local()
     }
 }
 
@@ -83,6 +93,12 @@ pub enum AiError {
     Timeout,
     #[error("auth.json couldn't be read. Check the file in your config folder.")]
     KeyFileUnreadable,
+    #[error("Couldn't find {program}. Install it or set its path in your config file.")]
+    ProgramMissing { program: String },
+    #[error("Couldn't find {path}. Check the path in your config file.")]
+    PathMissing { path: String },
+    #[error("{provider} stopped with an error. See dango.log for the reason.")]
+    ProgramFailed { provider: String },
 }
 
 /// What the next poll of a running request produced.
@@ -101,11 +117,27 @@ pub enum Next {
 /// request.
 pub struct Chunks {
     receiver: std::sync::mpsc::Receiver<Result<String, AiError>>,
+    /// An HTTP request ends by itself once nothing reads it; a child process
+    /// has to be told.
+    cleanup: Option<Box<dyn FnOnce() + Send>>,
 }
 
 impl Chunks {
     pub fn new(receiver: std::sync::mpsc::Receiver<Result<String, AiError>>) -> Self {
-        Self { receiver }
+        Self {
+            receiver,
+            cleanup: None,
+        }
+    }
+
+    pub fn with_cleanup(
+        receiver: std::sync::mpsc::Receiver<Result<String, AiError>>,
+        cleanup: impl FnOnce() + Send + 'static,
+    ) -> Self {
+        Self {
+            receiver,
+            cleanup: Some(Box::new(cleanup)),
+        }
     }
 
     pub fn next(&self, within: Duration) -> Next {
@@ -120,10 +152,22 @@ impl Chunks {
     }
 }
 
+impl Drop for Chunks {
+    fn drop(&mut self) {
+        if let Some(cleanup) = self.cleanup.take() {
+            cleanup();
+        }
+    }
+}
+
 /// Whatever answers a request. The `genai` client is one implementation; the
 /// tests use a scripted one.
 pub trait Completions: Send + Sync {
     fn stream(&self, request: Request) -> Chunks;
+
+    /// Stops whatever is still running, because Dango is quitting. A service
+    /// request ends with the process; a program has to be told.
+    fn stop_all(&self) {}
 }
 
 #[cfg(test)]
@@ -180,7 +224,8 @@ mod tests {
             provider: "local".into(),
             kind: ProviderKind::Ollama,
             base_url: None,
-            model: "qwen3:8b".into(),
+            model: Some("qwen3:8b".into()),
+            path: None,
             thinking: Thinking::Off,
             prompt: "Improve this.".into(),
             key: None,

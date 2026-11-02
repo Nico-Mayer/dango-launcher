@@ -704,10 +704,11 @@ impl Harness {
             provider: "local".into(),
             kind: ProviderKind::Ollama,
             base_url: None,
-            model: model.clone(),
+            model: Some(model.clone()),
             thinking: Thinking::Off,
             prompt: rendered.text,
             key: None,
+            path: None,
         });
 
         let mut answer = String::new();

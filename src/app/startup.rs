@@ -13,7 +13,7 @@ use super::{
 use super::{Services, ViewRunner, RESULT_LIMIT};
 use crate::config::{self, FileConfig};
 use crate::extension::{self, EnabledStore, ExtensionHost, HostResolver};
-use crate::extensions::ai::{AuthFile, GenAiClient};
+use crate::extensions::ai::{AgentClient, AuthFile, Clients, GenAiClient};
 use crate::extensions::applications::{AppIndex, ApplicationsExtension};
 use crate::extensions::clipboard::{
     ClipboardExtension, ClipboardSource, History, PreferencePolicy, Watcher,
@@ -309,7 +309,10 @@ fn build_services(
 
     let ai = AiParts {
         keys: Arc::new(AuthFile::new(config::auth_path())),
-        client: Arc::new(GenAiClient::new(startup.runtime.clone())),
+        client: Arc::new(Clients::new(
+            Arc::new(GenAiClient::new(startup.runtime.clone())),
+            Arc::new(AgentClient::new(cache_dir().join("agent-workspace"))),
+        )),
         text: exchange.clone(),
         clipboard: clipboard
             .as_ref()

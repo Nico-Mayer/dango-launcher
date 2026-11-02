@@ -1343,6 +1343,7 @@ dependencies = [
  "objc2-foundation 0.3.2",
  "open",
  "png",
+ "process-wrap",
  "raw-window-handle",
  "reqwest 0.13.5",
  "rolling-file",
@@ -1355,13 +1356,15 @@ dependencies = [
  "slint",
  "slint-build",
  "steamlocate",
+ "tempfile",
  "thiserror 2.0.20",
  "time",
  "tokio",
  "uiautomation",
  "url",
  "uuid",
- "windows 0.61.3",
+ "which",
+ "windows 0.62.2",
  "windows-registry",
  "windows-sys 0.61.2",
  "winresource",
@@ -5257,6 +5260,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "process-wrap"
+version = "10.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1f21b97672d2dc848e7b25701ab4535618b92f4861c13cc3f7f7bed52ad3c8da"
+dependencies = [
+ "indexmap 2.14.2",
+ "nix 0.31.3",
+ "windows 0.62.2",
+]
+
+[[package]]
 name = "profiling"
 version = "1.0.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8015,6 +8029,15 @@ dependencies = [
  "naga-types",
  "raw-window-handle",
  "static_assertions",
+]
+
+[[package]]
+name = "which"
+version = "8.0.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bae2f2b2b816647a1cab1acc91f5bd20812d53cb344382635ec2181940c8034f"
+dependencies = [
+ "libc",
 ]
 
 [[package]]

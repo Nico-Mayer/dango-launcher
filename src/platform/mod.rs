@@ -82,6 +82,43 @@ pub fn runs_inline_on_main_thread() -> bool {
     return false;
 }
 
+/// Folders an agent CLI is often installed to that a tray app's PATH lacks.
+pub fn agent_known_dirs() -> Vec<std::path::PathBuf> {
+    #[cfg(target_os = "windows")]
+    return windows::agent_known_dirs();
+    #[cfg(target_os = "macos")]
+    return macos::agent_known_dirs();
+}
+
+/// A command for an agent CLI that shows no window and can be stopped with
+/// everything it starts.
+pub fn contained_command(program: &std::path::Path) -> process_wrap::std::CommandWrap {
+    #[cfg(target_os = "windows")]
+    return windows::contained_command(program);
+    #[cfg(target_os = "macos")]
+    return macos::contained_command(program);
+}
+
+/// Whether a process with this id is still running. For tests that check a
+/// stopped request left nothing behind.
+#[cfg(test)]
+pub fn process_alive(pid: u32) -> bool {
+    #[cfg(target_os = "windows")]
+    return windows::process_alive(pid);
+    #[cfg(target_os = "macos")]
+    return unsafe { libc::kill(pid as libc::pid_t, 0) == 0 };
+}
+
+/// What `env` prints in the user's login shell, where that differs from
+/// Dango's own environment. Windows hands a login-started app the saved PATH,
+/// so there is nothing to ask for. Blocks for up to ten seconds on macOS.
+pub fn login_shell_env() -> Option<String> {
+    #[cfg(target_os = "windows")]
+    return None;
+    #[cfg(target_os = "macos")]
+    return macos::login_shell_env();
+}
+
 /// Where `auto-launch` writes the login entry for `app_name`, for messages.
 pub fn login_entry(app_name: &str) -> String {
     #[cfg(target_os = "windows")]

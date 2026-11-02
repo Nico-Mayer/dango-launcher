@@ -55,6 +55,11 @@ icondata_core = "0.1"
 single-instance = "0.3"
 interprocess = "2"
 url = "2"
+# Finds an agent CLI in a given folder list, PATHEXT included.
+which = "8"
+# Spawns an agent CLI into a Windows job object or a Unix process group, so
+# abandoning a request stops everything the wrapper script started.
+process-wrap = { version = "10", default-features = false, features = ["std", "job-object", "creation-flags", "process-group"] }
 schemars = "1.2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
@@ -90,6 +95,7 @@ base64 = "0.22"
 i-slint-backend-testing = "=1.18.1"
 jsonschema = { version = "0.26", default-features = false }
 minisign-verify = "0.2"
+tempfile = "3"
 tokio = { version = "1.53.1", default-features = false, features = ["test-util"] }
 
 [target.'cfg(target_os = "windows")'.dependencies]
@@ -110,7 +116,7 @@ windows-sys = { version = "0.61", features = [
   "Win32_UI_Input_KeyboardAndMouse",
   "Win32_UI_WindowsAndMessaging",
 ] }
-windows = { version = "0.61", features = [
+windows = { version = "0.62", features = [
   "Win32_Foundation",
   "Win32_Graphics_Dwm",
   "Win32_Graphics_Gdi",

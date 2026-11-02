@@ -1,3 +1,4 @@
+mod agent;
 mod apps;
 mod browser;
 mod clipboard;
@@ -10,6 +11,9 @@ mod system;
 mod text;
 mod window;
 
+#[cfg(test)]
+pub use agent::process_alive;
+pub use agent::{agent_known_dirs, contained_command};
 pub use apps::{icon_for, WindowsAppIndexer};
 pub use browser::{browser_app, browser_target};
 pub use clipboard::{

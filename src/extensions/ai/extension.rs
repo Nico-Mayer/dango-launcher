@@ -29,7 +29,7 @@ use super::commands::{
     build, AiCommand, Output, Providers, EXTENSION_ID, PREF_PROVIDER, PREF_THINKING,
 };
 use super::provider::{Completions, Request, Thinking};
-use super::stream::{drive, Ended, FIRST_FRAGMENT_TIMEOUT};
+use super::stream::{drive, limit_for, Ended};
 use super::Keys;
 
 pub const ACTION_RUN: &str = "run";
@@ -156,19 +156,16 @@ impl Inner {
 
         ctx.push_view(detail_tree(WORKING, true, false));
 
+        let limit = limit_for(&request);
         let chunks = self.client.stream(request);
-        let ended = drive(
-            &chunks,
-            FIRST_FRAGMENT_TIMEOUT,
-            &|| ctx.is_cancelled(),
-            &mut |so_far| ctx.push_view(detail_tree(so_far, true, false)),
-        );
+        let ended = drive(&chunks, limit, &|| ctx.is_cancelled(), &mut |so_far| {
+            ctx.push_view(detail_tree(so_far, true, false))
+        });
 
         match ended {
             Ended::Cancelled => {}
             Ended::Failed(error) => ctx.fail(error.to_string()),
-            Ended::Answer(answer) if answer.trim().is_empty() => ctx.fail(NO_ANSWER),
-            Ended::Answer(answer) => self.deliver(command.output, answer, ctx),
+            Ended::Answer(answer) => self.deliver(command.output, &answer, ctx),
         }
     }
 
@@ -230,7 +227,7 @@ impl Inner {
             }
         };
 
-        if !request.is_local() {
+        if request.needs_key() {
             match self.keys.key(&request.provider) {
                 Ok(Some(key)) => request.key = Some(key),
                 Ok(None) => {
@@ -266,24 +263,29 @@ impl Inner {
         }
     }
 
-    fn deliver(&self, output: Output, answer: String, ctx: &InvocationContext) {
-        *self.answer.lock().unwrap() = Some(answer.clone());
+    fn deliver(&self, output: Output, answer: &str, ctx: &InvocationContext) {
+        let answer = answer.trim();
+        if answer.is_empty() {
+            ctx.fail(NO_ANSWER);
+            return;
+        }
+        *self.answer.lock().unwrap() = Some(answer.to_string());
         match output {
-            Output::View => ctx.push_view(detail_tree(&answer, false, true)),
-            Output::Paste => match self.insert(&answer) {
+            Output::View => ctx.push_view(detail_tree(answer, false, true)),
+            Output::Paste => match self.insert(answer) {
                 Ok(()) => ctx.succeed(),
                 Err(message) => {
-                    ctx.push_view(detail_tree(&answer, false, true));
+                    ctx.push_view(detail_tree(answer, false, true));
                     ctx.fail(message);
                 }
             },
             Output::Copy => match &self.clipboard {
                 Some(clipboard) => {
-                    clipboard.set_text(&answer);
+                    clipboard.set_text(answer);
                     ctx.succeed();
                 }
                 None => {
-                    ctx.push_view(detail_tree(&answer, false, true));
+                    ctx.push_view(detail_tree(answer, false, true));
                     ctx.fail(crate::text::TextError::Clipboard.to_string());
                 }
             },
@@ -634,7 +636,7 @@ mod tests {
             "the selection is missing: {}",
             request.prompt
         );
-        assert_eq!(request.model, "qwen3:8b");
+        assert_eq!(request.model.as_deref(), Some("qwen3:8b"));
         assert_eq!(sink.markdown().last().unwrap(), "Better text.");
     }
 
@@ -768,6 +770,19 @@ mod tests {
     }
 
     #[test]
+    fn an_agent_program_is_asked_without_a_key_file() {
+        let fixture = fixture_with_keys(
+            r#"{ "extensions": { "dango.ai": { "providers": { "claude": { "kind": "claude" } } } } }"#,
+            Scripted::answering(&["Better."]),
+            selected("text"),
+            FixedKeys(None),
+        );
+        run(&fixture, "improve-writing", Arc::new(Recorded::default()));
+        let request = fixture.client.last_request().expect("a request was made");
+        assert!(request.key.is_none());
+    }
+
+    #[test]
     fn an_openai_server_on_this_machine_is_asked_without_a_key() {
         let fixture = fixture_with_keys(
             r#"{ "extensions": { "dango.ai": { "providers": {
@@ -838,6 +853,27 @@ mod tests {
         );
         assert!(fixture.text.inserted.lock().unwrap().is_empty());
         assert!(fixture.clipboard.written.lock().unwrap().is_empty());
+    }
+
+    #[test]
+    fn the_answer_is_pasted_without_surrounding_whitespace() {
+        let config = r#"{ "extensions": { "dango.ai": {
+            "providers": { "local": { "kind": "ollama", "model": "qwen3:8b" } },
+            "commands": { "improve-writing": { "output": "paste" } }
+        } } }"#;
+        let fixture = fixture(
+            config,
+            Scripted::answering(&[
+                "
+ Better text.",
+                "
+",
+            ]),
+            selected("bad"),
+        );
+        run(&fixture, "improve-writing", Arc::new(Recorded::default()));
+
+        assert_eq!(*fixture.text.inserted.lock().unwrap(), ["Better text."]);
     }
 
     #[test]

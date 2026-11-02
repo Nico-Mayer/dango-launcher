@@ -8,12 +8,32 @@
 
 use std::time::{Duration, Instant};
 
-use super::provider::{AiError, Chunks, Next};
+use super::provider::{AiError, Chunks, Next, Request};
 
 /// Nothing at all within this long means the model is not going to answer.
 /// Only the wait for the first fragment is bounded; a long answer is allowed to
 /// take as long as it takes.
 pub const FIRST_FRAGMENT_TIMEOUT: Duration = Duration::from_secs(30);
+
+/// An agent program prints its answer at the end, after seconds of warm-up and
+/// thinking, so it gets longer, and the clock restarts on every output.
+pub const AGENT_QUIET_LIMIT: Duration = Duration::from_secs(120);
+
+/// When a running request counts as not answering.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Limit {
+    /// Nothing at all arrived within this long.
+    FirstOutput(Duration),
+    /// This long passed since the start or the last fragment.
+    Quiet(Duration),
+}
+
+pub fn limit_for(request: &Request) -> Limit {
+    match request.kind.is_agent() {
+        true => Limit::Quiet(AGENT_QUIET_LIMIT),
+        false => Limit::FirstOutput(FIRST_FRAGMENT_TIMEOUT),
+    }
+}
 
 /// The floor between two view replacements.
 pub const COALESCE: Duration = Duration::from_millis(50);
@@ -33,13 +53,13 @@ pub enum Ended {
 /// so the last fragment never needs a wait of its own.
 pub fn drive(
     chunks: &Chunks,
-    first_fragment_timeout: Duration,
+    limit: Limit,
     cancelled: &dyn Fn() -> bool,
     on_update: &mut dyn FnMut(&str),
 ) -> Ended {
-    let started = Instant::now();
     let mut answer = String::new();
     let mut heard = false;
+    let mut last_heard = Instant::now();
     let mut last_update: Option<Instant> = None;
 
     loop {
@@ -47,9 +67,13 @@ pub fn drive(
             return Ended::Cancelled;
         }
         match chunks.next(POLL) {
-            Next::Text(fragment) if fragment.is_empty() => heard = true,
+            Next::Text(fragment) if fragment.is_empty() => {
+                heard = true;
+                last_heard = Instant::now();
+            }
             Next::Text(fragment) => {
                 heard = true;
+                last_heard = Instant::now();
                 answer.push_str(&fragment);
                 let due = last_update.is_none_or(|at| at.elapsed() >= COALESCE);
                 if due {
@@ -58,7 +82,11 @@ pub fn drive(
                 }
             }
             Next::Idle => {
-                if !heard && started.elapsed() >= first_fragment_timeout {
+                let expired = match limit {
+                    Limit::FirstOutput(within) => !heard && last_heard.elapsed() >= within,
+                    Limit::Quiet(within) => last_heard.elapsed() >= within,
+                };
+                if expired {
                     return Ended::Failed(AiError::Timeout);
                 }
             }
@@ -78,7 +106,8 @@ mod tests {
             provider: "local".into(),
             kind: ProviderKind::Ollama,
             base_url: None,
-            model: "qwen3:8b".into(),
+            model: Some("qwen3:8b".into()),
+            path: None,
             thinking: Thinking::Off,
             prompt: "Improve this.".into(),
             key: None,
@@ -99,7 +128,7 @@ mod tests {
         let mut updates = Vec::new();
         let ended = drive(
             &chunks,
-            FIRST_FRAGMENT_TIMEOUT,
+            Limit::FirstOutput(FIRST_FRAGMENT_TIMEOUT),
             &never_cancelled(),
             &mut |so_far| updates.push(so_far.to_string()),
         );
@@ -125,7 +154,7 @@ mod tests {
         let mut updates = Vec::new();
         drive(
             &chunks,
-            FIRST_FRAGMENT_TIMEOUT,
+            Limit::FirstOutput(FIRST_FRAGMENT_TIMEOUT),
             &never_cancelled(),
             &mut |so_far| updates.push(so_far.to_string()),
         );
@@ -140,7 +169,7 @@ mod tests {
 
         let ended = drive(
             &chunks,
-            Duration::from_millis(60),
+            Limit::FirstOutput(Duration::from_millis(60)),
             &never_cancelled(),
             &mut |_| {},
         );
@@ -161,7 +190,7 @@ mod tests {
 
         let ended = drive(
             &chunks,
-            Duration::from_millis(60),
+            Limit::FirstOutput(Duration::from_millis(60)),
             &|| started.elapsed() >= Duration::from_millis(200),
             &mut |so_far| updates.push(so_far.to_string()),
         );
@@ -176,9 +205,12 @@ mod tests {
         let client = super::super::provider::testing::Scripted::answering(&["one", "two"]);
         let chunks = client.stream(request());
         let mut updates = Vec::new();
-        let ended = drive(&chunks, FIRST_FRAGMENT_TIMEOUT, &|| true, &mut |so_far| {
-            updates.push(so_far.to_string())
-        });
+        let ended = drive(
+            &chunks,
+            Limit::FirstOutput(FIRST_FRAGMENT_TIMEOUT),
+            &|| true,
+            &mut |so_far| updates.push(so_far.to_string()),
+        );
         assert_eq!(ended, Ended::Cancelled);
         assert!(updates.is_empty(), "a cancelled request still drew");
     }
@@ -189,10 +221,63 @@ mod tests {
         let chunks = client.stream(request());
         let ended = drive(
             &chunks,
-            FIRST_FRAGMENT_TIMEOUT,
+            Limit::FirstOutput(FIRST_FRAGMENT_TIMEOUT),
             &never_cancelled(),
             &mut |_| {},
         );
         assert_eq!(ended, Ended::Failed(AiError::Timeout));
+    }
+
+    #[test]
+    fn an_agent_program_gets_the_quiet_limit_and_a_service_the_first_output_one() {
+        let agent = Request {
+            kind: ProviderKind::Claude,
+            ..request()
+        };
+        assert_eq!(limit_for(&agent), Limit::Quiet(AGENT_QUIET_LIMIT));
+        assert_eq!(AGENT_QUIET_LIMIT, Duration::from_secs(120));
+        assert_eq!(
+            limit_for(&request()),
+            Limit::FirstOutput(Duration::from_secs(30))
+        );
+    }
+
+    #[test]
+    fn a_program_that_goes_quiet_after_output_times_out() {
+        let (sender, receiver) = std::sync::mpsc::channel();
+        sender.send(Ok("partial".to_string())).unwrap();
+        let chunks = Chunks::new(receiver);
+
+        let ended = drive(
+            &chunks,
+            Limit::Quiet(Duration::from_millis(60)),
+            &never_cancelled(),
+            &mut |_| {},
+        );
+
+        assert_eq!(ended, Ended::Failed(AiError::Timeout));
+        drop(sender);
+    }
+
+    #[test]
+    fn a_program_that_keeps_printing_is_not_cut_off() {
+        let (sender, receiver) = std::sync::mpsc::channel();
+        let chunks = Chunks::new(receiver);
+        let feeder = std::thread::spawn(move || {
+            for _ in 0..30 {
+                sender.send(Ok("x".to_string())).unwrap();
+                std::thread::sleep(Duration::from_millis(50));
+            }
+        });
+
+        let ended = drive(
+            &chunks,
+            Limit::Quiet(Duration::from_secs(1)),
+            &never_cancelled(),
+            &mut |_| {},
+        );
+
+        feeder.join().unwrap();
+        assert_eq!(ended, Ended::Answer("x".repeat(30)));
     }
 }

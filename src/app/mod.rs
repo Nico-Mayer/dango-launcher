@@ -702,6 +702,9 @@ impl Core {
     }
 
     pub fn quit(&self) {
+        if let Some(ai) = &self.services.ai {
+            ai.client.stop_all();
+        }
         self.services.hotkeys.release_all();
         self.shell.quit();
     }
