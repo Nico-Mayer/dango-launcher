@@ -264,20 +264,20 @@ mod tests {
         let (sender, receiver) = std::sync::mpsc::channel();
         let chunks = Chunks::new(receiver);
         let feeder = std::thread::spawn(move || {
-            for _ in 0..10 {
+            for _ in 0..30 {
                 sender.send(Ok("x".to_string())).unwrap();
-                std::thread::sleep(Duration::from_millis(20));
+                std::thread::sleep(Duration::from_millis(50));
             }
         });
 
         let ended = drive(
             &chunks,
-            Limit::Quiet(Duration::from_millis(80)),
+            Limit::Quiet(Duration::from_secs(1)),
             &never_cancelled(),
             &mut |_| {},
         );
 
         feeder.join().unwrap();
-        assert_eq!(ended, Ended::Answer("x".repeat(10)));
+        assert_eq!(ended, Ended::Answer("x".repeat(30)));
     }
 }
