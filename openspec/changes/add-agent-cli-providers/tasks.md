@@ -9,7 +9,7 @@
 
 - [x] 2.1 Add `ProviderKind::is_agent()` and `Request::path`; make `resolve` allow no model for agent kinds; verify tests in `commands.rs` for "agent program with no model" and that a service kind with no model still fails with "Set a model for {provider} in your config file"
 - [x] 2.2 Replace the extension's `!is_local()` key check with `Request::needs_key()`; verify a test in `extension.rs` that a `claude` provider with no `auth.json` reaches the client with no key
-- [ ] 2.3 Change `drive` to take a `Limit` (`FirstOutput`, `Quiet`) and add `limit_for(&Request)`; verify a unit test that `limit_for` gives `FirstOutput(30 s)` for `ollama` and `Quiet(120 s)` for `claude`, and `stream.rs` tests with a hand-fed channel and millisecond limits: `Quiet` fails after a silence, and does not fail while fragments keep arriving past the limit
+- [x] 2.3 Change `drive` to take a `Limit` (`FirstOutput`, `Quiet`) and add `limit_for(&Request)`; verify a unit test that `limit_for` gives `FirstOutput(30 s)` for `ollama` and `Quiet(120 s)` for `claude`, and `stream.rs` tests with a hand-fed channel and millisecond limits: `Quiet` fails after a silence, and does not fail while fragments keep arriving past the limit
 - [ ] 2.4 Move trimming of the answer into `extension.rs::deliver`; verify the existing empty-answer test still gives "The model returned no text" and a whitespace-only answer does too
 
 ## 3. Argument tables

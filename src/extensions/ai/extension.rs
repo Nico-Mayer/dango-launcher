@@ -29,7 +29,7 @@ use super::commands::{
     build, AiCommand, Output, Providers, EXTENSION_ID, PREF_PROVIDER, PREF_THINKING,
 };
 use super::provider::{Completions, Request, Thinking};
-use super::stream::{drive, Ended, FIRST_FRAGMENT_TIMEOUT};
+use super::stream::{drive, limit_for, Ended};
 use super::Keys;
 
 pub const ACTION_RUN: &str = "run";
@@ -156,13 +156,11 @@ impl Inner {
 
         ctx.push_view(detail_tree(WORKING, true, false));
 
+        let limit = limit_for(&request);
         let chunks = self.client.stream(request);
-        let ended = drive(
-            &chunks,
-            FIRST_FRAGMENT_TIMEOUT,
-            &|| ctx.is_cancelled(),
-            &mut |so_far| ctx.push_view(detail_tree(so_far, true, false)),
-        );
+        let ended = drive(&chunks, limit, &|| ctx.is_cancelled(), &mut |so_far| {
+            ctx.push_view(detail_tree(so_far, true, false))
+        });
 
         match ended {
             Ended::Cancelled => {}
