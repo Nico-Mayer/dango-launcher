@@ -274,8 +274,9 @@ Per-command settings, keyed by command id.
 | Setting | Type | Default | Values | Description |
 | --- | --- | --- | --- | --- |
 | `baseUrl` | string |  |  | Where the service lives. Anthropic needs none; an OpenAI-compatible endpoint always does; Ollama defaults to the local one. |
-| `kind` | string |  | `anthropic`, `openai`, `ollama` | The protocol a provider speaks. `openai` covers any OpenAI-compatible endpoint, such as OpenRouter, LM Studio, or vLLM. |
-| `model` | string |  |  | The model used by a command that names this provider but no model. |
+| `kind` | string |  | `anthropic`, `openai`, `ollama`, `claude`, `pi` | The protocol a provider speaks. `openai` covers any OpenAI-compatible endpoint, such as OpenRouter, LM Studio, or vLLM. `claude` and `pi` run that CLI with the sign-in it already has. |
+| `model` | string |  |  | The model used by a command that names this provider but no model. Optional for `claude` and `pi`, which then use their own default. |
+| `path` | string |  |  | Absolute path to the program, for `claude` and `pi`. Without it Dango looks on PATH and in the usual install folders. |
 
 ## AI command settings
 

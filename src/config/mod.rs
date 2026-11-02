@@ -190,18 +190,34 @@ pub struct ProviderSettings {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub base_url: Option<String>,
     /// The model used by a command that names this provider but no model.
+    /// Optional for `claude` and `pi`, which then use their own default.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub model: Option<String>,
+    /// Absolute path to the program, for `claude` and `pi`. Without it Dango
+    /// looks on PATH and in the usual install folders.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub path: Option<std::path::PathBuf>,
 }
 
 /// The protocol a provider speaks. `openai` covers any OpenAI-compatible
-/// endpoint, such as OpenRouter, LM Studio, or vLLM.
+/// endpoint, such as OpenRouter, LM Studio, or vLLM. `claude` and `pi` run that
+/// CLI with the sign-in it already has.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum ProviderKind {
     Anthropic,
     Openai,
     Ollama,
+    Claude,
+    Pi,
+}
+
+impl ProviderKind {
+    /// Whether the provider is a program Dango runs rather than a service it
+    /// calls.
+    pub fn is_agent(self) -> bool {
+        matches!(self, ProviderKind::Claude | ProviderKind::Pi)
+    }
 }
 
 /// How hard the model should think before answering. A model that cannot think
@@ -596,5 +612,37 @@ mod tests {
         )
         .unwrap_err();
         assert!(error.to_string().contains("cli"), "{error}");
+    }
+
+    #[test]
+    fn codex_is_not_a_provider_kind() {
+        let error = Config::parse(
+            r#"{ "extensions": { "dango.ai": { "providers": { "codex": { "kind": "codex" } } } } }"#,
+        )
+        .unwrap_err();
+        assert!(error.to_string().contains("codex"), "{error}");
+    }
+
+    #[test]
+    fn an_agent_provider_round_trips_with_its_path() {
+        let text = r#"{ "extensions": { "dango.ai": { "providers": {
+            "claude": { "kind": "claude", "model": "sonnet", "path": "C:/tools/claude.exe" },
+            "pi": { "kind": "pi" }
+        } } } }"#;
+        let config = Config::parse(text).unwrap();
+        let again = Config::parse(&serde_json::to_string(&config).unwrap()).unwrap();
+        let providers = &again.extensions["dango.ai"].providers;
+
+        let claude = &providers["claude"];
+        assert_eq!(claude.kind, ProviderKind::Claude);
+        assert_eq!(claude.model.as_deref(), Some("sonnet"));
+        assert_eq!(
+            claude.path.as_deref(),
+            Some(std::path::Path::new("C:/tools/claude.exe"))
+        );
+        assert_eq!(providers["pi"].kind, ProviderKind::Pi);
+        assert!(providers["pi"].path.is_none());
+        assert!(ProviderKind::Claude.is_agent() && ProviderKind::Pi.is_agent());
+        assert!(!ProviderKind::Ollama.is_agent());
     }
 }

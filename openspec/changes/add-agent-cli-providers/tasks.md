@@ -2,8 +2,8 @@
 
 ## 1. Config
 
-- [ ] 1.1 Add `Claude` and `Pi` to `ProviderKind` and `path` to `ProviderSettings`; verify a config test round-trips a `claude` entry with `path`, and that `"kind": "cli"` and `"kind": "codex"` are config errors naming the kind (`cargo test config`)
-- [ ] 1.2 Regenerate the schema and `docs/config.md` (`env DANGO_UPDATE_DOCS=1 cargo test the_settings_reference_is_current`); verify `the_settings_reference_is_current` passes and the `kind` row lists all five kinds
+- [x] 1.1 Add `Claude` and `Pi` to `ProviderKind` and `path` to `ProviderSettings`; verify a config test round-trips a `claude` entry with `path`, and that `"kind": "cli"` and `"kind": "codex"` are config errors naming the kind (`cargo test config`)
+- [x] 1.2 Regenerate the schema and `docs/config.md` (`env DANGO_UPDATE_DOCS=1 cargo test the_settings_reference_is_current`); verify `the_settings_reference_is_current` passes and the `kind` row lists all five kinds
 
 ## 2. Request resolution and limits
 

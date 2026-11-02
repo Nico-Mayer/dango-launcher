@@ -47,7 +47,13 @@ impl Completions for GenAiClient {
 /// silent model does not keep its connection open behind it.
 async fn run(request: Request, sender: mpsc::Sender<Result<String, AiError>>) {
     let deadline = tokio::time::Instant::now() + FIRST_FRAGMENT_TIMEOUT;
-    let client = build(&request);
+    let Some(kind) = adapter_kind(request.kind) else {
+        let _ = sender.send(Err(AiError::Unreachable {
+            provider: request.provider.clone(),
+        }));
+        return;
+    };
+    let client = build(&request, kind);
 
     let chat = ChatRequest::default().append_message(ChatMessage::user(request.prompt.clone()));
     let options = options(&request);
@@ -101,8 +107,7 @@ async fn run(request: Request, sender: mpsc::Sender<Result<String, AiError>>) {
     }
 }
 
-fn build(request: &Request) -> Client {
-    let kind = adapter_kind(&request.kind);
+fn build(request: &Request, kind: AdapterKind) -> Client {
     let endpoint = Endpoint::from_owned(base_url(request));
     let auth = match &request.key {
         Some(key) => AuthData::from_single(key.clone()),
@@ -125,11 +130,12 @@ fn build(request: &Request) -> Client {
         .build()
 }
 
-fn adapter_kind(kind: &ProviderKind) -> AdapterKind {
+fn adapter_kind(kind: ProviderKind) -> Option<AdapterKind> {
     match kind {
-        ProviderKind::Anthropic => AdapterKind::Anthropic,
-        ProviderKind::Openai => AdapterKind::OpenAI,
-        ProviderKind::Ollama => AdapterKind::Ollama,
+        ProviderKind::Anthropic => Some(AdapterKind::Anthropic),
+        ProviderKind::Openai => Some(AdapterKind::OpenAI),
+        ProviderKind::Ollama => Some(AdapterKind::Ollama),
+        ProviderKind::Claude | ProviderKind::Pi => None,
     }
 }
 
