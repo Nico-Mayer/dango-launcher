@@ -2,6 +2,56 @@
 
 All notable changes to Dango. Generated from commit history at release time.
 
+## [4.1.0] - 2026-11-02
+
+### Features
+
+- **log:** Record panics in dango.log
+- **log:** Add time and backtrace to panic log
+- **config:** Add claude and pi provider kinds
+- **ai:** Run agent providers without model or key
+- **ai:** Give agent programs a quiet limit
+- **ai:** Add claude and pi argument tables
+- **ai:** Find agent programs in a folder list
+- **ai:** Read PATH from env output
+- **platform:** List folders agent CLIs install to
+- **platform:** Spawn agent CLIs hidden and contained
+- **ai:** Run agent CLIs as a completions client
+- **ai:** Send agent kinds to the agent client
+- **ai:** Stop agent CLIs when Dango quits
+
+### Fixes
+
+- **windows:** Retry icons while the shell is busy
+- **clipboard:** Render file icons after showing history
+- **system:** Render running app icons after the list
+- **ui:** Keep a command's view after an action
+- **ai:** Trim the answer before delivering it
+- **examples:** Update walkthrough Request fields
+- **ai:** Allow agent lookup code before its caller
+- **ai:** Keep macOS agent runs from misreporting
+- **ai:** End agent runs when the program exits
+- **platform:** Read macOS login env as bytes
+
+### Refactoring
+
+- Move icon cache out of applications
+- **windows:** Use the crate's E_PENDING
+- **ai:** Drop dead code allow on agent modules
+
+### Documentation
+
+- **agents:** Note tray PATH and hidden console traps
+- **agents:** Note synthetic hotkey focus limit
+- **agents:** Note open env and grant relaunch
+
+### Maintenance
+
+- **clipboard:** Accept fallback file icon
+- **clipboard:** Render file icons without the shell
+- Keep symbols in release builds
+- **ai:** Widen quiet limit margin in stream test
+- **deps:** Bump windows to 0.62
 ## [4.0.0] - 2026-11-02
 
 ### Features
