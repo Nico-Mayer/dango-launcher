@@ -63,6 +63,30 @@ impl IconCache {
         }
     }
 
+    /// Renders every `(key, locator)` icon not cached yet, once per key, and
+    /// says whether any appeared. Lets a command show its view first and push
+    /// it again once the icons exist.
+    pub fn fill(
+        &self,
+        wanted: impl IntoIterator<Item = (String, String)>,
+        render: impl Fn(&str) -> Option<IconRgba>,
+        cancelled: impl Fn() -> bool,
+    ) -> bool {
+        let mut tried = HashSet::new();
+        let mut appeared = false;
+        for (key, locator) in wanted {
+            if cancelled() {
+                break;
+            }
+            if !tried.insert(key.clone()) || self.path(&key).is_some() {
+                continue;
+            }
+            self.ensure_with(&key, || render(&locator));
+            appeared |= self.path(&key).is_some();
+        }
+        appeared
+    }
+
     #[cfg(test)]
     pub fn in_temp() -> Arc<Self> {
         let dir = std::env::temp_dir().join(format!("dango-icons-{}", uuid::Uuid::new_v4()));
@@ -151,6 +175,57 @@ mod tests {
             cache.path("code").is_none(),
             "no file means the frontend shows a placeholder"
         );
+    }
+
+    fn wanted(keys: &[&str]) -> Vec<(String, String)> {
+        keys.iter()
+            .map(|key| (key.to_string(), format!("/{key}")))
+            .collect()
+    }
+
+    #[test]
+    fn fill_renders_each_missing_key_once_and_reports_it() {
+        let cache = IconCache::in_temp();
+        cache.ensure_with("cached", blue);
+        let rendered = std::sync::Mutex::new(Vec::new());
+
+        let appeared = cache.fill(
+            wanted(&["cached", "new", "new"]),
+            |locator| {
+                rendered.lock().unwrap().push(locator.to_string());
+                blue()
+            },
+            || false,
+        );
+
+        assert!(appeared);
+        assert_eq!(*rendered.lock().unwrap(), ["/new"]);
+        assert!(cache.path("new").is_some());
+    }
+
+    #[test]
+    fn fill_tries_a_failing_key_once() {
+        let cache = IconCache::in_temp();
+        let tries = std::sync::atomic::AtomicUsize::new(0);
+
+        let appeared = cache.fill(
+            wanted(&["pdf", "pdf"]),
+            |_| {
+                tries.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                None
+            },
+            || false,
+        );
+
+        assert!(!appeared);
+        assert_eq!(tries.into_inner(), 1);
+    }
+
+    #[test]
+    fn fill_stops_once_cancelled() {
+        let cache = IconCache::in_temp();
+        let appeared = cache.fill(wanted(&["new"]), |_| panic!("must not render"), || true);
+        assert!(!appeared);
     }
 
     #[test]

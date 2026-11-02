@@ -9,7 +9,7 @@ use crate::extension::{
     ActionOutcome, CommandDecl, Extension, FormValues, InvocationMode, Manifest, PreferenceDecl,
     PreferenceKind, Preferences, Service, NAMED_ICON,
 };
-use crate::icon_cache::{IconCache, ICON_SIZE};
+use crate::icon_cache::{IconCache, IconRgba, ICON_SIZE};
 use crate::invocation::{Command, InvocationContext};
 use crate::protocol::{
     Action, ActionStyle, EmptyState, ItemDetail, ListItem, ListView, Metadata, Modifier, Shortcut,
@@ -268,15 +268,23 @@ struct HistoryCommand {
 }
 
 impl Command for HistoryCommand {
+    /// Shows the history before rendering missing file icons, which can wait
+    /// on a busy shell, then shows it again with them. The second view reads
+    /// the history again, so an entry removed in between stays removed.
     fn invoke(&self, ctx: &InvocationContext) {
-        match self.history.entries() {
-            Ok(entries) => ctx.push_view(history_view(
-                &entries,
-                primary_action(&self.preferences),
-                local_now(),
-                &self.icons,
-            )),
-            Err(error) => ctx.fail(error.to_string()),
+        let primary = primary_action(&self.preferences);
+        let entries = match self.history.entries() {
+            Ok(entries) => entries,
+            Err(error) => return ctx.fail(error.to_string()),
+        };
+        ctx.push_view(history_view(&entries, primary, local_now(), &self.icons));
+        if !self.icons.fill(file_icons(&entries), render_file_icon, || {
+            ctx.is_cancelled()
+        }) {
+            return;
+        }
+        if let Ok(entries) = self.history.entries() {
+            ctx.push_view(history_view(&entries, primary, local_now(), &self.icons));
         }
     }
 }
@@ -441,22 +449,31 @@ fn file_name(path: &str) -> &str {
         .unwrap_or(path)
 }
 
-/// The cache is checked before the file, because checking a file on an
-/// offline network share can take seconds.
 fn file_icon(files: &[&str], icons: &IconCache) -> String {
-    let fallback = || format!("{NAMED_ICON}file");
-    let Some(path) = files.first() else {
-        return fallback();
-    };
-    let key = icon_key(path);
-    if let Some(cached) = icons.path(&key) {
-        return cached;
-    }
-    if !Path::new(path).exists() {
-        return fallback();
-    }
-    icons.ensure_with(&key, || crate::platform::icon_for(path, ICON_SIZE));
-    icons.path(&key).unwrap_or_else(fallback)
+    files
+        .first()
+        .and_then(|path| icons.path(&icon_key(path)))
+        .unwrap_or_else(|| format!("{NAMED_ICON}file"))
+}
+
+fn file_icons(entries: &[Entry]) -> Vec<(String, String)> {
+    entries
+        .iter()
+        .filter(|entry| entry.kind == Kind::Files)
+        .filter_map(|entry| {
+            let path = entry.files().first()?.to_string();
+            Some((icon_key(&path), path))
+        })
+        .collect()
+}
+
+/// Only runs for a type not cached yet, because checking a file on an offline
+/// network share can take seconds.
+fn render_file_icon(path: &str) -> Option<IconRgba> {
+    Path::new(path)
+        .exists()
+        .then(|| crate::platform::icon_for(path, ICON_SIZE))
+        .flatten()
 }
 
 /// Plain files share their type's icon, so the cache grows with the types
@@ -648,6 +665,15 @@ mod tests {
             .collect()
     }
 
+    fn open_history(extension: &ClipboardExtension) -> Vec<ViewTree> {
+        let sink = Arc::new(RecordingSink::default());
+        let command = extension.command(COMMAND_HISTORY).unwrap();
+        command.invoke(&InvocationContext::for_test(COMMAND_HISTORY, sink.clone()));
+        let pushed = sink.0.lock().unwrap().clone();
+        assert!(!pushed.is_empty(), "a view was pushed");
+        pushed
+    }
+
     fn list_of(tree: &ViewTree) -> &ListView {
         match &tree.view {
             View::List(list) => list,
@@ -803,15 +829,17 @@ mod tests {
         std::fs::write(&file, "x").unwrap();
         record_files(&history, &[file.to_str().unwrap()]);
 
-        let tree = extension.list();
-        let item = &list_of(&tree).items[0];
-        assert_eq!(item.title, file.file_name().unwrap().to_str().unwrap());
-        let icon = item.icon.clone().unwrap();
-        // Windows' GetImage returns E_PENDING when the shell is busy (#28).
-        assert!(
-            icon == format!("{NAMED_ICON}file") || Path::new(&icon).exists(),
-            "the system icon is cached or the fallback: {icon}"
+        let pushed = open_history(&extension);
+        let first = &list_of(&pushed[0]).items[0];
+        assert_eq!(first.title, file.file_name().unwrap().to_str().unwrap());
+        assert_eq!(
+            first.icon.as_deref(),
+            Some(format!("{NAMED_ICON}file").as_str()),
+            "shown before the icon is rendered"
         );
+        assert_eq!(pushed.len(), 2, "shown again once the icon exists");
+        let icon = list_of(&pushed[1]).items[0].icon.clone().unwrap();
+        assert!(Path::new(&icon).exists(), "the system icon: {icon}");
     }
 
     #[test]
@@ -846,8 +874,11 @@ mod tests {
         let file = std::env::temp_dir().join(format!("dango-{}.dangotest", uuid::Uuid::new_v4()));
         std::fs::write(&file, "x").unwrap();
         record_files(&history, &[file.to_str().unwrap()]);
-        let tree = extension.list();
-        let cached = list_of(&tree).items[0].icon.clone().unwrap();
+        let pushed = open_history(&extension);
+        let cached = list_of(pushed.last().unwrap()).items[0]
+            .icon
+            .clone()
+            .unwrap();
 
         std::fs::remove_file(&file).unwrap();
         let tree = extension.list();
@@ -1113,12 +1144,15 @@ mod tests {
         record_text(&f.history, "hello");
         f.store.set(EXTENSION_ID, PREF_PRIMARY_ACTION, "copy");
 
-        let sink = Arc::new(RecordingSink::default());
-        let command = f.extension.command(COMMAND_HISTORY).unwrap();
-        command.invoke(&InvocationContext::for_test(COMMAND_HISTORY, sink.clone()));
+        let pushed = open_history(&f.extension);
+        assert_eq!(list_of(&pushed[0]).items[0].actions[0].id, ACTION_RESTORE);
+    }
 
-        let tree = sink.0.lock().unwrap().clone().expect("a view was pushed");
-        assert_eq!(list_of(&tree).items[0].actions[0].id, ACTION_RESTORE);
+    #[test]
+    fn a_history_without_file_entries_is_shown_once() {
+        let (extension, history, _) = setup();
+        record_text(&history, "hello");
+        assert_eq!(open_history(&extension).len(), 1);
     }
 
     #[test]
@@ -1185,11 +1219,11 @@ mod tests {
     }
 
     #[derive(Default)]
-    struct RecordingSink(Mutex<Option<ViewTree>>);
+    struct RecordingSink(Mutex<Vec<ViewTree>>);
 
     impl crate::invocation::Sink for RecordingSink {
         fn push_view(&self, tree: ViewTree) {
-            *self.0.lock().unwrap() = Some(tree);
+            self.0.lock().unwrap().push(tree);
         }
         fn finish(&self, _outcome: crate::invocation::Outcome) {}
     }
