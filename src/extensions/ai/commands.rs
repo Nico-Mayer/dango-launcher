@@ -8,6 +8,7 @@
 use std::collections::BTreeMap;
 
 use crate::config::{CommandSettings, Config, ProviderSettings};
+use crate::templates::{Template, TemplateError};
 
 use super::provider::{Request, Thinking};
 
@@ -164,6 +165,13 @@ fn merge(
     if prompt.trim().is_empty() {
         return Err(format!("{EXTENSION_ID}: the command '{id}' has no prompt"));
     }
+    if let Err(TemplateError::Parse(detail) | TemplateError::Render(detail)) =
+        Template::parse(&prompt)
+    {
+        return Err(format!(
+            "{EXTENSION_ID}: the command '{id}' has a prompt that can't be read: {detail}"
+        ));
+    }
 
     let thinking = match overrides.thinking.as_deref() {
         None => None,
@@ -275,7 +283,6 @@ impl Providers {
 mod tests {
     use super::*;
     use crate::config::ProviderKind;
-    use crate::templates::Template;
 
     fn config(json: &str) -> Config {
         Config::parse(json).unwrap()
@@ -420,6 +427,28 @@ mod tests {
             .problems
             .iter()
             .any(|problem| problem.contains("speak")));
+    }
+
+    #[test]
+    fn a_prompt_that_cannot_be_parsed_is_reported_and_skipped() {
+        let built = build(&config(
+            r#"{ "extensions": { "dango.ai": { "commands": {
+                "explain": { "prompt": "Explain {{ selection" },
+                "broken": { "title": "Broken", "prompt": "unclosed {{ name" }
+            } } } }"#,
+        ));
+        assert!(find(&built, "explain").is_none());
+        assert!(find(&built, "broken").is_none());
+        assert_eq!(built.commands.len(), SHIPPED.len() - 1, "others survived");
+        assert_eq!(built.problems.len(), 2);
+        assert!(built
+            .problems
+            .iter()
+            .any(|problem| problem.contains("explain")));
+        assert!(built
+            .problems
+            .iter()
+            .any(|problem| problem.contains("broken")));
     }
 
     #[test]
