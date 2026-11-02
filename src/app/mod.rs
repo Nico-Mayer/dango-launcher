@@ -733,7 +733,6 @@ impl Core {
         self.services.hyperkey.lock().unwrap().running = None;
         if let Some(message) = apply_hyperkey(&self.config, &self.services.hyperkey) {
             crate::log::append(&message);
-            self.set_config_status(true);
         }
     }
 
@@ -966,6 +965,12 @@ fn apply_hyperkey(file_config: &FileConfig, slot: &Mutex<HyperkeySlot>) -> Optio
             .contains(&Permission::InputMonitoring) =>
         {
             Some("hyperkey: needs the Input Monitoring permission".to_string())
+        }
+        None if platform::permissions()
+            .missing()
+            .contains(&Permission::Accessibility) =>
+        {
+            Some("hyperkey: needs the Accessibility permission".to_string())
         }
         None => Some(
             "hyperkey: could not start; unavailable on this platform or refused by the OS"
