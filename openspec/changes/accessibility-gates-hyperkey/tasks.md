@@ -9,4 +9,4 @@
 ## 2. Verification
 
 - [x] 2.1 macOS, hyperkey configured, Input Monitoring granted, Accessibility revoked while Dango runs: verify the Accessibility warning item shows the new subtitle, `dango.log` says "hyperkey: needs the Accessibility permission", CapsLock works normally, and typing and the mouse stay normal; grant it again and verify the hyperkey works within a few seconds without a restart. Test with a bundle under its own identifier (see AGENTS.md build facts) so the installed Dango's grants stay untouched
-- [ ] 2.2 Run the `ponytail-review` skill in a fresh subagent on this change's commits, without the apply context
+- [x] 2.2 Run the `ponytail-review` skill in a fresh subagent on this change's commits, without the apply context
