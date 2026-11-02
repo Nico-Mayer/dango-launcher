@@ -257,7 +257,6 @@ mod tests {
     use super::*;
     use crate::config::{ProviderKind, Thinking};
     use crate::extensions::ai::provider::Next;
-    use std::path::Path;
     use std::time::Instant;
 
     struct Setup {
