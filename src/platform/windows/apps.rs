@@ -5,7 +5,7 @@
 use std::path::Path;
 use std::time::Duration;
 
-use windows::core::{Interface, HRESULT, HSTRING, PCWSTR, PWSTR};
+use windows::core::{Interface, HSTRING, PCWSTR, PWSTR};
 use windows::Win32::Foundation::{CloseHandle, ERROR_SUCCESS, HANDLE, HWND, LPARAM, SIZE, TRUE};
 use windows::Win32::Graphics::Gdi::{
     CreateCompatibleDC, DeleteDC, DeleteObject, GetDIBits, GetObjectW, BITMAP, BITMAPINFO,
@@ -14,6 +14,7 @@ use windows::Win32::Graphics::Gdi::{
 use windows::Win32::Storage::EnhancedStorage::{PKEY_AppUserModel_ID, PKEY_Link_TargetParsingPath};
 use windows::Win32::Storage::Packaging::Appx::GetApplicationUserModelId;
 use windows::Win32::System::Com::StructuredStorage::{PropVariantClear, PropVariantToStringAlloc};
+use windows::Win32::System::Com::Urlmon::E_PENDING;
 use windows::Win32::System::Com::{CoInitializeEx, CoTaskMemFree, COINIT_APARTMENTTHREADED};
 use windows::Win32::System::Threading::{
     OpenProcess, QueryFullProcessImageNameW, PROCESS_NAME_WIN32, PROCESS_QUERY_LIMITED_INFORMATION,
@@ -32,9 +33,6 @@ use windows::Win32::UI::WindowsAndMessaging::{
 use crate::extensions::applications::{AppIndexer, IndexedApp, LaunchError};
 use crate::icon_cache::IconRgba;
 
-/// What `GetImage` returns while the shell is busy. The `windows` crate does
-/// not define it.
-const E_PENDING: HRESULT = HRESULT(0x8000000A_u32 as i32);
 const PENDING_RETRIES: u32 = 10;
 const PENDING_DELAY: Duration = Duration::from_millis(100);
 
