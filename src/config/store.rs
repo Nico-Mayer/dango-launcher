@@ -1,9 +1,5 @@
 //! The config file behind the `PreferenceStore` and `EnabledStore` traits.
-//!
-//! The readers never learn the store changed: they still ask for a preference
-//! or an enabled state and get one. The value now comes from the file instead
-//! of SQLite, and a missing value falls through to the declared default the
-//! same way it did before.
+//! A value the file does not set falls through to the declared default.
 
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex, RwLock};

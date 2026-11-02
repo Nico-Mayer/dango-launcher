@@ -1,6 +1,6 @@
 //! Reading an extension's preferences.
 //!
-//! The stored value lives in the database and the default lives in the
+//! The set value lives in the config file and the default lives in the
 //! manifest, so neither half can answer on its own. A reader binds the two, and
 //! is bound to one extension: an extension cannot reach another's values
 //! because it is never handed a reader that could.
@@ -10,7 +10,7 @@ use std::sync::Arc;
 use super::manifest::{PreferenceDecl, PreferenceKind};
 
 /// Where preference values are kept. Abstracted so the reader is testable
-/// without a database, the same way the enabled state is.
+/// without a config file, the same way the enabled state is.
 pub trait PreferenceStore: Send + Sync {
     fn get(&self, extension_id: &str, key: &str) -> Option<String>;
 }

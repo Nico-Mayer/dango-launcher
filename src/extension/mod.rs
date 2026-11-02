@@ -85,7 +85,7 @@ pub trait Service: Send + Sync {
 }
 
 /// Where enabled state lives across restarts. Abstracted so the host is
-/// testable without a database.
+/// testable without a config file.
 pub trait EnabledStore: Send + Sync {
     fn is_enabled(&self, extension_id: &str) -> bool;
     fn is_command_enabled(&self, _extension_id: &str, _command_id: &str) -> bool {
