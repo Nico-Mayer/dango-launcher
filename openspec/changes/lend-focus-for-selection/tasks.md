@@ -8,7 +8,7 @@
 ## 2. Lend the foreground in the read path (shared)
 
 - [x] 2.1 Add a lend step to `Handoff` that returns a guard giving the foreground back on drop, and make `TextExchange::selection` use it instead of `Launcher::dismiss`; drop `DirectSelection::needs_foreground`; verify with `cargo test` fakes that a read never dismisses the launcher, the lend is taken before the direct read, and returned on every exit (text, empty, copy fallback, copy error, lend error)
-- [ ] 2.2 Show a failed read in the launcher at once: verify with a UI test on the Slint testing backend that running an AI command with no selection leaves the launcher visible showing "Select some text first"
+- [x] 2.2 Show a failed read in the launcher at once: verify with a UI test on the Slint testing backend that running an AI command with no selection leaves the launcher visible showing "Select some text first"
 
 ## 3. Windows
 

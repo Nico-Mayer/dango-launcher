@@ -11,6 +11,17 @@ mod render;
 #[cfg(test)]
 mod tests;
 
+#[cfg(test)]
+pub(crate) fn render_headless(snapshot: crate::ui::Snapshot) -> generated::LauncherWindow {
+    i_slint_backend_testing::init_no_event_loop();
+    let ui = generated::LauncherWindow::new().unwrap();
+    ui.window().set_size(slint::LogicalSize::new(720.0, 480.0));
+    ui.show().unwrap();
+    let mut renderer = render::Renderer::new(&ui);
+    render::publish(&mut renderer, &ui, snapshot, |_| {});
+    ui
+}
+
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::atomic::{AtomicBool, Ordering};

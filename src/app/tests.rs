@@ -333,6 +333,70 @@ impl Runner for NoRunner {
     }
 }
 
+struct NothingSelected;
+
+impl crate::text::TextTarget for NothingSelected {
+    fn insert(&self, _text: &str, _caret: Option<usize>) -> Result<(), crate::text::TextError> {
+        Ok(())
+    }
+    fn expand(
+        &self,
+        _backspaces: usize,
+        _text: &str,
+        _caret: Option<usize>,
+    ) -> Result<(), crate::text::TextError> {
+        Ok(())
+    }
+    fn paste_content(
+        &self,
+        _content: &crate::extensions::clipboard::Content,
+    ) -> Result<(), crate::text::TextError> {
+        Ok(())
+    }
+    fn selection(&self) -> Result<Option<String>, crate::text::TextError> {
+        Ok(None)
+    }
+    fn clipboard_text(&self) -> Option<String> {
+        None
+    }
+}
+
+#[tokio::test]
+async fn a_failed_selection_read_shows_in_the_launcher_at_once() {
+    let ai = super::AiParts {
+        keys: Arc::new(crate::extensions::ai::AuthFile::new(
+            std::env::temp_dir().join("dango-no-auth.json"),
+        )),
+        client: Arc::new(StopCounter::default()),
+        text: Some(Arc::new(NothingSelected)),
+        clipboard: None,
+        runner: Arc::new(NoRunner),
+    };
+    let config = r#"{ "extensions": { "dango.ai": { "providers": {
+        "local": { "kind": "ollama", "model": "qwen3:8b" }
+    } } } }"#;
+    let (extension, _) = ai.build(&Config::parse(config).unwrap());
+    let (core, shell) = core_with_ai(config, FakeGrab::default(), vec![extension], Some(ai));
+    core.toggle();
+    core.run_command("dango.ai.improve-writing").unwrap();
+    settle().await;
+
+    assert!(!shell
+        .calls()
+        .iter()
+        .any(|call| matches!(call, Call::Hide { .. })));
+    let ui = crate::slint_shell::render_headless(shell.last_snapshot());
+    assert!(
+        i_slint_backend_testing::ElementHandle::find_by_accessible_label(
+            &ui,
+            "Select some text first"
+        )
+        .next()
+        .is_some(),
+        "the failure is on screen"
+    );
+}
+
 #[tokio::test]
 async fn quitting_stops_running_agent_programs() {
     let client = Arc::new(StopCounter::default());

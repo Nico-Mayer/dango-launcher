@@ -545,8 +545,8 @@ impl Core {
             while let Some(next) = output.recv().await {
                 match next {
                     Output::View(tree) => {
-                        // A command that read the selection hid the launcher to
-                        // do it. It has something to show now, so the launcher
+                        // A command that pasted hid the launcher to do it. It
+                        // has something to show now, so the launcher
                         // comes back rather than streaming into a window nobody
                         // can see. A held launcher is different: the user closed
                         // it and will find the output when they come back.
