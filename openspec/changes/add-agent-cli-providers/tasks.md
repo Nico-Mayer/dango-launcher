@@ -34,6 +34,7 @@
 - [x] 5.4 Exit handling: poll `try_wait` after stdout closes, on non-zero exit log stdout and stderr and send `ProgramFailed`; verify tests: stderr text is in the log and not in the answer, a failing script that prints to stdout gives "{provider} stopped with an error. See dango.log for the reason." with that stdout in the log
 - [x] 5.5 Bring back `Chunks::with_cleanup` and call `start_kill` on drop without holding a lock across any wait; verify two tests: a script with a sleeping child that keeps stdout open, and a script that starts a child with output sent to `nul` or `/dev/null` and then exits; in both, dropping `Chunks` returns quickly and the child is gone
 - [x] 5.6 Add `AiError::ProgramMissing` with "Couldn't find {program}. Install it or set its path in your config file."; verify a test that a missing program fails with that message and nothing is spawned
+- [x] 5.7 Finish a run when the program exits even if a helper it started keeps stdout or stderr open: after the exit, wait a short grace period for the pipes to close, then end with what was printed; verify a Windows test where a batch file starts a helper that inherits the pipes, prints an answer, and exits, and the answer arrives well before the quiet limit
 
 ## 6. Wiring
 

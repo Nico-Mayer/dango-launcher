@@ -16,7 +16,7 @@ use std::io::{Read, Write};
 use std::path::PathBuf;
 use std::process::{ExitStatus, Stdio};
 use std::sync::{mpsc, Arc, Mutex};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use process_wrap::std::ChildWrapper;
 
@@ -24,6 +24,10 @@ use super::provider::{AiError, Chunks, Completions, Request};
 
 /// How often the worker looks for the program's exit once its output closed.
 const EXIT_POLL: Duration = Duration::from_millis(20);
+
+/// How long the output may stay open after the program exited. A helper it
+/// started inherits the pipes and can hold them open for as long as it lives.
+const DRAIN_GRACE: Duration = Duration::from_millis(500);
 
 type Log = Arc<dyn Fn(&str) + Send + Sync>;
 
@@ -156,23 +160,23 @@ impl Run {
                 let _ = stdin.write_all(prompt.as_bytes());
             });
         }
-        let chatter = stderr.map(|mut stderr| {
+        let (chatter_sender, chatter) = mpsc::channel();
+        if let Some(mut stderr) = stderr {
             std::thread::spawn(move || {
                 let mut text = String::new();
                 let _ = stderr.read_to_string(&mut text);
-                text
-            })
-        });
+                let _ = chatter_sender.send(text);
+            });
+        }
+        let (piece_sender, pieces) = mpsc::channel();
+        if let Some(stdout) = stdout {
+            std::thread::spawn(move || read_text(stdout, piece_sender));
+        }
 
-        let Some(printed) = stdout.and_then(|stdout| self.pass_on(stdout)) else {
+        let Some((printed, status)) = self.follow(&pieces) else {
             return Ok(());
         };
-        let Some(status) = self.exit_status() else {
-            return Ok(());
-        };
-        let chatter = chatter
-            .and_then(|thread| thread.join().ok())
-            .unwrap_or_default();
+        let chatter = chatter.recv_timeout(DRAIN_GRACE).unwrap_or_default();
 
         if status.success() {
             if !chatter.trim().is_empty() {
@@ -188,64 +192,63 @@ impl Run {
         Err(self.failed())
     }
 
-    /// Sends standard output on as it arrives and returns all of it, or `None`
-    /// once nobody is reading any more.
-    fn pass_on(&self, mut stdout: impl Read) -> Option<String> {
+    /// Passes output on as it arrives until the program has exited and its
+    /// output closed, or the grace after the exit ran out. Returns everything
+    /// printed and the exit, or `None` once the request was abandoned.
+    fn follow(&self, pieces: &mpsc::Receiver<String>) -> Option<(String, ExitStatus)> {
         let mut printed = String::new();
-        let mut pending: Vec<u8> = Vec::new();
-        let mut buffer = [0u8; 4096];
+        let mut exited: Option<(ExitStatus, Instant)> = None;
         loop {
-            let read = match stdout.read(&mut buffer) {
-                Ok(0) | Err(_) => break,
-                Ok(read) => read,
-            };
-            pending.extend_from_slice(&buffer[..read]);
-            // A character split across two reads waits for its other half.
-            let complete = match std::str::from_utf8(&pending) {
-                Ok(_) => pending.len(),
-                Err(error) if error.error_len().is_none() => error.valid_up_to(),
-                Err(_) => pending.len(),
-            };
-            let text = String::from_utf8_lossy(&pending[..complete]).into_owned();
-            pending.drain(..complete);
-            if text.is_empty() {
-                continue;
+            match pieces.recv_timeout(EXIT_POLL) {
+                Ok(text) => {
+                    printed.push_str(&text);
+                    if self.sender.send(Ok(text)).is_err() {
+                        return None;
+                    }
+                }
+                Err(mpsc::RecvTimeoutError::Disconnected) => {
+                    let status = match exited {
+                        Some((status, _)) => status,
+                        None => self.exit_status()?,
+                    };
+                    return Some((printed, status));
+                }
+                Err(mpsc::RecvTimeoutError::Timeout) => {}
             }
-            printed.push_str(&text);
-            if self.sender.send(Ok(text)).is_err() {
-                return None;
-            }
-        }
-        if !pending.is_empty() {
-            let text = String::from_utf8_lossy(&pending).into_owned();
-            printed.push_str(&text);
-            if self.sender.send(Ok(text)).is_err() {
-                return None;
+            match exited {
+                Some((status, at)) if at.elapsed() >= DRAIN_GRACE => {
+                    return Some((printed, status))
+                }
+                Some(_) => {}
+                None => exited = self.poll_exit()?.map(|status| (status, Instant::now())),
             }
         }
-        Some(printed)
     }
 
-    /// The program's exit, or `None` once the request was abandoned.
     fn exit_status(&self) -> Option<ExitStatus> {
         loop {
-            {
-                let mut running = lock(&self.shared);
-                if running.abandoned {
-                    return None;
-                }
-                // The program's own process, one wrapper down. A process group's
-                // `try_wait` reaps the program and then drops its status while a
-                // helper it started still runs, which would turn a failure into
-                // an answer.
-                let program = running.child.as_mut().map(|child| child.inner_mut());
-                match program.map(|program| program.try_wait()) {
-                    Some(Ok(Some(status))) => return Some(status),
-                    Some(Ok(None)) => {}
-                    Some(Err(_)) | None => return None,
-                }
+            if let Some(status) = self.poll_exit()? {
+                return Some(status);
             }
             std::thread::sleep(EXIT_POLL);
+        }
+    }
+
+    /// Whether the program has exited, or `None` once the request was
+    /// abandoned.
+    fn poll_exit(&self) -> Option<Option<ExitStatus>> {
+        let mut running = lock(&self.shared);
+        if running.abandoned {
+            return None;
+        }
+        // The program's own process, one wrapper down. A process group's
+        // `try_wait` reaps the program and then drops its status while a
+        // helper it started still runs, which would turn a failure into an
+        // answer.
+        let program = running.child.as_mut().map(|child| child.inner_mut());
+        match program.map(|program| program.try_wait()) {
+            Some(Ok(exited)) => Some(exited),
+            Some(Err(_)) | None => None,
         }
     }
 
@@ -260,6 +263,32 @@ impl Run {
     }
 }
 
+/// Reads text as it arrives. A character split across two reads waits for
+/// its other half.
+fn read_text(mut output: impl Read, pieces: mpsc::Sender<String>) {
+    let mut pending: Vec<u8> = Vec::new();
+    let mut buffer = [0u8; 4096];
+    loop {
+        let read = match output.read(&mut buffer) {
+            Ok(0) | Err(_) => break,
+            Ok(read) => read,
+        };
+        pending.extend_from_slice(&buffer[..read]);
+        let complete = match std::str::from_utf8(&pending) {
+            Ok(_) => pending.len(),
+            Err(error) if error.error_len().is_none() => error.valid_up_to(),
+            Err(_) => pending.len(),
+        };
+        let text = String::from_utf8_lossy(&pending[..complete]).into_owned();
+        pending.drain(..complete);
+        if !text.is_empty() && pieces.send(text).is_err() {
+            return;
+        }
+    }
+    if !pending.is_empty() {
+        let _ = pieces.send(String::from_utf8_lossy(&pending).into_owned());
+    }
+}
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -411,15 +440,13 @@ mod tests {
         assert!(log.contains("token expired"), "{log}");
     }
 
-    // Windows passes the output pipe to every inheriting child of a batch file,
-    // so there the helper would hold the answer open; the bug this guards
-    // against is a process group's, which only Unix uses.
-    #[cfg(unix)]
     #[test]
     fn a_program_that_fails_while_its_helper_runs_still_fails() {
         let setup = setup();
         let program = setup.script(
-            "",
+            "start \"\" /b powershell -NoProfile -Command \"Start-Sleep 60\" >nul 2>&1
+echo not signed in
+exit /b 3",
             "sleep 60 >/dev/null 2>&1 &
 echo not signed in
 exit 3",
@@ -432,6 +459,25 @@ exit 3",
             }
         );
         assert!(setup.log().contains("not signed in"), "{}", setup.log());
+    }
+
+    #[test]
+    fn a_helper_holding_the_output_open_does_not_hold_up_the_answer() {
+        let setup = setup();
+        let program = setup.script(
+            "start \"\" /b powershell -NoProfile -Command \"Start-Sleep 60\"
+echo The answer",
+            "sleep 60 &
+echo The answer",
+        );
+        let started = Instant::now();
+        let answer = read_all(&setup.client.stream(request(program))).unwrap();
+        assert_eq!(answer.trim(), "The answer");
+        assert!(
+            started.elapsed() < Duration::from_secs(10),
+            "{:?}",
+            started.elapsed()
+        );
     }
 
     #[test]

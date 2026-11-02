@@ -140,9 +140,12 @@ time limit from the first moment. The worker:
    it, then writes the prompt to stdin and closes stdin,
 6. reads stdout as it arrives, decoding UTF-8 across read boundaries, and
    sends each piece as a fragment. A second thread reads stderr,
-7. after stdout closes, polls `try_wait` until the program exits. On exit 0
-   the answer stands. On any other exit it logs stdout and stderr and sends
-   `ProgramFailed`, which replaces what was shown.
+7. polls the program's own process with `try_wait` while it passes output on.
+   Once the program has exited, it waits at most 500 ms for the output to
+   close. A helper the program started inherits the pipes and can hold them
+   open for as long as it lives. On exit 0 the answer stands. On any other
+   exit it logs stdout and stderr and sends `ProgramFailed`, which replaces
+   what was shown.
 
 **Kill without holding a lock across `wait`.** The old code held the child's
 mutex while it called `wait()`. `JobObjectChild::wait` waits for every process
