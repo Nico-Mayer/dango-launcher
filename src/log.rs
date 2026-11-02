@@ -35,9 +35,13 @@ pub fn record_panics() {
     let default = std::panic::take_hook();
     std::panic::set_hook(Box::new(move |info| {
         let thread = std::thread::current();
+        let now = time::OffsetDateTime::now_utc()
+            .format(&time::format_description::well_known::Rfc3339)
+            .unwrap_or_default();
         append(&format!(
-            "panic on thread '{}': {info}",
-            thread.name().unwrap_or("unnamed")
+            "{now} panic on thread '{}': {info}\n{}",
+            thread.name().unwrap_or("unnamed"),
+            std::backtrace::Backtrace::force_capture()
         ));
         default(info);
     }));
