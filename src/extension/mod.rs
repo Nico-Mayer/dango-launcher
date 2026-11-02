@@ -191,7 +191,7 @@ impl ExtensionHost {
                 extension_id: command.extension_id.clone(),
                 id: command.qualified_id(),
                 title: command.decl.title.clone(),
-                subtitle: command.decl.subtitle.clone(),
+                status: None,
                 icon: command.decl.icon.clone(),
                 keywords: command.decl.keywords.clone(),
                 alias: command.decl.alias.clone(),

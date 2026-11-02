@@ -532,3 +532,41 @@ async fn launching_a_game_hides_the_launcher() {
         ]
     );
 }
+
+fn x_candidate(source: crate::search::Source, pinned: bool) -> crate::search::Candidate {
+    crate::search::Candidate {
+        extension_id: "x".into(),
+        id: "x.item".into(),
+        title: "Item".into(),
+        status: Some("Needs attention".into()),
+        icon: None,
+        keywords: vec![],
+        alias: None,
+        source,
+        actions: vec![],
+        match_positions: vec![],
+        suggested: false,
+        pinned,
+    }
+}
+
+#[tokio::test]
+async fn a_root_item_shows_its_extension_name() {
+    let (core, _) = core_with("{}", FakeGrab::default(), vec![two_commands()]);
+    let item = core.result_item(x_candidate(crate::search::Source::RootItem, false));
+    assert_eq!(item.subtitle.as_deref(), Some("X"));
+}
+
+#[tokio::test]
+async fn a_command_shows_its_extension_name() {
+    let (core, _) = core_with("{}", FakeGrab::default(), vec![two_commands()]);
+    let item = core.result_item(x_candidate(crate::search::Source::Command, false));
+    assert_eq!(item.subtitle.as_deref(), Some("X"));
+}
+
+#[tokio::test]
+async fn a_pinned_item_shows_its_status_line() {
+    let (core, _) = core_with("{}", FakeGrab::default(), vec![two_commands()]);
+    let item = core.result_item(x_candidate(crate::search::Source::RootItem, true));
+    assert_eq!(item.subtitle.as_deref(), Some("Needs attention"));
+}

@@ -268,12 +268,18 @@ impl Core {
     }
 
     fn result_item(&self, c: Candidate) -> ui::ResultItem {
+        let context = self.context(&c.extension_id);
+        let subtitle = if c.pinned {
+            c.status
+        } else {
+            Some(context.title.clone())
+        };
         ui::ResultItem {
-            context: self.context(&c.extension_id),
+            context,
             extension_id: c.extension_id,
             id: c.id,
             title: c.title,
-            subtitle: c.subtitle,
+            subtitle,
             icon: c.icon,
             actions: c.actions,
             match_positions: c.match_positions,

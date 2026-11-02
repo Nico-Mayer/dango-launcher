@@ -138,7 +138,7 @@ fn warning(permission: Permission) -> Candidate {
         extension_id: EXTENSION_ID.into(),
         id: item_id(permission).into(),
         title: format!("{} is off", name(permission)),
-        subtitle: Some(turns_off(permission).into()),
+        status: Some(turns_off(permission).into()),
         icon: Some("icon:triangle-alert".into()),
         keywords: vec![
             name(permission).to_lowercase(),
@@ -228,7 +228,7 @@ mod tests {
         assert_eq!(items.len(), 1);
         assert_eq!(items[0].title, "Input Monitoring is off");
         assert!(items[0].pinned);
-        assert!(items[0].subtitle.as_deref().unwrap().contains("hyperkey"));
+        assert!(items[0].status.as_deref().unwrap().contains("hyperkey"));
         assert!(items[0].keywords.contains(&"permission".to_string()));
         assert_eq!(items[0].actions[0].title, "Grant access");
     }
@@ -238,7 +238,7 @@ mod tests {
         let (extension, _, _) = build(vec![Permission::Accessibility]);
         let items = items(&extension).await;
         assert_eq!(items[0].title, "Accessibility is off");
-        assert!(items[0].subtitle.as_deref().unwrap().contains("hyperkey"));
+        assert!(items[0].status.as_deref().unwrap().contains("hyperkey"));
     }
 
     #[tokio::test]

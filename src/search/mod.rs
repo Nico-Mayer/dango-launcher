@@ -26,7 +26,9 @@ pub struct Candidate {
     pub extension_id: String,
     pub id: String,
     pub title: String,
-    pub subtitle: Option<String>,
+    /// A line shown beside the title of a pinned item. Every other row shows
+    /// its extension's name there instead.
+    pub status: Option<String>,
     pub icon: Option<String>,
     pub keywords: Vec<String>,
     pub alias: Option<String>,
@@ -239,7 +241,7 @@ mod tests {
             extension_id: "test".into(),
             id: id.into(),
             title: id.into(),
-            subtitle: None,
+            status: None,
             icon: None,
             keywords: vec![],
             alias: None,

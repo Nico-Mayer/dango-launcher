@@ -200,7 +200,7 @@ mod tests {
             extension_id: "test".into(),
             id: id.into(),
             title: title.into(),
-            subtitle: None,
+            status: None,
             icon: None,
             keywords: vec![],
             alias: None,

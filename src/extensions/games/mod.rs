@@ -183,7 +183,7 @@ impl RootProvider for GameProvider {
                 extension_id: EXTENSION_ID.into(),
                 id: game.app_id.to_string(),
                 title: game.name,
-                subtitle: Some("Steam".into()),
+                status: None,
                 icon: Some(game.icon.unwrap_or_else(fallback_icon)),
                 keywords: vec![],
                 alias: None,
@@ -377,7 +377,6 @@ mod tests {
         assert_eq!(items.len(), 1);
         assert_eq!(items[0].id, "1091500");
         assert_eq!(items[0].title, "Cyberpunk 2077");
-        assert_eq!(items[0].subtitle.as_deref(), Some("Steam"));
         assert_eq!(items[0].icon.as_deref(), Some("/cache/1091500/icon.jpg"));
         assert_eq!(items[0].actions[0].title, "Open");
     }
