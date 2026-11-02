@@ -1,9 +1,5 @@
 {
   "mcpServers": {
-    "slint-docs": {
-      "type": "http",
-      "url": "https://docs.slint.dev/mcp"
-    },
     "dango-ui": {
       "type": "stdio",
       "command": "cargo",
