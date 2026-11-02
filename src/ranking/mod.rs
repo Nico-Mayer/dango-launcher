@@ -53,6 +53,7 @@ impl Ranker for DangoRanker {
         let mut matcher = Query::new(query);
         let mut scored: Vec<Scored> = Vec::new();
         for mut candidate in candidates {
+            candidate.pinned = false;
             // An exact alias match is a deliberate, unambiguous request, so it
             // outranks everything regardless of match score or frecency.
             if candidate
@@ -451,6 +452,17 @@ mod tests {
 
         let ids: Vec<&str> = ranked.iter().map(|c| c.id.as_str()).collect();
         assert_eq!(ids, ["a"]);
+    }
+
+    #[test]
+    fn a_typed_query_clears_pinned() {
+        let ranker = ranker();
+        let mut pinned = candidate("pin", "Accessibility is off");
+        pinned.pinned = true;
+
+        let ranked = ranker.rank("access", vec![pinned], 10);
+
+        assert!(!ranked[0].pinned);
     }
 
     #[test]
