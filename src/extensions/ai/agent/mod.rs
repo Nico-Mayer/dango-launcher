@@ -123,6 +123,9 @@ impl Run {
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());
+        if lock(&self.shared).abandoned {
+            return Ok(());
+        }
         let mut child = command.spawn().map_err(|error| {
             self.note(&format!(
                 "can't start {}: {error}",
@@ -231,7 +234,12 @@ impl Run {
                 if running.abandoned {
                     return None;
                 }
-                match running.child.as_mut().map(|child| child.try_wait()) {
+                // The program's own process, one wrapper down. A process group's
+                // `try_wait` reaps the program and then drops its status while a
+                // helper it started still runs, which would turn a failure into
+                // an answer.
+                let program = running.child.as_mut().map(|child| child.inner_mut());
+                match program.map(|program| program.try_wait()) {
                     Some(Ok(Some(status))) => return Some(status),
                     Some(Ok(None)) => {}
                     Some(Err(_)) | None => return None,
@@ -401,6 +409,29 @@ mod tests {
         let log = setup.log();
         assert!(log.contains("not signed in"), "{log}");
         assert!(log.contains("token expired"), "{log}");
+    }
+
+    // Windows passes the output pipe to every inheriting child of a batch file,
+    // so there the helper would hold the answer open; the bug this guards
+    // against is a process group's, which only Unix uses.
+    #[cfg(unix)]
+    #[test]
+    fn a_program_that_fails_while_its_helper_runs_still_fails() {
+        let setup = setup();
+        let program = setup.script(
+            "",
+            "sleep 60 >/dev/null 2>&1 &
+echo not signed in
+exit 3",
+        );
+        let error = read_all(&setup.client.stream(request(program))).unwrap_err();
+        assert_eq!(
+            error,
+            AiError::ProgramFailed {
+                provider: "claude".into()
+            }
+        );
+        assert!(setup.log().contains("not signed in"), "{}", setup.log());
     }
 
     #[test]

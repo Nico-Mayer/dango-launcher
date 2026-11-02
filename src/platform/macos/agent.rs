@@ -57,10 +57,11 @@ pub fn login_shell_env() -> Option<String> {
         .ok()?;
     let group = child.id() as libc::pid_t;
     let mut stdout = child.stdout.take()?;
-    let reader = std::thread::spawn(move || {
+    let (sender, received) = std::sync::mpsc::channel();
+    std::thread::spawn(move || {
         let mut output = String::new();
         let _ = stdout.read_to_string(&mut output);
-        output
+        let _ = sender.send(output);
     });
 
     let deadline = Instant::now() + LOGIN_SHELL_LIMIT;
@@ -77,6 +78,11 @@ pub fn login_shell_env() -> Option<String> {
         libc::killpg(group, libc::SIGKILL);
     }
     let _ = child.wait();
-    let output = reader.join().ok()?;
+    // A process that left the group (`setsid`) survives the kill and can hold
+    // stdout open for good, so the reader is waited for only until the deadline.
+    let remaining = deadline.saturating_duration_since(Instant::now());
+    let output = received
+        .recv_timeout(remaining.max(Duration::from_millis(100)))
+        .ok()?;
     finished.then_some(output)
 }

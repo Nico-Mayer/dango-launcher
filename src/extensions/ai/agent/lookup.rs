@@ -39,14 +39,23 @@ fn dirs_now(refresh: bool) -> Vec<PathBuf> {
 
 fn login_path(refresh: bool) -> Option<OsString> {
     static ASKED: Mutex<Option<Option<OsString>>> = Mutex::new(None);
-    let mut asked = ASKED
-        .lock()
-        .unwrap_or_else(|poisoned| poisoned.into_inner());
-    if refresh || asked.is_none() {
-        let env = crate::platform::login_shell_env();
-        *asked = Some(env.as_deref().and_then(path_from_env));
+    let lock = || {
+        ASKED
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+    };
+    if !refresh {
+        if let Some(asked) = lock().clone() {
+            return asked;
+        }
     }
-    asked.clone().flatten()
+    // Asked without the lock held, so a slow login shell holds up only the
+    // request that asked, not every one after it.
+    let path = crate::platform::login_shell_env()
+        .as_deref()
+        .and_then(path_from_env);
+    *lock() = Some(path.clone());
+    path
 }
 
 /// The process PATH first, so the search only adds folders, then `extra`, with
