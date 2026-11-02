@@ -277,6 +277,21 @@ mod atoms {
         }
     }
 
+    #[test]
+    fn a_kbd_and_a_tag_are_announced_once() {
+        i_slint_backend_testing::init_no_event_loop();
+        let gallery = AtomGallery::new().unwrap();
+        gallery.set_chord(keys::panel_label().into());
+        gallery.show().unwrap();
+        for label in ["Link", keys::panel_label().as_str()] {
+            assert_eq!(
+                ElementHandle::find_by_accessible_label(&gallery, label).count(),
+                1,
+                "{label} is announced once"
+            );
+        }
+    }
+
     /// Only the bundled Geist Mono makes these two the same width; a system
     /// fallback would be proportional.
     #[test]
