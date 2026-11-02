@@ -3,6 +3,8 @@
 /tools/*/target/
 .env
 .env.*
+.agents
+.claude
 !.env.example
 
 # Machine-specific agent settings

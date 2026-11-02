@@ -7,12 +7,11 @@ targets:
   - name: universal
     skills:
       mode: copy
-ignore:
-  - .DS_Store
-  - .git/
-  - __pycache__/
-audit:
-  block_threshold: CRITICAL
+
+skills:
+  - name: rust-skills
+    source: https://github.com/leonardomso/rust-skills
+
 mcp:
   servers:
     dango-ui:
@@ -25,6 +24,7 @@ mcp:
         - tools/dango-ui-mcp/Cargo.toml
       targets:
         - claude
+
 plugins:
   version: 2
   packages:
@@ -35,3 +35,11 @@ plugins:
         claude:
           source: https://github.com/slint-ui/ai-plugins.git
           plugin: slint
+
+ignore:
+  - .DS_Store
+  - .git/
+  - __pycache__/
+
+audit:
+  block_threshold: CRITICAL
