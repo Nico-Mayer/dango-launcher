@@ -25,7 +25,9 @@ pub(super) fn run(proc: HookProc, report: Sender<Option<u32>>) {
             return;
         };
         let _ = report.send(Some(GetCurrentThreadId()));
-        SetTimer(std::ptr::null_mut(), 0, REINSTALL_EVERY_MS, None);
+        if SetTimer(std::ptr::null_mut(), 0, REINSTALL_EVERY_MS, None) == 0 {
+            eprintln!("[dango] keyboard hook timer failed, a removed hook stays removed");
+        }
 
         let mut msg: MSG = std::mem::zeroed();
         while GetMessageW(&mut msg, std::ptr::null_mut(), 0, 0) > 0 {
