@@ -108,8 +108,16 @@ and the restore is recorded once; the hand check covers this.
   narrowing finds the entry by any of them.
 - Icon: `platform::icon_for` on the first path, cached in an `IconCache` held
   by the clipboard extension, the way the system extension does for running
-  apps. The cache is keyed by path. No icon (path gone, render failed) falls
-  back to `icon:file`, a new name in the registry (`lu::LuFile`).
+  apps. A plain file is keyed by its extension (`file-type-pdf`), so the
+  cache grows with the file types copied, not with every path. A path with no
+  extension (usually a folder), `.app`, `.exe` or `.lnk` is keyed by its path,
+  since those have icons of their own. The cache is looked up before the file
+  is checked, because checking a file on an offline network share can take
+  seconds. No icon (path gone, render failed) falls back to `icon:file`, a
+  new name in the registry (`lu::LuFile`).
+  - Rejected: keying every file by path. The cache never shrinks, and the
+    cache's file naming maps `/x/report.pdf` and a folder `/x/report_pdf` to
+    one PNG.
 - Pane: `ItemDetail.text` with the paths, one per line. The text pane is
   `ui/views/` detail view, already used for text entries; no new component.
 - Metadata: "Type" "File" or "Files"; "Count" for more than one. A folder is
