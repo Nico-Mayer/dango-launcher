@@ -911,6 +911,19 @@ fn an_action_answering_with_an_invalid_grid_is_refused() {
     assert_refused(&h);
 }
 
+#[test]
+fn a_command_pushing_again_after_an_action_replaced_its_view_replaces_it_again() {
+    let mut h = Harness::view(list_tree((1..=3).map(list_item).collect()));
+    h.press("Enter");
+    let request = h.runs()[0].clone();
+    h.finish(
+        request,
+        ActionOutcome::Replaced(Box::new(list_tree((1..=2).map(list_item).collect()))),
+    );
+    h.render(1, list_tree((1..=2).map(list_item).collect()));
+    assert_eq!(h.launcher.stack.len(), 1);
+}
+
 fn shortcut_action(key: &str, modifiers: Vec<Modifier>) -> Action {
     Action {
         id: "shortcut".into(),

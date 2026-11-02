@@ -378,7 +378,6 @@ impl Launcher {
                 } else {
                     self.replace_top(*tree, fx);
                 }
-                self.shown_invocation = None;
             }
             (ActionOutcome::Toast(text), _) => self.show_success(text, fx),
             (ActionOutcome::Failed(message), _) => self.show_failure(message),
