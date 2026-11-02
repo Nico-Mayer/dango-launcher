@@ -48,6 +48,7 @@ pub struct ClipboardExtension {
     preferences: Arc<Preferences>,
     text: Option<Arc<dyn TextTarget>>,
     icons: Arc<IconCache>,
+    render_icon: fn(&str) -> Option<IconRgba>,
 }
 
 impl ClipboardExtension {
@@ -65,6 +66,15 @@ impl ClipboardExtension {
             preferences: Arc::new(preferences),
             text,
             icons,
+            render_icon: render_file_icon,
+        }
+    }
+
+    #[cfg(test)]
+    fn with_icon_renderer(self, render_icon: fn(&str) -> Option<IconRgba>) -> Self {
+        Self {
+            render_icon,
+            ..self
         }
     }
 
@@ -95,6 +105,7 @@ impl Extension for ClipboardExtension {
                 history: self.history.clone(),
                 preferences: self.preferences.clone(),
                 icons: self.icons.clone(),
+                render_icon: self.render_icon,
             })),
             _ => None,
         }
@@ -265,6 +276,7 @@ struct HistoryCommand {
     history: Arc<History>,
     preferences: Arc<Preferences>,
     icons: Arc<IconCache>,
+    render_icon: fn(&str) -> Option<IconRgba>,
 }
 
 impl Command for HistoryCommand {
@@ -278,7 +290,7 @@ impl Command for HistoryCommand {
             Err(error) => return ctx.fail(error.to_string()),
         };
         ctx.push_view(history_view(&entries, primary, local_now(), &self.icons));
-        if !self.icons.fill(file_icons(&entries), render_file_icon, || {
+        if !self.icons.fill(file_icons(&entries), self.render_icon, || {
             ctx.is_cancelled()
         }) {
             return;
@@ -822,16 +834,23 @@ mod tests {
         history.entries().unwrap()[0].id.clone()
     }
 
+    fn rendered_icon(_path: &str) -> Option<IconRgba> {
+        Some(IconRgba {
+            width: 8,
+            height: 8,
+            rgba: vec![64; 8 * 8 * 4],
+        })
+    }
+
     #[test]
     fn a_file_entry_of_one_file_shows_its_name_and_system_icon() {
         let (extension, history, _) = setup();
-        let file = std::env::temp_dir().join(format!("dango-{}.txt", uuid::Uuid::new_v4()));
-        std::fs::write(&file, "x").unwrap();
-        record_files(&history, &[file.to_str().unwrap()]);
+        let extension = extension.with_icon_renderer(rendered_icon);
+        record_files(&history, &["/a/report.pdf"]);
 
         let pushed = open_history(&extension);
         let first = &list_of(&pushed[0]).items[0];
-        assert_eq!(first.title, file.file_name().unwrap().to_str().unwrap());
+        assert_eq!(first.title, "report.pdf");
         assert_eq!(
             first.icon.as_deref(),
             Some(format!("{NAMED_ICON}file").as_str()),
