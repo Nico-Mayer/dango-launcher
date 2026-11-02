@@ -49,7 +49,7 @@ pub struct Config {
     /// Per-extension settings, keyed by extension id.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub extensions: BTreeMap<String, Extension>,
-    /// A physical key remapped to act as the hyper modifier system-wide.
+    /// CapsLock, remapped to act as the hyper modifier system-wide.
     /// Present means on; leave it out to turn it off. On macOS it uses F18,
     /// so a hotkey with `f18` does not work while it is on.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -59,14 +59,11 @@ pub struct Config {
     pub selection: Selection,
 }
 
-/// One physical key remapped to act as the hyper modifier system-wide. While
-/// it is held, Ctrl+Alt+Shift+Super are in effect, so a chord like
-/// `hyper+left` fires from this one key.
+/// CapsLock, remapped to act as the hyper modifier system-wide. While it is
+/// held, Ctrl+Alt+Shift+Super are in effect, so a chord like `hyper+left`
+/// fires from this one key.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct Hyperkey {
-    /// The physical key to remap. Defaults to capslock.
-    #[serde(default = "default_hyperkey_key")]
-    pub key: String,
     /// Whether Shift is part of the combination. Default true; false emits
     /// Ctrl+Alt+Super, which leaves typed characters unshifted.
     #[serde(default = "default_true", skip_serializing_if = "is_true")]
@@ -81,15 +78,10 @@ pub struct Hyperkey {
 impl Default for Hyperkey {
     fn default() -> Self {
         Self {
-            key: default_hyperkey_key(),
             shift: true,
             tap: None,
         }
     }
-}
-
-fn default_hyperkey_key() -> String {
-    "capslock".to_string()
 }
 
 fn default_true() -> bool {
@@ -453,11 +445,11 @@ mod tests {
     }
 
     #[test]
-    fn a_hyperkey_block_parses_with_defaults() {
-        let config = Config::parse(r#"{ "hyperkey": { "key": "capslock" } }"#).unwrap();
+    fn an_empty_hyperkey_block_turns_it_on_with_defaults() {
+        let config = Config::parse(r#"{ "hyperkey": {} }"#).unwrap();
         let hyperkey = config.hyperkey.as_ref().expect("hyperkey present");
-        assert_eq!(hyperkey.key, "capslock");
         assert!(hyperkey.shift, "shift defaults on");
+        assert!(hyperkey.tap.is_none());
         assert_eq!(
             config.hyper_modifiers(),
             Modifiers::CONTROL | Modifiers::ALT | Modifiers::SHIFT | Modifiers::SUPER
@@ -466,13 +458,18 @@ mod tests {
 
     #[test]
     fn a_hyperkey_can_exclude_shift() {
-        let config =
-            Config::parse(r#"{ "hyperkey": { "key": "capslock", "shift": false } }"#).unwrap();
+        let config = Config::parse(r#"{ "hyperkey": { "shift": false } }"#).unwrap();
         assert!(!config.hyperkey.as_ref().unwrap().shift);
         assert_eq!(
             config.hyper_modifiers(),
             Modifiers::CONTROL | Modifiers::ALT | Modifiers::SUPER
         );
+    }
+
+    #[test]
+    fn a_leftover_hyperkey_key_is_ignored() {
+        let config = Config::parse(r#"{ "hyperkey": { "key": "f13" } }"#).unwrap();
+        assert!(config.hyperkey.is_some());
     }
 
     #[test]

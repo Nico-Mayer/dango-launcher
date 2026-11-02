@@ -8,7 +8,7 @@ Every setting in config.json. Generated from the code; do not edit by hand.
 | --- | --- | --- | --- | --- |
 | `$schema` | string |  |  | Where your editor finds this schema. Dango writes it beside the config file, so `./config.schema.json` is the value to use. |
 | `extensions` | object |  |  | Per-extension settings, keyed by extension id. |
-| `hyperkey` | [Hyperkey](#hyperkey) |  |  | A physical key remapped to act as the hyper modifier system-wide. Present means on; leave it out to turn it off. On macOS it uses F18, so a hotkey with `f18` does not work while it is on. |
+| `hyperkey` | [Hyperkey](#hyperkey) |  |  | CapsLock, remapped to act as the hyper modifier system-wide. Present means on; leave it out to turn it off. On macOS it uses F18, so a hotkey with `f18` does not work while it is on. |
 | `launcher` | [Launcher](#launcher) |  |  | Settings of the launcher itself. |
 | `selection` | [Selection](#selection) |  |  | How Dango reads the text you have selected. |
 | `version` | integer |  |  | The config schema version. Leave it at 1. |
@@ -252,7 +252,6 @@ Per-command settings, keyed by command id.
 
 | Setting | Type | Default | Values | Description |
 | --- | --- | --- | --- | --- |
-| `key` | string | `capslock` | `capslock`, `caps` | The physical key to remap. Defaults to capslock. |
 | `shift` | boolean |  |  | Whether Shift is part of the combination. Default true; false emits Ctrl+Alt+Super, which leaves typed characters unshifted. |
 | `tap` | string |  | `space`, `enter`, `return`, `tab`, `escape`, `esc`, `backspace`, `delete` and 78 more | A key to send on a quick, solitary tap of the hyperkey, such as `escape`. A hold, or a press with another key, still acts as the modifier. Leave it out for no tap action. |
 

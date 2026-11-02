@@ -40,8 +40,12 @@ trap this change removes, for a value that now has nothing to choose.
 `(shift, tap)` instead of `(key, shift, tap)` to decide whether to restart the
 hyperkey. Nothing else changes there.
 
-No user-visible text is added or changed: the only string removed is the
-"is not a remappable key" log line.
+User-visible text: the `hyperkey` description in the schema and
+`docs/config.md` changes from "A physical key remapped to act as the hyper
+modifier system-wide." to "CapsLock, remapped to act as the hyper modifier
+system-wide.", because no other key can be chosen. The `key` row and its
+description "The physical key to remap. Defaults to capslock." are removed, as
+is the "is not a remappable key" log line.
 
 ## Risks / Trade-offs
 

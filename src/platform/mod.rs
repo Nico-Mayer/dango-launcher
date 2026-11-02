@@ -183,22 +183,10 @@ pub fn system_control() -> std::sync::Arc<dyn SystemControl> {
     return std::sync::Arc::new(macos::MacSystemControl);
 }
 
-/// Which physical key acts as the hyperkey. Only CapsLock for now; the allowlist
-/// can grow without a config break.
+/// Which physical key acts as the hyperkey. CapsLock is the only one.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum HyperkeyTrigger {
     CapsLock,
-}
-
-impl HyperkeyTrigger {
-    /// Maps a config `key` name to a trigger, or `None` for a name not on the
-    /// allowlist.
-    pub fn from_key(name: &str) -> Option<Self> {
-        match name.trim().to_ascii_lowercase().as_str() {
-            "capslock" | "caps" => Some(Self::CapsLock),
-            _ => None,
-        }
-    }
 }
 
 /// The modifiers the hyperkey holds down while the trigger key is held.
@@ -629,7 +617,7 @@ pub fn launcher_origin(
 
 #[cfg(test)]
 mod tests {
-    use super::{crlf, launcher_origin, lf, HyperkeyTrigger};
+    use super::{crlf, launcher_origin, lf};
 
     #[test]
     fn bare_line_feeds_become_crlf_and_existing_crlf_stays() {
@@ -644,19 +632,6 @@ mod tests {
     fn crlf_reads_back_as_line_feeds() {
         assert_eq!(lf("a\r\nb\r\n".into()), "a\nb\n");
         assert_eq!(lf(crlf("a\nb\n").into_owned()), "a\nb\n");
-    }
-
-    #[test]
-    fn trigger_from_key_uses_an_allowlist() {
-        assert_eq!(
-            HyperkeyTrigger::from_key("capslock"),
-            Some(HyperkeyTrigger::CapsLock)
-        );
-        assert_eq!(
-            HyperkeyTrigger::from_key("CapsLock"),
-            Some(HyperkeyTrigger::CapsLock)
-        );
-        assert!(HyperkeyTrigger::from_key("f13").is_none());
     }
 
     #[test]

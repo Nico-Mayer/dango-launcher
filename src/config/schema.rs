@@ -18,7 +18,6 @@ const APPLICATIONS_ID: &str = "dango.applications";
 /// Command settings only the AI extension reads; every other extension's
 /// commands reject them.
 const AI_ONLY: &[&str] = &["title", "prompt", "provider", "model", "thinking", "output"];
-const HYPERKEY_KEYS: &[&str] = &["capslock", "caps"];
 
 pub fn generate(manifests: &[Manifest]) -> Value {
     let mut schema = schemars::schema_for!(Config).to_value();
@@ -195,7 +194,6 @@ fn key_names() -> Vec<String> {
 
 fn constrain_hyperkey(schema: &mut Value) {
     let hyperkey = &mut defs(schema)["Hyperkey"]["properties"];
-    hyperkey["key"]["enum"] = json!(HYPERKEY_KEYS);
     hyperkey["tap"]["enum"] = json!(key_names());
 }
 
@@ -557,7 +555,7 @@ mod tests {
         "$schema": "./config.schema.json",
         "version": 1,
         "launcher": { "hotkey": { "macos": "cmd+space", "windows": "ctrl+space" }, "autostart": true, "reset-after": 90 },
-        "hyperkey": { "key": "capslock", "shift": false, "tap": "escape" },
+        "hyperkey": { "shift": false, "tap": "escape" },
         "selection": { "excluded-applications": "Zed" },
         "extensions": {
             "dango.clipboard": {
@@ -680,7 +678,7 @@ mod tests {
         assert!(!accepts(
             r#"{ "extensions": { "dango.clipboard": { "preferences": { "primary-action": "speak" } } } }"#
         ));
-        assert!(!accepts(r#"{ "hyperkey": { "key": "tab" } }"#));
+        assert!(!accepts(r#"{ "hyperkey": { "key": "capslock" } }"#));
         assert!(!accepts(r#"{ "hyperkey": { "tap": "lft" } }"#));
     }
 

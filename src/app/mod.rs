@@ -79,7 +79,7 @@ pub struct HyperkeySlot {
     settings: Option<HyperkeySettings>,
 }
 
-type HyperkeySettings = (String, bool, Option<String>);
+type HyperkeySettings = (bool, Option<String>);
 
 struct UiState {
     launcher: ui::Launcher,
@@ -925,10 +925,7 @@ fn apply_hyperkey(file_config: &FileConfig, slot: &Mutex<HyperkeySlot>) -> Optio
     let mut slot = slot.lock().unwrap();
     let shared = file_config.shared();
     let config = shared.read().unwrap();
-    let settings = config
-        .hyperkey
-        .as_ref()
-        .map(|h| (h.key.clone(), h.shift, h.tap.clone()));
+    let settings = config.hyperkey.as_ref().map(|h| (h.shift, h.tap.clone()));
     if slot.settings == settings && (settings.is_none() || slot.running.is_some()) {
         return None;
     }
@@ -936,15 +933,9 @@ fn apply_hyperkey(file_config: &FileConfig, slot: &Mutex<HyperkeySlot>) -> Optio
     slot.settings = settings;
 
     let hyperkey = config.hyperkey.as_ref()?;
-    let Some(trigger) = platform::HyperkeyTrigger::from_key(&hyperkey.key) else {
-        return Some(format!(
-            "hyperkey: '{}' is not a remappable key",
-            hyperkey.key
-        ));
-    };
     let mods = config.hyper_modifiers();
     let spec = platform::HyperkeySpec {
-        trigger,
+        trigger: platform::HyperkeyTrigger::CapsLock,
         emit: platform::HyperModifiers {
             ctrl: mods.contains(Modifiers::CONTROL),
             alt: mods.contains(Modifiers::ALT),
