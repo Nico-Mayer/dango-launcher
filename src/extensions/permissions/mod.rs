@@ -116,7 +116,7 @@ fn from_item_id(id: &str) -> Option<Permission> {
 fn turns_off(permission: Permission) -> &'static str {
     match permission {
         Permission::Accessibility => {
-            "Pasting, snippets, AI paste, and window management don't work without it"
+            "Pasting, snippets, AI paste, window management, and the hyperkey don't work without it"
         }
         Permission::InputMonitoring => "Keyword expansion and the hyperkey don't work without it",
     }
@@ -231,6 +231,14 @@ mod tests {
         assert!(items[0].subtitle.as_deref().unwrap().contains("hyperkey"));
         assert!(items[0].keywords.contains(&"permission".to_string()));
         assert_eq!(items[0].actions[0].title, "Grant access");
+    }
+
+    #[tokio::test]
+    async fn the_accessibility_warning_names_the_hyperkey() {
+        let (extension, _, _) = build(vec![Permission::Accessibility]);
+        let items = items(&extension).await;
+        assert_eq!(items[0].title, "Accessibility is off");
+        assert!(items[0].subtitle.as_deref().unwrap().contains("hyperkey"));
     }
 
     #[tokio::test]

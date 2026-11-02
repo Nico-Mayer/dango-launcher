@@ -2,9 +2,9 @@
 
 ## 1. Accessibility warning names the hyperkey
 
-- [ ] 1.1 Change the Accessibility subtitle in `turns_off` (`src/extensions/permissions/mod.rs`) to "Pasting, snippets, AI paste, window management, and the hyperkey don't work without it"; verify with a new test `the_accessibility_warning_names_the_hyperkey` beside `one_missing_permission_is_one_pinned_warning` (`cargo test`)
-- [ ] 1.2 Add a build fact to AGENTS.md: a local macOS bundle sharing `com.nimayer.dango` with the installed Dango gets confused with it in System Settings, and macOS's reopen after a grant starts the installed one. Test permissions with a copy under its own `CFBundleIdentifier`, ad-hoc signed with `codesign --sign -`, outside `/tmp`
-- [ ] 1.3 Run `mise run check` and `cargo test`
+- [x] 1.1 Change the Accessibility subtitle in `turns_off` (`src/extensions/permissions/mod.rs`) to "Pasting, snippets, AI paste, window management, and the hyperkey don't work without it"; verify with a new test `the_accessibility_warning_names_the_hyperkey` beside `one_missing_permission_is_one_pinned_warning` (`cargo test`)
+- [x] 1.2 Add a build fact to AGENTS.md: a local macOS bundle sharing `com.nimayer.dango` with the installed Dango gets confused with it in System Settings, and macOS's reopen after a grant starts the installed one. Test permissions with a copy under its own `CFBundleIdentifier`, ad-hoc signed with `codesign --sign -`, outside `/tmp`
+- [x] 1.3 Run `mise run check` and `cargo test`
 
 ## 2. Verification
 
