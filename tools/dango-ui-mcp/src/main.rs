@@ -2,38 +2,50 @@
 //! Code. Claude Code gives up on an HTTP server that is not listening when the
 //! session starts, and Slint's server only exists while a debug build runs.
 //! This stdio server is always up: it forwards Slint's tools once the build
-//! listens, tells Claude Code when they appear, and can start the build.
+//! listens, tells Claude Code when they appear, starts and restarts the build,
+//! and adds tools Slint's set lacks for an agent.
+
+mod dango;
+mod keys;
+mod snapshot;
 
 use std::io::Write;
-use std::path::{Path, PathBuf};
-use std::process::Stdio;
 use std::sync::{Arc, OnceLock};
 use std::time::{Duration, Instant};
 
 use rmcp::model::{
-    CallToolRequestParams, CallToolResponse, CallToolResult, ContentBlock, ListToolsResult,
-    PaginatedRequestParams, ServerCapabilities, ServerConfig, Tool,
+    CallToolRequestParams, CallToolResponse, CallToolResult, ContentBlock, JsonObject,
+    ListToolsResult, PaginatedRequestParams, ServerCapabilities, ServerConfig, Tool,
 };
 use rmcp::service::{NotificationContext, RequestContext, RunningService};
 use rmcp::transport::{stdio, StreamableHttpClientTransport};
 use rmcp::{ErrorData, Peer, RoleClient, RoleServer, ServerHandler, ServiceExt};
+use serde_json::{json, Value};
+use tokio::process::Child;
 use tokio::sync::Mutex;
 
-const PORT: &str = "9315";
+use dango::Checkout;
+
 const URL: &str = "http://127.0.0.1:9315/mcp";
 const LAUNCH: &str = "launch_dango";
+const RESTART: &str = "restart_dango";
+const PRESS: &str = "press";
+const SNAPSHOT: &str = "snapshot";
 /// The socket a second Dango uses to ask the running one to show itself.
 const INSTANCE_SOCKET: &str = "com.nimayer.dango.sock";
 const POLL: Duration = Duration::from_secs(2);
 /// A cold debug build of the whole app takes minutes.
 const LAUNCH_DEADLINE: Duration = Duration::from_secs(600);
+/// A running Dango opens Slint's server on its first show.
+const SHOW_DEADLINE: Duration = Duration::from_secs(10);
 
 type Upstream = RunningService<RoleClient, ()>;
 
-#[derive(Default)]
 struct Proxy {
     upstream: Mutex<Option<Upstream>>,
     client: OnceLock<Peer<RoleServer>>,
+    checkout: Checkout,
+    dango: Mutex<Option<Child>>,
 }
 
 impl Proxy {
@@ -81,59 +93,167 @@ impl Proxy {
         }
     }
 
+    /// Shows the launcher until Slint's server answers.
+    async fn show_until_connected(&self, deadline: Duration) -> bool {
+        let started = Instant::now();
+        while started.elapsed() < deadline {
+            let _ = tokio::task::spawn_blocking(show).await;
+            if self.connect().await || self.connected().await {
+                return true;
+            }
+            tokio::time::sleep(Duration::from_millis(500)).await;
+        }
+        false
+    }
+
     async fn launch(&self) -> CallToolResult {
         if self.connected().await {
             return text("Dango is already running with its MCP server.");
         }
         if instance_socket().is_ok() {
-            return failure("Another Dango is running. Quit it first: only one runs at a time.");
+            if self.show_until_connected(SHOW_DEADLINE).await {
+                return text("Dango was already running; its tools are available.");
+            }
+            return failure(format!(
+                "Another Dango is running without the MCP server. If it is this \
+                 checkout's debug build, call `{RESTART}`; otherwise quit it first."
+            ));
         }
-        let root = repo_root();
-        let log_path = root.join("target").join("dango-ui-mcp.log");
-        let child = std::fs::create_dir_all(root.join("target"))
-            .and_then(|()| std::fs::File::create(&log_path))
-            .and_then(|log| Ok((log.try_clone()?, log)))
-            .and_then(|(out, err)| {
-                let mut command = tokio::process::Command::new("cargo");
-                command
-                    .args(["run", "--features", "slint/mcp"])
-                    .env("SLINT_MCP_PORT", PORT)
-                    .current_dir(&root)
-                    .stdin(Stdio::null())
-                    .stdout(out)
-                    .stderr(err);
-                #[cfg(windows)]
-                command.creation_flags(0x0800_0000); // CREATE_NO_WINDOW
-                command.spawn()
-            });
-        let mut child = match child {
+        if let Err(error) = self.checkout.build().await {
+            return failure(error);
+        }
+        let child = match self.checkout.spawn() {
             Ok(child) => child,
-            Err(error) => return failure(format!("Couldn't start `cargo run`: {error}")),
+            Err(error) => return failure(format!("Couldn't start Dango: {error}")),
         };
+        let mut dango = self.dango.lock().await;
+        let child = dango.insert(child);
 
         let started = Instant::now();
         while started.elapsed() < LAUNCH_DEADLINE {
             tokio::time::sleep(Duration::from_millis(500)).await;
             if let Ok(Some(status)) = child.try_wait() {
                 return failure(format!(
-                    "The debug build stopped ({status}). If another Dango is running, \
-                     quit it first: only one runs at a time.\n\nEnd of {}:\n{}",
-                    log_path.display(),
-                    tail(&log_path, 20)
+                    "Dango stopped ({status}). If another Dango is running, quit it \
+                     first: only one runs at a time.\n\n{}",
+                    self.checkout.log_tail(20)
                 ));
             }
-            // Slint's server starts listening on the first show.
             let _ = tokio::task::spawn_blocking(show).await;
             if self.connect().await || self.connected().await {
                 return text(format!(
                     "Dango's debug build is running and its tools are available. Log: {}",
-                    log_path.display()
+                    self.checkout.log.display()
                 ));
             }
         }
         failure(format!(
-            "The debug build did not open its MCP server in time. Log: {}",
-            log_path.display()
+            "Dango did not open its MCP server in time. Log: {}",
+            self.checkout.log.display()
+        ))
+    }
+
+    async fn restart(&self) -> CallToolResult {
+        self.upstream.lock().await.take();
+        self.dango.lock().await.take();
+        let checkout = self.checkout.clone();
+        let stopped = tokio::task::spawn_blocking(move || checkout.stop())
+            .await
+            .unwrap_or(0);
+        dango::wait_until_gone(|| instance_socket().is_ok()).await;
+        self.announce().await;
+        let result = self.launch().await;
+        if stopped == 0 || result.is_error == Some(true) {
+            return result;
+        }
+        text("Stopped the old debug build, rebuilt, and started it again. Its tools are available.")
+    }
+
+    async fn call(&self, name: &'static str, arguments: Value) -> Result<Value, String> {
+        let upstream = self.upstream.lock().await;
+        let upstream = upstream.as_ref().ok_or_else(not_running)?;
+        let arguments = match arguments {
+            Value::Object(map) => map,
+            _ => JsonObject::new(),
+        };
+        let result = upstream
+            .call_tool(CallToolRequestParams::new(name).with_arguments(arguments))
+            .await
+            .map_err(|error| format!("Dango didn't answer: {error}"))?;
+        let body = result
+            .content
+            .iter()
+            .filter_map(ContentBlock::as_text)
+            .map(|t| t.text.as_str())
+            .collect::<Vec<_>>()
+            .join("\n");
+        if result.is_error == Some(true) {
+            return Err(format!("`{name}` failed: {body}"));
+        }
+        Ok(result
+            .structured_content
+            .unwrap_or_else(|| serde_json::from_str(&body).unwrap_or(Value::Null)))
+    }
+
+    async fn window(&self, arguments: &JsonObject) -> Result<Value, String> {
+        if let Some(handle) = arguments.get("windowHandle") {
+            return Ok(handle.clone());
+        }
+        let windows = self.call("list_windows", json!({})).await?;
+        windows["windowHandles"][0]
+            .as_object()
+            .map(|handle| Value::Object(handle.clone()))
+            .ok_or_else(|| "Dango has no window open.".into())
+    }
+
+    async fn press(&self, arguments: JsonObject) -> Result<String, String> {
+        let steps: Vec<String> = arguments
+            .get("steps")
+            .and_then(|steps| serde_json::from_value(steps.clone()).ok())
+            .ok_or("`steps` must be a list of strings.")?;
+        let events = steps
+            .iter()
+            .map(|step| keys::parse(step))
+            .collect::<Result<Vec<_>, _>>()?;
+        let window = self.window(&arguments).await?;
+        for event in events.into_iter().flatten() {
+            self.call(
+                "dispatch_key_event",
+                json!({
+                    "windowHandle": window,
+                    "text": event.text(),
+                    "eventType": event.event_type(),
+                }),
+            )
+            .await?;
+        }
+        Ok(format!("Pressed {}.", steps.join(", ")))
+    }
+
+    async fn snapshot(&self, arguments: JsonObject) -> Result<String, String> {
+        let window = self.window(&arguments).await?;
+        let properties = self
+            .call("get_window_properties", json!({ "windowHandle": window }))
+            .await?;
+        let scale = properties["scaleFactor"].as_f64().unwrap_or(1.0);
+        let height = properties["size"]["height"].as_f64().unwrap_or(0.0) / scale;
+        let tree = self
+            .call(
+                "get_element_tree",
+                json!({
+                    "elementHandle": properties["rootElementHandle"],
+                    "maxElements": 1000,
+                }),
+            )
+            .await?;
+        let elements = tree["elements"]
+            .as_array()
+            .map(Vec::as_slice)
+            .unwrap_or_default();
+        Ok(snapshot::render(
+            elements,
+            height,
+            tree["truncated"].as_bool().unwrap_or(false),
         ))
     }
 }
@@ -147,9 +267,10 @@ impl ServerHandler for Proxy {
                 .build(),
         )
         .with_instructions(
-            "Inspects and drives the Dango launcher UI of a debug build. When only \
-             `launch_dango` is listed, call it to build and start Dango; the UI tools \
-             appear once it runs.",
+            "Inspects and drives the Dango launcher UI of a debug build. When only the \
+             proxy's own tools are listed, call `launch_dango`; Slint's tools appear once \
+             Dango runs. After changing code, call `restart_dango`. Prefer `snapshot` over \
+             `get_element_tree` and `press` over `dispatch_key_event`.",
         )
     }
 
@@ -162,7 +283,7 @@ impl ServerHandler for Proxy {
         _request: Option<PaginatedRequestParams>,
         _context: RequestContext<RoleServer>,
     ) -> Result<ListToolsResult, ErrorData> {
-        let mut tools = vec![launch_tool()];
+        let mut tools = own_tools();
         if let Some(upstream) = self.upstream.lock().await.as_ref() {
             if let Ok(forwarded) = upstream.list_all_tools().await {
                 tools.extend(forwarded);
@@ -176,33 +297,87 @@ impl ServerHandler for Proxy {
         request: CallToolRequestParams,
         _context: RequestContext<RoleServer>,
     ) -> Result<CallToolResponse, ErrorData> {
-        if request.name == LAUNCH {
-            return Ok(self.launch().await.into());
-        }
-        let upstream = self.upstream.lock().await;
-        let Some(upstream) = upstream.as_ref() else {
-            return Ok(failure(format!(
-                "Dango isn't running with its MCP server. Call `{LAUNCH}` first."
-            ))
-            .into());
+        let arguments = request.arguments.clone().unwrap_or_default();
+        let result = match request.name.as_ref() {
+            LAUNCH => self.launch().await,
+            RESTART => self.restart().await,
+            PRESS => outcome(self.press(arguments).await),
+            SNAPSHOT => outcome(self.snapshot(arguments).await),
+            _ => {
+                let upstream = self.upstream.lock().await;
+                match upstream.as_ref() {
+                    None => failure(not_running()),
+                    Some(upstream) => match upstream.call_tool(request).await {
+                        Ok(result) => result,
+                        Err(error) => failure(format!("Dango didn't answer: {error}")),
+                    },
+                }
+            }
         };
-        Ok(match upstream.call_tool(request).await {
-            Ok(result) => result.into(),
-            Err(error) => failure(format!("Dango didn't answer: {error}")).into(),
-        })
+        Ok(result.into())
     }
 }
 
-fn launch_tool() -> Tool {
-    let mut schema = rmcp::model::JsonObject::new();
-    schema.insert("type".into(), "object".into());
-    Tool::new(
-        LAUNCH,
-        "Build and start a Dango debug build with the Slint MCP server, show the \
-         launcher once so the server starts, and wait until its UI tools are \
-         available. Fails if another Dango is already running.",
-        schema,
-    )
+fn own_tools() -> Vec<Tool> {
+    let window_handle = json!({
+        "type": "object",
+        "description": "Optional. Defaults to the first window from list_windows.",
+        "properties": {"index": {"type": "string"}, "generation": {"type": "string"}},
+    });
+    vec![
+        tool(
+            LAUNCH,
+            "Build and start this checkout's Dango debug build with the Slint MCP \
+             server, show the launcher once so the server starts, and wait until its UI \
+             tools are available. Fails if another Dango is already running.",
+            json!({"type": "object"}),
+        ),
+        tool(
+            RESTART,
+            "Stop this checkout's running debug build (never an installed Dango), \
+             rebuild, and start it again. Use after changing code.",
+            json!({"type": "object"}),
+        ),
+        tool(
+            PRESS,
+            "Press keys in the Dango window, in order. Each step is a key (`down`, \
+             `up`, `enter`, `escape`, `tab`, `backspace`, `home`, `end`, `pageup`, \
+             `f1`, a single character), a chord with `ctrl`, `shift`, `alt`, `meta` \
+             (`ctrl+k`, `shift+tab`), or `text:<characters>` to type. Use this instead \
+             of dispatch_key_event, which can't carry arrow or modifier keys from an \
+             agent.",
+            json!({
+                "type": "object",
+                "properties": {
+                    "steps": {"type": "array", "items": {"type": "string"}},
+                    "windowHandle": window_handle,
+                },
+                "required": ["steps"],
+            }),
+        ),
+        tool(
+            SNAPSHOT,
+            "List the Dango window's elements an agent acts on, one per line: \
+             `#index/generation role \"label\" value=\"...\" selected offscreen`. \
+             `#23/1` is elementHandle {\"index\":\"23\",\"generation\":\"1\"}. Far smaller \
+             than get_element_tree; use that only for layout details.",
+            json!({
+                "type": "object",
+                "properties": {"windowHandle": window_handle},
+            }),
+        ),
+    ]
+}
+
+fn tool(name: &'static str, description: &'static str, schema: Value) -> Tool {
+    let Value::Object(schema) = schema else {
+        unreachable!("tool schemas are objects")
+    };
+    Tool::new(name, description, schema)
+}
+
+fn not_running() -> String {
+    format!("Dango isn't running with its MCP server. Call `{LAUNCH}` first.")
 }
 
 fn text(message: impl Into<String>) -> CallToolResult {
@@ -211,6 +386,13 @@ fn text(message: impl Into<String>) -> CallToolResult {
 
 fn failure(message: impl Into<String>) -> CallToolResult {
     CallToolResult::error(vec![ContentBlock::text(message)])
+}
+
+fn outcome(result: Result<String, String>) -> CallToolResult {
+    match result {
+        Ok(message) => text(message),
+        Err(message) => failure(message),
+    }
 }
 
 fn instance_socket() -> std::io::Result<interprocess::local_socket::Stream> {
@@ -222,19 +404,51 @@ fn show() -> std::io::Result<()> {
     instance_socket()?.write_all(b"show\n")
 }
 
-fn repo_root() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("..").join("..")
-}
-
-fn tail(path: &Path, lines: usize) -> String {
-    let log = std::fs::read_to_string(path).unwrap_or_default();
-    let all: Vec<&str> = log.lines().collect();
-    all[all.len().saturating_sub(lines)..].join("\n")
+/// Windows can't replace a running exe, so while any session runs this proxy,
+/// `cargo run` in the next one fails to rebuild it after a change. Windows
+/// can rename a running exe, though: move ours aside and copy it back. The
+/// copy keeps the timestamp, so cargo still sees the build as fresh.
+#[cfg(windows)]
+fn release_own_exe() {
+    let Ok(exe) = std::env::current_exe() else {
+        return;
+    };
+    let Some(dir) = exe.parent() else {
+        return;
+    };
+    // cargo hard-links the exe from `deps/`, so both names point at the
+    // running file.
+    let names = [exe.clone(), dir.join("deps").join("dango_ui_mcp.exe")];
+    let pid = std::process::id();
+    for (n, name) in names.iter().enumerate() {
+        let aside = name.with_extension(format!("exe.old-{pid}-{n}"));
+        if std::fs::rename(name, &aside).is_ok() {
+            let _ = std::fs::copy(&aside, name);
+        }
+    }
+    for dir in [dir.to_path_buf(), dir.join("deps")] {
+        let Ok(entries) = std::fs::read_dir(&dir) else {
+            continue;
+        };
+        for entry in entries.flatten() {
+            if entry.file_name().to_string_lossy().contains(".exe.old-") {
+                // Fails for files other sessions still run, which is fine.
+                let _ = std::fs::remove_file(entry.path());
+            }
+        }
+    }
 }
 
 #[tokio::main]
 async fn main() {
-    let proxy = Arc::new(Proxy::default());
+    #[cfg(windows)]
+    release_own_exe();
+    let proxy = Arc::new(Proxy {
+        upstream: Mutex::default(),
+        client: OnceLock::new(),
+        checkout: Checkout::new(),
+        dango: Mutex::default(),
+    });
     tokio::spawn(proxy.clone().watch());
     proxy.connect().await;
     let Ok(server) = proxy.serve(stdio()).await else {
