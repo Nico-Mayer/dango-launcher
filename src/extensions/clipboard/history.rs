@@ -24,6 +24,8 @@ pub enum Content {
     Text(String),
     /// Encoded PNG bytes, not yet written anywhere.
     Image(Vec<u8>),
+    /// Paths of files copied together, in the order they were copied.
+    Files(Vec<String>),
 }
 
 impl Content {
@@ -31,6 +33,7 @@ impl Content {
         match self {
             Content::Text(text) => text.len(),
             Content::Image(bytes) => bytes.len(),
+            Content::Files(paths) => joined_len(paths),
         }
     }
 
@@ -38,13 +41,21 @@ impl Content {
     /// duplicates. A hash rather than the content itself, because the column is
     /// unique-indexed and an image is megabytes.
     fn fingerprint(&self) -> String {
-        let (kind, bytes): (&[u8], &[u8]) = match self {
-            Content::Text(text) => (b"text\0", text.as_bytes()),
-            Content::Image(bytes) => (b"image\0", bytes),
-        };
         let mut hasher = SipHasher13::new();
-        hasher.write(kind);
-        hasher.write(bytes);
+        match self {
+            Content::Text(text) => {
+                hasher.write(b"text\0");
+                hasher.write(text.as_bytes());
+            }
+            Content::Image(bytes) => {
+                hasher.write(b"image\0");
+                hasher.write(bytes);
+            }
+            Content::Files(paths) => {
+                hasher.write(b"files\0");
+                hasher.write(paths.join("\n").as_bytes());
+            }
+        }
         format!("{:016x}", hasher.finish())
     }
 }
@@ -55,7 +66,8 @@ pub struct Entry {
     pub id: String,
     pub kind: Kind,
     /// The copied text, or `None` for an image. From `entries`, only the
-    /// first `LISTED_CHARS` characters.
+    /// first `LISTED_CHARS` characters, except for files, which keep every
+    /// path, one per line.
     pub text: Option<String>,
     /// Where the image is, or `None` for text.
     pub path: Option<String>,
@@ -72,6 +84,13 @@ pub struct Entry {
 }
 
 impl Entry {
+    pub fn files(&self) -> Vec<&str> {
+        match self.kind {
+            Kind::Files => self.text.as_deref().unwrap_or_default().lines().collect(),
+            _ => Vec::new(),
+        }
+    }
+
     /// What the detail pane shows of an image. Never one larger than the
     /// preview, so moving the selection stays cheap; a row from before sizes
     /// were stored falls back to its thumbnail, or itself when it was too
@@ -90,6 +109,7 @@ impl Entry {
 pub enum Kind {
     Text,
     Image,
+    Files,
 }
 
 impl Kind {
@@ -97,14 +117,15 @@ impl Kind {
         match self {
             Kind::Text => "text",
             Kind::Image => "image",
+            Kind::Files => "files",
         }
     }
 
     fn parse(raw: &str) -> Self {
-        if raw == "image" {
-            Kind::Image
-        } else {
-            Kind::Text
+        match raw {
+            "image" => Kind::Image,
+            "files" => Kind::Files,
+            _ => Kind::Text,
         }
     }
 }
@@ -133,6 +154,8 @@ pub enum HistoryError {
     TooLarge,
     #[error("That entry was already deleted")]
     Gone,
+    #[error("{}", if *count == 1 { "The copied file no longer exists" } else { "The copied files no longer exist" })]
+    FilesGone { count: usize },
     #[error("Couldn't read the clipboard history")]
     Failed(String),
 }
@@ -234,6 +257,7 @@ impl History {
         let mut size = None;
         let (kind, text, path) = match &content {
             Content::Text(text) => (Kind::Text, Some(text.clone()), None),
+            Content::Files(paths) => (Kind::Files, Some(paths.join("\n")), None),
             Content::Image(image) => {
                 let path = self.images.join(format!("{id}.png"));
                 std::fs::write(&path, image).map_err(|error| {
@@ -275,7 +299,9 @@ impl History {
     pub fn entries(&self) -> Result<Vec<Entry>, HistoryError> {
         let entries = self.store.with(|c| {
             let mut stmt = c.prepare(&format!(
-                "SELECT entry_id, kind, substr(text, 1, {LISTED_CHARS}), {DETAILS} \
+                "SELECT entry_id, kind, \
+                 CASE kind WHEN 'files' THEN text ELSE substr(text, 1, {LISTED_CHARS}) END, \
+                 {DETAILS} \
                  FROM local_clipboard_history ORDER BY copied_at DESC, rowid DESC"
             ))?;
             let rows = stmt.query_map([], entry)?;
@@ -306,6 +332,19 @@ impl History {
         let entry = self.get(id)?;
         match entry.kind {
             Kind::Text => Ok(Content::Text(entry.text.unwrap_or_default())),
+            Kind::Files => {
+                let paths = entry.files();
+                let existing: Vec<String> = paths
+                    .iter()
+                    .filter(|path| Path::new(path).exists())
+                    .map(|path| path.to_string())
+                    .collect();
+                if existing.is_empty() {
+                    self.remove(id)?;
+                    return Err(HistoryError::FilesGone { count: paths.len() });
+                }
+                Ok(Content::Files(existing))
+            }
             Kind::Image => {
                 let path = entry.path.clone().ok_or(HistoryError::Gone)?;
                 match std::fs::read(&path) {
@@ -414,6 +453,10 @@ fn entry(row: &rusqlite::Row) -> rusqlite::Result<Entry> {
         lines: row.get(9)?,
         copied_at: row.get(4)?,
     })
+}
+
+fn joined_len(paths: &[String]) -> usize {
+    paths.iter().map(String::len).sum::<usize>() + paths.len().saturating_sub(1)
 }
 
 fn thumbnail_path(image: impl AsRef<Path>) -> PathBuf {
@@ -551,6 +594,134 @@ mod tests {
         assert_eq!(entries[0].kind, Kind::Text);
         assert_eq!(entries[0].text.as_deref(), Some("hello"));
         assert!(entries[0].path.is_none());
+    }
+
+    fn files(paths: &[&str]) -> Content {
+        Content::Files(paths.iter().map(|path| path.to_string()).collect())
+    }
+
+    /// Real files, since a file entry only goes back with the ones that exist.
+    fn files_on_disk(names: &[&str]) -> (PathBuf, Vec<String>) {
+        let dir = std::env::temp_dir().join(format!("dango-files-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let paths = names
+            .iter()
+            .map(|name| {
+                let path = dir.join(name);
+                std::fs::write(&path, name).unwrap();
+                path.to_string_lossy().into_owned()
+            })
+            .collect();
+        (dir, paths)
+    }
+
+    #[test]
+    fn copied_files_are_one_entry() {
+        let history = history();
+        history
+            .record(
+                files(&["/a/report.pdf", "/a/notes.txt"]),
+                None,
+                Bounds::default(),
+                1,
+            )
+            .unwrap();
+        let entries = history.entries().unwrap();
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].kind, Kind::Files);
+        assert_eq!(entries[0].files(), ["/a/report.pdf", "/a/notes.txt"]);
+        assert!(entries[0].path.is_none());
+    }
+
+    #[test]
+    fn the_same_files_again_reorder_rather_than_duplicate() {
+        let history = history();
+        let bounds = Bounds::default();
+        history
+            .record(files(&["/a/one", "/a/two"]), None, bounds, 1)
+            .unwrap();
+        history.record(text("between"), None, bounds, 2).unwrap();
+        history
+            .record(files(&["/a/one", "/a/two"]), None, bounds, 3)
+            .unwrap();
+        let entries = history.entries().unwrap();
+        assert_eq!(entries.len(), 2);
+        assert_eq!(entries[0].kind, Kind::Files);
+    }
+
+    #[test]
+    fn files_and_their_names_as_text_are_different_entries() {
+        let history = history();
+        let bounds = Bounds::default();
+        history.record(files(&["/a/one"]), None, bounds, 1).unwrap();
+        history.record(text("/a/one"), None, bounds, 2).unwrap();
+        assert_eq!(history.entries().unwrap().len(), 2);
+    }
+
+    #[test]
+    fn a_file_entry_lists_every_path_however_long() {
+        let history = history();
+        let long = format!("/{}", "d".repeat(LISTED_CHARS));
+        history
+            .record(files(&[&long, "/a/last"]), None, Bounds::default(), 1)
+            .unwrap();
+        assert_eq!(
+            history.entries().unwrap()[0].files(),
+            [long.as_str(), "/a/last"]
+        );
+    }
+
+    #[test]
+    fn only_files_that_still_exist_go_back() {
+        let history = history();
+        let (_dir, paths) = files_on_disk(&["kept.txt", "gone.txt"]);
+        history
+            .record(Content::Files(paths.clone()), None, Bounds::default(), 1)
+            .unwrap();
+        std::fs::remove_file(&paths[1]).unwrap();
+        let id = history.entries().unwrap()[0].id.clone();
+        assert_eq!(
+            history.content(&id).unwrap(),
+            Content::Files(vec![paths[0].clone()])
+        );
+    }
+
+    #[test]
+    fn a_file_entry_whose_files_are_all_gone_takes_its_row_with_it() {
+        let history = history();
+        history
+            .record(
+                files(&["/no/such/one", "/no/such/two"]),
+                None,
+                Bounds::default(),
+                1,
+            )
+            .unwrap();
+        let id = history.entries().unwrap()[0].id.clone();
+        let error = history.content(&id).unwrap_err();
+        assert!(matches!(error, HistoryError::FilesGone { count: 2 }));
+        assert_eq!(error.to_string(), "The copied files no longer exist");
+        assert!(history.entries().unwrap().is_empty());
+    }
+
+    #[test]
+    fn a_missing_single_file_says_file() {
+        assert_eq!(
+            HistoryError::FilesGone { count: 1 }.to_string(),
+            "The copied file no longer exists"
+        );
+    }
+
+    #[test]
+    fn removing_a_file_entry_leaves_the_files_alone() {
+        let history = history();
+        let (_dir, paths) = files_on_disk(&["keep.txt"]);
+        history
+            .record(Content::Files(paths.clone()), None, Bounds::default(), 1)
+            .unwrap();
+        let id = history.entries().unwrap()[0].id.clone();
+        history.remove(&id).unwrap();
+        assert!(Path::new(&paths[0]).exists());
     }
 
     #[test]

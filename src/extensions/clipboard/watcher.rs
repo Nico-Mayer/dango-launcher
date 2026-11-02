@@ -107,6 +107,7 @@ impl Watcher {
         match content {
             Content::Text(text) => self.source.set_text(text),
             Content::Image(png) => self.source.set_image(png),
+            Content::Files(paths) => self.source.set_files(paths),
         }
     }
 
@@ -185,7 +186,7 @@ impl Watcher {
     pub fn expect_own_write(&self, content: &Content) {
         let dimensions = match content {
             Content::Image(png) => image_dimensions(png),
-            Content::Text(_) => None,
+            Content::Text(_) | Content::Files(_) => None,
         };
         let mut ours = self.ours.lock().unwrap();
         if ours.len() == PENDING_OWN_WRITES {
@@ -241,9 +242,13 @@ impl Watcher {
         }
     }
 
-    /// Text first: an application that offers both usually means the text, and
-    /// the text is the cheaper thing to keep.
+    /// Files first, because Finder offers their names as text beside them.
+    /// Then text: an application that offers text and an image usually means
+    /// the text, and the text is the cheaper thing to keep.
     fn read(&self) -> Option<Content> {
+        if let Some(paths) = self.source.files() {
+            return Some(Content::Files(paths));
+        }
         if let Some(text) = self.source.text().filter(|t| !t.trim().is_empty()) {
             return Some(Content::Text(text));
         }
@@ -355,6 +360,7 @@ mod tests {
         history_permission: Mutex<Option<u32>>,
         text: Mutex<Option<String>>,
         image: Mutex<Option<Vec<u8>>>,
+        files: Mutex<Option<Vec<String>>>,
         /// Every read of content, so a test can prove excluded content was
         /// never looked at.
         reads: Mutex<Vec<&'static str>>,
@@ -364,13 +370,28 @@ mod tests {
         fn copy_text(&self, value: &str) {
             *self.text.lock().unwrap() = Some(value.into());
             *self.image.lock().unwrap() = None;
+            *self.files.lock().unwrap() = None;
             *self.formats.lock().unwrap() = vec!["public.utf8-plain-text".into()];
         }
 
         fn copy_image(&self, bytes: &[u8]) {
             *self.text.lock().unwrap() = None;
             *self.image.lock().unwrap() = Some(bytes.to_vec());
+            *self.files.lock().unwrap() = None;
             *self.formats.lock().unwrap() = vec!["public.png".into()];
+        }
+
+        /// What Finder puts there: the files, and their names as text.
+        fn copy_files(&self, paths: &[&str]) {
+            let names: Vec<&str> = paths
+                .iter()
+                .map(|path| path.rsplit('/').next().unwrap_or(path))
+                .collect();
+            *self.text.lock().unwrap() = Some(names.join("\r"));
+            *self.image.lock().unwrap() = None;
+            *self.files.lock().unwrap() = Some(paths.iter().map(|p| p.to_string()).collect());
+            *self.formats.lock().unwrap() =
+                vec!["public.file-url".into(), "public.utf8-plain-text".into()];
         }
 
         fn mark_excluded(&self) {
@@ -407,11 +428,19 @@ mod tests {
             self.reads.lock().unwrap().push("image");
             self.image.lock().unwrap().clone()
         }
+        fn files(&self) -> Option<Vec<String>> {
+            self.reads.lock().unwrap().push("files");
+            self.files.lock().unwrap().clone()
+        }
         fn set_text(&self, value: &str) {
             self.copy_text(value);
         }
         fn set_image(&self, png: &[u8]) {
             self.copy_image(png);
+        }
+        fn set_files(&self, paths: &[String]) {
+            let paths: Vec<&str> = paths.iter().map(String::as_str).collect();
+            self.copy_files(&paths);
         }
     }
 
@@ -697,6 +726,53 @@ mod tests {
         f.attribution.from("1Password");
         f.clipboard.copy_text("a password");
         assert!(!f.watcher.handle_change(1));
+    }
+
+    #[test]
+    fn copied_files_are_one_entry_rather_than_their_names() {
+        let f = setup();
+        f.clipboard
+            .copy_files(&["/Users/me/report.pdf", "/Users/me/notes.txt"]);
+        assert!(f.watcher.handle_change(1));
+
+        let entries = f.history.entries().unwrap();
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].kind, super::super::Kind::Files);
+        assert_eq!(
+            entries[0].files(),
+            ["/Users/me/report.pdf", "/Users/me/notes.txt"]
+        );
+    }
+
+    #[test]
+    fn marked_files_are_never_even_read() {
+        let f = setup();
+        f.clipboard.copy_files(&["/Users/me/secret.key"]);
+        f.clipboard.mark_excluded();
+        assert!(!f.watcher.handle_change(1));
+        assert!(f.clipboard.reads.lock().unwrap().is_empty());
+    }
+
+    #[test]
+    fn files_from_an_excluded_application_are_never_even_read() {
+        let f = setup();
+        f.policy.excluded.lock().unwrap().push("Proton Pass".into());
+        f.attribution.from("Proton Pass");
+        f.clipboard.copy_files(&["/Users/me/export.csv"]);
+        assert!(!f.watcher.handle_change(1));
+        assert!(f.clipboard.reads.lock().unwrap().is_empty());
+    }
+
+    #[test]
+    fn dangos_own_file_write_is_not_recorded() {
+        let f = setup();
+        f.clipboard.copy_files(&["/Users/me/report.pdf"]);
+        assert!(f.watcher.handle_change(1));
+
+        f.watcher
+            .restore(&Content::Files(vec!["/Users/me/report.pdf".into()]));
+        assert!(!f.watcher.handle_change(2));
+        assert_eq!(f.history.entries().unwrap().len(), 1);
     }
 
     #[test]

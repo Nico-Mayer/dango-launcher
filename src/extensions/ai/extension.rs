@@ -540,7 +540,11 @@ mod tests {
         fn set_text(&self, text: &str) {
             self.written.lock().unwrap().push(text.to_string());
         }
+        fn files(&self) -> Option<Vec<String>> {
+            None
+        }
         fn set_image(&self, _png: &[u8]) {}
+        fn set_files(&self, _paths: &[String]) {}
     }
 
     struct FixedKeys(Option<&'static str>);

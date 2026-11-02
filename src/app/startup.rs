@@ -258,6 +258,7 @@ fn build_services(
             watcher,
             preferences,
             exchange.clone(),
+            icons.clone(),
         ));
         register(&mut host, "clipboard", extension);
     }

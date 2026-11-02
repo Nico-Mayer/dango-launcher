@@ -474,6 +474,7 @@ impl TextExchange {
         match content {
             Content::Text(text) => self.clipboard.set_text(text),
             Content::Image(png) => self.clipboard.set_image(png),
+            Content::Files(paths) => self.clipboard.set_files(paths),
         }
     }
 }
@@ -541,6 +542,16 @@ mod tests {
                 Some(Content::Image(png)) => Some(png),
                 _ => None,
             }
+        }
+        fn files(&self) -> Option<Vec<String>> {
+            let files = self.files.lock().unwrap().clone();
+            (!files.is_empty()).then_some(files)
+        }
+        fn set_files(&self, paths: &[String]) {
+            let content = Content::Files(paths.to_vec());
+            self.writes.lock().unwrap().push(content.clone());
+            *self.content.lock().unwrap() = Some(content);
+            *self.files.lock().unwrap() = paths.to_vec();
         }
         fn set_text(&self, text: &str) {
             let content = Content::Text(text.to_string());
@@ -1006,6 +1017,38 @@ mod tests {
 
         assert_eq!(f.keys.events(), vec!["paste"]);
         assert_eq!(f.clipboard.now(), Some(Content::Image(png)));
+    }
+
+    #[test]
+    fn pasting_files_puts_the_files_on_the_clipboard() {
+        let paths = vec!["/Users/me/report.pdf".to_string()];
+        let f = fixture(holding("what the user had"), FakeKeys::working());
+
+        f.exchange
+            .paste_content(&Content::Files(paths.clone()))
+            .unwrap();
+
+        assert_eq!(f.keys.events(), vec!["paste"]);
+        assert_eq!(f.clipboard.now(), Some(Content::Files(paths.clone())));
+        assert_eq!(f.writes.declared(), vec![Content::Files(paths)]);
+    }
+
+    #[test]
+    fn restoring_copied_files_is_declared_as_files() {
+        let clipboard = Arc::new(FakeClipboard::default());
+        *clipboard.files.lock().unwrap() = vec!["report.pdf".into()];
+        let f = fixture(clipboard, FakeKeys::working());
+
+        f.exchange.insert("the snippet", None).unwrap();
+
+        assert_eq!(
+            f.writes.declared(),
+            vec![
+                Content::Text("the snippet".into()),
+                Content::Files(vec!["report.pdf".into()])
+            ],
+            "the watcher reads files back, so that is what must be expected"
+        );
     }
 
     #[test]

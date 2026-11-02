@@ -2,12 +2,14 @@
 //! the policy that turns preferences into the bounds and exclusions the watcher
 //! asks for on every change.
 
+use std::path::Path;
 use std::sync::Arc;
 
 use crate::extension::{
     ActionOutcome, CommandDecl, Extension, FormValues, InvocationMode, Manifest, PreferenceDecl,
     PreferenceKind, Preferences, Service, NAMED_ICON,
 };
+use crate::extensions::applications::{IconCache, ICON_SIZE};
 use crate::invocation::{Command, InvocationContext};
 use crate::protocol::{
     Action, ActionStyle, EmptyState, ItemDetail, ListItem, ListView, Metadata, Modifier, Shortcut,
@@ -45,6 +47,7 @@ pub struct ClipboardExtension {
     watcher: Arc<Watcher>,
     preferences: Arc<Preferences>,
     text: Option<Arc<dyn TextTarget>>,
+    icons: Arc<IconCache>,
 }
 
 impl ClipboardExtension {
@@ -53,6 +56,7 @@ impl ClipboardExtension {
         watcher: Arc<Watcher>,
         preferences: Preferences,
         text: Option<Arc<dyn TextTarget>>,
+        icons: Arc<IconCache>,
     ) -> Self {
         Self {
             manifest: manifest(),
@@ -60,15 +64,17 @@ impl ClipboardExtension {
             watcher,
             preferences: Arc::new(preferences),
             text,
+            icons,
         }
     }
 
     fn list(&self) -> ViewTree {
+        let primary = primary_action(&self.preferences);
         match self.history.entries() {
-            Ok(entries) => history_view(&entries, primary_action(&self.preferences), local_now()),
+            Ok(entries) => history_view(&entries, primary, local_now(), &self.icons),
             Err(error) => {
                 crate::log::append(&format!("could not read the clipboard history: {error}"));
-                history_view(&[], primary_action(&self.preferences), local_now())
+                history_view(&[], primary, local_now(), &self.icons)
             }
         }
     }
@@ -88,6 +94,7 @@ impl Extension for ClipboardExtension {
             COMMAND_HISTORY => Some(Arc::new(HistoryCommand {
                 history: self.history.clone(),
                 preferences: self.preferences.clone(),
+                icons: self.icons.clone(),
             })),
             _ => None,
         }
@@ -258,6 +265,7 @@ fn primary_action(preferences: &Preferences) -> PrimaryAction {
 struct HistoryCommand {
     history: Arc<History>,
     preferences: Arc<Preferences>,
+    icons: Arc<IconCache>,
 }
 
 impl Command for HistoryCommand {
@@ -267,6 +275,7 @@ impl Command for HistoryCommand {
                 &entries,
                 primary_action(&self.preferences),
                 local_now(),
+                &self.icons,
             )),
             Err(error) => ctx.fail(error.to_string()),
         }
@@ -277,19 +286,24 @@ fn local_now() -> OffsetDateTime {
     OffsetDateTime::now_local().unwrap_or_else(|_| OffsetDateTime::now_utc())
 }
 
-pub fn history_view(entries: &[Entry], primary: PrimaryAction, now: OffsetDateTime) -> ViewTree {
+pub fn history_view(
+    entries: &[Entry],
+    primary: PrimaryAction,
+    now: OffsetDateTime,
+    icons: &IconCache,
+) -> ViewTree {
     ViewTree {
         protocol_version: PROTOCOL_VERSION,
         view: View::List(ListView {
             loading: false,
             empty_state: Some(EmptyState {
                 title: "Nothing copied yet".into(),
-                description: Some("Text and images you copy will show up here".into()),
+                description: Some("Text, images, and files you copy will show up here".into()),
                 ..Default::default()
             }),
             items: entries
                 .iter()
-                .map(|entry| item(entry, primary, now))
+                .map(|entry| item(entry, primary, now, icons))
                 .collect(),
             detail_pane: true,
             ..Default::default()
@@ -297,7 +311,8 @@ pub fn history_view(entries: &[Entry], primary: PrimaryAction, now: OffsetDateTi
     }
 }
 
-fn item(entry: &Entry, primary: PrimaryAction, now: OffsetDateTime) -> ListItem {
+fn item(entry: &Entry, primary: PrimaryAction, now: OffsetDateTime, icons: &IconCache) -> ListItem {
+    let files = entry.files();
     let (title, icon) = match entry.kind {
         Kind::Text => (
             preview(entry.text.as_deref().unwrap_or_default()),
@@ -309,6 +324,7 @@ fn item(entry: &Entry, primary: PrimaryAction, now: OffsetDateTime) -> ListItem 
             "Image".to_string(),
             entry.thumbnail.clone().or_else(|| entry.path.clone()),
         ),
+        Kind::Files => (files_title(&files), Some(file_icon(&files, icons))),
     };
     let paste = Action {
         id: ACTION_INSERT.into(),
@@ -341,6 +357,10 @@ fn item(entry: &Entry, primary: PrimaryAction, now: OffsetDateTime) -> ListItem 
         title,
         subtitle: None,
         icon,
+        keywords: files
+            .iter()
+            .map(|path| file_name(path).to_string())
+            .collect(),
         detail: Some(detail(entry, now)),
         actions,
         ..Default::default()
@@ -377,6 +397,19 @@ fn detail(entry: &Entry, now: OffsetDateTime) -> ItemDetail {
                 ..Default::default()
             }
         }
+        Kind::Files => {
+            let files = entry.files();
+            let several = files.len() > 1;
+            metadata.push(pair("Type", if several { "Files" } else { "File" }.into()));
+            if several {
+                metadata.push(pair("Count", files.len().to_string()));
+            }
+            ItemDetail {
+                text: Some(files.join("\n")),
+                metadata,
+                ..Default::default()
+            }
+        }
         Kind::Image => {
             metadata.push(pair("Type", "Image".into()));
             if let Some((width, height)) = entry.size {
@@ -389,6 +422,33 @@ fn detail(entry: &Entry, now: OffsetDateTime) -> ItemDetail {
             }
         }
     }
+}
+
+fn files_title(files: &[&str]) -> String {
+    let first = files
+        .first()
+        .map(|path| file_name(path))
+        .unwrap_or_default();
+    match files.len() {
+        0 | 1 => first.to_string(),
+        count => format!("{first} and {} more", count - 1),
+    }
+}
+
+fn file_name(path: &str) -> &str {
+    Path::new(path)
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or(path)
+}
+
+fn file_icon(files: &[&str], icons: &IconCache) -> String {
+    let fallback = || format!("{NAMED_ICON}file");
+    let Some(path) = files.first().filter(|path| Path::new(path).exists()) else {
+        return fallback();
+    };
+    icons.ensure_with(path, || crate::platform::icon_for(path, ICON_SIZE));
+    icons.path(path).unwrap_or_else(fallback)
 }
 
 /// One line, so entries can be told apart at a glance. Runs of whitespace
@@ -446,8 +506,14 @@ mod tests {
         fn set_text(&self, text: &str) {
             *self.0.lock().unwrap() = Some(Content::Text(text.into()));
         }
+        fn files(&self) -> Option<Vec<String>> {
+            None
+        }
         fn set_image(&self, png: &[u8]) {
             *self.0.lock().unwrap() = Some(Content::Image(png.to_vec()));
+        }
+        fn set_files(&self, paths: &[String]) {
+            *self.0.lock().unwrap() = Some(Content::Files(paths.to_vec()));
         }
     }
 
@@ -531,6 +597,7 @@ mod tests {
                 watcher,
                 Preferences::new(EXTENSION_ID, manifest().preferences, store.clone()),
                 text,
+                IconCache::in_temp(),
             ),
             history,
             clipboard,
@@ -700,6 +767,96 @@ mod tests {
         assert!(std::path::Path::new(&path).exists());
     }
 
+    fn record_files(history: &History, paths: &[&str]) -> String {
+        let paths = paths.iter().map(|path| path.to_string()).collect();
+        history
+            .record(Content::Files(paths), None, Bounds::default(), 1)
+            .unwrap();
+        history.entries().unwrap()[0].id.clone()
+    }
+
+    #[test]
+    fn a_file_entry_of_one_file_shows_its_name_and_system_icon() {
+        let (extension, history, _) = setup();
+        let file = std::env::temp_dir().join(format!("dango-{}.txt", uuid::Uuid::new_v4()));
+        std::fs::write(&file, "x").unwrap();
+        record_files(&history, &[file.to_str().unwrap()]);
+
+        let tree = extension.list();
+        let item = &list_of(&tree).items[0];
+        assert_eq!(item.title, file.file_name().unwrap().to_str().unwrap());
+        let icon = item.icon.clone().unwrap();
+        assert!(
+            Path::new(&icon).exists(),
+            "the system icon is cached: {icon}"
+        );
+    }
+
+    #[test]
+    fn a_file_entry_of_several_files_is_found_by_any_name() {
+        let (extension, history, _) = setup();
+        record_files(
+            &history,
+            &["/no/such/report.pdf", "/no/such/a.txt", "/no/such/b.txt"],
+        );
+
+        let tree = extension.list();
+        let item = &list_of(&tree).items[0];
+        assert_eq!(item.title, "report.pdf and 2 more");
+        assert_eq!(item.keywords, ["report.pdf", "a.txt", "b.txt"]);
+    }
+
+    #[test]
+    fn a_file_entry_whose_file_has_gone_shows_the_generic_icon() {
+        let (extension, history, _) = setup();
+        record_files(&history, &["/no/such/report.pdf"]);
+        let tree = extension.list();
+        assert_eq!(
+            list_of(&tree).items[0].icon.as_deref(),
+            Some(format!("{NAMED_ICON}file").as_str())
+        );
+    }
+
+    #[test]
+    fn copying_a_file_entry_puts_the_files_back() {
+        let (extension, history, clipboard) = setup();
+        let file = std::env::temp_dir().join(format!("dango-{}.txt", uuid::Uuid::new_v4()));
+        std::fs::write(&file, "x").unwrap();
+        let path = file.to_string_lossy().into_owned();
+        let id = record_files(&history, &[&path]);
+
+        assert!(matches!(
+            extension.perform_action(&id, ACTION_RESTORE, &FormValues::new()),
+            ActionOutcome::Done
+        ));
+        assert_eq!(
+            *clipboard.0.lock().unwrap(),
+            Some(Content::Files(vec![path]))
+        );
+    }
+
+    #[test]
+    fn a_file_entry_whose_files_have_gone_is_reported_and_dropped() {
+        let f = build(Some(Arc::new(FakeTarget::default())));
+        let id = record_files(&f.history, &["/no/such/one", "/no/such/two"]);
+
+        for action in [ACTION_RESTORE, ACTION_INSERT] {
+            let id = if action == ACTION_INSERT {
+                record_files(&f.history, &["/no/such/three"])
+            } else {
+                id.clone()
+            };
+            let outcome = f.extension.perform_action(&id, action, &FormValues::new());
+            let ActionOutcome::Failed(message) = outcome else {
+                panic!("{action} must fail, got {outcome:?}");
+            };
+            assert!(message.starts_with("The copied file"), "{message}");
+        }
+        assert!(f.history.entries().unwrap().is_empty());
+        assert_eq!(*f.clipboard.0.lock().unwrap(), None);
+        assert!(f.target.pasted.lock().unwrap().is_empty());
+    }
+
     const NOW: OffsetDateTime = time::macros::datetime!(2026-11-01 16:00 UTC);
 
     fn entry(kind: Kind) -> Entry {
@@ -726,8 +883,53 @@ mod tests {
     }
 
     #[test]
+    fn a_file_entry_shows_its_paths_and_count() {
+        let several = Entry {
+            text: Some("/a/report.pdf\n/a/notes.txt\n/a/c".into()),
+            ..entry(Kind::Files)
+        };
+        let detail = detail(&several, NOW);
+        assert_eq!(
+            detail.text.as_deref(),
+            Some("/a/report.pdf\n/a/notes.txt\n/a/c")
+        );
+        assert_eq!(
+            pairs(&detail),
+            [
+                ("Source", "Notepad"),
+                ("Copied", "Today, 15:59"),
+                ("Type", "Files"),
+                ("Count", "3")
+            ]
+        );
+
+        let one = Entry {
+            text: Some("/a/report.pdf".into()),
+            ..entry(Kind::Files)
+        };
+        let detail = super::detail(&one, NOW);
+        assert!(pairs(&detail).contains(&("Type", "File")));
+        assert!(!pairs(&detail).iter().any(|(label, _)| *label == "Count"));
+    }
+
+    #[test]
+    fn the_empty_history_mentions_files() {
+        let tree = history_view(&[], PrimaryAction::Paste, NOW, &IconCache::in_temp());
+        let description = list_of(&tree).empty_state.clone().unwrap().description;
+        assert_eq!(
+            description.as_deref(),
+            Some("Text, images, and files you copy will show up here")
+        );
+    }
+
+    #[test]
     fn the_history_shows_a_detail_pane() {
-        let tree = history_view(&[entry(Kind::Text)], PrimaryAction::Paste, NOW);
+        let tree = history_view(
+            &[entry(Kind::Text)],
+            PrimaryAction::Paste,
+            NOW,
+            &IconCache::in_temp(),
+        );
         let list = list_of(&tree);
         assert!(list.detail_pane);
         assert!(list.items[0].detail.is_some());

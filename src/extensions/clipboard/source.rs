@@ -65,8 +65,11 @@ pub trait ClipboardSource: Send + Sync {
     fn text(&self) -> Option<String>;
     /// The contents as encoded PNG bytes, when there is an image.
     fn image(&self) -> Option<Vec<u8>>;
+    /// Paths of files copied in a file manager, or `None` when there are none.
+    fn files(&self) -> Option<Vec<String>>;
     fn set_text(&self, text: &str);
     fn set_image(&self, png: &[u8]);
+    fn set_files(&self, paths: &[String]);
 
     /// Everything on the clipboard that `put_back` can restore.
     fn snapshot(&self) -> Snapshot {
@@ -113,6 +116,9 @@ impl Snapshot {
 
     /// What the clipboard history reads once this is put back.
     pub fn content(&self) -> Option<Content> {
+        if !self.files.is_empty() {
+            return Some(Content::Files(self.files.clone()));
+        }
         if let Some(text) = &self.text {
             return Some(Content::Text(text.clone()));
         }
@@ -165,6 +171,21 @@ impl ClipboardSource for CrateClipboard {
     fn image(&self) -> Option<Vec<u8>> {
         let image = until_free(|| self.context.get_image(), busy::holds_image).ok()?;
         Some(image.to_png().ok()?.get_bytes().to_vec())
+    }
+
+    fn files(&self) -> Option<Vec<String>> {
+        until_free(|| self.context.get_files(), busy::holds_anything)
+            .ok()
+            .filter(|paths| !paths.is_empty())
+    }
+
+    fn set_files(&self, paths: &[String]) {
+        let written = until_free(|| self.context.set_files(paths.to_vec()), busy::possible);
+        if let Err(error) = written {
+            crate::log::append(&format!(
+                "could not put files back on the clipboard: {error}"
+            ));
+        }
     }
 
     fn set_text(&self, text: &str) {
@@ -365,6 +386,27 @@ mod tests {
         holder.wait().unwrap();
         assert_eq!(read.as_deref(), Some("dango before busy"));
         assert_eq!(clipboard.text().as_deref(), Some("dango during busy"));
+    }
+
+    #[test]
+    #[ignore]
+    fn files_survive_a_round_trip() {
+        let dir = std::env::temp_dir().join("dango-files-round-trip");
+        std::fs::create_dir_all(&dir).unwrap();
+        let paths: Vec<String> = ["one.txt", "two.txt"]
+            .iter()
+            .map(|name| {
+                let path = dir.join(name);
+                std::fs::write(&path, name).unwrap();
+                path.to_string_lossy().into_owned()
+            })
+            .collect();
+        let clipboard = CrateClipboard::new().unwrap();
+        clipboard.set_files(&paths);
+        assert_eq!(clipboard.files(), Some(paths.clone()));
+        assert_eq!(clipboard.snapshot().content(), Some(Content::Files(paths)));
+        clipboard.set_text("dango after files");
+        assert_eq!(clipboard.files(), None);
     }
 
     #[test]

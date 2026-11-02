@@ -990,6 +990,7 @@ mod detail {
             ],
             PrimaryAction::Paste,
             time::OffsetDateTime::now_utc(),
+            &crate::extensions::applications::IconCache::in_temp(),
         ));
         assert!(h.find("Notepad").is_some());
         assert!(h.ui.global::<DetailData>().get_plain());
