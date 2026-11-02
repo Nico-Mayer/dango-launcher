@@ -1,7 +1,7 @@
-//! The Windows hyperkey: a low-level keyboard hook that turns one physical key
-//! into the hyper modifier.
+//! The Windows hyperkey: a low-level keyboard hook that turns CapsLock into the
+//! hyper modifier.
 //!
-//! While the mapped key is held, the hook holds the configured modifiers down
+//! While CapsLock is held, the hook holds the configured modifiers down
 //! (Ctrl+Alt+Super, plus Shift unless excluded) and swallows the key's own
 //! function, so a `hyper+X` chord fires through the same global-shortcut path as
 //! any other chord. The hook's own injected modifiers carry `DANGO_INJECTED`,

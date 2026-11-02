@@ -1,5 +1,10 @@
 # Spec Delta
 
+## RENAMED Requirements
+
+- FROM: `### Requirement: A configured key acts as the hyper modifier`
+- TO: `### Requirement: CapsLock acts as the hyper modifier when configured`
+
 ## MODIFIED Requirements
 
 ### Requirement: The hyperkey is off unless configured
