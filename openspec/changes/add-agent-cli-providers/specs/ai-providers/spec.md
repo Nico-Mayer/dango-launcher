@@ -312,6 +312,12 @@ started.
 - **THEN** the program and every process it started are stopped
 - **AND** the launcher handles the next key without delay
 
+#### Scenario: Quitting Dango stops the program
+
+- **WHEN** an agent program is running for a command and the user quits Dango
+  from the tray
+- **THEN** the program and every process it started are stopped
+
 #### Scenario: A process left behind by the program is stopped
 
 - **WHEN** the program has finished printing but a process it started is still
