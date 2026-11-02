@@ -11,18 +11,10 @@
 //! still gets the fallback. The probe that informed this found Zed to be one:
 //! its focused element is a bare window.
 
-use std::sync::mpsc;
-use std::time::Duration;
-
 use uiautomation::patterns::UITextPattern;
 use uiautomation::UIAutomation;
 
-use crate::text::{DirectSelection, Selected};
-
-/// Long enough for a busy application to answer across a process boundary,
-/// short enough to leave the fallback room inside the 300ms the read is given.
-/// The probe measured real applications at under 10ms.
-const DEADLINE: Duration = Duration::from_millis(200);
+use crate::text::{with_deadline, DirectSelection, Selected};
 
 /// How much of the selection to take. Far past anything a transform should be
 /// pointed at, and it stops a runaway document range being copied whole.
@@ -38,17 +30,7 @@ impl DirectSelection for WindowsSelection {
     }
 
     fn selected_text(&self) -> Selected {
-        let (sender, receiver) = mpsc::channel();
-        // On its own thread with a deadline: this is a cross-process COM call,
-        // and an application that is busy or hung must not hold the launcher.
-        // A call that never returns leaks this one thread, which is the price
-        // of not blocking.
-        std::thread::spawn(move || {
-            let _ = sender.send(read());
-        });
-        receiver
-            .recv_timeout(DEADLINE)
-            .unwrap_or(Selected::Unavailable)
+        with_deadline(read)
     }
 }
 

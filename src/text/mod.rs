@@ -108,6 +108,24 @@ pub trait DirectSelection: Send + Sync {
     }
 }
 
+/// Long enough for a busy application to answer across a process boundary,
+/// short enough to leave the fallback room inside the 300ms the read is given.
+/// The Windows probe measured real applications at under 10ms.
+const DIRECT_READ_DEADLINE: std::time::Duration = std::time::Duration::from_millis(200);
+
+/// Runs a direct read on its own thread so an application that is busy or hung
+/// cannot hold the launcher. A read that does not answer in time leaks its
+/// thread until the platform's own timeout ends it.
+pub(crate) fn with_deadline(read: impl FnOnce() -> Selected + Send + 'static) -> Selected {
+    let (sender, receiver) = std::sync::mpsc::channel();
+    std::thread::spawn(move || {
+        let _ = sender.send(read());
+    });
+    receiver
+        .recv_timeout(DIRECT_READ_DEADLINE)
+        .unwrap_or(Selected::Unavailable)
+}
+
 /// Declares a write Dango is about to make so the clipboard history ignores it.
 /// A trait rather than the watcher itself, because the exchange has to work
 /// when the clipboard extension is disabled.
@@ -464,6 +482,21 @@ impl TextExchange {
 mod tests {
     use super::*;
     use std::sync::Mutex;
+
+    #[test]
+    fn a_direct_read_past_the_deadline_is_unavailable() {
+        let selected = with_deadline(|| {
+            std::thread::sleep(DIRECT_READ_DEADLINE * 2);
+            Selected::Text("too late".into())
+        });
+        assert_eq!(selected, Selected::Unavailable);
+    }
+
+    #[test]
+    fn a_direct_read_in_time_is_returned() {
+        let selected = with_deadline(|| Selected::Text("in time".into()));
+        assert_eq!(selected, Selected::Text("in time".into()));
+    }
 
     #[derive(Default)]
     struct FakeClipboard {

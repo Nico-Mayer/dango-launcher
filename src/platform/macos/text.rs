@@ -18,14 +18,10 @@ use objc2_app_kit::NSWorkspace;
 use objc2_application_services::{AXError, AXUIElement};
 use objc2_core_foundation::{CFRetained, CFString, CFType};
 
-use crate::text::{DirectSelection, Handoff, Keys, MainThread, Selected, TextError};
+use crate::text::{with_deadline, DirectSelection, Handoff, Keys, MainThread, Selected, TextError};
 
 const FOCUSED_ELEMENT: &str = "AXFocusedUIElement";
 const SELECTED_TEXT: &str = "AXSelectedText";
-
-/// The same bound as the Windows read, and for the same reason: the AX default
-/// waits seconds on an application that does not answer.
-const SELECTION_DEADLINE: Duration = Duration::from_millis(200);
 
 /// How long to wait for the target application to take the paste before the
 /// clipboard is put back. macOS offers no signal that a paste has been handled,
@@ -197,19 +193,12 @@ impl Handoff for MacHandoff {
 pub struct MacSelection;
 
 impl DirectSelection for MacSelection {
-    /// On its own thread rather than through `AXUIElementSetMessagingTimeout`:
-    /// set on the system-wide fallback element, that timeout becomes the global
-    /// one, window management included. A read that never returns leaks this
-    /// one thread until the AX default gives up.
+    /// Bounded by a thread rather than `AXUIElementSetMessagingTimeout`: set
+    /// on the system-wide fallback element, that timeout becomes the global
+    /// one, window management included.
     fn selected_text(&self) -> Selected {
         let pid = frontmost_pid();
-        let (sender, receiver) = std::sync::mpsc::channel();
-        std::thread::spawn(move || {
-            let _ = sender.send(read(pid));
-        });
-        receiver
-            .recv_timeout(SELECTION_DEADLINE)
-            .unwrap_or(Selected::Unavailable)
+        with_deadline(move || read(pid))
     }
 }
 
