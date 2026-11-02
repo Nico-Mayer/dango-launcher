@@ -3,10 +3,10 @@
 ## Why
 
 The text on the right of a root search row means something different for each
-extension. Applications show a file path, most commands show their
-extension's name in a short or different form ("Clipboard", "Dango"),
-settings panes show nothing, Steam games show "Steam", and snippets and
-quicklinks show their body. You cannot read the column at a glance, because
+extension. Applications show a file path or nothing,
+most commands show their extension's name in a short or different form
+("Clipboard", "Dango"), Steam games show "Steam", and snippets and quicklinks
+show their body. You cannot read the column at a glance, because
 there is no rule for what it contains.
 
 ## What Changes
@@ -19,8 +19,8 @@ there is no rule for what it contains.
 - **BREAKING**: remove `subtitle` from the command declaration in the
   extension manifest. No migration, because Dango is alpha.
 - Visible results for each built-in:
-  - Applications: "Applications" (was the app's path)
-  - Settings panes: "System" (was empty)
+  - Applications: "Applications" (was the app's path, or empty for apps
+    without one, such as UWP apps)
   - Steam games: "Games" (was "Steam")
   - Check for Updates: "Updates" (was "Dango")
   - Clipboard History: "Clipboard History" (was "Clipboard")
@@ -63,7 +63,7 @@ None.
 - `src/search/mod.rs`: `Candidate::subtitle` becomes a status line that only
   pinned items set.
 - `src/app/mod.rs`: `Core::result_item` chooses the row's subtitle.
-- `src/extensions/applications`, `games`, `snippets`, `system`: root items stop
+- `src/extensions/applications`, `games`, `snippets`: root items stop
   setting a subtitle.
 - `src/extensions/permissions`, `updates`: pinned items move to the status
   field.

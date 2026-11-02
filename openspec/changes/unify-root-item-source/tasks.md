@@ -5,10 +5,10 @@
 The candidate field rename touches every provider, so this group lands as one
 build-green step.
 
-- [ ] 1.1 Rename `Candidate::subtitle` to `status` in `src/search/mod.rs` and update every construction site (`src/extension/mod.rs`, `src/extension/registry.rs`, `src/ranking/mod.rs`, test fixtures). Only `permissions` and `updates` set it. `applications`, `games`, `snippets` (both kinds), and `system` settings panes set nothing. Verify with `cargo build --all-targets`.
-- [ ] 1.2 In `Core::result_item` (`src/app/mod.rs`), set `ResultItem::subtitle` to `c.status` when `c.pinned`, else to `context.title`. Add tests in `src/app/tests.rs` that a non-pinned root item shows its extension's name, a command shows its extension's name, and a pinned item shows its status line. Verify with `cargo test app::`.
-- [ ] 1.3 Update the extension tests that asserted the old texts: `applications` (`/a/code`), `games` (`Steam`), `snippets` (body preview in root), `permissions` and `updates` (now on `status`). Verify with `cargo test extensions::`.
-- [ ] 1.4 Run `cargo test` (UI tests included) and `mise run check`, and verify both pass.
+- [x] 1.1 Rename `Candidate::subtitle` to `status` in `src/search/mod.rs` and update every construction site (`src/extension/mod.rs`, `src/extension/registry.rs`, `src/ranking/mod.rs`, test fixtures). Only `permissions` and `updates` set it. `applications`, `games`, and `snippets` (both kinds) set nothing. Verify with `cargo build --all-targets`.
+- [x] 1.2 In `Core::result_item` (`src/app/mod.rs`), set `ResultItem::subtitle` to `c.status` when `c.pinned`, else to `context.title`. Add tests in `src/app/tests.rs` that a non-pinned root item shows its extension's name, a command shows its extension's name, and a pinned item shows its status line. Verify with `cargo test app::`.
+- [x] 1.3 Update the extension tests that asserted the old texts: `applications` (`/a/code`), `games` (`Steam`), `snippets` (body preview in root), `permissions` and `updates` (now on `status`). Verify with `cargo test extensions::`.
+- [x] 1.4 Run `cargo test` (UI tests included) and `mise run check`, and verify both pass.
 
 ## 2. Remove the command subtitle from the manifest
 

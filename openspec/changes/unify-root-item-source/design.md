@@ -72,7 +72,7 @@ brought back "Dango" and "Clipboard".
 No new strings. The changed right-hand texts are existing extension names,
 already Title Case per `interface-copy`:
 
-- "Applications", "System", "Games", "Updates", "Clipboard History",
+- "Applications", "Games", "Updates", "Clipboard History",
   "Snippets", "Quicklinks"
 
 Pinned status lines ("You have 0.4.0", the permission lines) are unchanged.
