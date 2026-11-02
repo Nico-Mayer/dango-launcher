@@ -6,10 +6,7 @@
 //! from seeing Escape or the time limit. Dropping the `Chunks` stops the
 //! program and everything it started, at any point of the run.
 
-// Nothing calls these until the agent client lands on top of them.
-#[allow(dead_code)]
 mod args;
-#[allow(dead_code)]
 mod lookup;
 
 use std::io::{Read, Write};
