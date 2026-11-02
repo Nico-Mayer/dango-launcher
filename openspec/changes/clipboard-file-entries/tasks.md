@@ -25,7 +25,7 @@
 - [ ] 4.2 Paste the entry into a Finder window: Finder copies both files there; copy action then Cmd+V in Finder does the same; no new history entry appears after either
 - [ ] 4.3 Delete one of the two files, paste the entry: the other is pasted; delete both, paste: toast "The copied files no longer exist", entry gone
 - [ ] 4.4 With files copied in Finder on the clipboard, insert text through Dango (a snippet) into an editor: afterwards the clipboard holds the files again and no new history entry appears
-- [ ] 4.5 `mise run check` and `cargo test` pass on the Mac
+- [x] 4.5 `mise run check` and `cargo test` pass on the Mac
 
 ## 5. Windows hand checks
 
