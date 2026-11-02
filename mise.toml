@@ -41,6 +41,38 @@ description = "Cut a release: derive version, changelog, commit, tag, push"
 run = "node scripts/release.mjs"
 interactive = true
 
+[tasks."skills:mise"]
+description = "Sync mise skills"
+hide = true
+run = [
+  "mise skills sync",
+  "mise skills sync --dir .claude/skills",
+]
+
+[tasks."skills:skillshare"]
+description = "Sync skillshare skills"
+run = [
+  "skillshare install -p",
+  "skillshare sync -p",
+]
+
+[tasks."skills:openspec"]
+description = "Sync openspec skills"
+hide = true
+run = [
+  "openspec init --tools claude",
+  "openspec init --tools agents",
+]
+
+[tasks."skills:sync"]
+description = "Sync all skills"
+# Sequential: subtasks write to the same skill dirs
+run = [
+  { task = "skills:mise" },
+  { task = "skills:skillshare" },
+  { task = "skills:openspec" },
+]
+
 [settings]
 idiomatic_version_file_enable_tools = ["rust"]
 skills.dir = ".agents/skills"
@@ -48,11 +80,6 @@ skills.auto_sync = true
 
 [hooks]
 postinstall = [
-  "mise skills sync",
-  "mise skills sync --dir .claude/skills",
-  "skillshare install -p",
-  "skillshare sync -p",
-  "openspec init --tools claude",
-  "openspec init --tools agents",
+  "mise run skills:sync",
   "hk install",
 ]
