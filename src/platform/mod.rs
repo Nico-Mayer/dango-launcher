@@ -90,6 +90,15 @@ pub fn agent_known_dirs() -> Vec<std::path::PathBuf> {
     return macos::agent_known_dirs();
 }
 
+/// A command for an agent CLI that shows no window and can be stopped with
+/// everything it starts.
+pub fn contained_command(program: &std::path::Path) -> process_wrap::std::CommandWrap {
+    #[cfg(target_os = "windows")]
+    return windows::contained_command(program);
+    #[cfg(target_os = "macos")]
+    return macos::contained_command(program);
+}
+
 /// What `env` prints in the user's login shell, where that differs from
 /// Dango's own environment. Windows hands a login-started app the saved PATH,
 /// so there is nothing to ask for. Blocks for up to ten seconds on macOS.

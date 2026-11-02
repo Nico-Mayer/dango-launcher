@@ -11,7 +11,7 @@ mod system;
 mod text;
 mod window;
 
-pub use agent::agent_known_dirs;
+pub use agent::{agent_known_dirs, contained_command};
 pub use apps::{icon_for, WindowsAppIndexer};
 pub use browser::{browser_app, browser_target};
 pub use clipboard::{

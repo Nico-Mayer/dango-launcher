@@ -1,4 +1,7 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
+
+use process_wrap::std::{CommandWrap, CreationFlags, JobObject};
+use windows::Win32::System::Threading::CREATE_NO_WINDOW;
 
 /// Where agent CLIs land that Explorer's PATH can lack: `mise activate` adds
 /// its folders only inside a shell, and npm, WinGet, scoop and the Claude
@@ -21,9 +24,29 @@ pub fn agent_known_dirs() -> Vec<PathBuf> {
     .collect()
 }
 
+/// A GUI-subsystem Dango has no console to share, so without
+/// `CREATE_NO_WINDOW` the child gets a visible one, which takes focus and
+/// hides the launcher. It has to go through the `CreationFlags` wrapper:
+/// `JobObject` overwrites flags set on the inner command.
+pub fn contained_command(program: &Path) -> CommandWrap {
+    let mut command = CommandWrap::with_new(program, |_| {});
+    command
+        .wrap(JobObject)
+        .wrap(CreationFlags(CREATE_NO_WINDOW));
+    command
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_contained_command_has_no_console_and_a_job() {
+        let command = contained_command(Path::new("claude"));
+        assert!(command.has_wrap::<JobObject>());
+        let flags = command.get_wrap::<CreationFlags>().expect("creation flags");
+        assert!(flags.0.contains(CREATE_NO_WINDOW));
+    }
 
     #[test]
     fn the_known_dirs_cover_mise_npm_and_winget() {

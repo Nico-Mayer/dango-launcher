@@ -13,7 +13,7 @@ mod system;
 mod text;
 mod window;
 
-pub use agent::{agent_known_dirs, login_shell_env};
+pub use agent::{agent_known_dirs, contained_command, login_shell_env};
 pub use apps::MacAppIndexer;
 pub use browser::{browser_app, browser_target};
 pub use clipboard::MacAttribution;

@@ -1,12 +1,20 @@
 use std::io::Read;
 use std::os::unix::process::CommandExt;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::time::{Duration, Instant};
+
+use process_wrap::std::{CommandWrap, ProcessGroup};
 
 /// A profile that waits on a passphrase or a slow network call must not hold
 /// the request up for longer than this.
 const LOGIN_SHELL_LIMIT: Duration = Duration::from_secs(10);
+
+pub fn contained_command(program: &Path) -> CommandWrap {
+    let mut command = CommandWrap::with_new(program, |_| {});
+    command.wrap(ProcessGroup::leader());
+    command
+}
 
 /// Where agent CLIs land besides the login shell's PATH.
 pub fn agent_known_dirs() -> Vec<PathBuf> {
