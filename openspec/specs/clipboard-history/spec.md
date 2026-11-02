@@ -10,8 +10,9 @@ deliberately never remembering what a password manager put there.
 
 ### Requirement: What the user copies is recorded
 
-While Dango is running, the extension SHALL record text and images placed on the
-clipboard, whichever application put them there.
+While Dango is running, the extension SHALL record text, images, and files
+placed on the clipboard, whichever application put them there. Files copied
+together SHALL be one entry, which holds where they are, not their contents.
 
 #### Scenario: Text is recorded
 
@@ -23,14 +24,39 @@ clipboard, whichever application put them there.
 - **WHEN** the user copies an image
 - **THEN** it appears in the history as the newest entry
 
+#### Scenario: Files are recorded on macOS
+
+- **WHEN** the user selects two files in Finder and copies them
+- **THEN** one entry holding both files appears in the history as the newest
+  entry
+- **AND** no text entry with their names is recorded
+
+#### Scenario: Files are recorded on Windows
+
+- **WHEN** the user selects two files in File Explorer and copies them
+- **THEN** one entry holding both files appears in the history as the newest
+  entry
+
+#### Scenario: A folder is recorded like a file
+
+- **WHEN** the user copies a folder in the file manager
+- **THEN** an entry holding that folder appears in the history
+
 #### Scenario: Copying the same thing again does not duplicate it
 
 - **WHEN** the user copies something already in the history
 - **THEN** the existing entry becomes the newest rather than a second entry being added
 
+#### Scenario: Copying the same files again does not duplicate them
+
+- **WHEN** the user copies the same files, in the same order, as an entry
+  already in the history
+- **THEN** that entry becomes the newest rather than a second entry being added
+
 #### Scenario: Content types that are not handled are ignored
 
-- **WHEN** the clipboard receives content that is neither text nor an image
+- **WHEN** the clipboard receives content that is neither text, an image, nor
+  files
 - **THEN** nothing is recorded
 - **AND** the history is left as it was
 
@@ -90,6 +116,9 @@ Which of the two Enter runs SHALL be set by the extension preference
 `paste`. The action Enter does not run SHALL be reachable from the action
 panel. A value that is neither SHALL behave as the default.
 
+A file entry SHALL go back on the clipboard as files, holding those of its
+files that still exist.
+
 #### Scenario: History opens newest first
 
 - **WHEN** the user invokes the history command
@@ -99,6 +128,12 @@ panel. A value that is neither SHALL behave as the default.
 
 - **WHEN** the user types while the history is open
 - **THEN** the list narrows to the entries whose text matches
+
+#### Scenario: List narrows to file names
+
+- **WHEN** the history holds an entry of three files and the user types part of
+  the third file's name
+- **THEN** that entry stays in the list
 
 #### Scenario: Enter pastes by default
 
@@ -113,6 +148,24 @@ panel. A value that is neither SHALL behave as the default.
   pasted images
 - **THEN** the launcher hides
 - **AND** the image is pasted into that application
+
+#### Scenario: Pasting a file entry on macOS
+
+- **WHEN** the user pastes a file entry while a Finder window is in front
+- **THEN** the launcher hides
+- **AND** Finder copies those files into that folder
+
+#### Scenario: Pasting a file entry on Windows
+
+- **WHEN** the user pastes a file entry while a File Explorer window is in front
+- **THEN** the launcher hides
+- **AND** File Explorer copies those files into that folder
+
+#### Scenario: Copying a file entry
+
+- **WHEN** the user chooses the copy action on a file entry
+- **THEN** the clipboard holds those files, so pasting in the file manager
+  copies them
 
 #### Scenario: Choosing an entry restores it
 
@@ -186,10 +239,23 @@ panel. A value that is neither SHALL behave as the default.
 - **WHEN** an image entry is listed
 - **THEN** it is shown with a thumbnail of itself
 
+#### Scenario: A file entry of one file is recognisable in the list
+
+- **WHEN** an entry holding only `report.pdf` is listed
+- **THEN** it is shown as "report.pdf", with the icon the system shows for that
+  file
+
+#### Scenario: A file entry of several files is recognisable in the list
+
+- **WHEN** an entry holding `report.pdf` and two more files is listed
+- **THEN** it is shown as "report.pdf and 2 more", with the icon the system
+  shows for `report.pdf`
+
 #### Scenario: Empty history
 
 - **WHEN** the user invokes the history command having copied nothing
-- **THEN** an empty state explains that nothing has been copied yet
+- **THEN** an empty state reads "Nothing copied yet" with "Text, images, and
+  files you copy will show up here"
 
 #### Scenario: An entry can be removed
 
@@ -197,18 +263,40 @@ panel. A value that is neither SHALL behave as the default.
 - **THEN** it is deleted from the history and its file, if it has one, is deleted
 - **AND** the list stays open
 
+#### Scenario: Removing a file entry leaves the files alone
+
+- **WHEN** the user removes a file entry
+- **THEN** the files it held are not deleted, moved, or changed
+
 #### Scenario: Entry whose file has gone
 
 - **WHEN** the user chooses an image entry whose file is missing
 - **THEN** the failure is reported
 - **AND** the entry is removed from the history
 
+#### Scenario: Some of a file entry's files have gone
+
+- **WHEN** the user pastes or copies a file entry of three files and one of
+  them was deleted
+- **THEN** the two that still exist go on the clipboard
+- **AND** no failure is reported
+
+#### Scenario: All of a file entry's files have gone
+
+- **WHEN** the user pastes or copies a file entry whose files were all deleted
+  or moved
+- **THEN** the launcher stays open and reports "The copied files no longer
+  exist", or "The copied file no longer exists" for an entry of one file
+- **AND** the entry is removed from the history
+- **AND** the clipboard is unchanged
+
 ### Requirement: The selected entry is shown in full
 
 The history SHALL show the selected entry beside the list. A text entry SHALL
 be shown as it was copied, with its line breaks and indentation, and never
 read as formatting. A long text SHALL show at least its start. An image entry
-SHALL be shown whole, scaled to fit the pane.
+SHALL be shown whole, scaled to fit the pane. A file entry SHALL show the full
+path of each of its files, one per line, in the order they were copied.
 
 #### Scenario: A text entry is shown as copied
 
@@ -225,6 +313,12 @@ SHALL be shown whole, scaled to fit the pane.
 - **WHEN** the user selects an image entry
 - **THEN** the pane shows the whole image, scaled to fit, with its aspect ratio kept
 
+#### Scenario: A file entry shows its paths
+
+- **WHEN** the user selects an entry holding two files
+- **THEN** the pane shows the full path of each, one per line, in the order
+  they were copied
+
 #### Scenario: Moving the selection changes the pane
 
 - **WHEN** the user presses Arrow Down in the history
@@ -240,10 +334,11 @@ that does not apply:
   "27 Oct, 14:31" within the current year, or "27 Oct 2025, 14:31" before it,
   in the user's local time.
 - "Type": "Text", "Link", "Email address", "Colour", or "File path" for text,
-  and "Image" for an image.
+  "Image" for an image, and "File" for one file or "Files" for several.
 - "Lines": the number of lines, for text with more than one line.
 - "Characters": the number of characters in the whole text, for text.
 - "Size": the width and height in pixels, as "1920 × 1080", for an image.
+- "Count": the number of files, for a file entry of more than one file.
 
 Copying something already in the history SHALL update its source and its time.
 
@@ -310,6 +405,16 @@ Copying something already in the history SHALL update its source and its time.
 
 - **WHEN** the user selects an image entry 1920 pixels wide and 1080 high
 - **THEN** the pane shows "Size" with "1920 × 1080"
+
+#### Scenario: One file
+
+- **WHEN** the user selects a file entry of one file
+- **THEN** the pane shows "Type" with "File" and no "Count" pair
+
+#### Scenario: Several files
+
+- **WHEN** the user selects a file entry of three files
+- **THEN** the pane shows "Type" with "Files" and "Count" with "3"
 
 #### Scenario: Copying again updates the metadata
 
@@ -394,7 +499,7 @@ memory its listed and shown images used.
 Content marked by the operating system as not for history, and content copied
 from an application the user has excluded, SHALL NOT be recorded. An excluded
 entry SHALL leave no trace: not in the database, not on disk, and not in memory
-beyond the check itself.
+beyond the check itself. This SHALL hold for text, images, and files alike.
 
 The excluded applications SHALL be set by the extension preference
 `excluded-applications`: application names, comma separated, matched ignoring
@@ -416,6 +521,12 @@ rule is in `openspec/specs/selection-and-paste`.
 #### Scenario: Application on the exclusion list
 
 - **WHEN** content is copied from an application named in `excluded-applications`
+- **THEN** nothing is recorded
+
+#### Scenario: Files from an excluded application
+
+- **WHEN** files are copied from an application named in
+  `excluded-applications`
 - **THEN** nothing is recorded
 
 #### Scenario: Exclusion matches names ignoring case
