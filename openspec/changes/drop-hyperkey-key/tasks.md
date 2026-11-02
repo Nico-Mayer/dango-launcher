@@ -13,7 +13,7 @@ green.
 
 ## 2. Review
 
-- [ ] 2.1 Run the `ponytail-review` skill in a fresh subagent on this change's commits, without the apply context. The review reports findings only; the author decides what to fix.
+- [x] 2.1 Run the `ponytail-review` skill in a fresh subagent on this change's commits, without the apply context. The review reports findings only; the author decides what to fix.
 
 ## Workflow follow-up
 
