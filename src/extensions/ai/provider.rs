@@ -97,6 +97,8 @@ pub enum AiError {
     ProgramMissing { program: String },
     #[error("Couldn't find {path}. Check the path in your config file.")]
     PathMissing { path: String },
+    #[error("{provider} stopped with an error. See dango.log for the reason.")]
+    ProgramFailed { provider: String },
 }
 
 /// What the next poll of a running request produced.
@@ -115,11 +117,27 @@ pub enum Next {
 /// request.
 pub struct Chunks {
     receiver: std::sync::mpsc::Receiver<Result<String, AiError>>,
+    /// An HTTP request ends by itself once nothing reads it; a child process
+    /// has to be told.
+    cleanup: Option<Box<dyn FnOnce() + Send>>,
 }
 
 impl Chunks {
     pub fn new(receiver: std::sync::mpsc::Receiver<Result<String, AiError>>) -> Self {
-        Self { receiver }
+        Self {
+            receiver,
+            cleanup: None,
+        }
+    }
+
+    pub fn with_cleanup(
+        receiver: std::sync::mpsc::Receiver<Result<String, AiError>>,
+        cleanup: impl FnOnce() + Send + 'static,
+    ) -> Self {
+        Self {
+            receiver,
+            cleanup: Some(Box::new(cleanup)),
+        }
     }
 
     pub fn next(&self, within: Duration) -> Next {
@@ -130,6 +148,14 @@ impl Chunks {
             Ok(Err(error)) => Next::Failed(error),
             Err(RecvTimeoutError::Timeout) => Next::Idle,
             Err(RecvTimeoutError::Disconnected) => Next::Done,
+        }
+    }
+}
+
+impl Drop for Chunks {
+    fn drop(&mut self) {
+        if let Some(cleanup) = self.cleanup.take() {
+            cleanup();
         }
     }
 }

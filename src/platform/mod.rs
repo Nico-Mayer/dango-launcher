@@ -99,6 +99,16 @@ pub fn contained_command(program: &std::path::Path) -> process_wrap::std::Comman
     return macos::contained_command(program);
 }
 
+/// Whether a process with this id is still running. For tests that check a
+/// stopped request left nothing behind.
+#[cfg(test)]
+pub fn process_alive(pid: u32) -> bool {
+    #[cfg(target_os = "windows")]
+    return windows::process_alive(pid);
+    #[cfg(target_os = "macos")]
+    return unsafe { libc::kill(pid as libc::pid_t, 0) == 0 };
+}
+
 /// What `env` prints in the user's login shell, where that differs from
 /// Dango's own environment. Windows hands a login-started app the saved PATH,
 /// so there is nothing to ask for. Blocks for up to ten seconds on macOS.
