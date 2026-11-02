@@ -360,7 +360,11 @@ fn build_services(
     let hyperkey = Mutex::default();
     if let Some(message) = apply_hyperkey(file_config, &hyperkey) {
         crate::log::append(&message);
-        notices.push("Hyperkey didn't start, see dango.log".to_string());
+        // A missing permission has its own tray item, and this notice could
+        // not be taken back once a grant restarts the hyperkey.
+        if crate::platform::permissions().missing().is_empty() {
+            notices.push("Hyperkey didn't start, see dango.log".to_string());
+        }
     }
     {
         let config = file_config.shared();
