@@ -2,6 +2,74 @@
 
 All notable changes to Dango. Generated from commit history at release time.
 
+## [4.0.0] - 2026-11-02
+
+### Features
+
+- **mcp:** Add press, snapshot and restart tools
+- **hyperkey:** [**breaking**] Drop the hyperkey.key setting
+- **permissions:** Name hyperkey in Accessibility warning
+- **icons:** Add file icon
+- **clipboard:** Record and restore copied files
+- **search:** Name the owning extension in root rows
+
+### Fixes
+
+- **mcp:** Fail launch while another Dango runs
+- **ai:** Never send a key to a local provider
+- **ranking:** Clear pinned flag on typed queries
+- **hotkeys:** Name the taken launcher chord
+- **ai:** Skip commands whose prompt can't parse
+- **ui:** Announce kbd and tag text once
+- **windows:** Reinstall keyboard hooks on a timer
+- **windows:** Hold Ctrl around synthetic chords
+- **windows:** Log when hook timer fails
+- **windows:** Hold Ctrl only after the chord key
+- **macos:** Report empty selection, skip Cmd+C
+- **macos:** Bound direct selection read
+- **macos:** Restart hyperkey on permission change
+- **macos:** Report hyperkey permission failures
+- **macos:** Skip hyperkey notice for missing grant
+- **macos:** No config error for missing hyperkey grant
+- **clipboard:** Share file icons by type
+
+### Refactoring
+
+- **hotkeys:** Reuse launcher problem for label
+- **ai:** Simplify prompt parse check
+- **config:** Drop unused config write-back
+- **config:** Drop unused serialize path
+- **text:** Share direct read deadline
+- **extension:** [**breaking**] Drop command subtitle
+
+### Documentation
+
+- **agents:** Note OpenSpec CLI tracks latest
+- **agents:** Compress AGENTS.md to caveman style
+- **agents:** Document dango-ui tools and scopes
+- Note silent low-level hook removal
+- Note hook swap reorders the chain
+- Correct chord hold note
+- **extension:** Drop stale persist note
+- **spec:** Drop config write-back from schema spec
+- Fix stale store comments
+- **hyperkey:** Name CapsLock in wording
+- Note own bundle ID for macOS permission checks
+- Note reopen drops env in permission checks
+
+### Maintenance
+
+- **mise:** Link tool skills into .agents and .claude
+- **claude:** Disable the svelte plugin again
+- Drop duplicate Slint skill and docs server
+- Pin slint-lsp and slint-viewer via mise
+- Drop slint-viewer
+- Move claude md
+- Drop stale skills-lock.json
+- Manage agent setup with skillshare
+- Add rust-skills and ignore agent folders
+- Add new skill
+- Mise tasks
 ## [3.0.3] - 2026-11-01
 
 ### Fixes
@@ -360,7 +428,7 @@ All notable changes to Dango. Generated from commit history at release time.
 ### Documentation
 
 - **agents:** Note tray PATH and .cmd lookup trap
-## [0.4.1-rc1] - 2026-10-30
+## [0.5.0] - 2026-10-30
 
 ### Features
 
