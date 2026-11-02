@@ -9,7 +9,7 @@ use crate::config::FileConfig;
 use crate::extension::{
     ActionOutcome, Extension, FormValues, InvocationMode, Manifest, NAMED_ICON,
 };
-use crate::icon_cache::{IconCache, ICON_SIZE};
+use crate::icon_cache::{IconCache, IconRgba, ICON_SIZE};
 use crate::invocation::{Command, InvocationContext};
 use crate::platform::{self, Label, SystemControl, SystemError};
 use crate::protocol::{Action, DetailView, ListItem, ListView, View, ViewTree, PROTOCOL_VERSION};
@@ -209,12 +209,10 @@ fn confirmation(count: usize) -> ViewTree {
 }
 
 /// The running applications, filtered by the launcher because the list is small
-/// and complete when it is pushed. Icons are rendered here rather than in the
-/// background, because the list is short and it is on screen only once asked
-/// for, unlike root search. They are cached by locator rather than by the
-/// application's id, because the cache outlives the session and process ids
-/// are reused.
-fn running_list(apps: Vec<crate::platform::RunningApp>, icons: &IconCache) -> ViewTree {
+/// and complete when it is pushed. Icons are cached by locator rather than by
+/// the application's id, because the cache outlives the session and process
+/// ids are reused.
+fn running_list(apps: &[crate::platform::RunningApp], icons: &IconCache) -> ViewTree {
     ViewTree {
         protocol_version: PROTOCOL_VERSION,
         view: View::List(ListView {
@@ -225,16 +223,11 @@ fn running_list(apps: Vec<crate::platform::RunningApp>, icons: &IconCache) -> Vi
                 ..Default::default()
             }),
             items: apps
-                .into_iter()
+                .iter()
                 .map(|app| ListItem {
-                    icon: app.icon.and_then(|locator| {
-                        icons.ensure_with(&locator, || {
-                            crate::platform::icon_for(&locator, ICON_SIZE)
-                        });
-                        icons.path(&locator)
-                    }),
-                    id: app.id,
-                    title: app.name,
+                    icon: app.icon.as_deref().and_then(|locator| icons.path(locator)),
+                    id: app.id.clone(),
+                    title: app.name.clone(),
                     subtitle: None,
                     actions: vec![Action {
                         id: ACTION_QUIT.into(),
@@ -248,6 +241,17 @@ fn running_list(apps: Vec<crate::platform::RunningApp>, icons: &IconCache) -> Vi
             ..Default::default()
         }),
     }
+}
+
+fn app_icons(apps: &[crate::platform::RunningApp]) -> Vec<(String, String)> {
+    apps.iter()
+        .filter_map(|app| app.icon.clone())
+        .map(|locator| (locator.clone(), locator))
+        .collect()
+}
+
+fn render_app_icon(locator: &str) -> Option<IconRgba> {
+    crate::platform::icon_for(locator, ICON_SIZE)
 }
 
 fn report(ctx: &InvocationContext, result: Result<(), SystemError>) {

@@ -8,7 +8,7 @@ use crate::icon_cache::IconCache;
 use crate::invocation::{Command, InvocationContext};
 use crate::platform::SystemControl;
 
-use super::{confirmation, report, running_list, OpenFile};
+use super::{app_icons, confirmation, render_app_icon, report, running_list, OpenFile};
 
 pub const CREATE_FAILED: &str = "Couldn't create the config file";
 pub const OPEN_FAILED: &str = "Couldn't open the config file";
@@ -45,8 +45,16 @@ impl Command for EmptyTrash {
 pub struct QuitApplication(pub Arc<dyn SystemControl>, pub Arc<IconCache>);
 
 impl Command for QuitApplication {
+    /// Shows the list before rendering missing icons, then shows it again.
     fn invoke(&self, ctx: &InvocationContext) {
-        ctx.push_view(running_list(self.0.running_apps(), &self.1));
+        let apps = self.0.running_apps();
+        ctx.push_view(running_list(&apps, &self.1));
+        if self
+            .1
+            .fill(app_icons(&apps), render_app_icon, || ctx.is_cancelled())
+        {
+            ctx.push_view(running_list(&apps, &self.1));
+        }
     }
 }
 
