@@ -242,8 +242,8 @@ impl ExtensionHost {
     }
 
     /// Brings every extension's active state and registered commands in line
-    /// with the enabled store, without persisting anything. Used on a config reload, where the store
-    /// (the file) is already the new source of truth.
+    /// with the enabled store. Used on a config reload, where the store (the
+    /// file) is already the new source of truth.
     pub fn reload_enabled(&mut self) -> LoadReport {
         let ids: Vec<String> = self.extensions.keys().cloned().collect();
         let mut report = LoadReport::default();
