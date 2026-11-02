@@ -34,6 +34,9 @@ use crate::text::{Handoff, Keys, TextError};
 
 const FOREGROUND_TIMEOUT: Duration = Duration::from_millis(400);
 const FOREGROUND_POLL: Duration = Duration::from_millis(10);
+/// New Notepad can handle a key well after it was sent. Released at once,
+/// Ctrl is already up when it reads the V, and it types "v" instead of pasting.
+const CHORD_HOLD: Duration = Duration::from_millis(30);
 /// Long enough for a busy application to finish handling the paste, short
 /// enough that a hung one does not hold the clipboard hostage.
 const PASTE_ACK_TIMEOUT_MS: u32 = 500;
@@ -80,7 +83,9 @@ impl WindowsKeys {
         let mut enigo = self.enigo.lock().unwrap();
         let send = |enigo: &mut Enigo| -> Result<(), enigo::InputError> {
             enigo.key(Key::Control, Direction::Press)?;
+            std::thread::sleep(CHORD_HOLD);
             let pressed = enigo.key(Key::Unicode(letter), Direction::Click);
+            std::thread::sleep(CHORD_HOLD);
             enigo.key(Key::Control, Direction::Release)?;
             pressed
         };
