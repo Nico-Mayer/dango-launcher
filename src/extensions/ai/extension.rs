@@ -28,7 +28,7 @@ use crate::text::TextTarget;
 use super::commands::{
     build, AiCommand, Output, Providers, EXTENSION_ID, PREF_PROVIDER, PREF_THINKING,
 };
-use super::provider::{Completions, ProviderKind, Request, Thinking};
+use super::provider::{Completions, Request, Thinking};
 use super::stream::{drive, Ended, FIRST_FRAGMENT_TIMEOUT};
 use super::Keys;
 
@@ -230,10 +230,9 @@ impl Inner {
             }
         };
 
-        if request.kind != ProviderKind::Ollama {
+        if !request.is_local() {
             match self.keys.key(&request.provider) {
                 Ok(Some(key)) => request.key = Some(key),
-                Ok(None) if request.is_local() => {}
                 Ok(None) => {
                     ctx.fail(
                         super::provider::AiError::MissingKey {
@@ -245,9 +244,6 @@ impl Inner {
                 }
                 Err(error) => {
                     crate::log::append(&format!("ai: {error}"));
-                    if request.is_local() {
-                        return Some(request);
-                    }
                     ctx.fail(super::provider::AiError::KeyFileUnreadable.to_string());
                     return None;
                 }
@@ -761,7 +757,7 @@ mod tests {
             LOCAL,
             Scripted::answering(&["Better."]),
             selected("text"),
-            FixedKeys(None),
+            FixedKeys(Some("sk-test")),
         );
         run(&fixture, "improve-writing", Arc::new(Recorded::default()));
         let request = fixture.client.last_request().expect("a request was made");
@@ -776,11 +772,11 @@ mod tests {
             } } } }"#,
             Scripted::answering(&["Better."]),
             selected("text"),
-            FixedKeys(None),
+            FixedKeys(Some("sk-test")),
         );
         run(&fixture, "improve-writing", Arc::new(Recorded::default()));
         let request = fixture.client.last_request().expect("a request was made");
-        assert!(request.key.is_none());
+        assert!(request.key.is_none(), "a key was sent to a local server");
     }
 
     #[test]
