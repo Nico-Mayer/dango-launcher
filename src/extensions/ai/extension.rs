@@ -165,8 +165,7 @@ impl Inner {
         match ended {
             Ended::Cancelled => {}
             Ended::Failed(error) => ctx.fail(error.to_string()),
-            Ended::Answer(answer) if answer.trim().is_empty() => ctx.fail(NO_ANSWER),
-            Ended::Answer(answer) => self.deliver(command.output, answer, ctx),
+            Ended::Answer(answer) => self.deliver(command.output, &answer, ctx),
         }
     }
 
@@ -264,24 +263,29 @@ impl Inner {
         }
     }
 
-    fn deliver(&self, output: Output, answer: String, ctx: &InvocationContext) {
-        *self.answer.lock().unwrap() = Some(answer.clone());
+    fn deliver(&self, output: Output, answer: &str, ctx: &InvocationContext) {
+        let answer = answer.trim();
+        if answer.is_empty() {
+            ctx.fail(NO_ANSWER);
+            return;
+        }
+        *self.answer.lock().unwrap() = Some(answer.to_string());
         match output {
-            Output::View => ctx.push_view(detail_tree(&answer, false, true)),
-            Output::Paste => match self.insert(&answer) {
+            Output::View => ctx.push_view(detail_tree(answer, false, true)),
+            Output::Paste => match self.insert(answer) {
                 Ok(()) => ctx.succeed(),
                 Err(message) => {
-                    ctx.push_view(detail_tree(&answer, false, true));
+                    ctx.push_view(detail_tree(answer, false, true));
                     ctx.fail(message);
                 }
             },
             Output::Copy => match &self.clipboard {
                 Some(clipboard) => {
-                    clipboard.set_text(&answer);
+                    clipboard.set_text(answer);
                     ctx.succeed();
                 }
                 None => {
-                    ctx.push_view(detail_tree(&answer, false, true));
+                    ctx.push_view(detail_tree(answer, false, true));
                     ctx.fail(crate::text::TextError::Clipboard.to_string());
                 }
             },
@@ -849,6 +853,27 @@ mod tests {
         );
         assert!(fixture.text.inserted.lock().unwrap().is_empty());
         assert!(fixture.clipboard.written.lock().unwrap().is_empty());
+    }
+
+    #[test]
+    fn the_answer_is_pasted_without_surrounding_whitespace() {
+        let config = r#"{ "extensions": { "dango.ai": {
+            "providers": { "local": { "kind": "ollama", "model": "qwen3:8b" } },
+            "commands": { "improve-writing": { "output": "paste" } }
+        } } }"#;
+        let fixture = fixture(
+            config,
+            Scripted::answering(&[
+                "
+ Better text.",
+                "
+",
+            ]),
+            selected("bad"),
+        );
+        run(&fixture, "improve-writing", Arc::new(Recorded::default()));
+
+        assert_eq!(*fixture.text.inserted.lock().unwrap(), ["Better text."]);
     }
 
     #[test]
