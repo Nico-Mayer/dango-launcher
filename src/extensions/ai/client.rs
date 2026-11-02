@@ -47,7 +47,7 @@ impl Completions for GenAiClient {
 /// silent model does not keep its connection open behind it.
 async fn run(request: Request, sender: mpsc::Sender<Result<String, AiError>>) {
     let deadline = tokio::time::Instant::now() + FIRST_FRAGMENT_TIMEOUT;
-    let Some(kind) = adapter_kind(request.kind) else {
+    let (Some(kind), Some(model)) = (adapter_kind(request.kind), request.model.clone()) else {
         let _ = sender.send(Err(AiError::Unreachable {
             provider: request.provider.clone(),
         }));
@@ -60,7 +60,7 @@ async fn run(request: Request, sender: mpsc::Sender<Result<String, AiError>>) {
 
     let started = match tokio::time::timeout_at(
         deadline,
-        client.exec_chat_stream(&request.model, chat, Some(&options)),
+        client.exec_chat_stream(&model, chat, Some(&options)),
     )
     .await
     {
@@ -267,7 +267,8 @@ mod tests {
             provider: "test".into(),
             kind,
             base_url: base.map(str::to_string),
-            model: "some-model".into(),
+            model: Some("some-model".into()),
+            path: None,
             thinking: Thinking::Off,
             prompt: "Improve this.".into(),
             key: None,
@@ -419,7 +420,8 @@ mod tests {
             provider: "local".into(),
             kind: ProviderKind::Ollama,
             base_url: None,
-            model,
+            model: Some(model),
+            path: None,
             thinking: Thinking::Off,
             prompt: "Reply with exactly: pong".into(),
             key: None,

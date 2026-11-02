@@ -254,19 +254,18 @@ impl Providers {
     /// extension supplies: it renders the one and reads the other per request.
     pub fn resolve(&self, command: &AiCommand) -> Result<Request, NotReady> {
         let (name, entry) = self.choose(command.provider.as_deref())?;
-        let model = match command.model.clone().or_else(|| entry.model.clone()) {
-            Some(model) => model,
-            None => {
-                return Err(NotReady::NoModel {
-                    provider: name.to_string(),
-                })
-            }
-        };
+        let model = command.model.clone().or_else(|| entry.model.clone());
+        if model.is_none() && !entry.kind.is_agent() {
+            return Err(NotReady::NoModel {
+                provider: name.to_string(),
+            });
+        }
         Ok(Request {
             provider: name.to_string(),
             kind: entry.kind,
             base_url: entry.base_url.clone(),
             model,
+            path: entry.path.clone(),
             thinking: command.thinking.unwrap_or(self.default_thinking),
             prompt: String::new(),
             key: None,
@@ -484,7 +483,7 @@ mod tests {
         let providers = Providers::from_config(&config(TWO_PROVIDERS));
         let request = providers.resolve(&command(None, None, None)).unwrap();
         assert_eq!(request.provider, "anthropic");
-        assert_eq!(request.model, "claude-sonnet-5");
+        assert_eq!(request.model.as_deref(), Some("claude-sonnet-5"));
         assert_eq!(request.thinking, Thinking::Medium);
     }
 
@@ -503,7 +502,7 @@ mod tests {
             .resolve(&command(Some("local"), None, None))
             .unwrap();
         assert_eq!(request.provider, "local");
-        assert_eq!(request.model, "qwen3:8b");
+        assert_eq!(request.model.as_deref(), Some("qwen3:8b"));
         assert_eq!(request.kind, ProviderKind::Ollama);
         assert_eq!(request.base_url.as_deref(), Some("http://localhost:11434"));
     }
@@ -515,7 +514,7 @@ mod tests {
             .resolve(&command(None, Some("claude-opus-5"), None))
             .unwrap();
         assert_eq!(request.provider, "anthropic");
-        assert_eq!(request.model, "claude-opus-5");
+        assert_eq!(request.model.as_deref(), Some("claude-opus-5"));
     }
 
     #[test]
@@ -594,6 +593,26 @@ mod tests {
         assert!(
             matches!(&error, NotReady::NoModel { provider } if provider == "local"),
             "{error}"
+        );
+        assert_eq!(
+            error.to_string(),
+            "Set a model for local in your config file"
+        );
+    }
+
+    #[test]
+    fn an_agent_program_with_no_model_uses_its_own_default() {
+        let providers = Providers::from_config(&config(
+            r#"{ "extensions": { "dango.ai": { "providers": {
+                "claude": { "kind": "claude", "path": "C:/tools/claude.exe" }
+            } } } }"#,
+        ));
+        let request = providers.resolve(&command(None, None, None)).unwrap();
+        assert_eq!(request.kind, ProviderKind::Claude);
+        assert!(request.model.is_none());
+        assert_eq!(
+            request.path.as_deref(),
+            Some(std::path::Path::new("C:/tools/claude.exe"))
         );
     }
 }

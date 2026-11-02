@@ -230,7 +230,7 @@ impl Inner {
             }
         };
 
-        if !request.is_local() {
+        if request.needs_key() {
             match self.keys.key(&request.provider) {
                 Ok(Some(key)) => request.key = Some(key),
                 Ok(None) => {
@@ -634,7 +634,7 @@ mod tests {
             "the selection is missing: {}",
             request.prompt
         );
-        assert_eq!(request.model, "qwen3:8b");
+        assert_eq!(request.model.as_deref(), Some("qwen3:8b"));
         assert_eq!(sink.markdown().last().unwrap(), "Better text.");
     }
 
@@ -765,6 +765,19 @@ mod tests {
         run(&fixture, "improve-writing", Arc::new(Recorded::default()));
         let request = fixture.client.last_request().expect("a request was made");
         assert!(request.key.is_none(), "a key was sent to a local model");
+    }
+
+    #[test]
+    fn an_agent_program_is_asked_without_a_key_file() {
+        let fixture = fixture_with_keys(
+            r#"{ "extensions": { "dango.ai": { "providers": { "claude": { "kind": "claude" } } } } }"#,
+            Scripted::answering(&["Better."]),
+            selected("text"),
+            FixedKeys(None),
+        );
+        run(&fixture, "improve-writing", Arc::new(Recorded::default()));
+        let request = fixture.client.last_request().expect("a request was made");
+        assert!(request.key.is_none());
     }
 
     #[test]

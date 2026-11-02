@@ -18,7 +18,11 @@ pub struct Request {
     pub provider: String,
     pub kind: ProviderKind,
     pub base_url: Option<String>,
-    pub model: String,
+    /// Always set for a service. An agent program without one uses its own
+    /// default.
+    pub model: Option<String>,
+    /// The program to run for an agent kind, when the user named one.
+    pub path: Option<std::path::PathBuf>,
     pub thinking: Thinking,
     pub prompt: String,
     pub key: Option<String>,
@@ -31,6 +35,7 @@ impl std::fmt::Debug for Request {
             .field("kind", &self.kind)
             .field("base_url", &self.base_url)
             .field("model", &self.model)
+            .field("path", &self.path)
             .field("thinking", &self.thinking)
             .field("prompt", &self.prompt)
             .field("key", &self.key.as_ref().map(|_| "<redacted>"))
@@ -43,6 +48,11 @@ impl Request {
     /// message when it cannot be reached and means no key is needed.
     pub fn is_local(&self) -> bool {
         self.kind == ProviderKind::Ollama || self.base_url.as_deref().is_some_and(is_loopback)
+    }
+
+    /// An agent program brings its own sign-in, and a local server takes none.
+    pub fn needs_key(&self) -> bool {
+        !self.kind.is_agent() && !self.is_local()
     }
 }
 
@@ -180,7 +190,8 @@ mod tests {
             provider: "local".into(),
             kind: ProviderKind::Ollama,
             base_url: None,
-            model: "qwen3:8b".into(),
+            model: Some("qwen3:8b".into()),
+            path: None,
             thinking: Thinking::Off,
             prompt: "Improve this.".into(),
             key: None,
