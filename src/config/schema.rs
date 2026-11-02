@@ -556,7 +556,6 @@ mod tests {
         "version": 1,
         "launcher": { "hotkey": { "macos": "cmd+space", "windows": "ctrl+space" }, "autostart": true, "reset-after": 90 },
         "hyperkey": { "shift": false, "tap": "escape" },
-        "selection": { "excluded-applications": "Zed" },
         "extensions": {
             "dango.clipboard": {
                 "enabled": true,

@@ -391,7 +391,6 @@ pub fn text_exchange(
     own_writes: std::sync::Arc<dyn crate::text::OwnWrites>,
     launcher: std::sync::Arc<dyn crate::text::Launcher>,
     main: std::sync::Arc<dyn crate::text::MainThread>,
-    refuses: Option<crate::text::RefusesFallback>,
 ) -> Option<crate::text::TextExchange> {
     #[cfg(target_os = "macos")]
     {
@@ -403,7 +402,6 @@ pub fn text_exchange(
             Some(std::sync::Arc::new(macos::MacSelection)),
             own_writes,
             launcher,
-            refuses,
         ))
     }
     #[cfg(target_os = "windows")]
@@ -421,25 +419,7 @@ pub fn text_exchange(
             Some(std::sync::Arc::new(windows::WindowsSelection)),
             own_writes,
             launcher,
-            refuses,
         ))
-    }
-}
-
-/// The application the launcher is covering, for a question about the
-/// application the user came from rather than about Dango.
-///
-/// On Windows the launcher holds the foreground, so this is the window it
-/// replaced. On macOS the launcher is a panel that never took activation, so
-/// the frontmost application already is the one being asked about.
-pub fn covered_app() -> Option<String> {
-    #[cfg(target_os = "windows")]
-    {
-        windows::covered_app()
-    }
-    #[cfg(target_os = "macos")]
-    {
-        foreground_app()
     }
 }
 

@@ -2,8 +2,8 @@
 
 ## 1. Drop the exclusion list
 
-- [ ] 1.1 Remove `config::Selection`, `RefusesFallback`, `refuses_fallback`, `TextError::SelectionRefused`, the `refuses` argument of `platform::text_exchange`, and their tests; verify `cargo test` passes and an old config with a `selection` key still parses (config test)
-- [ ] 1.2 Remove the `selection` example from `src/config/schema.rs`, its row from `docs/config.md`, and the exclusion step from `examples/walkthrough/macos.rs`; verify `mise run check` passes
+- [x] 1.1 Remove `config::Selection`, `RefusesFallback`, `refuses_fallback`, `TextError::SelectionRefused`, the `refuses` argument of `platform::text_exchange`, and their tests; verify `cargo test` passes and an old config with a `selection` key still parses (config test)
+- [x] 1.2 Remove the `selection` example from `src/config/schema.rs`, its row from `docs/config.md`, and the exclusion step from `examples/walkthrough/macos.rs`; verify `mise run check` passes
 
 ## 2. Lend the foreground in the read path (shared)
 

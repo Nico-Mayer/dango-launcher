@@ -10,7 +10,6 @@ Every setting in config.json. Generated from the code; do not edit by hand.
 | `extensions` | object |  |  | Per-extension settings, keyed by extension id. |
 | `hyperkey` | [Hyperkey](#hyperkey) |  |  | CapsLock, remapped to act as the hyper modifier system-wide. Present means on; leave it out to turn it off. On macOS it uses F18, so a hotkey with `f18` does not work while it is on. |
 | `launcher` | [Launcher](#launcher) |  |  | Settings of the launcher itself. |
-| `selection` | [Selection](#selection) |  |  | How Dango reads the text you have selected. |
 | `version` | integer |  |  | The config schema version. Leave it at 1. |
 
 ## `extensions`
@@ -262,12 +261,6 @@ Per-command settings, keyed by command id.
 | `autostart` | boolean |  |  | Start Dango when you log in, on the machine that reads this file. Default false. A development build ignores it. |
 | `hotkey` | [Hotkey](#hotkey) |  |  | The chord that summons the launcher. Default alt+space, which is Option+Space on macOS. |
 | `reset-after` | integer |  |  | Seconds the launcher keeps what you were doing after it is hidden by the hotkey or by losing focus. Pressing the hotkey again within this time continues where you left off. Default 60. 0 resets to root search at once. |
-
-## Selection
-
-| Setting | Type | Default | Values | Description |
-| --- | --- | --- | --- | --- |
-| `excluded-applications` | string |  |  | Applications where Dango must never send the copy chord to read a selection, comma separated and matched ignoring case. For editors that bind Ctrl+C to something of their own. Dango says it cannot read the selection there instead. |
 
 ## Provider settings
 

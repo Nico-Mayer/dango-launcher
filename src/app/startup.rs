@@ -235,7 +235,6 @@ fn build_services(
             own_writes,
             Arc::new(HideLauncher(core.clone())),
             Arc::new(OnMainThread(startup.shell.clone())),
-            Some(refuses_fallback(file_config.clone())),
         )
         .map(Arc::new)
     });
@@ -520,17 +519,4 @@ impl Grab for NoGrab {
         Err("global hotkeys are unavailable".into())
     }
     fn unregister(&self, _chord: global_hotkey::hotkey::HotKey) {}
-}
-
-/// Names the frontmost application when the user has refused the keystroke
-/// fallback there. Read fresh per call, so an edit to the file applies without
-/// a restart, and so the answer is about whatever is in front right now.
-fn refuses_fallback(config: Arc<FileConfig>) -> text::RefusesFallback {
-    Arc::new(move || {
-        // The application behind the launcher, not the launcher itself.
-        let application = platform::covered_app()?;
-        let shared = config.shared();
-        let refused = shared.read().ok()?.selection.refuses(&application);
-        refused.then_some(application)
-    })
 }

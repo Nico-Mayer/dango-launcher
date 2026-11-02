@@ -28,7 +28,6 @@ use enigo::{Direction, Enigo, Key, Keyboard, Settings};
 use objc2_app_kit::NSWorkspace;
 use objc2_foundation::{NSDate, NSRunLoop};
 
-use dango_lib::config::Config;
 use dango_lib::extensions::ai::{Completions, GenAiClient, Next, ProviderKind, Request, Thinking};
 use dango_lib::extensions::clipboard::{Content, CrateClipboard};
 use dango_lib::platform;
@@ -90,8 +89,6 @@ pub fn run() {
         Arc::new(NoLauncher),
         // The harness runs everything on the main thread already.
         Arc::new(HereIsFine),
-        // The walkthrough refuses nothing: it is here to exercise the paths.
-        None,
     ) else {
         eprintln!("no key injection");
         return;
@@ -142,7 +139,6 @@ pub fn run() {
     harness.a_selection_template_renders_and_arrives();
     harness.a_keyword_expands_in_place();
     harness.an_ai_command_reads_the_selection_and_answers();
-    harness.a_named_application_is_refused_rather_than_typed_at();
     harness.insertion_is_prompt();
 
     let _ = harness.clipboard.set_text(String::new());
@@ -731,93 +727,6 @@ impl Harness {
                 format!("{model} answered {}", Self::brief(&answer)),
             ),
         }
-    }
-
-    /// The exclusion list, against the one application on this machine that
-    /// answers nothing through `AXSelectedText`. Off by default because it
-    /// needs Zed installed and brings it to the front; set
-    /// `DANGO_WALKTHROUGH_EXCLUDE` to run it.
-    ///
-    /// Zed is the same application the Windows half of this change had to
-    /// refuse, and it exposes no selection on either platform.
-    fn a_named_application_is_refused_rather_than_typed_at(&mut self) {
-        println!("-- a named application is refused rather than typed at");
-        if std::env::var_os("DANGO_WALKTHROUGH_EXCLUDE").is_none() {
-            println!("  SKIP  set DANGO_WALKTHROUGH_EXCLUDE to run this (needs Zed)");
-            return;
-        }
-
-        let config = match Config::parse(r#"{ "selection": { "excluded-applications": "Zed" } }"#) {
-            Ok(config) => config,
-            Err(error) => {
-                self.check("the exclusion parses", false, format!("{error}"));
-                return;
-            }
-        };
-        let Some(source) = CrateClipboard::new() else {
-            self.check("a clipboard is available", false, "none".into());
-            return;
-        };
-        let declared = Arc::new(Declared::default());
-        // The same shape as the launcher's own: the application behind the
-        // launcher, matched against the user's list.
-        let refuses: dango_lib::text::RefusesFallback = Arc::new(move || {
-            let application = platform::covered_app()?;
-            config
-                .selection
-                .refuses(&application)
-                .then_some(application)
-        });
-        let Some(exchange) = platform::text_exchange(
-            source,
-            declared.clone(),
-            Arc::new(NoLauncher),
-            Arc::new(HereIsFine),
-            Some(refuses),
-        ) else {
-            self.check("an exchange is available", false, "no key injection".into());
-            return;
-        };
-
-        let _ = Command::new("osascript")
-            .args(["-e", "tell application \"Zed\" to activate"])
-            .status();
-        if !wait_for_frontmost("Zed") {
-            println!("  SKIP  Zed did not come to the front ({})", frontmost());
-            return;
-        }
-        // A selection, so a failure here means the route refused rather than
-        // that there was nothing to read.
-        self.chord('a');
-        std::thread::sleep(Duration::from_millis(400));
-
-        self.set_user_clipboard();
-        let before = declared.count();
-        let read = exchange.selection();
-        let writes = declared.count() - before;
-
-        match read {
-            Err(error) => {
-                let message = error.to_string();
-                self.check(
-                    "the refusal names the application and says what to do",
-                    message
-                        == "Dango can't read the selection in Zed. \
-                            Copy the text first, then run this command.",
-                    format!("said {message:?}"),
-                );
-            }
-            Ok(other) => self.check(
-                "the read is refused",
-                false,
-                format!("it returned {other:?} instead of refusing"),
-            ),
-        }
-        self.check(
-            "nothing was typed at the refused application",
-            writes == 0,
-            format!("declared {writes} clipboard writes, so the fallback ran"),
-        );
     }
 
     fn insertion_is_prompt(&mut self) {

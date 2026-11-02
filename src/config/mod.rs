@@ -54,9 +54,6 @@ pub struct Config {
     /// so a hotkey with `f18` does not work while it is on.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub hyperkey: Option<Hyperkey>,
-    /// How Dango reads the text you have selected.
-    #[serde(default, skip_serializing_if = "Selection::is_empty")]
-    pub selection: Selection,
 }
 
 /// CapsLock, remapped to act as the hyper modifier system-wide. While it is
@@ -90,47 +87,6 @@ fn default_true() -> bool {
 
 fn is_true(value: &bool) -> bool {
     *value
-}
-
-/// How Dango reads what the user has selected. Beside `hyperkey` rather than
-/// under an extension, because the text plumbing belongs to the application.
-#[derive(Debug, Clone, Default, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "kebab-case")]
-pub struct Selection {
-    /// Applications where Dango must never send the copy chord to read a
-    /// selection, comma separated and matched ignoring case. For editors that
-    /// bind Ctrl+C to something of their own. Dango says it cannot read the
-    /// selection there instead.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub excluded_applications: Option<String>,
-}
-
-impl Selection {
-    fn is_empty(&self) -> bool {
-        self.excluded_applications.is_none()
-    }
-
-    /// The names as written, split and trimmed. Empty by default: an exclusion
-    /// shipped as a default would quietly disable a working feature for someone
-    /// whose editor does not have the problem.
-    pub fn excluded(&self) -> Vec<String> {
-        match &self.excluded_applications {
-            Some(value) => value
-                .split(',')
-                .map(str::trim)
-                .filter(|name| !name.is_empty())
-                .map(str::to_string)
-                .collect(),
-            None => Vec::new(),
-        }
-    }
-
-    /// Whether the keystroke fallback is refused for this application.
-    pub fn refuses(&self, application: &str) -> bool {
-        self.excluded()
-            .iter()
-            .any(|name| name.eq_ignore_ascii_case(application))
-    }
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, JsonSchema)]
@@ -580,20 +536,8 @@ mod tests {
     }
 
     #[test]
-    fn a_selection_block_parses() {
-        let config =
-            Config::parse(r#"{ "selection": { "excluded-applications": "Zed, Neovim" } }"#)
-                .unwrap();
-        assert_eq!(config.selection.excluded(), ["Zed", "Neovim"]);
-        assert!(config.selection.refuses("zed"), "matched ignoring case");
-        assert!(!config.selection.refuses("Notepad"));
-    }
-
-    #[test]
-    fn no_selection_block_excludes_nothing() {
-        let config = Config::parse("{}").unwrap();
-        assert!(config.selection.excluded().is_empty());
-        assert!(!config.selection.refuses("Zed"));
+    fn a_leftover_selection_block_is_ignored() {
+        assert!(Config::parse(r#"{ "selection": { "excluded-applications": "Zed" } }"#).is_ok());
     }
 
     #[test]
