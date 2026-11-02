@@ -92,9 +92,9 @@ spend design on honouring old values.
   an SVG: add the name to that registry. An extension names one as
   `icon:<name>`; a value without that prefix is a path to an image file.
 - SQLite for local persistence.
-- Node, the OpenSpec CLI, hk, git-cliff, cargo-release, and cargo-packager
-  are pinned via mise (`mise.toml`). Node runs only the OpenSpec CLI and
-  `scripts/*.mjs`.
+- Node, hk, git-cliff, cargo-release, and cargo-packager are pinned via mise
+  (`mise.toml`). The OpenSpec CLI comes from mise too, on `latest`. Node runs
+  only the OpenSpec CLI and `scripts/*.mjs`.
 - Rust is pinned in `rust-toolchain.toml`. A global mise `rust` entry exports
   `RUSTUP_TOOLCHAIN`, which beats that file, so `mise.toml` tells mise to read
   it. Bump the channel there and nowhere else.
