@@ -6,16 +6,14 @@
 //! the commands themselves for an extension that builds them from configuration.
 //! Data stays in SQLite. Everything here is about reading that file safely:
 //! it is optional, a bad file never takes the app down, and keys the running
-//! version does not understand are preserved rather than dropped, so a newer
-//! Dango or a plugin can share the file and a future settings UI can write it
-//! back without losing anything.
+//! version does not understand are ignored rather than rejected.
 
 use std::collections::BTreeMap;
 
 use global_hotkey::hotkey::Modifiers;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use serde_json::{Map, Value};
+use serde_json::Value;
 
 pub mod hotkey;
 mod location;
@@ -35,8 +33,7 @@ pub enum ConfigError {
     Read(String),
 }
 
-/// The whole configuration. Every level keeps an `extra` catch-all so a key the
-/// running version does not understand survives a load and a write.
+/// The whole configuration.
 #[derive(Debug, Clone, Default, Serialize, Deserialize, JsonSchema)]
 pub struct Config {
     /// Where your editor finds this schema. Dango writes it beside the config
@@ -60,8 +57,6 @@ pub struct Config {
     /// How Dango reads the text you have selected.
     #[serde(default, skip_serializing_if = "Selection::is_empty")]
     pub selection: Selection,
-    #[serde(flatten)]
-    pub extra: Map<String, Value>,
 }
 
 /// One physical key remapped to act as the hyper modifier system-wide. While
@@ -81,8 +76,6 @@ pub struct Hyperkey {
     /// modifier. Leave it out for no tap action.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tap: Option<String>,
-    #[serde(flatten)]
-    pub extra: Map<String, Value>,
 }
 
 impl Default for Hyperkey {
@@ -91,7 +84,6 @@ impl Default for Hyperkey {
             key: default_hyperkey_key(),
             shift: true,
             tap: None,
-            extra: Map::new(),
         }
     }
 }
@@ -119,13 +111,11 @@ pub struct Selection {
     /// selection there instead.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub excluded_applications: Option<String>,
-    #[serde(flatten)]
-    pub extra: Map<String, Value>,
 }
 
 impl Selection {
     fn is_empty(&self) -> bool {
-        self.excluded_applications.is_none() && self.extra.is_empty()
+        self.excluded_applications.is_none()
     }
 
     /// The names as written, split and trimmed. Empty by default: an exclusion
@@ -168,16 +158,11 @@ pub struct Launcher {
     /// at once.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub reset_after: Option<u32>,
-    #[serde(flatten)]
-    pub extra: Map<String, Value>,
 }
 
 impl Launcher {
     fn is_empty(&self) -> bool {
-        self.hotkey.is_none()
-            && self.autostart.is_none()
-            && self.reset_after.is_none()
-            && self.extra.is_empty()
+        self.hotkey.is_none() && self.autostart.is_none() && self.reset_after.is_none()
     }
 }
 
@@ -200,8 +185,6 @@ pub struct Extension {
     /// is also the key its API key is filed under in auth.json.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub providers: BTreeMap<String, ProviderSettings>,
-    #[serde(flatten)]
-    pub extra: Map<String, Value>,
 }
 
 /// One model service. The key it is stored under is the name a command uses to
@@ -217,8 +200,6 @@ pub struct ProviderSettings {
     /// The model used by a command that names this provider but no model.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub model: Option<String>,
-    #[serde(flatten)]
-    pub extra: Map<String, Value>,
 }
 
 /// The protocol a provider speaks. `openai` covers any OpenAI-compatible
@@ -290,8 +271,6 @@ pub struct AppSettings {
     /// The chord that opens the application, or brings it to the front.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub hotkey: Option<Hotkey>,
-    #[serde(flatten)]
-    pub extra: Map<String, Value>,
 }
 
 /// An application's shown name: one string for both platforms, or one per
@@ -353,12 +332,10 @@ pub struct CommandSettings {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[schemars(with = "Option<Output>")]
     pub output: Option<String>,
-    #[serde(flatten)]
-    pub extra: Map<String, Value>,
 }
 
 impl Config {
-    /// Parses configuration from JSON text. Unknown keys are kept.
+    /// Parses configuration from JSON text. Unknown keys are ignored.
     pub fn parse(text: &str) -> Result<Config, ConfigError> {
         // An empty or whitespace-only file is a valid empty configuration
         // rather than a JSON error, so a `touch`ed file behaves like no file.
@@ -366,11 +343,6 @@ impl Config {
             return Ok(Config::default());
         }
         serde_json::from_str(text).map_err(|error| ConfigError::Parse(error.to_string()))
-    }
-
-    /// Serialises back to pretty JSON, preserving every preserved unknown key.
-    pub fn to_json(&self) -> String {
-        serde_json::to_string_pretty(self).unwrap_or_else(|_| "{}".to_string())
     }
 
     /// Loads from a path. A missing file is the default configuration, not an
@@ -437,7 +409,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn a_full_file_round_trips() {
+    fn a_full_file_parses() {
         let text = r#"{
           "version": 1,
           "launcher": { "hotkey": "alt+space" },
@@ -457,14 +429,10 @@ mod tests {
             config.alias("dango.window-management", "left-half"),
             Some("lh".to_string())
         );
-        // Re-parsing the serialised form yields the same view.
-        let again = Config::parse(&config.to_json()).unwrap();
-        assert_eq!(again.enabled("dango.clipboard"), Some(false));
-        assert_eq!(again.version, Some(1));
     }
 
     #[test]
-    fn unknown_keys_are_preserved_through_a_round_trip() {
+    fn unknown_keys_are_ignored() {
         let text = r#"{
           "version": 1,
           "somethingFuturistic": { "on": true },
@@ -476,10 +444,12 @@ mod tests {
             }
           }
         }"#;
-        let written = Config::parse(text).unwrap().to_json();
-        let original: Value = serde_json::from_str(text).unwrap();
-        let again: Value = serde_json::from_str(&written).unwrap();
-        assert_eq!(again, original);
+        let config = Config::parse(text).unwrap();
+        assert_eq!(config.enabled("dango.future"), Some(true));
+        assert_eq!(
+            config.command_enabled("dango.ai", "make-longer"),
+            Some(false)
+        );
     }
 
     #[test]
@@ -503,9 +473,6 @@ mod tests {
             config.hyper_modifiers(),
             Modifiers::CONTROL | Modifiers::ALT | Modifiers::SUPER
         );
-        // The excluded Shift also survives a round trip.
-        let again = Config::parse(&config.to_json()).unwrap();
-        assert!(!again.hyperkey.unwrap().shift);
     }
 
     #[test]
@@ -556,19 +523,7 @@ mod tests {
     }
 
     #[test]
-    fn a_load_modify_write_cycle_keeps_unrelated_keys() {
-        let text = r#"{ "version": 1, "keepMe": "yes", "extensions": { "x": { "enabled": true, "keepThis": 7 } } }"#;
-        let mut config = Config::parse(text).unwrap();
-        // Change one thing.
-        config.extensions.get_mut("x").unwrap().enabled = Some(false);
-        let json = config.to_json();
-        assert!(json.contains("keepMe"));
-        assert!(json.contains("keepThis"));
-        assert!(json.contains("\"enabled\": false"));
-    }
-
-    #[test]
-    fn application_bindings_parse_in_both_shapes_and_round_trip() {
+    fn application_bindings_parse_in_both_shapes() {
         let text = r#"{
           "extensions": { "dango.applications": { "apps": {
             "Safari": { "hotkey": "hyper+b" },
@@ -603,9 +558,6 @@ mod tests {
                 Some("Only There")
             );
         }
-
-        let again = Config::parse(&config.to_json()).unwrap();
-        let apps = &again.extensions["dango.applications"].apps;
         assert_eq!(apps.len(), 4);
         assert!(apps["terminal"].hotkey.is_some());
         assert!(matches!(
@@ -615,20 +567,13 @@ mod tests {
     }
 
     #[test]
-    fn a_selection_block_parses_and_round_trips() {
+    fn a_selection_block_parses() {
         let config =
             Config::parse(r#"{ "selection": { "excluded-applications": "Zed, Neovim" } }"#)
                 .unwrap();
         assert_eq!(config.selection.excluded(), ["Zed", "Neovim"]);
         assert!(config.selection.refuses("zed"), "matched ignoring case");
         assert!(!config.selection.refuses("Notepad"));
-
-        let json = config.to_json();
-        assert!(
-            json.contains("excluded-applications"),
-            "key renamed: {json}"
-        );
-        assert!(Config::parse(&json).unwrap().selection.refuses("Zed"));
     }
 
     #[test]
@@ -636,10 +581,6 @@ mod tests {
         let config = Config::parse("{}").unwrap();
         assert!(config.selection.excluded().is_empty());
         assert!(!config.selection.refuses("Zed"));
-        assert!(
-            !config.to_json().contains("selection"),
-            "an empty block was written back"
-        );
     }
 
     #[test]
@@ -658,16 +599,5 @@ mod tests {
         )
         .unwrap_err();
         assert!(error.to_string().contains("cli"), "{error}");
-    }
-
-    #[test]
-    fn the_schema_key_round_trips_first() {
-        let config =
-            Config::parse(r#"{ "version": 1, "$schema": "./config.schema.json" }"#).unwrap();
-        assert_eq!(config.schema.as_deref(), Some("./config.schema.json"));
-        assert_eq!(
-            config.to_json(),
-            "{\n  \"$schema\": \"./config.schema.json\",\n  \"version\": 1\n}"
-        );
     }
 }

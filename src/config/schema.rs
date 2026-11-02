@@ -605,14 +605,6 @@ mod tests {
     }
 
     #[test]
-    fn a_full_config_survives_a_round_trip() {
-        let written = Config::parse(FULL).unwrap().to_json();
-        let original: Value = serde_json::from_str(FULL).unwrap();
-        let again: Value = serde_json::from_str(&written).unwrap();
-        assert_eq!(again, original);
-    }
-
-    #[test]
     fn reset_after_is_a_whole_number_of_seconds() {
         assert!(accepts(r#"{ "launcher": { "reset-after": 0 } }"#));
         assert!(accepts(r#"{ "launcher": { "reset-after": 300 } }"#));

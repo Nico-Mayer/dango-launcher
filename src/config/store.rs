@@ -52,12 +52,7 @@ impl FileConfig {
     /// that exists is left alone, whatever it contains.
     pub fn ensure_file(&self) -> Result<PathBuf, String> {
         if !self.path.exists() {
-            {
-                let mut config = self.config.write().unwrap();
-                config.schema.get_or_insert_with(|| SCHEMA_REF.into());
-                config.version.get_or_insert(1);
-            }
-            let text = self.config.read().unwrap().to_json();
+            let text = format!("{{\n  \"$schema\": \"{SCHEMA_REF}\",\n  \"version\": 1\n}}");
             self.write(&text)
                 .map_err(|error| format!("{}: {error}", self.path.display()))?;
         }
