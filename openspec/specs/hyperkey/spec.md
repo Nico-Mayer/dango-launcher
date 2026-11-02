@@ -181,9 +181,16 @@ tap key).
 - **AND** `dango.log` says the hyperkey needs Input Monitoring
 - **AND** the launcher shows a warning that Input Monitoring is off and names the hyperkey
 
+#### Scenario: Accessibility is missing on macOS
+
+- **WHEN** a hyperkey is configured, Input Monitoring is granted, and Accessibility is not
+- **THEN** CapsLock keeps its normal function
+- **AND** `dango.log` says the hyperkey needs Accessibility
+- **AND** the launcher shows a warning that Accessibility is off and names the hyperkey
+
 #### Scenario: The permission is granted on macOS
 
-- **WHEN** a hyperkey is configured, the user grants Input Monitoring, and Dango restarts as macOS requires
+- **WHEN** a hyperkey is configured, Accessibility is granted, the user grants Input Monitoring, and Dango restarts as macOS requires
 - **THEN** CapsLock acts as the hyper modifier
 
 #### Scenario: Windows needs no permission
