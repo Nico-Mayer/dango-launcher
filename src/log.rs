@@ -28,3 +28,17 @@ pub fn append(message: &str) {
         let _ = file.flush();
     }
 }
+
+/// A release build has no console and aborts on panic, so without this the
+/// message is lost.
+pub fn record_panics() {
+    let default = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |info| {
+        let thread = std::thread::current();
+        append(&format!(
+            "panic on thread '{}': {info}",
+            thread.name().unwrap_or("unnamed")
+        ));
+        default(info);
+    }));
+}
