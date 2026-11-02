@@ -29,7 +29,7 @@
 
 ## 5. Windows hand checks
 
-- [ ] 5.1 `cargo test` and `mise run check` pass on Windows
+- [x] 5.1 `cargo test` and `mise run check` pass on Windows
 - [ ] 5.2 Release build with `DANGO_CONFIG_DIR` scratch dir: copy two files in File Explorer, history shows one entry with the Explorer icon and both paths; check with `dango-ui` `snapshot`
 - [ ] 5.3 Paste the entry into a File Explorer window: Explorer copies both files; copy action then Ctrl+V does the same; no new history entry; use `mise run keys` and `mise run shot` for what happens outside the launcher
 - [ ] 5.4 Missing files on Windows: one gone pastes the rest; all gone shows "The copied files no longer exist" and removes the entry
