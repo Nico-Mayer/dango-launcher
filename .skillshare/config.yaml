@@ -1,0 +1,37 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/runkids/skillshare/main/schemas/project-config.schema.json
+
+targets:
+  - name: claude
+    skills:
+      mode: copy
+  - name: universal
+    skills:
+      mode: copy
+ignore:
+  - .DS_Store
+  - .git/
+  - __pycache__/
+audit:
+  block_threshold: CRITICAL
+mcp:
+  servers:
+    dango-ui:
+      transport: stdio
+      command: cargo
+      args:
+        - run
+        - --quiet
+        - --manifest-path
+        - tools/dango-ui-mcp/Cargo.toml
+      targets:
+        - claude
+plugins:
+  version: 2
+  packages:
+    slint:
+      source: https://github.com/slint-ui/ai-plugins.git
+      plugin: slint
+      bindings:
+        claude:
+          source: https://github.com/slint-ui/ai-plugins.git
+          plugin: slint

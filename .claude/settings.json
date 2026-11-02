@@ -1,5 +1,0 @@
-{
-  "enabledPlugins": {
-    "slint-ai-plugins@anthropic-plugin-directory": true
-  }
-}
