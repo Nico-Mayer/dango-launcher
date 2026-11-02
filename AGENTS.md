@@ -111,6 +111,8 @@ No millisecond budgets in specs or tests. Results depend on machine load, unreli
 - winit never reports focus for Slint launcher on Windows: window is foreground + has keyboard, yet `has_focus` stays false, no `Focused` event. Focus loss watched with `SetWinEventHook(EVENT_SYSTEM_FOREGROUND)` in `platform/windows` instead.
 - On macOS launcher's native window exists before first show, so missing window handle ≠ "first show". One-time `attach` (panel reclass, non-activating mask, level, Spaces) runs from flag in `SlintShell`. Without it launcher never gets keyboard, typing goes to app behind.
 - Slint's winit backend probes for OpenGL 2 on Windows, silently falls back to software renderer without it. That renderer refuses `set_rendering_notifier`, so paint timing hangs off `RedrawRequested` in window event filter.
+- Tray app's PATH lacks what shell adds. Windows: Explorer gives saved PATH, without `mise activate` folders (author's saved PATH has no mise folder). macOS: launchd PATH only, no shell profile. Agent CLI lookup adds known install folders + (macOS) login shell's PATH, and passes same list as child's PATH so npm `.cmd` wrappers find `node`.
+- Child process of GUI-subsystem Dango on Windows gets visible console unless `CREATE_NO_WINDOW`, which takes focus and hides launcher. With process-wrap's `JobObject`, set flag through `CreationFlags` wrapper, never on inner `Command`: `JobObject` overwrites inner command's flags. Dev and test runs have console, so only release build shows it.
 
 ## Build and verification facts
 

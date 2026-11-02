@@ -38,7 +38,7 @@
 ## 6. Wiring
 
 - [x] 6.1 Add `Clients` dispatching by kind and hold it in `src/app/` where `GenAiClient` was; verify an `app` test with a `claude` provider reaches the agent side while an `ollama` one reaches the service side
-- [ ] 6.2 Add the platform traps to `AGENTS.md`: tray-app PATH lacks shell-only folders (`mise activate`) on both platforms, and `CREATE_NO_WINDOW` must go through process-wrap's `CreationFlags` wrapper, not the inner command; verify `mise run check` passes
+- [x] 6.2 Add the platform traps to `AGENTS.md`: tray-app PATH lacks shell-only folders (`mise activate`) on both platforms, and `CREATE_NO_WINDOW` must go through process-wrap's `CreationFlags` wrapper, not the inner command; verify `mise run check` passes
 
 ## 7. Windows hand checks
 
