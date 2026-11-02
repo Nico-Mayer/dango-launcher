@@ -17,7 +17,7 @@
 - [x] 3.1 Add the per-kind argument builders for `claude` and `pi` from the design table (model, thinking); verify unit tests for each kind and each thinking level
 - [ ] 3.2 Check by hand, once per CLI with a throwaway prompt, that `claude -p --safe-mode --tools "" --output-format text --no-session-persistence` and `pi -p --no-tools --no-context-files --no-session` each read the prompt from stdin and answer with the existing sign-in; record the result in this task, and change the builder and design if a flag is refused
   - claude: confirmed. The full fixed flag set, with the prompt on stdin, from an empty folder, answered `pong` with exit 0.
-  - pi: no flag refused, and the prompt on stdin started a request. It failed because the `openai-codex` sign-in has expired ("Your session has ended"). The error goes to stderr with exit 1, which is what `ProgramFailed` expects. Still to check after signing in to pi again: that it answers. Without `--no-extensions`, pi prints warnings about the user's extension packages, so that flag matters.
+  - pi: no flag refused, and the prompt on stdin started a request. It failed because the `openai-codex` sign-in has expired ("Your session has ended"). The error goes to stderr with exit 1, which is what `ProgramFailed` expects. Deferred: the author has no subscription pi can sign in to, so whether it answers stays open until one is available. Without `--no-extensions`, pi prints warnings about the user's extension packages, so that flag matters.
 
 ## 4. Program lookup
 
@@ -42,11 +42,11 @@
 
 ## 7. Windows hand checks
 
-- [ ] 7.1 Release build with `DANGO_CONFIG_DIR` set to a scratch dir holding a `claude` provider, started through `explorer.exe` so it gets the saved PATH, not the shell's: run Summarize on a selection; verify with `mise run shot` that no console window appeared, and that the launcher stayed foreground and showed the answer
+- [ ] 7.1 Quit the installed Dango. Release build started from PowerShell with `DANGO_CONFIG_DIR` set to a scratch dir holding a `claude` provider, and PATH reset to the saved value first (`$env:Path = [Environment]::GetEnvironmentVariable('Path','User') + ';' + [Environment]::GetEnvironmentVariable('Path','Machine')`), so it gets what a login start gets, not the shell's mise folders. `explorer.exe` would drop `DANGO_CONFIG_DIR`, so the build would run on the real config and move the autostart entry: run Summarize on a selection; verify with `mise run shot` that no console window appeared, and that the launcher stayed foreground and showed the answer
 - [ ] 7.2 Same build: verify in `dango.log` or a `dango-ui` snapshot that `claude` was found through `%LOCALAPPDATA%\mise\shims` with no path set; then set a wrong `path` and verify the "Couldn't find {path}" message
 - [ ] 7.3 Start a long prompt, press Escape, verify with `Get-Process claude, node -ErrorAction SilentlyContinue` that no agent process is left
 - [ ] 7.4 With a hook, an MCP server, and a rule in the global CLAUDE.md set up in the author's Claude Code config, run a command; verify the hook did not run (its side effect is absent), no MCP server process started, the CLAUDE.md rule had no effect on the answer, no new session appears in `claude --resume`, and the sign-in still answered
-- [ ] 7.5 Run one command with a `pi` provider; verify it answers, ignores a rule in the global AGENTS.md, and leaves no session behind
+- [ ] 7.5 Deferred (no subscription for pi). Run one command with a `pi` provider; verify it answers, ignores a rule in the global AGENTS.md, and leaves no session behind
 
 ## 8. macOS hand checks
 
