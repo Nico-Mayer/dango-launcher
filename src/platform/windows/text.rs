@@ -83,7 +83,6 @@ impl WindowsKeys {
         let mut enigo = self.enigo.lock().unwrap();
         let send = |enigo: &mut Enigo| -> Result<(), enigo::InputError> {
             enigo.key(Key::Control, Direction::Press)?;
-            std::thread::sleep(CHORD_HOLD);
             let pressed = enigo.key(Key::Unicode(letter), Direction::Click);
             std::thread::sleep(CHORD_HOLD);
             enigo.key(Key::Control, Direction::Release)?;
