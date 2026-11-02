@@ -61,10 +61,16 @@
 
 ## 8. macOS hand checks
 
-- [ ] 8.1 Bundle opened from Finder with a `claude` provider, `claude` reachable only through a PATH line in the fish config or mise shims: run Summarize; verify it answers, no window or Dock icon appears, and the launcher keeps focus
-- [ ] 8.2 Start a long prompt, press Escape; verify with `pgrep -fl claude` that nothing is left
-- [ ] 8.3 Repeat 7.4 on macOS; verify the same results
-- [ ] 8.4 Install a CLI while Dango runs, into a folder only the shell profile adds; verify the next command finds it without a restart; then add a `sleep 30` to the profile and verify the launcher stays responsive and Escape still abandons
+- [x] 8.1 Bundle opened from Finder with a `claude` provider, `claude` reachable only through a PATH line in the fish config or mise shims: run Summarize; verify it answers, no window or Dock icon appears, and the launcher keeps focus
+  - Passed 2026-11-02: release bundle copy with its own bundle id, ad-hoc signed, started through `open` from a clean environment (PATH `/usr/bin:/bin:/usr/sbin:/sbin`, SHELL fish), as Finder starts it. `claude` was found through the fish login shell's PATH and ran from the mise install folder. Summarize on a TextEdit selection answered in the launcher. `claude` registered no app with LaunchServices, so no Dock icon. Keys sent after the answer still reached the launcher.
+  - Reading the selection needs Accessibility. Granting it to the copy made macOS relaunch it without `--env`, as AGENTS.md says for Input Monitoring, so the first Summarize ran on the real config.
+- [x] 8.2 Start a long prompt, press Escape; verify with `pgrep -fl claude` that nothing is left
+  - Passed: a test command asking for a 2000-word essay with thinking high. While it ran, Dango's only child was `claude`, leader of its own process group. Right after Escape the group was empty, Dango had no child and no zombie, and no new `claude` process existed. `pgrep -fl claude` alone is not usable on this Mac: the author's Claude Code sessions also match, so Dango's descendants were checked instead.
+- [x] 8.3 Repeat 7.4 on macOS; verify the same results
+  - Passed: same test items as 7.4 (SessionStart hook writing a marker file, user-scope MCP server writing a marker file, CLAUDE.md rule "End every reply with PINEAPPLE7."). A control `claude -p` without `--safe-mode` left all traces and a session folder. The Dango run answered `pong` and left none, and no session folder exists for the workspace. The test items were removed afterwards.
+- [x] 8.4 Install a CLI while Dango runs, into a folder only the shell profile adds; verify the next command finds it without a restart; then add a `sleep 30` to the profile and verify the launcher stays responsive and Escape still abandons
+  - Passed: the copy ran with `MISE_DISABLE_TOOLS=pi` and the pi mise shim moved aside, so `pi` was missing. A `pi` command gave "Couldn't find pi. Install it or set its path in your config file." A script named `pi` was then put in a folder that only a new fish `conf.d` file adds to PATH; the next command answered from it, no restart. With `sleep 30` added to that file and the script removed, the miss started the fish probe again; Escape returned to the root list at once while it slept, the probe and its `sleep` were gone after the 10 s limit, and the launcher took typing. The profile edit and the shim were undone.
+  - A fish profile that runs `mise activate` installs every missing tool when `MISE_DATA_DIR` points at an empty folder, so that variable can't be used to hide a CLI from the probe.
 
 ## 9. Review
 
