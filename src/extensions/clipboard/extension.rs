@@ -442,13 +442,35 @@ fn file_name(path: &str) -> &str {
         .unwrap_or(path)
 }
 
+/// The cache is checked before the file, because checking a file on an
+/// offline network share can take seconds.
 fn file_icon(files: &[&str], icons: &IconCache) -> String {
     let fallback = || format!("{NAMED_ICON}file");
-    let Some(path) = files.first().filter(|path| Path::new(path).exists()) else {
+    let Some(path) = files.first() else {
         return fallback();
     };
-    icons.ensure_with(path, || crate::platform::icon_for(path, ICON_SIZE));
-    icons.path(path).unwrap_or_else(fallback)
+    let key = icon_key(path);
+    if let Some(cached) = icons.path(&key) {
+        return cached;
+    }
+    if !Path::new(path).exists() {
+        return fallback();
+    }
+    icons.ensure_with(&key, || crate::platform::icon_for(path, ICON_SIZE));
+    icons.path(&key).unwrap_or_else(fallback)
+}
+
+/// Plain files share their type's icon, so the cache grows with the types
+/// copied rather than with every path. Folders (usually without an
+/// extension), applications and shortcuts have icons of their own.
+fn icon_key(path: &str) -> String {
+    const OWN_ICON: [&str; 3] = ["app", "exe", "lnk"];
+    match Path::new(path).extension().and_then(|ext| ext.to_str()) {
+        Some(ext) if !OWN_ICON.iter().any(|own| own.eq_ignore_ascii_case(ext)) => {
+            format!("file-type-{}", ext.to_lowercase())
+        }
+        _ => path.to_string(),
+    }
 }
 
 /// One line, so entries can be told apart at a glance. Runs of whitespace
@@ -804,6 +826,35 @@ mod tests {
         let item = &list_of(&tree).items[0];
         assert_eq!(item.title, "report.pdf and 2 more");
         assert_eq!(item.keywords, ["report.pdf", "a.txt", "b.txt"]);
+    }
+
+    #[test]
+    fn files_of_one_type_share_an_icon_and_the_rest_keep_their_own() {
+        assert_eq!(icon_key("/a/report.PDF"), "file-type-pdf");
+        assert_eq!(icon_key("/b/other.pdf"), "file-type-pdf");
+        assert_eq!(
+            icon_key("/Applications/Safari.app"),
+            "/Applications/Safari.app"
+        );
+        assert_eq!(icon_key(r"C:\Tools\app.EXE"), r"C:\Tools\app.EXE");
+        assert_eq!(icon_key("/a/report_pdf"), "/a/report_pdf");
+    }
+
+    #[test]
+    fn a_cached_type_icon_is_used_without_touching_the_file() {
+        let (extension, history, _) = setup();
+        let file = std::env::temp_dir().join(format!("dango-{}.dangotest", uuid::Uuid::new_v4()));
+        std::fs::write(&file, "x").unwrap();
+        record_files(&history, &[file.to_str().unwrap()]);
+        let tree = extension.list();
+        let cached = list_of(&tree).items[0].icon.clone().unwrap();
+
+        std::fs::remove_file(&file).unwrap();
+        let tree = extension.list();
+        assert_eq!(
+            list_of(&tree).items[0].icon.as_deref(),
+            Some(cached.as_str())
+        );
     }
 
     #[test]
