@@ -164,6 +164,10 @@ impl Drop for Chunks {
 /// tests use a scripted one.
 pub trait Completions: Send + Sync {
     fn stream(&self, request: Request) -> Chunks;
+
+    /// Stops whatever is still running, because Dango is quitting. A service
+    /// request ends with the process; a program has to be told.
+    fn stop_all(&self) {}
 }
 
 #[cfg(test)]

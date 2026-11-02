@@ -15,6 +15,7 @@
 ## 3. Argument tables
 
 - [x] 3.1 Add the per-kind argument builders for `claude` and `pi` from the design table (model, thinking); verify unit tests for each kind and each thinking level
+- [x] 3.3 Move each CLI's program name, fixed flags, model flag, effort flag and off level into one table entry per kind, and give `claude` `DISABLE_AUTOUPDATER=1` in its entry's environment; verify the `args` tests still pass and a test that the claude environment holds the variable and pi's is empty
 - [ ] 3.2 Check by hand, once per CLI with a throwaway prompt, that `claude -p --safe-mode --tools "" --output-format text --no-session-persistence` and `pi -p --no-tools --no-context-files --no-session` each read the prompt from stdin and answer with the existing sign-in; record the result in this task, and change the builder and design if a flag is refused
   - claude: confirmed. The full fixed flag set, with the prompt on stdin, from an empty folder, answered `pong` with exit 0.
   - pi: no flag refused, and the prompt on stdin started a request. It failed because the `openai-codex` sign-in has expired ("Your session has ended"). The error goes to stderr with exit 1, which is what `ProgramFailed` expects. Deferred: the author has no subscription pi can sign in to, so whether it answers stays open until one is available. Without `--no-extensions`, pi prints warnings about the user's extension packages, so that flag matters.
@@ -35,11 +36,16 @@
 - [x] 5.5 Bring back `Chunks::with_cleanup` and call `start_kill` on drop without holding a lock across any wait; verify two tests: a script with a sleeping child that keeps stdout open, and a script that starts a child with output sent to `nul` or `/dev/null` and then exits; in both, dropping `Chunks` returns quickly and the child is gone
 - [x] 5.6 Add `AiError::ProgramMissing` with "Couldn't find {program}. Install it or set its path in your config file."; verify a test that a missing program fails with that message and nothing is spawned
 - [x] 5.7 Finish a run when the program exits even if a helper it started keeps stdout or stderr open: after the exit, wait a short grace period for the pipes to close, then end with what was printed; verify a Windows test where a batch file starts a helper that inherits the pipes, prints an answer, and exits, and the answer arrives well before the quiet limit
+- [x] 5.8 Reap the killed program after an abandoned run, so no zombie process is left on macOS; verify the abandon tests still pass on Windows, and leave the zombie check to the Mac session (8.2)
+- [x] 5.9 Add a test that a UTF-8 character split across two reads arrives whole; verify it passes and fails when the hold-back branch is removed
+- [x] 5.10 Replace the millisecond budgets in the agent tests with checks of order or of the process being gone; verify `cargo test agent::` passes
+- [x] 5.11 macOS: read the login shell's `env` output as bytes and convert lossily, so one variable that isn't valid UTF-8 doesn't lose the PATH; leave its run to the Mac session (8.4)
 
 ## 6. Wiring
 
 - [x] 6.1 Add `Clients` dispatching by kind and hold it in `src/app/` where `GenAiClient` was; verify an `app` test with a `claude` provider reaches the agent side while an `ollama` one reaches the service side
 - [x] 6.2 Add the platform traps to `AGENTS.md`: tray-app PATH lacks shell-only folders (`mise activate`) on both platforms, and `CREATE_NO_WINDOW` must go through process-wrap's `CreationFlags` wrapper, not the inner command; verify `mise run check` passes
+- [x] 6.3 Stop every running agent program when Dango quits from the tray: `Completions::stop_all`, kept by `AgentClient`, forwarded by `Clients`, called from `Core::quit`; verify an agent test that `stop_all` stops a running script's child, and an app test that quitting calls it
 
 ## 7. Windows hand checks
 

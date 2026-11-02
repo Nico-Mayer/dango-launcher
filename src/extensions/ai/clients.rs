@@ -23,6 +23,10 @@ impl Completions for Clients {
             false => self.service.stream(request),
         }
     }
+
+    fn stop_all(&self) {
+        self.agent.stop_all();
+    }
 }
 
 #[cfg(test)]
