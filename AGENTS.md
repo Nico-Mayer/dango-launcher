@@ -96,7 +96,7 @@ No millisecond budgets in specs or tests. Results depend on machine load, unreli
 - `open::with` and `open::with_detached` on Windows look bare app name up under App Paths but can keep trailing NUL (5.4.5), so `Command` refuses path. Pass full exe path; browser opener reads it with `windows-registry` in `platform/windows/browser.rs`.
 - Non-elevated process can't hook or manage elevated windows on Windows. Accept limit.
 - Windows silently removes `WH_KEYBOARD_LL` hook whose procedure exceeds `LowLevelHooksTimeout`, no notice. `platform/windows/llhook.rs` replaces hook on timer. Each replacement puts Dango first in hook chain, ahead of AutoHotkey or PowerToys even if they started later, so a remap there of a key Dango swallows (CapsLock) stops working.
-- New Notepad (and likely other WinUI apps) can handle injected key late: Ctrl released right after V reads as plain `v`. Synthetic chords hold modifier briefly around key (`CHORD_HOLD`).
+- New Notepad (and likely other WinUI apps) can handle injected key late: Ctrl released right after V reads as plain `v`. Synthetic chords hold modifier briefly after key (`CHORD_HOLD`).
 - On Windows, `WS_EX_TOOLWINDOW` re-applied after each show: tao rewrote extended style on every visibility change, nobody checked whether winit does. Windows positions in physical pixels, macOS in logical points. Don't share positioning code.
 - macOS gates window management, paste, snippet expansion, reading selection behind Accessibility.
 - enigo's `Enigo::new` on macOS fails with `NoPermission` without Accessibility. Create on first use, never at startup.
