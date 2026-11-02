@@ -731,8 +731,11 @@ impl Core {
     /// after the change takes the permissions as they now are.
     fn restart_hyperkey(&self) {
         self.services.hyperkey.lock().unwrap().running = None;
-        if let Some(message) = apply_hyperkey(&self.config, &self.services.hyperkey) {
-            crate::log::append(&message);
+        if let Some(failure) = apply_hyperkey(&self.config, &self.services.hyperkey) {
+            crate::log::append(failure.log_line());
+            if failure == HyperkeyFailure::Refused {
+                self.set_config_status(true);
+            }
         }
     }
 
@@ -811,9 +814,11 @@ impl Core {
         // Stopping the macOS hyperkey waits on its event tap thread.
         let core = self.clone();
         self.runtime.spawn_blocking(move || {
-            if let Some(message) = apply_hyperkey(&core.config, &core.services.hyperkey) {
-                crate::log::append(&message);
-                core.set_config_status(true);
+            if let Some(failure) = apply_hyperkey(&core.config, &core.services.hyperkey) {
+                crate::log::append(failure.log_line());
+                if failure == HyperkeyFailure::Refused {
+                    core.set_config_status(true);
+                }
             }
         });
     }
@@ -930,7 +935,31 @@ fn aliased_candidates(host: &ExtensionHost, file_config: &FileConfig) -> Vec<Can
 /// and releases any modifiers it holds, then starts a fresh one if the config
 /// asks for it. Returns a message to surface when a configured hyperkey could
 /// not start.
-fn apply_hyperkey(file_config: &FileConfig, slot: &Mutex<HyperkeySlot>) -> Option<String> {
+/// Why the hyperkey did not start. A missing permission already has its own
+/// tray item and clears itself on a grant, so callers raise no notice for it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum HyperkeyFailure {
+    MissingPermission(Permission),
+    Refused,
+}
+
+impl HyperkeyFailure {
+    pub(super) fn log_line(self) -> &'static str {
+        match self {
+            Self::MissingPermission(Permission::InputMonitoring) => {
+                "hyperkey: needs the Input Monitoring permission"
+            }
+            Self::MissingPermission(Permission::Accessibility) => {
+                "hyperkey: needs the Accessibility permission"
+            }
+            Self::Refused => {
+                "hyperkey: could not start; unavailable on this platform or refused by the OS"
+            }
+        }
+    }
+}
+
+fn apply_hyperkey(file_config: &FileConfig, slot: &Mutex<HyperkeySlot>) -> Option<HyperkeyFailure> {
     // Locked before the config is read, so of two quick reloads the later
     // settings win.
     let mut slot = slot.lock().unwrap();
@@ -955,26 +984,15 @@ fn apply_hyperkey(file_config: &FileConfig, slot: &Mutex<HyperkeySlot>) -> Optio
         },
         tap: hyperkey.tap.clone(),
     };
-    match platform::start_hyperkey(spec) {
-        Some(running) => {
-            slot.running = Some(running);
-            None
-        }
-        None if platform::permissions()
-            .missing()
-            .contains(&Permission::InputMonitoring) =>
-        {
-            Some("hyperkey: needs the Input Monitoring permission".to_string())
-        }
-        None if platform::permissions()
-            .missing()
-            .contains(&Permission::Accessibility) =>
-        {
-            Some("hyperkey: needs the Accessibility permission".to_string())
-        }
-        None => Some(
-            "hyperkey: could not start; unavailable on this platform or refused by the OS"
-                .to_string(),
-        ),
-    }
+    let Some(running) = platform::start_hyperkey(spec) else {
+        let missing = platform::permissions().missing();
+        return Some(
+            [Permission::InputMonitoring, Permission::Accessibility]
+                .into_iter()
+                .find(|permission| missing.contains(permission))
+                .map_or(HyperkeyFailure::Refused, HyperkeyFailure::MissingPermission),
+        );
+    };
+    slot.running = Some(running);
+    None
 }

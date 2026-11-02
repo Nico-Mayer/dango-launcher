@@ -8,7 +8,7 @@ use tokio::runtime::Handle;
 
 use super::{
     aliased_candidates, apply_hyperkey, extension_contexts, load_problems, AiParts, Core,
-    HideLauncher, OnMainThread,
+    HideLauncher, HyperkeyFailure, OnMainThread,
 };
 use super::{Services, ViewRunner, RESULT_LIMIT};
 use crate::config::{self, FileConfig};
@@ -358,11 +358,9 @@ fn build_services(
 
     let hotkeys = register_hotkeys(file_config, notices);
     let hyperkey = Mutex::default();
-    if let Some(message) = apply_hyperkey(file_config, &hyperkey) {
-        crate::log::append(&message);
-        // A missing permission has its own tray item, and this notice could
-        // not be taken back once a grant restarts the hyperkey.
-        if crate::platform::permissions().missing().is_empty() {
+    if let Some(failure) = apply_hyperkey(file_config, &hyperkey) {
+        crate::log::append(failure.log_line());
+        if failure == HyperkeyFailure::Refused {
             notices.push("Hyperkey didn't start, see dango.log".to_string());
         }
     }
