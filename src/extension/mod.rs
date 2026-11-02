@@ -88,7 +88,6 @@ pub trait Service: Send + Sync {
 /// testable without a database.
 pub trait EnabledStore: Send + Sync {
     fn is_enabled(&self, extension_id: &str) -> bool;
-    fn set_enabled(&self, extension_id: &str, enabled: bool);
     fn is_command_enabled(&self, _extension_id: &str, _command_id: &str) -> bool {
         true
     }
@@ -242,17 +241,6 @@ impl ExtensionHost {
         Ok(report)
     }
 
-    pub fn set_enabled(&mut self, extension_id: &str, enabled: bool) -> LoadReport {
-        self.enabled.set_enabled(extension_id, enabled);
-        let mut report = LoadReport::default();
-        if enabled {
-            self.activate(extension_id, &mut report);
-        } else {
-            self.deactivate(extension_id);
-        }
-        report
-    }
-
     /// Brings every extension's active state and registered commands in line
     /// with the enabled store, without persisting anything. Used on a config reload, where the store
     /// (the file) is already the new source of truth.
@@ -378,6 +366,14 @@ mod tests {
     }
 
     impl MemoryEnabled {
+        fn set_enabled(&self, id: &str, enabled: bool) {
+            let mut disabled = self.disabled.lock().unwrap();
+            disabled.retain(|d| d != id);
+            if !enabled {
+                disabled.push(id.to_string());
+            }
+        }
+
         fn set_command_enabled(&self, qualified_id: &str, enabled: bool) {
             let mut disabled = self.disabled_commands.lock().unwrap();
             disabled.retain(|d| d != qualified_id);
@@ -390,13 +386,6 @@ mod tests {
     impl EnabledStore for MemoryEnabled {
         fn is_enabled(&self, id: &str) -> bool {
             !self.disabled.lock().unwrap().iter().any(|d| d == id)
-        }
-        fn set_enabled(&self, id: &str, enabled: bool) {
-            let mut disabled = self.disabled.lock().unwrap();
-            disabled.retain(|d| d != id);
-            if !enabled {
-                disabled.push(id.to_string());
-            }
         }
         fn is_command_enabled(&self, extension_id: &str, command_id: &str) -> bool {
             !self
@@ -462,6 +451,16 @@ mod tests {
         ExtensionHost::new(Arc::new(MemoryEnabled::default()))
     }
 
+    fn host_with_store() -> (ExtensionHost, Arc<MemoryEnabled>) {
+        let enabled = Arc::new(MemoryEnabled::default());
+        (ExtensionHost::new(enabled.clone()), enabled)
+    }
+
+    fn toggle(host: &mut ExtensionHost, enabled: &MemoryEnabled, id: &str, on: bool) {
+        enabled.set_enabled(id, on);
+        host.reload_enabled();
+    }
+
     #[test]
     fn reload_enabled_syncs_active_state_to_the_store() {
         let enabled = Arc::new(MemoryEnabled::default());
@@ -470,8 +469,7 @@ mod tests {
         host.register(extension.clone()).unwrap();
         assert!(host.is_active("apps"));
 
-        // An external edit disables it; a reload brings the runtime in line
-        // without the host calling set_enabled to persist anything back.
+        // An external edit disables it; a reload brings the runtime in line.
         enabled.set_enabled("apps", false);
         host.reload_enabled();
         assert!(!host.is_active("apps"));
@@ -494,10 +492,10 @@ mod tests {
 
     #[test]
     fn disabling_removes_commands_and_stops_the_extension() {
-        let mut host = host();
+        let (mut host, enabled) = host_with_store();
         let extension = TestExtension::new("apps", "open");
         host.register(extension.clone()).unwrap();
-        host.set_enabled("apps", false);
+        toggle(&mut host, &enabled, "apps", false);
         assert!(!host.is_active("apps"));
         assert!(host.registry().get("apps.open").is_none());
         assert!(extension.deactivated.load(Ordering::SeqCst));
@@ -505,11 +503,11 @@ mod tests {
 
     #[test]
     fn re_enabling_restores_commands_without_reconstruction() {
-        let mut host = host();
+        let (mut host, enabled) = host_with_store();
         let extension = TestExtension::new("apps", "open");
         host.register(extension.clone()).unwrap();
-        host.set_enabled("apps", false);
-        host.set_enabled("apps", true);
+        toggle(&mut host, &enabled, "apps", false);
+        toggle(&mut host, &enabled, "apps", true);
         assert!(host.registry().get("apps.open").is_some());
         assert_eq!(extension.activate_count.load(Ordering::SeqCst), 2);
     }
@@ -700,17 +698,17 @@ mod tests {
 
     #[test]
     fn a_disabled_extension_is_not_handed_out_for_an_action() {
-        let mut host = host();
+        let (mut host, enabled) = host_with_store();
         host.register(Arc::new(Owner("alpha"))).unwrap();
-        host.set_enabled("alpha", false);
+        toggle(&mut host, &enabled, "alpha", false);
         assert!(host.extension("alpha").is_none());
     }
 
     #[test]
     fn a_command_of_a_disabled_extension_does_not_resolve() {
-        let mut host = host();
+        let (mut host, enabled) = host_with_store();
         host.register(TestExtension::new("apps", "open")).unwrap();
-        host.set_enabled("apps", false);
+        toggle(&mut host, &enabled, "apps", false);
         assert!(host.resolve_command("apps.open").is_none());
     }
 
@@ -760,14 +758,14 @@ mod tests {
             watcher: watcher.clone(),
         });
 
-        let mut host = host();
+        let (mut host, enabled) = host_with_store();
         host.register(extension).unwrap();
         assert!(watcher.running.load(Ordering::SeqCst));
 
-        host.set_enabled("clip", false);
+        toggle(&mut host, &enabled, "clip", false);
         assert!(!watcher.running.load(Ordering::SeqCst));
 
-        host.set_enabled("clip", true);
+        toggle(&mut host, &enabled, "clip", true);
         assert!(watcher.running.load(Ordering::SeqCst));
     }
     struct Noop;

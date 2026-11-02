@@ -13,7 +13,6 @@ use super::manifest::{PreferenceDecl, PreferenceKind};
 /// without a database, the same way the enabled state is.
 pub trait PreferenceStore: Send + Sync {
     fn get(&self, extension_id: &str, key: &str) -> Option<String>;
-    fn set(&self, extension_id: &str, key: &str, value: &str);
 }
 
 /// One extension's view of its own preferences.
@@ -53,18 +52,6 @@ impl Preferences {
         self.number(key)
             .filter(|value| value.is_finite() && *value >= 0.0)
             .map(|value| value as u64)
-    }
-
-    pub fn set_string(&self, key: &str, value: &str) {
-        self.store.set(&self.extension_id, key, value);
-    }
-
-    pub fn set_number(&self, key: &str, value: f64) {
-        self.store.set(&self.extension_id, key, &value.to_string());
-    }
-
-    pub fn set_boolean(&self, key: &str, value: bool) {
-        self.store.set(&self.extension_id, key, &value.to_string());
     }
 
     /// The stored value when it parses as the declared type, the declared
@@ -121,6 +108,13 @@ mod tests {
         fn key(extension_id: &str, key: &str) -> String {
             format!("{extension_id}/{key}")
         }
+
+        fn set(&self, extension_id: &str, key: &str, value: &str) {
+            self.0
+                .lock()
+                .unwrap()
+                .insert(Self::key(extension_id, key), value.to_string());
+        }
     }
 
     impl PreferenceStore for MemoryStore {
@@ -130,12 +124,6 @@ mod tests {
                 .unwrap()
                 .get(&Self::key(extension_id, key))
                 .cloned()
-        }
-        fn set(&self, extension_id: &str, key: &str, value: &str) {
-            self.0
-                .lock()
-                .unwrap()
-                .insert(Self::key(extension_id, key), value.to_string());
         }
     }
 
@@ -186,7 +174,7 @@ mod tests {
     fn a_stored_value_wins_over_the_default() {
         let store = Arc::new(MemoryStore::default());
         let prefs = preferences(store.clone());
-        prefs.set_number("entries", 20.0);
+        store.set("dango.clipboard", "entries", "20");
         assert_eq!(prefs.count("entries"), Some(20));
     }
 

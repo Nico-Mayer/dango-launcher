@@ -475,7 +475,6 @@ mod tests {
             fn is_enabled(&self, _id: &str) -> bool {
                 true
             }
-            fn set_enabled(&self, _id: &str, _enabled: bool) {}
         }
         struct AccessibilityOff;
         impl Permissions for AccessibilityOff {

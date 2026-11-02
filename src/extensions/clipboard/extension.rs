@@ -416,12 +416,15 @@ mod tests {
     #[derive(Default)]
     struct MemoryPreferences(Mutex<HashMap<String, String>>);
 
+    impl MemoryPreferences {
+        fn set(&self, _extension_id: &str, key: &str, value: &str) {
+            self.0.lock().unwrap().insert(key.into(), value.into());
+        }
+    }
+
     impl PreferenceStore for MemoryPreferences {
         fn get(&self, _extension_id: &str, key: &str) -> Option<String> {
             self.0.lock().unwrap().get(key).cloned()
-        }
-        fn set(&self, _extension_id: &str, key: &str, value: &str) {
-            self.0.lock().unwrap().insert(key.into(), value.into());
         }
     }
 

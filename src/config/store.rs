@@ -8,8 +8,6 @@
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex, RwLock};
 
-use serde_json::Value;
-
 use super::location::SCHEMA_REF;
 use super::Config;
 use crate::extension::{EnabledStore, PreferenceStore};
@@ -66,13 +64,6 @@ impl FileConfig {
         Ok(self.path.clone())
     }
 
-    fn persist(&self) {
-        let text = self.config.read().unwrap().to_json();
-        if let Err(error) = self.write(&text) {
-            eprintln!("[dango] could not write the config file: {error}");
-        }
-    }
-
     fn write(&self, text: &str) -> std::io::Result<()> {
         *self.own_write.lock().unwrap() = Some(text.to_string());
         if let Some(parent) = self.path.parent() {
@@ -86,19 +77,6 @@ impl PreferenceStore for FileConfig {
     fn get(&self, extension_id: &str, key: &str) -> Option<String> {
         self.config.read().unwrap().preference(extension_id, key)
     }
-
-    fn set(&self, extension_id: &str, key: &str, value: &str) {
-        {
-            let mut config = self.config.write().unwrap();
-            config
-                .extensions
-                .entry(extension_id.to_string())
-                .or_default()
-                .preferences
-                .insert(key.to_string(), Value::String(value.to_string()));
-        }
-        self.persist();
-    }
 }
 
 impl EnabledStore for FileConfig {
@@ -109,18 +87,6 @@ impl EnabledStore for FileConfig {
             .unwrap()
             .enabled(extension_id)
             .unwrap_or(true)
-    }
-
-    fn set_enabled(&self, extension_id: &str, enabled: bool) {
-        {
-            let mut config = self.config.write().unwrap();
-            config
-                .extensions
-                .entry(extension_id.to_string())
-                .or_default()
-                .enabled = Some(enabled);
-        }
-        self.persist();
     }
 
     fn is_command_enabled(&self, extension_id: &str, command_id: &str) -> bool {
@@ -178,23 +144,6 @@ mod tests {
         assert!(store.is_command_enabled("x", "plain"));
         assert!(store.is_command_enabled("x", "missing"));
         assert!(store.is_command_enabled("y", "missing"));
-    }
-
-    #[test]
-    fn a_set_persists_and_records_its_own_write() {
-        let path = temp_path("set");
-        let _ = std::fs::remove_file(&path);
-        let store = FileConfig::new(path.clone(), Config::default());
-        store.set_enabled("x", false);
-        assert!(!store.is_enabled("x"));
-        // The file was written and the write was recorded for the watcher.
-        let on_disk = std::fs::read_to_string(&path).unwrap();
-        assert!(on_disk.contains("\"enabled\": false"));
-        assert_eq!(
-            store.own_write.lock().unwrap().as_deref(),
-            Some(on_disk.as_str())
-        );
-        let _ = std::fs::remove_file(&path);
     }
 
     fn temp_dir(name: &str) -> PathBuf {
