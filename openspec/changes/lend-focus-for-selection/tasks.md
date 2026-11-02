@@ -14,7 +14,7 @@
 
 - [x] 3.1 Implement the Windows lend: force the previous window forward and wait (shared with `yield_to_previous`), and on drop `force_foreground` the launcher's hwnd; verify `cargo test` and `mise run check`
 - [x] 3.2 Add the `LENDING` flag and make the foreground event handler skip the hide while lending or when Dango is the foreground at handling time; verify with a unit test of the decision function
-- [ ] 3.3 Send Ctrl+Insert for `WindowsKeys::copy`, with `CHORD_HOLD`; verify `cargo test` and `mise run check`
+- [x] 3.3 Send Ctrl+Insert for `WindowsKeys::copy`, with `CHORD_HOLD`; verify `cargo test` and `mise run check`
 - [ ] 3.4 Hand check on Windows with `dango-ui` and `scripts/send-keys.ps1`: select text in Notepad, a browser, Windows Terminal and Zed, run Improve Writing from root search and from a command hotkey; the launcher stays on screen, the selection is read, typing goes to the launcher after, the clipboard is unchanged
 - [ ] 3.5 Hand check on Windows: with nothing selected in Zed and in Herdr, run Improve Writing; the launcher stays and shows "Select some text first", Windows Terminal running a program is not interrupted by the copy
 

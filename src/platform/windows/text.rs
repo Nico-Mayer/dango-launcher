@@ -79,11 +79,11 @@ impl WindowsKeys {
         }
     }
 
-    fn chord(&self, letter: char) -> Result<(), TextError> {
+    fn chord(&self, key: Key) -> Result<(), TextError> {
         let mut enigo = self.enigo.lock().unwrap();
         let send = |enigo: &mut Enigo| -> Result<(), enigo::InputError> {
             enigo.key(Key::Control, Direction::Press)?;
-            let pressed = enigo.key(Key::Unicode(letter), Direction::Click);
+            let pressed = enigo.key(key, Direction::Click);
             std::thread::sleep(CHORD_HOLD);
             enigo.key(Key::Control, Direction::Release)?;
             pressed
@@ -98,12 +98,14 @@ fn keystroke_failed(error: enigo::InputError) -> TextError {
 }
 
 impl Keys for WindowsKeys {
+    /// Ctrl+C is SIGINT in terminals and a command in modal editors.
+    /// Ctrl+Insert means copy there too, and nothing else anywhere.
     fn copy(&self) -> Result<(), TextError> {
-        self.chord('c')
+        self.chord(Key::Insert)
     }
 
     fn paste(&self) -> Result<(), TextError> {
-        self.chord('v')
+        self.chord(Key::Unicode('v'))
     }
 
     fn caret_left(&self, times: usize) -> Result<(), TextError> {

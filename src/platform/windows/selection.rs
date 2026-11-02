@@ -2,10 +2,7 @@
 //!
 //! Windows exposes the focused element's selected text through UI Automation,
 //! the same API a screen reader uses, so anything a screen reader can read this
-//! can read. That matters beyond speed: the fallback synthesizes Ctrl+C, and a
-//! modal editor is free to bind that chord to a command of its own. In a Helix
-//! keymap it toggles comments, so the fallback edits the document it was meant
-//! to read.
+//! can read, without the clipboard round trip of the Ctrl+Insert fallback.
 //!
 //! An application that exposes no text pattern still answers `Unavailable` and
 //! still gets the fallback. The probe that informed this found Zed to be one:
