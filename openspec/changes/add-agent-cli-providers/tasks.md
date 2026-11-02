@@ -14,7 +14,7 @@
 
 ## 3. Argument tables
 
-- [ ] 3.1 Add the per-kind argument builders for `claude` and `pi` from the design table (model, thinking); verify unit tests for each kind and each thinking level
+- [x] 3.1 Add the per-kind argument builders for `claude` and `pi` from the design table (model, thinking); verify unit tests for each kind and each thinking level
 - [ ] 3.2 Check by hand, once per CLI with a throwaway prompt, that `claude -p --safe-mode --tools "" --output-format text --no-session-persistence` and `pi -p --no-tools --no-context-files --no-session` each read the prompt from stdin and answer with the existing sign-in; record the result in this task, and change the builder and design if a flag is refused
   - claude: the author confirmed `-p --safe-mode` answers with the existing sign-in. Still to check: the prompt on stdin, together with the other fixed flags.
   - pi: not checked yet.

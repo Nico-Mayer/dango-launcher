@@ -1,6 +1,7 @@
 //! The AI extension: one-shot text transforms, each one a prompt the user can
 //! read and change.
 
+mod agent;
 mod auth;
 mod client;
 pub(crate) mod commands;
