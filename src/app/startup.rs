@@ -468,8 +468,8 @@ fn register_hotkeys(file_config: &Arc<FileConfig>, notices: &mut Vec<String>) ->
     let config = config.read().unwrap();
     let shortcut = platform::label(Label::LauncherShortcut);
     let (launcher, launcher_problem) = hotkeys::launcher(&config);
-    if let Some(problem) = launcher_problem {
-        crate::log::append(&problem);
+    if let Some(problem) = &launcher_problem {
+        crate::log::append(problem);
         notices.push(format!(
             "Invalid launcher.hotkey, using {shortcut}, see dango.log"
         ));
@@ -484,10 +484,16 @@ fn register_hotkeys(file_config: &Arc<FileConfig>, notices: &mut Vec<String>) ->
     let registry = Registry::new(grab, launcher);
     if let Err(error) = registry.register_launcher() {
         eprintln!("[dango] could not register the launcher hotkey: {error}");
-        notices.push(format!(
-            "{} is in use, set launcher.hotkey",
-            hotkeys::launcher_label(&config)
-        ));
+        let taken = match config
+            .launcher
+            .hotkey
+            .as_ref()
+            .and_then(config::Hotkey::for_platform)
+        {
+            Some(spec) if launcher_problem.is_none() => spec,
+            _ => shortcut,
+        };
+        notices.push(format!("{taken} is in use, set launcher.hotkey"));
     }
     let conflicts = registry.apply(&config);
     if !conflicts.is_empty() {
