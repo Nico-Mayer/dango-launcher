@@ -2,17 +2,16 @@
 //! an `AppIndexer` into searchable, launchable results with cached icons. The
 //! per-platform indexers live in `crate::platform`.
 
-mod icons;
 mod index;
 
-pub use icons::{IconCache, ICON_SIZE};
-pub use index::{AppIndex, AppIndexer, IconRgba, IndexedApp, LaunchError};
+pub use index::{AppIndex, AppIndexer, IndexedApp, LaunchError};
 
 use std::sync::Arc;
 
 use async_trait::async_trait;
 
 use crate::extension::{ActionOutcome, Extension, FormValues, Manifest, Service};
+use crate::icon_cache::{IconCache, ICON_SIZE};
 use crate::platform::{self, Label};
 use crate::protocol::{Action, Modifier, Shortcut};
 use crate::search::{Candidate, RootProvider, Source};

@@ -1,5 +1,6 @@
 use std::sync::{Arc, RwLock};
 
+use crate::icon_cache::IconRgba;
 use crate::store::Store;
 
 /// One installed application, uniform across platforms. `id` is the launch
@@ -10,12 +11,6 @@ pub struct IndexedApp {
     pub id: String,
     pub name: String,
     pub target: Option<String>,
-}
-
-pub struct IconRgba {
-    pub width: u32,
-    pub height: u32,
-    pub rgba: Vec<u8>,
 }
 
 #[derive(Debug, thiserror::Error)]

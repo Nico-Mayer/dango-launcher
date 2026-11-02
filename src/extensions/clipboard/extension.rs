@@ -9,7 +9,7 @@ use crate::extension::{
     ActionOutcome, CommandDecl, Extension, FormValues, InvocationMode, Manifest, PreferenceDecl,
     PreferenceKind, Preferences, Service, NAMED_ICON,
 };
-use crate::extensions::applications::{IconCache, ICON_SIZE};
+use crate::icon_cache::{IconCache, ICON_SIZE};
 use crate::invocation::{Command, InvocationContext};
 use crate::protocol::{
     Action, ActionStyle, EmptyState, ItemDetail, ListItem, ListView, Metadata, Modifier, Shortcut,

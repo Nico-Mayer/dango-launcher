@@ -9,7 +9,8 @@ use std::path::{Path, PathBuf};
 use objc2_app_kit::{NSWorkspace, NSWorkspaceOpenConfiguration};
 use objc2_foundation::{NSArray, NSFileManager, NSString, NSURL};
 
-use crate::extensions::applications::{AppIndexer, IconRgba, IndexedApp, LaunchError};
+use crate::extensions::applications::{AppIndexer, IndexedApp, LaunchError};
+use crate::icon_cache::IconRgba;
 
 pub struct MacAppIndexer;
 

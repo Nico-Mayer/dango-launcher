@@ -9,7 +9,7 @@ use crate::config::FileConfig;
 use crate::extension::{
     ActionOutcome, Extension, FormValues, InvocationMode, Manifest, NAMED_ICON,
 };
-use crate::extensions::applications::{IconCache, ICON_SIZE};
+use crate::icon_cache::{IconCache, ICON_SIZE};
 use crate::invocation::{Command, InvocationContext};
 use crate::platform::{self, Label, SystemControl, SystemError};
 use crate::protocol::{Action, DetailView, ListItem, ListView, View, ViewTree, PROTOCOL_VERSION};

@@ -14,7 +14,7 @@ use super::{Services, ViewRunner, RESULT_LIMIT};
 use crate::config::{self, FileConfig};
 use crate::extension::{self, EnabledStore, ExtensionHost, HostResolver};
 use crate::extensions::ai::{AuthFile, GenAiClient};
-use crate::extensions::applications::{AppIndex, ApplicationsExtension, IconCache};
+use crate::extensions::applications::{AppIndex, ApplicationsExtension};
 use crate::extensions::clipboard::{
     ClipboardExtension, ClipboardSource, History, PreferencePolicy, Watcher,
 };
@@ -26,6 +26,7 @@ use crate::extensions::updates::{self, UpdateSource, UpdatesExtension};
 use crate::extensions::window_management::WindowManagementExtension;
 use crate::extensions::{self};
 use crate::hotkeys::{self, Grab, Registry, SystemGrab};
+use crate::icon_cache::IconCache;
 use crate::invocation::Invoker;
 use crate::opener::SystemOpener;
 use crate::platform::{self, Label};

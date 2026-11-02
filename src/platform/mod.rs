@@ -525,7 +525,7 @@ fn lf(text: String) -> String {
 /// `locator` is a filesystem path on macOS and a shell parsing name on Windows,
 /// which is what lets one helper serve both the application index and the list
 /// of running applications.
-pub fn icon_for(locator: &str, size: u32) -> Option<crate::extensions::applications::IconRgba> {
+pub fn icon_for(locator: &str, size: u32) -> Option<crate::icon_cache::IconRgba> {
     #[cfg(target_os = "windows")]
     return windows::icon_for(locator, size);
     #[cfg(target_os = "macos")]

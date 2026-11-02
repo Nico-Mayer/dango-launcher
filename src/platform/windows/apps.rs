@@ -28,7 +28,8 @@ use windows::Win32::UI::WindowsAndMessaging::{
     GW_OWNER, SW_RESTORE, SW_SHOWNORMAL,
 };
 
-use crate::extensions::applications::{AppIndexer, IconRgba, IndexedApp, LaunchError};
+use crate::extensions::applications::{AppIndexer, IndexedApp, LaunchError};
+use crate::icon_cache::IconRgba;
 
 pub struct WindowsAppIndexer;
 

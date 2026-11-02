@@ -4,7 +4,7 @@
 use std::sync::Arc;
 
 use crate::config::FileConfig;
-use crate::extensions::applications::IconCache;
+use crate::icon_cache::IconCache;
 use crate::invocation::{Command, InvocationContext};
 use crate::platform::SystemControl;
 

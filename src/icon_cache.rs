@@ -3,14 +3,18 @@ use std::io::BufWriter;
 use std::path::PathBuf;
 use std::sync::{Arc, RwLock};
 
-use super::index::IconRgba;
-
 pub const ICON_SIZE: u32 = 64;
 
-/// Extracts and caches application icons as PNGs on disk, keyed by application
-/// id. Extraction runs off the search path; a result whose icon is not cached
-/// yet simply shows no icon until it appears, and one that cannot be extracted
-/// stays without a file so the frontend renders a placeholder.
+pub struct IconRgba {
+    pub width: u32,
+    pub height: u32,
+    pub rgba: Vec<u8>,
+}
+
+/// Caches system icons as PNGs on disk, keyed by whatever the caller names
+/// them by. Extraction runs off the path that builds a view; an icon that is
+/// not cached yet simply shows a fallback until it appears, and one that cannot
+/// be extracted stays without a file.
 pub struct IconCache {
     dir: PathBuf,
     cached: RwLock<HashSet<String>>,
@@ -31,9 +35,8 @@ impl IconCache {
         })
     }
 
-    /// The cached icon path for an app, or `None` when nothing is cached yet.
-    pub fn path(&self, app_id: &str) -> Option<String> {
-        let name = file_name(app_id);
+    pub fn path(&self, key: &str) -> Option<String> {
+        let name = file_name(key);
         self.cached
             .read()
             .unwrap()
@@ -67,8 +70,8 @@ impl IconCache {
     }
 }
 
-fn file_name(app_id: &str) -> String {
-    let stem: String = app_id
+fn file_name(key: &str) -> String {
+    let stem: String = key
         .chars()
         .map(|c| if c.is_alphanumeric() { c } else { '_' })
         .collect();

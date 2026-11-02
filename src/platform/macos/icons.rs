@@ -9,7 +9,7 @@ use objc2_core_graphics::{
 };
 use objc2_foundation::{NSRect, NSString};
 
-use crate::extensions::applications::IconRgba;
+use crate::icon_cache::IconRgba;
 
 pub fn icon_for(path: &str, size: u32) -> Option<IconRgba> {
     let image = NSWorkspace::sharedWorkspace().iconForFile(&NSString::from_str(path));
