@@ -103,7 +103,6 @@ mod tests {
             id: id.into(),
             title: id.into(),
             mode: InvocationMode::View,
-            subtitle: None,
             icon: None,
             keywords: vec![],
             alias: None,

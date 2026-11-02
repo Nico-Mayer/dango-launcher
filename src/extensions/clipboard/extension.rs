@@ -151,7 +151,6 @@ pub(crate) fn manifest() -> Manifest {
             id: COMMAND_HISTORY.into(),
             title: "Clipboard History".into(),
             mode: InvocationMode::View,
-            subtitle: Some("Clipboard".into()),
             icon: Some(format!("{NAMED_ICON}clipboard-list")),
             keywords: ["clipboard", "history", "paste", "copied"]
                 .iter()

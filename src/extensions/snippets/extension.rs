@@ -373,7 +373,7 @@ impl RootProvider for SnippetProvider {
             .into_iter()
             .map(|record| Candidate {
                 extension_id: extension_id(self.kind).into(),
-                subtitle: Some(one_line(&record.body)),
+                status: None,
                 icon: Some(sheet.of(&record)),
                 title: record.name,
                 id: record.id,
@@ -628,7 +628,6 @@ pub(crate) fn manifest(kind: Kind) -> Manifest {
                 id: COMMAND_CREATE.into(),
                 title: create.into(),
                 mode: InvocationMode::View,
-                subtitle: None,
                 icon: Some(icon(kind)),
                 keywords: vec!["new".into(), keyword.into()],
                 alias: None,
@@ -637,7 +636,6 @@ pub(crate) fn manifest(kind: Kind) -> Manifest {
                 id: COMMAND_SEARCH.into(),
                 title: search.into(),
                 mode: InvocationMode::View,
-                subtitle: None,
                 icon: Some(icon(kind)),
                 keywords: vec![keyword.into()],
                 alias: None,
@@ -841,25 +839,17 @@ mod tests {
         assert_eq!(candidates.len(), 1);
         assert_eq!(candidates[0].title, "Signature");
         assert_eq!(candidates[0].extension_id, SNIPPETS_ID);
-        assert_eq!(
-            candidates[0].subtitle.as_deref(),
-            Some("Best, Nico"),
-            "a multi-line snippet still reads as one row"
-        );
+        assert_eq!(candidates[0].status, None, "no body preview in root");
     }
 
-    #[tokio::test]
-    async fn a_long_snippet_is_cut_rather_than_wrapped() {
-        let f = fixture(Kind::Snippet);
-        f.records.create("Long", &"word ".repeat(40), None).unwrap();
+    #[test]
+    fn a_multi_line_body_reads_as_one_line() {
+        assert_eq!(one_line("Best,\n  Nico"), "Best, Nico");
+    }
 
-        let candidates = f
-            .extension
-            .root_provider()
-            .unwrap()
-            .items(String::new())
-            .await;
-        let subtitle = candidates[0].subtitle.clone().unwrap();
+    #[test]
+    fn a_long_body_is_cut_rather_than_wrapped() {
+        let subtitle = one_line(&"word ".repeat(40));
         assert_eq!(subtitle.chars().count(), 80);
         assert!(subtitle.ends_with('…'));
     }

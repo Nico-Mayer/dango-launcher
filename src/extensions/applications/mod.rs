@@ -160,7 +160,7 @@ impl RootProvider for AppProvider {
                 Candidate {
                     extension_id: EXTENSION_ID.into(),
                     icon: self.icons.path(&app.id),
-                    subtitle: app.target.clone(),
+                    status: None,
                     title: app.name,
                     id: app.id,
                     keywords: vec![],
@@ -270,7 +270,7 @@ mod tests {
         let items = ext.root_provider().unwrap().items(String::new()).await;
         assert_eq!(items.len(), 1);
         assert_eq!(items[0].title, "VS Code");
-        assert_eq!(items[0].subtitle.as_deref(), Some("/a/code"));
+        assert_eq!(items[0].status, None, "the path is not shown in root");
     }
 
     #[test]

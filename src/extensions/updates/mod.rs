@@ -46,7 +46,6 @@ pub(crate) fn manifest() -> Manifest {
             id: COMMAND_CHECK.into(),
             title: "Check for Updates".into(),
             mode: InvocationMode::View,
-            subtitle: Some("Dango".into()),
             icon: Some(format!("{NAMED_ICON}refresh-cw")),
             keywords: vec!["update".into(), "upgrade".into(), "version".into()],
             alias: None,
@@ -318,7 +317,7 @@ impl RootProvider for UpdateProvider {
             extension_id: EXTENSION_ID.into(),
             id: ITEM_ID.into(),
             title: available_title(&version),
-            subtitle: Some(format!("You have {}", self.0.current)),
+            status: Some(format!("You have {}", self.0.current)),
             icon: Some(format!("{NAMED_ICON}circle-arrow-down")),
             keywords: vec!["update".into(), "dango".into()],
             alias: None,
@@ -454,7 +453,7 @@ mod tests {
         let items = fixture.items().await;
         assert_eq!(items.len(), 1);
         assert_eq!(items[0].title, "Dango 0.5.0 is available");
-        assert_eq!(items[0].subtitle.as_deref(), Some("You have 0.4.0"));
+        assert_eq!(items[0].status.as_deref(), Some("You have 0.4.0"));
         assert!(items[0].pinned);
         assert!(items[0].keywords.contains(&"update".to_string()));
         assert!(items[0].keywords.contains(&"dango".to_string()));

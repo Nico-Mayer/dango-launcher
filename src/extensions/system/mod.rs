@@ -174,7 +174,6 @@ fn command(
         id: id.into(),
         title: title.into(),
         mode,
-        subtitle: Some("System".into()),
         icon: Some(format!("{NAMED_ICON}{icon}")),
         keywords: keywords.iter().map(|k| (*k).to_string()).collect(),
         alias: None,
