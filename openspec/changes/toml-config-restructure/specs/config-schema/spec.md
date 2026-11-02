@@ -1,0 +1,87 @@
+# Spec Delta
+
+## MODIFIED Requirements
+
+### Requirement: The schema is generated from the code
+
+Dango SHALL produce a JSON Schema for the config file from its own definition
+of the file: the typed settings of the app tables, every built-in extension's
+table with its settings' types, defaults, allowed values, and descriptions,
+and its shipped command ids. The schema SHALL NOT be maintained by hand
+anywhere.
+
+#### Scenario: A preference is known by key
+
+- **WHEN** a built-in extension has a setting
+- **THEN** the schema names that key in that extension's table, with its type, its default, its description, and its allowed values when it has any
+
+#### Scenario: A shipped command is known by id
+
+- **WHEN** a built-in extension ships a command
+- **THEN** the schema names that command id under that extension's `commands`
+
+#### Scenario: A setting's description comes from the code
+
+- **WHEN** a setting on the config structs carries a description in the code
+- **THEN** the schema carries that same text for the setting
+
+#### Scenario: The schema cannot disagree with the parser
+
+- **WHEN** a hotkey token is accepted by the hotkey parser
+- **THEN** the schema's hotkey pattern accepts a chord using it
+- **AND** a chord with a token the parser rejects does not match the pattern
+
+### Requirement: The schema is strict about known objects
+
+Every table the schema describes SHALL reject keys it does not name, except
+tables whose keys are the user's own names: applications bound to hotkeys, AI
+providers, AI commands, and the entries of the reserved `extensions` table.
+The top level SHALL be closed to `version`, the app tables, the built-in
+extension tables, and `extensions`. Enumerated settings SHALL list their
+values.
+
+#### Scenario: A misspelt key is rejected
+
+- **WHEN** a config contains `hotkeys` where `hotkey` is meant in `[launcher]`
+- **THEN** the schema reports the key as not allowed
+
+#### Scenario: An unknown top-level table is rejected
+
+- **WHEN** a config contains a `[clipbaord]` table
+- **THEN** the schema reports the table as not allowed
+
+#### Scenario: A user-named entry is accepted
+
+- **WHEN** a config binds an application, defines a provider, or defines an AI command under a name of the user's choosing
+- **THEN** the schema accepts the entry and checks its contents
+
+#### Scenario: A command setting that only one extension reads
+
+- **WHEN** a config gives a `prompt` to a command in a table other than `[ai]`
+- **THEN** the schema rejects the key for that table
+
+#### Scenario: An enumerated value is checked
+
+- **WHEN** a config sets a provider `kind`, a command's `thinking` or `output`, or the clipboard's `primary-action` to a value Dango does not have
+- **THEN** the schema rejects it and lists the values it does have
+
+#### Scenario: The runtime stays lenient
+
+- **WHEN** a config contains a key the schema rejects as unknown
+- **THEN** Dango still loads the file, exactly as before
+
+### Requirement: An editor can find the schema
+
+A config file Dango creates SHALL begin with the line
+`#:schema ./config.schema.json`, the comment TOML language servers read to
+find a schema. The file SHALL NOT need a key to point at the schema.
+
+#### Scenario: A created file points at the schema
+
+- **WHEN** Dango creates a config file
+- **THEN** its first line is `#:schema ./config.schema.json`
+
+#### Scenario: The editor completes and checks the file
+
+- **WHEN** a config file with that first line is opened in an editor whose TOML language server honours `#:schema`
+- **THEN** the editor offers the known keys and flags a key the schema rejects
