@@ -63,9 +63,43 @@ pub fn locate(
     }
 }
 
+/// The PATH in the output of `env`, as a login shell prints it.
+pub fn path_from_env(output: &str) -> Option<OsString> {
+    output
+        .lines()
+        .find_map(|line| line.strip_prefix("PATH="))
+        .map(|path| OsString::from(path.trim_end()))
+        .filter(|path| !path.is_empty())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_path_is_read_from_env_output() {
+        let zsh =
+            "HOME=/Users/nico\nSHELL=/bin/zsh\nPATH=/opt/homebrew/bin:/usr/bin:/bin\nTERM=dumb\n";
+        assert_eq!(
+            path_from_env(zsh),
+            Some(OsString::from("/opt/homebrew/bin:/usr/bin:/bin"))
+        );
+
+        let fish = "MANPATH=/usr/share/man\nPATH=/Users/nico/.local/share/mise/shims:/usr/bin\r\nSHELL=/opt/homebrew/bin/fish\n";
+        assert_eq!(
+            path_from_env(fish),
+            Some(OsString::from(
+                "/Users/nico/.local/share/mise/shims:/usr/bin"
+            ))
+        );
+    }
+
+    #[test]
+    fn env_output_without_a_path_gives_none() {
+        assert_eq!(path_from_env("HOME=/Users/nico\nSHELL=/bin/zsh\n"), None);
+        assert_eq!(path_from_env("PATH=\n"), None);
+        assert_eq!(path_from_env(""), None);
+    }
 
     fn program_file(dir: &Path, name: &str) -> PathBuf {
         let file = dir.join(if cfg!(windows) {
