@@ -197,7 +197,13 @@ impl DirectSelection for MacSelection {
         frontmost_pid()
             .and_then(|pid| selected_text_from(unsafe { AXUIElement::new_application(pid) }))
             .or_else(|| selected_text_from(unsafe { AXUIElement::new_system_wide() }))
-            .map_or(Selected::Unavailable, Selected::Text)
+            .map_or(Selected::Unavailable, |text| {
+                if text.is_empty() {
+                    Selected::Empty
+                } else {
+                    Selected::Text(text)
+                }
+            })
     }
 }
 
@@ -215,8 +221,7 @@ fn selected_text_from(root: CFRetained<AXUIElement>) -> Option<String> {
             .downcast::<AXUIElement>()
             .ok()?;
         let selected = copy_attribute(&focused, SELECTED_TEXT).ok().flatten()?;
-        let text = selected.downcast::<CFString>().ok()?.to_string();
-        (!text.is_empty()).then_some(text)
+        Some(selected.downcast::<CFString>().ok()?.to_string())
     }
 }
 
