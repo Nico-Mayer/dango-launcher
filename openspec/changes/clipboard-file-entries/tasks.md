@@ -23,7 +23,7 @@
 
 - [ ] 4.1 Release build with `DANGO_CONFIG_DIR` scratch dir, Accessibility granted: copy two files in Finder, history shows one entry "<name> and 1 more" with the Finder icon and both paths in the pane, no text entry of names; inspect with `dango-ui` `snapshot`
 - [x] 4.2 Paste the entry into a Finder window: Finder copies both files there; copy action then Cmd+V in Finder does the same; no new history entry appears after either
-- [ ] 4.3 Delete one of the two files, paste the entry: the other is pasted; delete both, paste: toast "The copied files no longer exist", entry gone
+- [x] 4.3 Delete one of the two files, paste the entry: the other is pasted; delete both, paste: toast "The copied files no longer exist", entry gone
 - [ ] 4.4 With files copied in Finder on the clipboard, insert text through Dango (a snippet) into an editor: afterwards the clipboard holds the files again and no new history entry appears
 - [x] 4.5 `mise run check` and `cargo test` pass on the Mac
 
