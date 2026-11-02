@@ -8,6 +8,7 @@
 
 use std::ffi::OsString;
 use std::path::{Path, PathBuf};
+use std::sync::Mutex;
 
 use crate::extensions::ai::provider::AiError;
 
@@ -16,6 +17,36 @@ use crate::extensions::ai::provider::AiError;
 pub struct Located {
     pub program: PathBuf,
     pub path: OsString,
+}
+
+/// Finds `program` the way a run does. The login shell's PATH is asked for once
+/// per process, and once more after a miss, so a folder the user has just added
+/// to their profile is found without a restart.
+pub fn find(program: &str, configured: Option<&Path>, cwd: &Path) -> Result<Located, AiError> {
+    match locate(program, configured, &dirs_now(false), cwd) {
+        Err(AiError::ProgramMissing { .. }) => locate(program, configured, &dirs_now(true), cwd),
+        found => found,
+    }
+}
+
+fn dirs_now(refresh: bool) -> Vec<PathBuf> {
+    let mut extra: Vec<PathBuf> = login_path(refresh)
+        .map(|path| std::env::split_paths(&path).collect())
+        .unwrap_or_default();
+    extra.extend(crate::platform::agent_known_dirs());
+    search_dirs(std::env::var_os("PATH").as_deref(), extra)
+}
+
+fn login_path(refresh: bool) -> Option<OsString> {
+    static ASKED: Mutex<Option<Option<OsString>>> = Mutex::new(None);
+    let mut asked = ASKED
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    if refresh || asked.is_none() {
+        let env = crate::platform::login_shell_env();
+        *asked = Some(env.as_deref().and_then(path_from_env));
+    }
+    asked.clone().flatten()
 }
 
 /// The process PATH first, so the search only adds folders, then `extra`, with
@@ -173,6 +204,22 @@ mod tests {
 
         program_file(dir.path(), "claude");
         assert!(locate("claude", None, &dirs, dir.path()).is_ok());
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn an_npm_wrapper_script_is_found_by_its_bare_name() {
+        let dir = tempfile::tempdir().unwrap();
+        let script = dir.path().join("claude.cmd");
+        std::fs::write(
+            &script,
+            b"@echo off
+",
+        )
+        .unwrap();
+
+        let found = locate("claude", None, &[dir.path().to_path_buf()], dir.path()).unwrap();
+        assert_eq!(found.program, script);
     }
 
     #[test]

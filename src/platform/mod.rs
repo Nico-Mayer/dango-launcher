@@ -82,6 +82,24 @@ pub fn runs_inline_on_main_thread() -> bool {
     return false;
 }
 
+/// Folders an agent CLI is often installed to that a tray app's PATH lacks.
+pub fn agent_known_dirs() -> Vec<std::path::PathBuf> {
+    #[cfg(target_os = "windows")]
+    return windows::agent_known_dirs();
+    #[cfg(target_os = "macos")]
+    return macos::agent_known_dirs();
+}
+
+/// What `env` prints in the user's login shell, where that differs from
+/// Dango's own environment. Windows hands a login-started app the saved PATH,
+/// so there is nothing to ask for. Blocks for up to ten seconds on macOS.
+pub fn login_shell_env() -> Option<String> {
+    #[cfg(target_os = "windows")]
+    return None;
+    #[cfg(target_os = "macos")]
+    return macos::login_shell_env();
+}
+
 /// Where `auto-launch` writes the login entry for `app_name`, for messages.
 pub fn login_entry(app_name: &str) -> String {
     #[cfg(target_os = "windows")]

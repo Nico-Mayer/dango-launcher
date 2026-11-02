@@ -23,8 +23,8 @@
 
 - [x] 4.1 Add the platform-neutral search: configured absolute path, else process PATH + `platform::agent_search_dirs()`, deduplicated, through `which::which_in`; verify unit tests with temp folders: configured path wins, a relative or missing configured path gives `PathMissing` with "Couldn't find {path}. Check the path in your config file.", order is respected, a program added after a miss is found on the next call
 - [x] 4.2 Add the platform-neutral `PATH=` parser for `env` output; verify unit tests on sample output from zsh and fish, including a missing `PATH=` line
-- [ ] 4.3 Windows: `agent_search_dirs()` in `platform/windows` with the known dirs from the design (mise shims, `.local\bin`, `%APPDATA%\npm`, WinGet links, scoop shims); verify a Windows-only test that a `claude.cmd` in a temp folder is found by bare name
-- [ ] 4.4 macOS: `agent_search_dirs()` in `platform/macos` running `$SHELL -l -c env` in its own process group with a 10 s kill, cached with one re-probe on a miss, plus the known dirs; leave its test run as an open hand check for the Mac session (8.4)
+- [x] 4.3 Windows: `agent_search_dirs()` in `platform/windows` with the known dirs from the design (mise shims, `.local\bin`, `%APPDATA%\npm`, WinGet links, scoop shims); verify a Windows-only test that a `claude.cmd` in a temp folder is found by bare name
+- [x] 4.4 macOS: `agent_search_dirs()` in `platform/macos` running `$SHELL -l -c env` in its own process group with a 10 s kill, cached with one re-probe on a miss, plus the known dirs; leave its test run as an open hand check for the Mac session (8.4)
 
 ## 5. Process client
 
