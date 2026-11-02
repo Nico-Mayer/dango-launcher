@@ -61,4 +61,4 @@
 
 ## 9. Review
 
-- [ ] 9.1 Run the `ponytail-review` skill in a fresh subagent on this change's commits, without the apply context; verify the findings are reported to the author
+- [x] 9.1 Run the `ponytail-review` skill in a fresh subagent on this change's commits, without the apply context; verify the findings are reported to the author
