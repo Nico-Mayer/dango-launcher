@@ -12,10 +12,10 @@ kept, and what the user is told when a request cannot be made or fails.
 
 A provider SHALL be an entry the user names in the configuration file, carrying
 the kind of service it speaks to, an endpoint where one applies, and a default
-model. Three kinds SHALL be supported: Anthropic's own protocol, an
-OpenAI-compatible endpoint, and Ollama on the local machine. No provider SHALL
-be assumed: with none configured, the AI commands SHALL say so rather than
-failing when they are run.
+model. Five kinds SHALL be supported: Anthropic's own protocol, an
+OpenAI-compatible endpoint, Ollama on the local machine, and the agent programs
+Claude Code and pi. No provider SHALL be assumed: with none configured, the AI
+commands SHALL say so rather than failing when they are run.
 
 #### Scenario: A hosted provider is configured
 
@@ -28,16 +28,20 @@ failing when they are run.
   as a hosted router or a local server
 - **THEN** commands naming that provider send their requests to that endpoint
 
+#### Scenario: An agent program is configured
+
+- **WHEN** the user adds a provider of the `claude` or `pi` kind
+- **THEN** commands naming that provider are answered by that program
+
 #### Scenario: An unknown provider kind
 
 - **WHEN** a provider entry names a kind Dango does not support
-- **THEN** that provider is ignored and the problem is surfaced the way a
-  configuration problem is
-- **AND** the other providers still work
+- **THEN** the problem is surfaced the way a configuration problem is
+- **AND** the message names that kind
 
 #### Scenario: A program is not a provider kind
 
-- **WHEN** a provider entry names the kind `cli`
+- **WHEN** a provider entry names the kind `cli` or `codex`
 - **THEN** it is treated as an unknown provider kind
 
 #### Scenario: No provider is configured
@@ -186,10 +190,17 @@ cannot think SHALL ignore the level rather than failing.
 
 #### Scenario: No model is named anywhere
 
-- **WHEN** neither the command nor its provider names a model
+- **WHEN** neither the command nor its provider names a model, and the provider
+  is not an agent program
 - **THEN** it fails with "Set a model for {provider} in your config file", with
   the provider's name in place of `{provider}`
 - **AND** no request is made
+
+#### Scenario: An agent program with no model named
+
+- **WHEN** neither the command nor its provider names a model, and the provider
+  is an agent program
+- **THEN** the program is run with whatever model it uses by default
 
 ### Requirement: A request failure is explained in the user's terms
 
@@ -222,6 +233,196 @@ for debugging SHALL go to the log.
 
 #### Scenario: Nothing arrives in time
 
-- **WHEN** no part of an answer has arrived within 30 seconds of the request
+- **WHEN** the provider is a service and no part of an answer has arrived
+  within 30 seconds of the request
 - **THEN** the request is abandoned
 - **AND** the message says the model did not answer in time
+
+#### Scenario: An agent program goes quiet
+
+- **WHEN** the provider is an agent program and two minutes pass since it
+  started or since it last printed something, without new output
+- **THEN** the program is stopped
+- **AND** the message says the model did not answer in time
+
+#### Scenario: An agent program that keeps printing is not cut off
+
+- **WHEN** an agent program runs longer than two minutes but never goes two
+  minutes without new output
+- **THEN** it is allowed to finish
+- **AND** its whole answer is shown
+
+### Requirement: An agent program answers with what it prints
+
+A provider of the `claude` or `pi` kind SHALL run that program once per request,
+give it the prompt, and use the text it prints as the answer, shown as it
+arrives. Dango SHALL NOT look up or send a key for these kinds: the program uses
+the sign-in the user set up for it.
+
+#### Scenario: A command is answered by an agent program
+
+- **WHEN** a command uses a `claude` provider and the program is installed and
+  signed in
+- **THEN** the launcher shows that it is working until output arrives
+- **AND** then shows the program's printed answer
+
+#### Scenario: No key is needed
+
+- **WHEN** a command uses an agent program provider and `auth.json` holds no
+  key for it, or does not exist
+- **THEN** the command runs normally
+
+#### Scenario: The named model reaches the program
+
+- **WHEN** a command names a model and uses an agent program provider
+- **THEN** the program is asked to use that model
+
+#### Scenario: The thinking level reaches the program
+
+- **WHEN** a command sets a thinking level other than off and uses an agent
+  program provider
+- **THEN** the program is asked for that level of effort
+
+#### Scenario: The program's chatter is not the answer
+
+- **WHEN** the program writes progress or warnings on its error output
+- **THEN** that text goes to the log
+- **AND** it does not appear in the answer
+
+### Requirement: An agent program runs without the user's agent setup
+
+An agent program run for a command SHALL NOT use tools, MCP servers, hooks,
+plugins, skills, extensions, or context files such as CLAUDE.md and AGENTS.md,
+and SHALL NOT save the run as a session the user could resume. It SHALL run in
+an empty folder of its own.
+
+#### Scenario: Tools are off
+
+- **WHEN** a prompt asks the program to read a file or run a command
+- **THEN** the program has no tool to do it with
+- **AND** nothing on the user's disk is read or changed
+
+#### Scenario: The user's hooks and MCP servers are not loaded
+
+- **WHEN** the user has hooks or MCP servers set up for the program and a
+  command uses it
+- **THEN** no hook runs and no MCP server is started for that run
+
+#### Scenario: The user's context files are not loaded
+
+- **WHEN** the user has a global CLAUDE.md or AGENTS.md with instructions for
+  the program and a command uses it
+- **THEN** those instructions do not reach the model
+
+#### Scenario: No session is left behind
+
+- **WHEN** a command has been answered by an agent program
+- **THEN** that run does not appear among the program's sessions to resume
+
+### Requirement: Dango finds the agent program
+
+When a command uses an agent program provider, Dango SHALL find the program at
+that moment. A configured absolute path SHALL be used as is. Without one, Dango
+SHALL look on its own PATH, the PATH the user's login shell sets up, and the
+usual install folders of version managers and package managers. A program
+installed into one of those places while Dango runs SHALL be found without a
+restart.
+
+#### Scenario: A configured path is used
+
+- **WHEN** a provider entry names an absolute path to the program
+- **THEN** that file is run, wherever it is
+
+#### Scenario: A program installed through a version manager on Windows
+
+- **WHEN** the program is reachable only through mise's shims or as an npm
+  wrapper script, and Dango was started at login
+- **THEN** Dango finds and runs it
+
+#### Scenario: A program on the shell's PATH on macOS
+
+- **WHEN** the program's folder is added to PATH only in the user's shell
+  profile, and Dango was opened from Finder or at login
+- **THEN** Dango finds and runs it
+
+#### Scenario: The program is not installed
+
+- **WHEN** no path is configured and the program cannot be found
+- **THEN** nothing is run
+- **AND** the command fails with "Couldn't find {program}. Install it or set its
+  path in your config file.", with the program's name in place of `{program}`
+
+#### Scenario: The configured path is wrong
+
+- **WHEN** a provider entry names a path that is not absolute or does not exist
+- **THEN** nothing is run
+- **AND** the command fails with "Couldn't find {path}. Check the path in your
+  config file.", with the configured path in place of `{path}`
+
+#### Scenario: The program is installed while Dango runs
+
+- **WHEN** the command failed because the program was missing, the user then
+  installs it into one of the searched places, and runs the command again
+- **THEN** the program is found and run, without a restart
+
+#### Scenario: A slow login shell does not block the launcher
+
+- **WHEN** the user's login shell takes long to start or waits for input while
+  Dango looks for the program
+- **THEN** the launcher stays responsive and Escape abandons the request
+- **AND** the search goes on without the login shell's PATH
+
+### Requirement: An agent program runs out of sight
+
+Running an agent program SHALL NOT show a window or take focus away from the
+launcher, and stopping a request SHALL stop the program and every process it
+started.
+
+#### Scenario: No console window on Windows
+
+- **WHEN** a command uses an agent program in a release build on Windows
+- **THEN** no console or other window appears
+- **AND** the launcher stays the foreground window and keeps its view
+
+#### Scenario: No window on macOS
+
+- **WHEN** a command uses an agent program on macOS
+- **THEN** no window or Dock icon appears
+- **AND** the launcher keeps focus
+
+#### Scenario: Abandoning stops the program
+
+- **WHEN** an agent program is running for a command and the request is
+  abandoned, by Escape, by a reset, or by another command
+- **THEN** the program and every process it started are stopped
+- **AND** the launcher handles the next key without delay
+
+#### Scenario: Quitting Dango stops the program
+
+- **WHEN** an agent program is running for a command and the user quits Dango
+  from the tray
+- **THEN** the program and every process it started are stopped
+
+#### Scenario: A process left behind by the program is stopped
+
+- **WHEN** the program has finished printing but a process it started is still
+  running, and the request is abandoned
+- **THEN** that process is stopped too
+
+### Requirement: An agent program's failure is explained
+
+When an agent program ends with an error, the command SHALL fail with a message
+saying so, and what the program wrote on both its outputs SHALL go to the log.
+
+#### Scenario: The program fails
+
+- **WHEN** the program exits with an error, for example because the user is not
+  signed in
+- **THEN** the command fails with "{provider} stopped with an error. See
+  dango.log for the reason.", with the provider's name in place of `{provider}`
+- **AND** the program's standard output and error output are in the log
+
+#### Scenario: The program succeeds but prints nothing
+
+- **WHEN** the program exits without error and prints no text
+- **THEN** the launcher says the model returned no text
