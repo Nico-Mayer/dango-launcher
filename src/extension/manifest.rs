@@ -29,7 +29,6 @@ pub struct CommandDecl {
     pub id: String,
     pub title: String,
     pub mode: InvocationMode,
-    pub subtitle: Option<String>,
     /// Either `icon:<name>` for a named icon or a path to an image file.
     pub icon: Option<String>,
     pub keywords: Vec<String>,
@@ -144,7 +143,6 @@ mod tests {
             id: id.into(),
             title: id.into(),
             mode: InvocationMode::View,
-            subtitle: None,
             icon: None,
             keywords: vec![],
             alias: None,

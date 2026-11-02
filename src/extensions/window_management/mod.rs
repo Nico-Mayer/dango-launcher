@@ -328,7 +328,6 @@ fn command(id: &str, title: &str, icon: &str, keywords: &[&str]) -> crate::exten
         id: id.into(),
         title: title.into(),
         mode: InvocationMode::NoView,
-        subtitle: Some("Window Management".into()),
         icon: Some(format!("{}{icon}", crate::extension::NAMED_ICON)),
         keywords: keywords.iter().map(|k| (*k).to_string()).collect(),
         alias: None,

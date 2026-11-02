@@ -12,7 +12,7 @@ build-green step.
 
 ## 2. Remove the command subtitle from the manifest
 
-- [ ] 2.1 Remove `CommandDecl::subtitle` from `src/extension/manifest.rs` and from every built-in manifest (`clipboard`, `system`, `window_management`, `games`, `ai`, `updates`, `snippets`) and test fixture. `command_candidates` no longer reads it. Verify with `cargo test` and `mise run check`.
+- [x] 2.1 Remove `CommandDecl::subtitle` from `src/extension/manifest.rs` and from every built-in manifest (`clipboard`, `system`, `window_management`, `games`, `ai`, `updates`, `snippets`) and test fixture. `command_candidates` no longer reads it. Verify with `cargo test` and `mise run check`.
 
 ## 3. Review
 

@@ -46,7 +46,6 @@ pub(crate) fn manifest() -> Manifest {
             id: COMMAND_CHECK.into(),
             title: "Check for Updates".into(),
             mode: InvocationMode::View,
-            subtitle: Some("Dango".into()),
             icon: Some(format!("{NAMED_ICON}refresh-cw")),
             keywords: vec!["update".into(), "upgrade".into(), "version".into()],
             alias: None,

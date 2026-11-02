@@ -47,7 +47,6 @@ pub(crate) fn manifest() -> Manifest {
             id: COMMAND_SEARCH.into(),
             title: "Search Games".into(),
             mode: InvocationMode::View,
-            subtitle: Some("Games".into()),
             icon: Some(fallback_icon()),
             keywords: ["steam", "games", "play", "library"]
                 .iter()

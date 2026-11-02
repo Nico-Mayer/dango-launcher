@@ -399,7 +399,6 @@ pub(crate) fn manifest(commands: &[AiCommand]) -> Manifest {
                 id: command.id.clone(),
                 title: command.title.clone(),
                 mode: InvocationMode::View,
-                subtitle: Some("AI".into()),
                 icon: Some(format!("{NAMED_ICON}{ICON}")),
                 keywords: vec!["ai".into()],
                 alias: None,

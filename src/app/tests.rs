@@ -409,7 +409,6 @@ fn two_commands() -> Arc<TwoCommands> {
         id: id.into(),
         title: format!("Fire {id}"),
         mode: InvocationMode::View,
-        subtitle: None,
         icon: None,
         keywords: vec![],
         alias: None,
