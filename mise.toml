@@ -47,4 +47,12 @@ skills.dir = ".agents/skills"
 skills.auto_sync = true
 
 [hooks]
-postinstall = "mise skills sync --dir .claude/skills"
+postinstall = [
+  "mise skills sync",
+  "mise skills sync --dir .claude/skills",
+  "skillshare install -p",
+  "skillshare sync -p",
+  "openspec init --tools claude",
+  "openspec init --tools agents",
+  "hk install",
+]
