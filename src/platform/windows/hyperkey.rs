@@ -20,20 +20,17 @@ use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
 
 use windows_sys::Win32::Foundation::{LPARAM, LRESULT, WPARAM};
-use windows_sys::Win32::System::LibraryLoader::GetModuleHandleW;
-use windows_sys::Win32::System::Threading::GetCurrentThreadId;
 use windows_sys::Win32::UI::Input::KeyboardAndMouse::{
     SendInput, VkKeyScanW, INPUT, INPUT_KEYBOARD, KEYBDINPUT, KEYEVENTF_KEYUP, VIRTUAL_KEY,
     VK_BACK, VK_CAPITAL, VK_DELETE, VK_ESCAPE, VK_LCONTROL, VK_LMENU, VK_LSHIFT, VK_LWIN,
     VK_RETURN, VK_SPACE, VK_TAB,
 };
 use windows_sys::Win32::UI::WindowsAndMessaging::{
-    CallNextHookEx, GetMessageW, PostThreadMessageW, SetWindowsHookExW, UnhookWindowsHookEx,
-    HC_ACTION, KBDLLHOOKSTRUCT, MSG, WH_KEYBOARD_LL, WM_KEYDOWN, WM_KEYUP, WM_QUIT, WM_SYSKEYDOWN,
-    WM_SYSKEYUP,
+    CallNextHookEx, PostThreadMessageW, HC_ACTION, KBDLLHOOKSTRUCT, WM_KEYDOWN, WM_KEYUP, WM_QUIT,
+    WM_SYSKEYDOWN, WM_SYSKEYUP,
 };
 
-use super::DANGO_INJECTED;
+use super::{llhook, DANGO_INJECTED};
 use crate::platform::{Hyperkey, HyperkeySpec, HyperkeyTrigger};
 
 static TRIGGER_VK: AtomicU32 = AtomicU32::new(0);
@@ -116,28 +113,12 @@ impl Drop for WindowsHyperkey {
 }
 
 fn hook_thread(report: Sender<Option<u32>>) {
-    unsafe {
-        let hmod = GetModuleHandleW(std::ptr::null());
-        let hook = SetWindowsHookExW(WH_KEYBOARD_LL, Some(hook_proc), hmod, 0);
-        if hook.is_null() {
-            let _ = report.send(None);
-            return;
-        }
-        let _ = report.send(Some(GetCurrentThreadId()));
-
-        // A low-level hook needs a message loop on its own thread. GetMessage
-        // returns 0 on the WM_QUIT that Drop posts, which ends the loop.
-        let mut msg: MSG = std::mem::zeroed();
-        while GetMessageW(&mut msg, std::ptr::null_mut(), 0, 0) > 0 {}
-
-        // Release anything still held so no modifier is left stuck down, then
-        // remove the hook.
-        if HELD.swap(false, Ordering::SeqCst) {
-            emit_modifiers(false);
-        }
-        UnhookWindowsHookEx(hook);
-        TRIGGER_VK.store(0, Ordering::SeqCst);
+    llhook::run(hook_proc, report);
+    // Release anything still held so no modifier is left stuck down.
+    if HELD.swap(false, Ordering::SeqCst) {
+        unsafe { emit_modifiers(false) };
     }
+    TRIGGER_VK.store(0, Ordering::SeqCst);
 }
 
 unsafe extern "system" fn hook_proc(code: i32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {

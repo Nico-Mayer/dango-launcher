@@ -13,25 +13,21 @@
 //! untouched, so translating here does not clobber the dead-key composition the
 //! user's real typing depends on.
 
-use std::sync::mpsc::Sender;
 use std::sync::Mutex;
 use std::thread::JoinHandle;
 
 use windows_sys::Win32::Foundation::{LPARAM, LRESULT, WPARAM};
-use windows_sys::Win32::System::LibraryLoader::GetModuleHandleW;
-use windows_sys::Win32::System::Threading::GetCurrentThreadId;
 use windows_sys::Win32::UI::Input::KeyboardAndMouse::{
     GetAsyncKeyState, GetKeyState, GetKeyboardLayout, ToUnicodeEx, HKL, VK_CAPITAL, VK_CONTROL,
     VK_LCONTROL, VK_LMENU, VK_LSHIFT, VK_LWIN, VK_MENU, VK_RCONTROL, VK_RMENU, VK_RSHIFT, VK_RWIN,
     VK_SHIFT,
 };
 use windows_sys::Win32::UI::WindowsAndMessaging::{
-    CallNextHookEx, GetForegroundWindow, GetMessageW, GetWindowThreadProcessId, PostThreadMessageW,
-    SetWindowsHookExW, UnhookWindowsHookEx, HC_ACTION, KBDLLHOOKSTRUCT, MSG, WH_KEYBOARD_LL,
-    WM_KEYDOWN, WM_QUIT, WM_SYSKEYDOWN,
+    CallNextHookEx, GetForegroundWindow, GetWindowThreadProcessId, PostThreadMessageW, HC_ACTION,
+    KBDLLHOOKSTRUCT, WM_KEYDOWN, WM_QUIT, WM_SYSKEYDOWN,
 };
 
-use super::DANGO_INJECTED;
+use super::{llhook, DANGO_INJECTED};
 use crate::platform::{KeyMonitor, KeyStroke};
 
 type Sink = Box<dyn Fn(KeyStroke) + Send>;
@@ -57,7 +53,7 @@ impl WindowsKeyMonitor {
         let (report, done) = std::sync::mpsc::channel::<Option<u32>>();
         let thread = std::thread::Builder::new()
             .name("dango-keymonitor".into())
-            .spawn(move || hook_thread(report))
+            .spawn(move || llhook::run(hook_proc, report))
             .ok()?;
 
         match done.recv() {
@@ -85,23 +81,6 @@ impl Drop for WindowsKeyMonitor {
             let _ = thread.join();
         }
         *SINK.lock().unwrap() = None;
-    }
-}
-
-fn hook_thread(report: Sender<Option<u32>>) {
-    unsafe {
-        let hmod = GetModuleHandleW(std::ptr::null());
-        let hook = SetWindowsHookExW(WH_KEYBOARD_LL, Some(hook_proc), hmod, 0);
-        if hook.is_null() {
-            let _ = report.send(None);
-            return;
-        }
-        let _ = report.send(Some(GetCurrentThreadId()));
-
-        let mut msg: MSG = std::mem::zeroed();
-        while GetMessageW(&mut msg, std::ptr::null_mut(), 0, 0) > 0 {}
-
-        UnhookWindowsHookEx(hook);
     }
 }
 

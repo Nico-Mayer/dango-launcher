@@ -3,6 +3,7 @@ mod browser;
 mod clipboard;
 mod hyperkey;
 mod keymonitor;
+mod llhook;
 mod permissions;
 mod selection;
 mod system;
