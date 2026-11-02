@@ -45,7 +45,7 @@ Alpha, no users. Breaking changes to config file, extension manifest, view proto
   none`.
 - Named icons from `icondata_lu` behind one registry in `src/slint_shell/icons.rs`. Never draw icon elsewhere, never hand-roll SVG: add name to registry. Extension names one as `icon:<name>`; value without prefix = image file path.
 - SQLite for local persistence.
-- Node, hk, git-cliff, cargo-release, cargo-packager, slint-lsp, slint-viewer pinned via mise (`mise.toml`). OpenSpec CLI from mise too, on `latest`. Node runs only OpenSpec CLI and `scripts/*.mjs`.
+- Node, hk, git-cliff, cargo-release, cargo-packager, slint-lsp pinned via mise (`mise.toml`). OpenSpec CLI from mise too, on `latest`. Node runs only OpenSpec CLI and `scripts/*.mjs`.
 - Rust pinned in `rust-toolchain.toml`. Global mise `rust` entry exports `RUSTUP_TOOLCHAIN`, which beats that file, so `mise.toml` tells mise to read it. Bump channel there, nowhere else.
 
 ### Off the shelf before hand-rolled
@@ -130,8 +130,7 @@ No millisecond budgets in specs or tests. Results depend on machine load, unreli
 - Windows can't replace running exe, so proxy open in one session made `cargo run` in next fail to rebuild it (`os error 5`, server shows CONNECTION_CLOSED). At start proxy renames own exe (both names: cargo hard-links it from `deps/`) and copies it back; copy keeps timestamp, so cargo still sees build fresh.
 - Drive launcher through `dango-ui`, not SendInput: `press` for keys (`down`, `ctrl+k`, `escape`, `text:fire`), `snapshot` for compact list of labelled + interactive elements with handles, `take_screenshot` for window pixels. Slint's `dispatch_key_event` takes Slint's raw key chars; arrows + modifiers are control/private-use chars that never arrive from agent, so `press` maps names to them. `set_element_value` leaves caret at start: `press` `end` before typing more.
 - `mise run keys` + `mise run shot` (wrap `scripts/*.ps1`, Windows only) only for what lives outside launcher window: global hotkey (`mise run keys alt+space`), focus + paste into other apps, placement on screen, multiple monitors. `shot` captures every display, prints PNG path. `down:` held through SendInput doesn't auto-repeat: send key many times to mimic holding. Keys go to whatever in front, so check foreground window is Dango before sending Enter, Escape, Ctrl chords.
-- `slint-viewer --check ui/app.slint` compiles UI without cargo. `--screenshot` renders components without data (atoms, empty shell). Can't fill our views: `--load-data` takes no `styled-text` or image, and row missing field panics viewer.
-- `slint-lsp` + `slint-viewer` = separate assets of one GitHub release, and mise runs one entry per tool name, so `slint-lsp` from `github:`, `slint-viewer` from `ubi:`. Keep both at `slint` crate version. Slint plugin's LSP runs `slint-lsp` from PATH.
+- `slint-lsp` from mise `github:` backend, kept at `slint` crate version. Slint plugin's LSP runs `slint-lsp` from PATH.
 - Packaging is `cargo-packager`, configured in `[package.metadata.packager]` in `Cargo.toml` with camelCase keys. `mise run package` builds `nsis` on Windows and `app,dmg` on macOS. With `CARGO_PACKAGER_SIGN_PRIVATE_KEY` set, writes minisign `.sig` next to each output and tars `.app` into `.app.tar.gz` updater installs.
 - cargo-packager writes no update manifest. `manifest` job in `release.yml` builds `latest.json` from uploaded `.sig` files.
 - cargo-packager reads macOS signing identity only from its config, and `--config` replaces `Cargo.toml` table instead of merging. CI writes `signingIdentity` into `Cargo.toml` before packaging. Without it bundle not codesigned, no entitlements. To test signed build, add `signingIdentity` locally with identity from `security find-identity -v -p codesigning`, don't commit.
