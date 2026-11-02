@@ -23,12 +23,6 @@ const MAX_CHARACTERS: i32 = 100_000;
 pub struct WindowsSelection;
 
 impl DirectSelection for WindowsSelection {
-    /// The launcher holds the foreground here, so the focused element is its
-    /// own search field until it gets out of the way.
-    fn needs_foreground(&self) -> bool {
-        true
-    }
-
     fn selected_text(&self) -> Selected {
         with_deadline(read)
     }

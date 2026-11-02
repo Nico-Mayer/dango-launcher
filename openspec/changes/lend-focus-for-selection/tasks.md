@@ -7,12 +7,12 @@
 
 ## 2. Lend the foreground in the read path (shared)
 
-- [ ] 2.1 Add a lend step to `Handoff` that returns a guard giving the foreground back on drop, and make `TextExchange::selection` use it instead of `Launcher::dismiss`; drop `DirectSelection::needs_foreground`; verify with `cargo test` fakes that a read never dismisses the launcher, the lend is taken before the direct read, and returned on every exit (text, empty, copy fallback, copy error, lend error)
+- [x] 2.1 Add a lend step to `Handoff` that returns a guard giving the foreground back on drop, and make `TextExchange::selection` use it instead of `Launcher::dismiss`; drop `DirectSelection::needs_foreground`; verify with `cargo test` fakes that a read never dismisses the launcher, the lend is taken before the direct read, and returned on every exit (text, empty, copy fallback, copy error, lend error)
 - [ ] 2.2 Show a failed read in the launcher at once: verify with a UI test on the Slint testing backend that running an AI command with no selection leaves the launcher visible showing "Select some text first"
 
 ## 3. Windows
 
-- [ ] 3.1 Implement the Windows lend: force the previous window forward and wait (shared with `yield_to_previous`), and on drop `force_foreground` the launcher's hwnd; verify `cargo test` and `mise run check`
+- [x] 3.1 Implement the Windows lend: force the previous window forward and wait (shared with `yield_to_previous`), and on drop `force_foreground` the launcher's hwnd; verify `cargo test` and `mise run check`
 - [ ] 3.2 Add the `LENDING` flag and make the foreground event handler skip the hide while lending or when Dango is the foreground at handling time; verify with a unit test of the decision function
 - [ ] 3.3 Send Ctrl+Insert for `WindowsKeys::copy`, with `CHORD_HOLD`; verify `cargo test` and `mise run check`
 - [ ] 3.4 Hand check on Windows with `dango-ui` and `scripts/send-keys.ps1`: select text in Notepad, a browser, Windows Terminal and Zed, run Improve Writing from root search and from a command hotkey; the launcher stays on screen, the selection is read, typing goes to the launcher after, the clipboard is unchanged

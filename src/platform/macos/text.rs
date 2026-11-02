@@ -18,7 +18,9 @@ use objc2_app_kit::NSWorkspace;
 use objc2_application_services::{AXError, AXUIElement};
 use objc2_core_foundation::{CFRetained, CFString, CFType};
 
-use crate::text::{with_deadline, DirectSelection, Handoff, Keys, MainThread, Selected, TextError};
+use crate::text::{
+    with_deadline, DirectSelection, Handoff, Keys, Lend, MainThread, Selected, TextError,
+};
 
 const FOCUSED_ELEMENT: &str = "AXFocusedUIElement";
 const SELECTED_TEXT: &str = "AXSelectedText";
@@ -175,6 +177,12 @@ impl Handoff for MacHandoff {
     fn yield_to_previous(&self) -> Result<(), TextError> {
         std::thread::sleep(HIDE_SETTLE);
         Ok(())
+    }
+
+    /// The panel never took activation, so the application behind it is
+    /// already frontmost and the panel stays key.
+    fn lend_to_previous(&self) -> Lend {
+        Lend::nothing_to_give_back()
     }
 
     fn settle_after_paste(&self) {

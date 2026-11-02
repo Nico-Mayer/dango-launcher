@@ -30,7 +30,7 @@ use windows_sys::Win32::UI::WindowsAndMessaging::{
 };
 
 use super::DANGO_INJECTED;
-use crate::text::{Handoff, Keys, TextError};
+use crate::text::{Handoff, Keys, Lend, TextError};
 
 const FOREGROUND_TIMEOUT: Duration = Duration::from_millis(400);
 const FOREGROUND_POLL: Duration = Duration::from_millis(10);
@@ -166,6 +166,24 @@ impl Handoff for WindowsHandoff {
             }
             std::thread::sleep(FOREGROUND_POLL);
         }
+    }
+
+    /// Gives the foreground back only if Dango held it. Keyword expansion reads
+    /// with the launcher hidden, and activating a hidden window would take the
+    /// keyboard from the app the user is typing in.
+    fn lend_to_previous(&self) -> Lend {
+        let launcher = unsafe { GetForegroundWindow() } as isize;
+        let ready = self.yield_to_previous();
+        if launcher == 0 || !super::is_own_window(launcher as HWND) {
+            return Lend::new(ready, || {});
+        }
+        Lend::new(ready, move || unsafe {
+            let launcher = launcher as HWND;
+            super::force_foreground(launcher);
+            if GetForegroundWindow() != launcher {
+                eprintln!("[dango] the launcher didn't get the foreground back after a read");
+            }
+        })
     }
 
     /// A window that answers a no-op message is back in its message loop, which

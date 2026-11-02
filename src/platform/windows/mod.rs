@@ -331,6 +331,12 @@ pub(super) fn foreground_app() -> Option<String> {
     }
 }
 
+pub(super) fn is_own_window(window: HWND) -> bool {
+    let mut pid = 0u32;
+    unsafe { GetWindowThreadProcessId(window, &mut pid) };
+    pid == std::process::id()
+}
+
 pub(super) fn foreground_is_dango() -> bool {
     use windows::Win32::UI::WindowsAndMessaging::{GetForegroundWindow, GetWindowThreadProcessId};
     unsafe {

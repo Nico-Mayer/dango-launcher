@@ -66,6 +66,10 @@ pub trait Handoff: Send + Sync {
     /// Returns once the previous application is genuinely ready to receive
     /// input, or reports why it never will be.
     fn yield_to_previous(&self) -> Result<(), TextError>;
+    /// Gives the previous application the foreground for a read while the
+    /// launcher stays on screen. Dropping the lend takes the foreground back,
+    /// also when it failed part way.
+    fn lend_to_previous(&self) -> Lend;
     /// Called after the paste keystroke and before the clipboard is restored.
     /// Windows asks the target to answer a no-op message, which it only does
     /// once it has handled the paste. macOS has no such signal and waits.
@@ -73,6 +77,40 @@ pub trait Handoff: Send + Sync {
     /// Only paste needs this. A copy leaves an observable result, so the
     /// exchange watches for it instead of being told how long to wait.
     fn settle_after_paste(&self);
+}
+
+#[must_use]
+pub struct Lend {
+    ready: Result<(), TextError>,
+    give_back: Option<Box<dyn FnOnce() + Send>>,
+}
+
+impl Lend {
+    pub fn new(ready: Result<(), TextError>, give_back: impl FnOnce() + Send + 'static) -> Self {
+        Self {
+            ready,
+            give_back: Some(Box::new(give_back)),
+        }
+    }
+
+    pub fn nothing_to_give_back() -> Self {
+        Self {
+            ready: Ok(()),
+            give_back: None,
+        }
+    }
+
+    pub fn ready(&self) -> Result<(), TextError> {
+        self.ready.clone()
+    }
+}
+
+impl Drop for Lend {
+    fn drop(&mut self) {
+        if let Some(give_back) = self.give_back.take() {
+            give_back();
+        }
+    }
 }
 
 /// What the frontmost application said when asked directly. The three answers
@@ -92,18 +130,6 @@ pub enum Selected {
 /// answer `Unavailable` for an application that exposes nothing.
 pub trait DirectSelection: Send + Sync {
     fn selected_text(&self) -> Selected;
-
-    /// Whether the launcher has to be out of the way first.
-    ///
-    /// Windows answers yes, and it is not an optimisation: the launcher holds
-    /// the foreground there, so "the focused element" is Dango's own search
-    /// field and "the frontmost application" is Dango. Both questions are about
-    /// the application behind it. macOS answers no, because its launcher is a
-    /// panel that never took activation, so the application being asked about
-    /// is still the frontmost one.
-    fn needs_foreground(&self) -> bool {
-        false
-    }
 }
 
 /// Long enough for a busy application to answer across a process boundary,
@@ -250,11 +276,13 @@ impl TextExchange {
         if !self.keys.permitted() {
             return Err(TextError::PermissionMissing);
         }
+        // On Windows the launcher holds the foreground, so the focused element
+        // would be Dango's own search field. Lent, not dismissed: a failed read
+        // is shown in the launcher.
+        let lend = self.handoff.lend_to_previous();
+        lend.ready()?;
+
         if let Some(direct) = &self.direct {
-            if direct.needs_foreground() {
-                self.launcher.dismiss();
-                self.handoff.yield_to_previous()?;
-            }
             match direct.selected_text() {
                 Selected::Text(text) if !text.is_empty() => return Ok(Some(text)),
                 // Answered, with nothing selected. Not a reason to start typing
@@ -272,9 +300,6 @@ impl TextExchange {
     /// copy removes the ambiguity: if it survives, the copy did nothing.
     fn selection_through_clipboard(&self) -> Result<Option<String>, TextError> {
         let saved = self.read_clipboard();
-
-        self.launcher.dismiss();
-        self.handoff.yield_to_previous()?;
 
         let sentinel = format!("dango-selection-{}", uuid::Uuid::new_v4());
         self.own_writes.expect(&Content::Text(sentinel.clone()));
@@ -641,7 +666,19 @@ mod tests {
     #[derive(Default)]
     struct FakeHandoff {
         fails: Option<TextError>,
+        lend_fails: Option<TextError>,
         yielded: Mutex<usize>,
+        lent: Mutex<usize>,
+        returned: Arc<Mutex<usize>>,
+    }
+
+    impl FakeHandoff {
+        fn lent(&self) -> usize {
+            *self.lent.lock().unwrap()
+        }
+        fn returned(&self) -> usize {
+            *self.returned.lock().unwrap()
+        }
     }
 
     impl FakeHandoff {
@@ -657,6 +694,15 @@ mod tests {
                 Some(error) => Err(error.clone()),
                 None => Ok(()),
             }
+        }
+        fn lend_to_previous(&self) -> Lend {
+            *self.lent.lock().unwrap() += 1;
+            let returned = self.returned.clone();
+            let ready = match &self.lend_fails {
+                Some(error) => Err(error.clone()),
+                None => Ok(()),
+            };
+            Lend::new(ready, move || *returned.lock().unwrap() += 1)
         }
         fn settle_after_paste(&self) {}
     }
@@ -770,19 +816,64 @@ mod tests {
         );
     }
 
+    fn exchange_with(
+        clipboard: Arc<FakeClipboard>,
+        keys: Arc<FakeKeys>,
+        handoff: Arc<FakeHandoff>,
+        direct: Option<Arc<dyn DirectSelection>>,
+        launcher: Arc<FakeLauncher>,
+    ) -> TextExchange {
+        TextExchange::new(
+            clipboard,
+            keys,
+            handoff,
+            direct,
+            Arc::new(RecordingWrites::default()),
+            launcher,
+        )
+    }
+
     #[test]
-    fn reading_a_selection_also_dismisses_first() {
-        let clipboard = holding("what the user had");
-        let keys = Arc::new(FakeKeys {
-            permitted: true,
-            pastes_into: Some(clipboard.clone()),
-            ..Default::default()
-        });
-        let f = fixture(clipboard, keys);
+    fn a_read_lends_the_foreground_and_gives_it_back_on_every_exit() {
+        let cases: [(&str, Option<Selected>, bool, Option<TextError>); 5] = [
+            ("text", Some(Selected::Text("selected".into())), false, None),
+            ("empty", Some(Selected::Empty), false, None),
+            ("copy fallback", Some(Selected::Unavailable), false, None),
+            ("copy error", Some(Selected::Unavailable), true, None),
+            (
+                "lend error",
+                Some(Selected::Unavailable),
+                false,
+                Some(TextError::NoTarget),
+            ),
+        ];
+        for (case, direct, copy_fails, lend_fails) in cases {
+            let clipboard = holding("what the user had");
+            let keys = Arc::new(FakeKeys {
+                permitted: true,
+                copy_fails,
+                pastes_into: Some(clipboard.clone()),
+                ..Default::default()
+            });
+            let handoff = Arc::new(FakeHandoff {
+                lend_fails: lend_fails.clone(),
+                ..Default::default()
+            });
+            let launcher = Arc::new(FakeLauncher::default());
+            let direct = direct.map(|selected| Arc::new(FakeDirect(selected)) as _);
+            let exchange =
+                exchange_with(clipboard, keys, handoff.clone(), direct, launcher.clone());
 
-        f.exchange.selection().unwrap();
+            let read = exchange.selection();
 
-        assert_eq!(f.launcher.dismissals(), 1, "the copy is a keystroke too");
+            if let Some(error) = lend_fails {
+                assert_eq!(read, Err(error), "{case}");
+            }
+            assert_eq!(launcher.dismissals(), 0, "{case}: a read never hides");
+            assert_eq!(handoff.lent(), 1, "{case}");
+            assert_eq!(handoff.returned(), 1, "{case}: foreground not given back");
+            assert_eq!(*handoff.yielded.lock().unwrap(), 0, "{case}");
+        }
     }
 
     #[test]
@@ -1209,19 +1300,15 @@ mod tests {
 
     /// A direct route that only answers about whatever is in front, the way
     /// Windows does.
-    struct FrontmostOnly(Selected, Arc<FakeLauncher>);
+    struct FrontmostOnly(Selected, Arc<FakeHandoff>);
 
     impl DirectSelection for FrontmostOnly {
         fn selected_text(&self) -> Selected {
             assert!(
-                self.1.dismissals() > 0,
+                self.1.lent() == 1 && self.1.returned() == 0,
                 "asked while the launcher still had the foreground"
             );
             self.0.clone()
-        }
-
-        fn needs_foreground(&self) -> bool {
-            true
         }
     }
 
@@ -1252,52 +1339,28 @@ mod tests {
     }
 
     #[test]
-    fn a_route_that_needs_the_foreground_gets_it_before_being_asked() {
-        let launcher = Arc::new(FakeLauncher::default());
+    fn the_foreground_is_lent_before_the_direct_read() {
+        let handoff = FakeHandoff::working();
         let keys = FakeKeys::working();
-        let exchange = TextExchange::new(
+        let exchange = exchange_with(
             holding("what the user had"),
             keys.clone(),
-            FakeHandoff::working(),
+            handoff.clone(),
             Some(Arc::new(FrontmostOnly(
                 Selected::Text("from the app behind".into()),
-                launcher.clone(),
+                handoff.clone(),
             ))),
-            Arc::new(RecordingWrites::default()),
-            launcher.clone(),
+            Arc::new(FakeLauncher::default()),
         );
 
         // The assertion that matters is inside the fake: it fails if it is
-        // asked while the launcher is still in front.
+        // asked while the launcher still has the foreground.
         assert_eq!(
             exchange.selection().unwrap().as_deref(),
             Some("from the app behind")
         );
         assert!(keys.events().is_empty(), "still no keystroke");
-    }
-
-    /// The mirror of the test above, and the macOS shape. There the launcher is
-    /// a panel that never took activation, so the application being asked about
-    /// is already frontmost: hiding it would be a regression the user watches
-    /// happen for no reason.
-    #[test]
-    fn a_route_that_does_not_need_the_foreground_leaves_the_launcher_up() {
-        let launcher = Arc::new(FakeLauncher::default());
-        let exchange = TextExchange::new(
-            holding("what the user had"),
-            FakeKeys::working(),
-            FakeHandoff::working(),
-            Some(Arc::new(FakeDirect(Selected::Text("selected".into())))),
-            Arc::new(RecordingWrites::default()),
-            launcher.clone(),
-        );
-
-        assert_eq!(exchange.selection().unwrap().as_deref(), Some("selected"));
-        assert_eq!(
-            launcher.dismissals(),
-            0,
-            "the launcher went off screen to read a selection it could already see"
-        );
+        assert_eq!(handoff.returned(), 1);
     }
 
     #[test]
