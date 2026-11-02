@@ -67,7 +67,7 @@ built-in extension ids. Enumerated settings SHALL list their values.
 #### Scenario: The runtime stays lenient
 
 - **WHEN** a config contains a key the schema rejects
-- **THEN** Dango still loads the file and preserves the key on write-back, exactly as before
+- **THEN** Dango still loads the file, exactly as before
 
 ### Requirement: The schema is written beside the config file
 
@@ -106,18 +106,12 @@ NOT affect startup.
 ### Requirement: An editor can find the schema
 
 A config file Dango creates SHALL begin with a `$schema` key whose value is
-the relative path `./config.schema.json`, and Dango SHALL keep that key when
-it writes the file back.
+the relative path `./config.schema.json`.
 
 #### Scenario: A created file points at the schema
 
 - **WHEN** Dango creates a config file
 - **THEN** its first key is `$schema` with the value `./config.schema.json`
-
-#### Scenario: The key survives a write-back
-
-- **WHEN** a config file has a `$schema` key and Dango writes the file
-- **THEN** the key and its value are still present afterwards
 
 #### Scenario: The editor completes and checks the file
 
