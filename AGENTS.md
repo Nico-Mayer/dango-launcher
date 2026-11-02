@@ -1,352 +1,137 @@
 # Dango
 
-A keyboard-first launcher and command palette for Windows and macOS, in the
-spirit of Raycast. A tray app that stays resident, listens on one global
-shortcut, and summons a command prompt over whatever the user is doing.
+Keyboard-first launcher + command palette for Windows and macOS, Raycast-style. Tray app stays resident, listens on one global shortcut, summons command prompt over whatever user doing.
 
-Personal hobby project. No external users. Optimise for the author's daily use
-and for a codebase that stays pleasant to work in. Do not add process,
-telemetry, or infrastructure that only pays off at a scale this project will
-never reach.
+Personal hobby project. No external users. Optimise for author's daily use + codebase pleasant to work in. No process, telemetry, or infra that only pays off at scale project never reaches.
 
 ## Sources of truth
 
-- `openspec/specs/` - what the app does. Every behaviour rule lives here.
-- `AGENTS.md` (this file) - how to work on the code: stack, architecture,
-  conventions, platform traps, build facts.
+- `openspec/specs/` - what app does. Every behaviour rule lives here.
+- `AGENTS.md` (this file) - how to work on code: stack, architecture, conventions, platform traps, build facts.
 - `openspec/config.yaml` - rules for writing OpenSpec artifacts.
 - GitHub issues - open work.
 
-Do not duplicate a rule across these. If a spec already says it, link to the
-spec.
+No rule duplicated across these. If spec says it, link to spec.
 
 ## Workflow
 
-- A change to behaviour goes through OpenSpec: `/opsx:propose`, then
-  `/opsx:apply`, then `/opsx:archive`. Use `/opsx:explore` to think first.
-- A fix that does not change specified behaviour can be done directly.
-- Agents commit their own work as they go, without asking: atomic
-  conventional commits, each one building and passing its tests. Pushing
-  still waits for the author.
-- Run `mise run check` before pushing: `cargo fmt` and
-  `cargo clippy --all-targets -- -D warnings` on every file, which also
-  compiles the `.slint` files. Tests, UI included: `cargo test`. Plain
-  `hk check` only looks at changed files, so on a clean tree it checks
-  nothing.
-- Repeated commands are mise tasks (`mise tasks` lists them). They set
-  their own env vars and pick the platform's command, so they run the same
-  in fish, PowerShell, and bash.
-- Work one platform at a time. Finish and verify on the machine at hand, and
-  leave the other platform's hand checks as open tasks in the change's
-  `tasks.md` until a session on that machine. Do not archive a change with
-  open hand checks. Do not switch back and forth within a session.
-- When you hit a platform trap or build fact not listed below, add it here in
-  the same change.
+- Behaviour change goes through OpenSpec: `/opsx:propose`, then `/opsx:apply`, then `/opsx:archive`. `/opsx:explore` to think first.
+- Fix not changing specified behaviour: do directly.
+- Agents commit own work as they go, no asking: atomic conventional commits, each builds + passes tests. Pushing still waits for author.
+- Run `mise run check` before push: `cargo fmt` and `cargo clippy --all-targets -- -D warnings` on every file, also compiles `.slint` files. Tests, UI included: `cargo test`. Plain `hk check` only checks changed files, so clean tree = checks nothing.
+- Repeated commands = mise tasks (`mise tasks` lists). They set own env vars + pick platform's command, so same in fish, PowerShell, bash.
+- One platform at a time. Finish + verify on machine at hand; leave other platform's hand checks as open tasks in change's `tasks.md` until session on that machine. No archiving change with open hand checks. No switching back and forth within session.
+- Hit platform trap or build fact not listed below → add here in same change.
 
 ## Project stage
 
-Alpha with no users. Breaking changes to the config file, the extension
-manifest, the view protocol, and stored data are free: no migrations, no
-compatibility shims, no deprecation paths. Keep the version fields, but do not
-spend design on honouring old values.
+Alpha, no users. Breaking changes to config file, extension manifest, view protocol, stored data are free: no migrations, no compat shims, no deprecation paths. Keep version fields, but no design spent honouring old values.
 
 ## Platforms
 
-- Windows and macOS are both first class. Every feature ships on both, or the
-  spec states the gap and why.
-- Linux is out of scope. No Linux code, no Wayland design, no Linux branches
-  "just in case".
-- Development happens on both macOS and Windows, daily use on Windows.
-- Text input covers English and German keyboards only. No IME, non-Latin
-  script, or right-to-left requirements, checks, or tests.
-- OS-specific code sits behind narrow Rust traits (for example `WindowManager`,
-  `ClipboardSource`, `KeyMonitor`, `AppIndexer`), implemented in
-  `platform/windows` and `platform/macos`. Never scatter `cfg` attributes
-  through feature code.
+- Windows + macOS both first class. Every feature ships on both, or spec states gap + why.
+- Linux out of scope. No Linux code, no Wayland design, no Linux branches "just in case".
+- Dev on macOS + Windows, daily use on Windows.
+- Text input: English + German keyboards only. No IME, non-Latin script, or RTL requirements, checks, tests.
+- OS-specific code behind narrow Rust traits (e.g. `WindowManager`, `ClipboardSource`, `KeyMonitor`, `AppIndexer`), implemented in `platform/windows` and `platform/macos`. Never scatter `cfg` attributes through feature code.
 
 ## Tech stack
 
-- One Rust crate at the repo root: all OS integration, all business logic,
-  and the UI. Rust in `src/`, `.slint` files in `ui/`.
-- Slint draws the launcher and the tray in the Dango process, on the winit
-  backend. The UI is a renderer of the launcher snapshot, not a place for
-  logic. The look is the design system in `openspec/specs/design-system`.
-- One theme, the `Theme` global in `ui/theme.slint`. Every colour, radius,
-  size, and type face comes from it, in a dark and a light value. It reads the
-  operating system's scheme through std-widgets' `Palette.color-scheme`, which
-  is the only reason the build keeps a std-widgets style. Rust never passes a
-  colour.
-- `ui/` holds `theme.slint`, `atoms/` (icon, kbd, tag, accessory, dot, and
-  the form controls), `shell/` (window, SearchBar, ActionBar, action panel),
-  `views/` (list, grid, detail, form, empty view), and `app.slint`, which
-  exports the window, the tray, and the globals. Each part maps to one part of
-  the design.
-- Controls are our own, built on `TextInput`, `FocusScope`, `TouchArea`, and
-  `PopupWindow`. std-widgets' controls cannot take our colours, radii, or
-  focus border (their palette is `out`), so only `ScrollView` is used from
-  them. A control carries `accessible-role`, `-label`, `-value`, and
-  `-description` itself, with its inner `TextInput` set to `accessible-role:
+- One Rust crate at repo root: all OS integration, business logic, UI. Rust in `src/`, `.slint` files in `ui/`.
+- Slint draws launcher + tray in Dango process, winit backend. UI = renderer of launcher snapshot, no logic. Look = design system in `openspec/specs/design-system`.
+- One theme, `Theme` global in `ui/theme.slint`. Every colour, radius, size, typeface from it, dark + light value. Reads OS scheme via std-widgets' `Palette.color-scheme`, only reason build keeps std-widgets style. Rust never passes colour.
+- `ui/` holds `theme.slint`, `atoms/` (icon, kbd, tag, accessory, dot, form controls), `shell/` (window, SearchBar, ActionBar, action panel), `views/` (list, grid, detail, form, empty view), and `app.slint`, exporting window, tray, globals. Each part maps to one design part.
+- Controls our own, built on `TextInput`, `FocusScope`, `TouchArea`, `PopupWindow`. std-widgets controls can't take our colours, radii, focus border (palette is `out`), so only `ScrollView` used from them. Control carries `accessible-role`, `-label`, `-value`, `-description` itself, inner `TextInput` set to `accessible-role:
   none`.
-- Named icons come from `icondata_lu` behind one registry in
-  `src/slint_shell/icons.rs`. Never draw an icon elsewhere and never hand-roll
-  an SVG: add the name to that registry. An extension names one as
-  `icon:<name>`; a value without that prefix is a path to an image file.
+- Named icons from `icondata_lu` behind one registry in `src/slint_shell/icons.rs`. Never draw icon elsewhere, never hand-roll SVG: add name to registry. Extension names one as `icon:<name>`; value without prefix = image file path.
 - SQLite for local persistence.
-- Node, hk, git-cliff, cargo-release, and cargo-packager are pinned via mise
-  (`mise.toml`). The OpenSpec CLI comes from mise too, on `latest`. Node runs
-  only the OpenSpec CLI and `scripts/*.mjs`.
-- Rust is pinned in `rust-toolchain.toml`. A global mise `rust` entry exports
-  `RUSTUP_TOOLCHAIN`, which beats that file, so `mise.toml` tells mise to read
-  it. Bump the channel there and nowhere else.
+- Node, hk, git-cliff, cargo-release, cargo-packager pinned via mise (`mise.toml`). OpenSpec CLI from mise too, on `latest`. Node runs only OpenSpec CLI and `scripts/*.mjs`.
+- Rust pinned in `rust-toolchain.toml`. Global mise `rust` entry exports `RUSTUP_TOOLCHAIN`, which beats that file, so `mise.toml` tells mise to read it. Bump channel there, nowhere else.
 
 ### Off the shelf before hand-rolled
 
-A hard requirement. Before writing code that does a general job, look for a
-maintained crate or package and pick it unless it genuinely cannot do the job.
-Hand-roll only when nothing suitable exists or the candidate provably falls
-short, and then the design names the candidates and what they could not do.
-"I did not look" is not a reason, and neither is a guess: check the API before
-ruling a library out.
+Hard requirement. Before writing code for general job, look for maintained crate/package, pick it unless it genuinely can't do job. Hand-roll only when nothing suitable exists or candidate provably falls short; then design names candidates + what they couldn't do. "I did not look" not a reason, nor a guess: check API before ruling library out.
 
 ## Architecture
 
-Everything the user can invoke is a command, and every command belongs to an
-extension. Built-in features are extensions too. The contract is in
-`openspec/specs/extension-model` and `openspec/specs/view-protocol`.
+Everything user can invoke = command; every command belongs to extension. Built-ins are extensions too. Contract in `openspec/specs/extension-model` and `openspec/specs/view-protocol`.
 
-- Built-ins run as native Rust. Third-party extensions will later run in a
-  sandboxed host. Do not route built-ins through the sandbox.
-- The manifest and the view protocol are versioned contracts. A change that
-  touches them says so in its design.
-- The launcher's interaction state lives in one Rust state machine,
-  `src/ui/`: query, selection, the view stack, the action panel,
-  Escape stages, and what each key does. It is a pure reducer, tested with
-  `cargo test` and no window. No interaction rule lives in the renderer.
-- `src/app/` holds `Core`: the state machine, the hold, the services, the
-  hotkeys, and the tray status. Window and tray work goes through the narrow
-  `Shell` trait (`src/shell.rs`), which `src/slint_shell/` implements and a
-  recording fake implements in tests.
-- The renderer (`src/slint_shell/render/`) turns each snapshot into Slint
-  globals, replacing everything, with one writer per global: `Shell`,
-  `Search`, `ListData`, `GridData`, `EmptyData`, `DetailData`, `Panel`, and
-  `FormData`. Components read the globals they need, so nothing is threaded
-  through the window. Callbacks go through the `Intents` global to
-  `Core::dispatch`, in order on the main thread. A root `FocusScope` asks Rust
-  through `capture-key-pressed` whether a chord is in the snapshot's
-  `bindings` before the focused control sees it. The renderer keeps only
-  hover, focus placement, and scroll-into-view.
-- Rows, headings, tiles, and panel entries have fixed heights, so the renderer
-  places and reveals them, and sizes the window, by counting. Change a height
-  in `Theme` and the matching constant in `render/` together.
-- Slint owns the main thread; a tokio runtime owned by the shell runs beside
-  it. Backend work reaches the UI through `Shell::on_main_thread`, which is
-  `slint::invoke_from_event_loop`.
-- Secrets live only in `auth.json` (see `openspec/specs/ai-providers`). The read
-  sits behind one function, so the `keyring` crate can take it over later.
+- Built-ins run native Rust. Third-party extensions later run in sandboxed host. Don't route built-ins through sandbox.
+- Manifest + view protocol = versioned contracts. Change touching them says so in design.
+- Launcher interaction state lives in one Rust state machine, `src/ui/`: query, selection, view stack, action panel, Escape stages, what each key does. Pure reducer, tested with `cargo test`, no window. No interaction rule in renderer.
+- `src/app/` holds `Core`: state machine, hold, services, hotkeys, tray status. Window + tray work goes through narrow `Shell` trait (`src/shell.rs`), implemented by `src/slint_shell/` and by recording fake in tests.
+- Renderer (`src/slint_shell/render/`) turns each snapshot into Slint globals, replacing everything, one writer per global: `Shell`, `Search`, `ListData`, `GridData`, `EmptyData`, `DetailData`, `Panel`, `FormData`. Components read globals they need, nothing threaded through window. Callbacks go through `Intents` global to `Core::dispatch`, in order on main thread. Root `FocusScope` asks Rust via `capture-key-pressed` whether chord is in snapshot's `bindings` before focused control sees it. Renderer keeps only hover, focus placement, scroll-into-view.
+- Rows, headings, tiles, panel entries have fixed heights, so renderer places, reveals, sizes window by counting. Change height in `Theme` and matching constant in `render/` together.
+- Slint owns main thread; tokio runtime owned by shell runs beside it. Backend work reaches UI via `Shell::on_main_thread`, which is `slint::invoke_from_event_loop`.
+- Secrets only in `auth.json` (see `openspec/specs/ai-providers`). Read behind one function, so `keyring` crate can take over later.
 
 ## Performance
 
-Keep the UI snappy. Speed comes from structure, not from timing numbers:
+Keep UI snappy. Speed from structure, not timing numbers:
 
-- The launcher component is built at startup and only shown and hidden after.
-- Search never blocks. Providers are async, slow ones appear late, and each
-  keystroke cancels the previous search instead of debouncing.
-- View updates replace the full tree. No reconciler, no diffing.
-- Defer work away from startup and the hotkey path when it can run lazily.
+- Launcher component built at startup, only shown/hidden after.
+- Search never blocks. Providers async, slow ones appear late, each keystroke cancels previous search instead of debouncing.
+- View updates replace full tree. No reconciler, no diffing.
+- Defer work away from startup + hotkey path when lazy possible.
 
-Do not put millisecond budgets in specs or tests. Results depend on machine
-load and are not reliable.
+No millisecond budgets in specs or tests. Results depend on machine load, unreliable.
 
 ## Conventions
 
-- Conventional commits. Imperative subject under 50 characters, no trailing
-  period. Atomic commits.
-- Be extremely conservative with code comments. Comment only non-obvious
-  reasoning, a surprising constraint, or a subtle workaround.
-- Rust: borrow over clone, `Result` with typed errors over strings, small
-  focused modules.
-- A surface is built from the design system's parts in `ui/atoms/`,
-  `ui/shell/`, and `ui/views/`. A new part goes where the design puts it and
-  takes every value from `Theme`. Interactive elements carry an
-  `accessible-label`, which is also how the UI tests find them.
-- UI tests run the real state machine against the component on
-  `i_slint_backend_testing` (`src/slint_shell/tests.rs`).
-- Any element that needs an icon uses one. A placeholder square only where the
-  icon is genuinely unknown.
-- User-facing text is written with the `ux-writing` skill and against
-  `openspec/specs/interface-copy`.
+- Conventional commits. Imperative subject under 50 chars, no trailing period. Atomic commits.
+- Extremely conservative with code comments. Comment only non-obvious reasoning, surprising constraint, subtle workaround.
+- Rust: borrow over clone, `Result` with typed errors over strings, small focused modules.
+- Surface built from design system parts in `ui/atoms/`, `ui/shell/`, `ui/views/`. New part goes where design puts it, takes every value from `Theme`. Interactive elements carry `accessible-label`, also how UI tests find them.
+- UI tests run real state machine against component on `i_slint_backend_testing` (`src/slint_shell/tests.rs`).
+- Any element needing icon uses one. Placeholder square only where icon genuinely unknown.
+- User-facing text written with `ux-writing` skill and against `openspec/specs/interface-copy`.
 
 ## Platform traps
 
-- Windows app indexing must enumerate `shell:AppsFolder`, not Start Menu `.lnk`
-  files. Only that route sees UWP and MSIX apps, and it gives AppUserModelIDs
-  for launching plus icons via `IShellItemImageFactory::GetImage`.
-- A `shell:AppsFolder` target can be a `::{GUID}` shell namespace identifier
-  (File Explorer is one). Its second character is a colon, so a naive
-  drive-letter test takes it for a path. Classify paths with
-  `Path::components` and `Component::Prefix`.
-- Windows window management must correct geometry with
-  `DWMWA_EXTENDED_FRAME_BOUNDS`, or invisible resize borders leave gaps.
-  Multi-monitor tiling needs per-monitor DPI awareness.
-- Restoring focus to the previous foreground window on Windows hits the
-  foreground lock and needs `AttachThreadInput` and `AllowSetForegroundWindow`.
-  Paste, snippet expansion, and AI replace-selection all depend on it.
-  `AttachThreadInput` is in `Win32::System::Threading`, not
-  `Win32::UI::WindowsAndMessaging`.
-- Windows reports AltGr as left Ctrl plus right Alt, so a chord check must
-  look at `VK_RMENU` before treating Ctrl+Alt as a shortcut, or every AltGr
-  character (`@`, `{`, `\` on a German layout) reads as one.
-- `open::with` and `open::with_detached` on Windows look a bare app name up
-  under App Paths but can keep a trailing NUL (5.4.5), so `Command` refuses
-  the path. Pass a full exe path; the browser opener reads it with
-  `windows-registry` in `platform/windows/browser.rs`.
-- A non-elevated process cannot hook or manage elevated windows on Windows.
-  Accept the limit.
-- On Windows, `WS_EX_TOOLWINDOW` is re-applied after each show: tao rewrote
-  the extended style on every visibility change, and nobody has checked
-  whether winit does. Windows positions in physical pixels, macOS in logical
-  points. Do not share the positioning code.
-- macOS gates window management, paste, snippet expansion, and reading the
-  selection behind Accessibility.
-- enigo's `Enigo::new` on macOS fails with `NoPermission` without
-  Accessibility. Create it on first use, never at startup.
-- Keyboard `CGEventTap`s on macOS, listen-only and active, need Input
-  Monitoring, not Accessibility. An Input Monitoring grant applies only after
-  a restart; an Accessibility grant applies at once.
-- Showing the launcher over fullscreen apps on macOS needs an NSPanel.
-- winit resizes a macOS window with `setContentSize`, which keeps the
-  bottom-left origin, so a Slint `Window::set_size` or a changed `height`
-  grows the launcher upward and moves the SearchBar. The height goes through
-  `LauncherWindow::set_height`, which keeps the top edge, and only where
-  `keeps_top_edge` is true. Set the component's `height` before the native
-  resize: Slint sizes a window back to the height its component allows, within
-  the same `SetWindowPos`. Windows uses `SetWindowPos` with `SWP_NOMOVE`;
-  macOS has no implementation yet (`setFrame:display:` with the origin moved
-  down) and stays at full height.
-- Reading the selection is direct on macOS via `AXSelectedText`. On Windows the
-  realistic path is copy, read clipboard, restore clipboard.
-- An ad-hoc signed macOS build has a designated requirement of its own
-  `cdhash`, which changes every build, so macOS can treat each update as a new
-  app and drop its Accessibility and Input Monitoring grants. Release builds
-  are signed with one certificate from CI secrets to keep the requirement
-  stable.
-- A real signature turns on the hardened runtime. Under it, `osascript` talking
-  to Finder (Empty Trash) needs the `com.apple.security.automation.apple-events`
-  entitlement in `Entitlements.plist` and an `NSAppleEventsUsageDescription`
-  in `Info.plist`, or tccd denies it.
-- winit never reports focus for the Slint launcher on Windows: the window is
-  the foreground and has the keyboard, yet `has_focus` stays false and no
-  `Focused` event arrives. Focus loss is watched with a
-  `SetWinEventHook(EVENT_SYSTEM_FOREGROUND)` in `platform/windows` instead.
-- On macOS the launcher's native window already exists before the first
-  show, so a missing window handle does not mean "first show". The one-time
-  `attach` (panel reclass, non-activating mask, level, Spaces) runs from a
-  flag in `SlintShell`. Without it the launcher never gets the keyboard and
-  typing goes to the app behind it.
-- Slint's winit backend probes for OpenGL 2 on Windows and silently falls back
-  to the software renderer without it. That renderer refuses
-  `set_rendering_notifier`, so paint timing hangs off `RedrawRequested` in the
-  window event filter.
+- Windows app indexing must enumerate `shell:AppsFolder`, not Start Menu `.lnk` files. Only that route sees UWP + MSIX apps, gives AppUserModelIDs for launching plus icons via `IShellItemImageFactory::GetImage`.
+- `shell:AppsFolder` target can be `::{GUID}` shell namespace identifier (File Explorer is one). Second char is colon, so naive drive-letter test takes it for path. Classify paths with `Path::components` and `Component::Prefix`.
+- Windows window management must correct geometry with `DWMWA_EXTENDED_FRAME_BOUNDS`, or invisible resize borders leave gaps. Multi-monitor tiling needs per-monitor DPI awareness.
+- Restoring focus to previous foreground window on Windows hits foreground lock, needs `AttachThreadInput` and `AllowSetForegroundWindow`. Paste, snippet expansion, AI replace-selection all depend on it. `AttachThreadInput` is in `Win32::System::Threading`, not `Win32::UI::WindowsAndMessaging`.
+- Windows reports AltGr as left Ctrl + right Alt, so chord check must look at `VK_RMENU` before treating Ctrl+Alt as shortcut, or every AltGr char (`@`, `{`, `\` on German layout) reads as one.
+- `open::with` and `open::with_detached` on Windows look bare app name up under App Paths but can keep trailing NUL (5.4.5), so `Command` refuses path. Pass full exe path; browser opener reads it with `windows-registry` in `platform/windows/browser.rs`.
+- Non-elevated process can't hook or manage elevated windows on Windows. Accept limit.
+- On Windows, `WS_EX_TOOLWINDOW` re-applied after each show: tao rewrote extended style on every visibility change, nobody checked whether winit does. Windows positions in physical pixels, macOS in logical points. Don't share positioning code.
+- macOS gates window management, paste, snippet expansion, reading selection behind Accessibility.
+- enigo's `Enigo::new` on macOS fails with `NoPermission` without Accessibility. Create on first use, never at startup.
+- Keyboard `CGEventTap`s on macOS, listen-only and active, need Input Monitoring, not Accessibility. Input Monitoring grant applies only after restart; Accessibility grant applies at once.
+- Showing launcher over fullscreen apps on macOS needs NSPanel.
+- winit resizes macOS window with `setContentSize`, keeping bottom-left origin, so Slint `Window::set_size` or changed `height` grows launcher upward + moves SearchBar. Height goes through `LauncherWindow::set_height`, which keeps top edge, only where `keeps_top_edge` true. Set component's `height` before native resize: Slint sizes window back to height its component allows, within same `SetWindowPos`. Windows uses `SetWindowPos` with `SWP_NOMOVE`; macOS has no implementation yet (`setFrame:display:` with origin moved down), stays full height.
+- Reading selection direct on macOS via `AXSelectedText`. On Windows realistic path: copy, read clipboard, restore clipboard.
+- Ad-hoc signed macOS build has designated requirement of own `cdhash`, changes every build, so macOS may treat each update as new app, drop Accessibility + Input Monitoring grants. Release builds signed with one certificate from CI secrets to keep requirement stable.
+- Real signature turns on hardened runtime. Under it, `osascript` talking to Finder (Empty Trash) needs `com.apple.security.automation.apple-events` entitlement in `Entitlements.plist` and `NSAppleEventsUsageDescription` in `Info.plist`, or tccd denies.
+- winit never reports focus for Slint launcher on Windows: window is foreground + has keyboard, yet `has_focus` stays false, no `Focused` event. Focus loss watched with `SetWinEventHook(EVENT_SYSTEM_FOREGROUND)` in `platform/windows` instead.
+- On macOS launcher's native window exists before first show, so missing window handle ≠ "first show". One-time `attach` (panel reclass, non-activating mask, level, Spaces) runs from flag in `SlintShell`. Without it launcher never gets keyboard, typing goes to app behind.
+- Slint's winit backend probes for OpenGL 2 on Windows, silently falls back to software renderer without it. That renderer refuses `set_rendering_notifier`, so paint timing hangs off `RedrawRequested` in window event filter.
 
 ## Build and verification facts
 
-- The hk pre-commit hook stashes unstaged files, which drops `MERGE_HEAD`,
-  so `git commit` after a conflicted merge fails with "could not open
-  `.git/MERGE_HEAD`". The staged tree survives: commit it with
-  `git commit-tree "$(git write-tree)" -p main -p <branch>` and fast-forward
-  to the result.
-- The software renderer clips children to a square and ignores the clipping
-  element's `border-radius`. A child that fills a rounded corner, such as the
-  ActionBar's background, rounds that corner itself.
-- Slint's `ElementHandle` test API finds nothing without debug info in the
-  generated code, so `build.rs` turns it on for the debug profile.
-- The Slint tray links Common Controls 6. A Windows binary without the
-  manifest that selects it fails to load (`STATUS_ENTRYPOINT_NOT_FOUND`), the
-  test binary included, so `build.rs` has the linker embed it in every
-  artifact.
-- A Slint `ListView` estimates its height from the rows it has built and
-  clamps a scroll to that estimate, so scrolling to an unbuilt row stops
-  short. Every list, root and pushed, builds every row in a `ScrollView`; it
-  holds at most 50 items (`ui::ITEM_LIMIT`).
-- Windows cannot be cross-compiled from macOS here. CI on `windows-latest` is
-  the only Windows compile check from the Mac. Check Windows symbol names and
-  module paths against the vendored crate source under `~/.cargo/registry`
-  before pushing; macOS code the same way from Windows.
-- Tauri used to switch on crate features for us. Without it, a missing
-  feature shows up as an item "configured out" (`windows`, `time`): add the
-  feature the compiler names.
-- CI runs `cargo clippy --all-targets -- -D warnings`, which lints the tests
-  too. Two lints that bite in platform code:
-  an inner `unsafe` block inside an `unsafe fn` (`unused_unsafe`) and casting a
-  value to its own type (`unnecessary_cast`, easy with `HWND`).
-- `mise run` installs every missing tool in `mise.toml` before a task runs,
-  cargo-packager compiled from source included. CI sets
-  `MISE_TASK_RUN_AUTO_INSTALL=false` and installs what it needs through
-  mise-action's `install_args`. A CI task that needs a new tool fails until
-  the tool is added there.
-- A cache saved by a tag run can be read only by that same tag, so release
-  runs save no cache, neither Rust's nor mise's. They would only fill the
-  10 GB cache limit.
-- On the Mac the shell is fish: `VAR=value cmd` is invalid. Use
-  `env VAR=value cmd`.
-- A release build applies `launcher.autostart`, so running one from `target/`
-  with the author's config points the login entry at that build. Test release
-  builds with `DANGO_CONFIG_DIR` set to a scratch directory.
-- `DANGO_CONFIG_DIR` moves only the config file. The database (data dir) and
-  clipboard images (cache dir) stay in the author's real
-  `com.nimayer.dango` folders, so a hand check that copies things lands in
-  the real clipboard history.
-- `DANGO_MEASURE=1` enables activation timing logs (stderr) in a release build.
-  A `windows_subsystem = "windows"` build shows stderr only when it is
-  redirected.
-- Release sets `panic = "abort"`, and a release build on Windows has no
-  console, so a panic there is a silent exit.
-- The Slint MCP server is for debug builds only, and never enabled in
-  `Cargo.toml`, so a release cannot open the port:
-  `mise run ui`, which is `cargo run --features slint/mcp` with
-  `SLINT_MCP_PORT=9315`. It starts listening on the first window show.
-- `dango-ui` in `.mcp.json` is a stdio proxy in `tools/dango-ui-mcp`, its
-  own crate and target folder, so it is always connected. With no debug
-  build up it lists only `launch_dango`, which runs the command above, shows
-  the launcher once, and waits; Slint's tools then appear on their own, and
-  also when a build was started by hand. The build's output goes to
-  `target/dango-ui-mcp.log`. `launch_dango` fails while another Dango runs.
-  The first session after a clean checkout compiles the proxy; if Claude
-  Code times out on it, build it once with
-  `cargo build --manifest-path tools/dango-ui-mcp/Cargo.toml`. The proxy
-  builds with the pinned toolchain, so do the same after a toolchain bump.
-- For hand checks on Windows, an agent can press keys with `mise run keys`
-  (for example `mise run keys alt+space 'text:fire' escape`) and capture
-  every display with `mise run shot`, which prints the PNG path. Both wrap
-  `scripts/*.ps1` and exist only on Windows. A `down:` held
-  through SendInput does not auto-repeat: send the key many times to mimic
-  holding it. Keys go to whatever is in front, so check the foreground
-  window is Dango before sending Enter, Escape, or Ctrl chords.
-- The Slint MCP `dispatch_key_event` cannot send Arrow keys from the agent,
-  and a newline inside a longer text is typed into the field. Send Enter on
-  its own, and pick list rows with `set_element_value` on the search field.
-- Packaging is `cargo-packager`, configured in `[package.metadata.packager]`
-  in `Cargo.toml` with camelCase keys. `mise run package` builds `nsis` on
-  Windows and `app,dmg` on macOS.
-  With `CARGO_PACKAGER_SIGN_PRIVATE_KEY` set, it writes a minisign `.sig` next
-  to each output and tars the `.app` into the `.app.tar.gz` the updater
-  installs.
-- cargo-packager writes no update manifest. The `manifest` job in
-  `release.yml` builds `latest.json` from the uploaded `.sig` files.
-- cargo-packager reads the macOS signing identity only from its config, and
-  `--config` replaces the `Cargo.toml` table instead of merging into it. CI
-  writes `signingIdentity` into `Cargo.toml` before packaging. Without it the
-  bundle is not codesigned and carries no entitlements. To test a signed build,
-  add `signingIdentity` locally with the identity from
-  `security find-identity -v -p codesigning`, and do not commit it.
-- `single-instance` on macOS treats its name as a file path, so a bare name
-  lands in the working directory: `/` and read-only for an app opened from
-  Finder or at login, where Dango then exits silently. The lock lives in the
-  data dir (`platform::instance_lock`).
-- Opening a running app from Finder or the Dock starts no second process on
-  macOS: the running one gets a reopen Apple event (`aevt`/`rapp`), handled
-  by `platform::watch_reopen`. Only a launch from the shell reaches the
-  single instance socket.
-- On macOS the updater swaps the bundle in place and returns. Dango then
-  releases its single instance lock and starts the bundle again with
-  `open -n`. On Windows the NSIS installer exits Dango and starts it again.
+- hk pre-commit hook stashes unstaged files, dropping `MERGE_HEAD`, so `git commit` after conflicted merge fails with "could not open `.git/MERGE_HEAD`". Staged tree survives: commit with `git commit-tree "$(git write-tree)" -p main -p <branch>` and fast-forward to result.
+- Software renderer clips children to square, ignores clipping element's `border-radius`. Child filling rounded corner, e.g. ActionBar's background, rounds that corner itself.
+- Slint's `ElementHandle` test API finds nothing without debug info in generated code, so `build.rs` turns it on for debug profile.
+- Slint tray links Common Controls 6. Windows binary without manifest selecting it fails to load (`STATUS_ENTRYPOINT_NOT_FOUND`), test binary included, so `build.rs` has linker embed it in every artifact.
+- Slint `ListView` estimates height from rows built, clamps scroll to estimate, so scrolling to unbuilt row stops short. Every list, root and pushed, builds every row in `ScrollView`; holds max 50 items (`ui::ITEM_LIMIT`).
+- Windows can't be cross-compiled from macOS here. CI on `windows-latest` = only Windows compile check from Mac. Check Windows symbol names + module paths against vendored crate source under `~/.cargo/registry` before push; macOS code same way from Windows.
+- Tauri used to switch on crate features for us. Without it, missing feature shows as item "configured out" (`windows`, `time`): add feature compiler names.
+- CI runs `cargo clippy --all-targets -- -D warnings`, linting tests too. Two lints that bite in platform code: inner `unsafe` block inside `unsafe fn` (`unused_unsafe`) and casting value to own type (`unnecessary_cast`, easy with `HWND`).
+- `mise run` installs every missing tool in `mise.toml` before task runs, cargo-packager compiled from source included. CI sets `MISE_TASK_RUN_AUTO_INSTALL=false`, installs what it needs via mise-action's `install_args`. CI task needing new tool fails until tool added there.
+- Cache saved by tag run readable only by same tag, so release runs save no cache, neither Rust's nor mise's. Would only fill 10 GB cache limit.
+- On Mac shell is fish: `VAR=value cmd` invalid. Use `env VAR=value cmd`.
+- Release build applies `launcher.autostart`, so running one from `target/` with author's config points login entry at that build. Test release builds with `DANGO_CONFIG_DIR` set to scratch dir.
+- `DANGO_CONFIG_DIR` moves only config file. Database (data dir) + clipboard images (cache dir) stay in author's real `com.nimayer.dango` folders, so hand check that copies things lands in real clipboard history.
+- `DANGO_MEASURE=1` enables activation timing logs (stderr) in release build. `windows_subsystem = "windows"` build shows stderr only when redirected.
+- Release sets `panic = "abort"`, release build on Windows has no console, so panic there = silent exit.
+- Slint MCP server debug builds only, never enabled in `Cargo.toml`, so release can't open port: `mise run ui`, which is `cargo run --features slint/mcp` with `SLINT_MCP_PORT=9315`. Starts listening on first window show.
+- `dango-ui` in `.mcp.json` = stdio proxy in `tools/dango-ui-mcp`, own crate + target folder, so always connected. No debug build up → lists only `launch_dango`, which runs command above, shows launcher once, waits; Slint's tools then appear on own, also when build started by hand. Build output goes to `target/dango-ui-mcp.log`. `launch_dango` fails while another Dango runs. First session after clean checkout compiles proxy; if Claude Code times out, build once with `cargo build --manifest-path tools/dango-ui-mcp/Cargo.toml`. Proxy builds with pinned toolchain, so same after toolchain bump.
+- Hand checks on Windows: agent can press keys with `mise run keys` (e.g. `mise run keys alt+space 'text:fire' escape`) and capture every display with `mise run shot`, which prints PNG path. Both wrap `scripts/*.ps1`, exist only on Windows. `down:` held through SendInput doesn't auto-repeat: send key many times to mimic holding. Keys go to whatever in front, so check foreground window is Dango before sending Enter, Escape, Ctrl chords.
+- Slint MCP `dispatch_key_event` can't send Arrow keys from agent, and newline inside longer text typed into field. Send Enter alone, pick list rows with `set_element_value` on search field.
+- Packaging is `cargo-packager`, configured in `[package.metadata.packager]` in `Cargo.toml` with camelCase keys. `mise run package` builds `nsis` on Windows and `app,dmg` on macOS. With `CARGO_PACKAGER_SIGN_PRIVATE_KEY` set, writes minisign `.sig` next to each output and tars `.app` into `.app.tar.gz` updater installs.
+- cargo-packager writes no update manifest. `manifest` job in `release.yml` builds `latest.json` from uploaded `.sig` files.
+- cargo-packager reads macOS signing identity only from its config, and `--config` replaces `Cargo.toml` table instead of merging. CI writes `signingIdentity` into `Cargo.toml` before packaging. Without it bundle not codesigned, no entitlements. To test signed build, add `signingIdentity` locally with identity from `security find-identity -v -p codesigning`, don't commit.
+- `single-instance` on macOS treats name as file path, so bare name lands in working dir: `/` and read-only for app opened from Finder or at login, where Dango then exits silently. Lock lives in data dir (`platform::instance_lock`).
+- Opening running app from Finder or Dock starts no second process on macOS: running one gets reopen Apple event (`aevt`/`rapp`), handled by `platform::watch_reopen`. Only shell launch reaches single instance socket.
+- On macOS updater swaps bundle in place and returns. Dango then releases single instance lock, restarts bundle with `open -n`. On Windows NSIS installer exits Dango and restarts it.
