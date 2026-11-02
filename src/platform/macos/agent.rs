@@ -59,9 +59,10 @@ pub fn login_shell_env() -> Option<String> {
     let mut stdout = child.stdout.take()?;
     let (sender, received) = std::sync::mpsc::channel();
     std::thread::spawn(move || {
-        let mut output = String::new();
-        let _ = stdout.read_to_string(&mut output);
-        let _ = sender.send(output);
+        // Bytes, so one variable that isn't UTF-8 doesn't cost the whole PATH.
+        let mut output = Vec::new();
+        let _ = stdout.read_to_end(&mut output);
+        let _ = sender.send(String::from_utf8_lossy(&output).into_owned());
     });
 
     let deadline = Instant::now() + LOGIN_SHELL_LIMIT;
