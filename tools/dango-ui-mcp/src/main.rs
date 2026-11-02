@@ -85,6 +85,9 @@ impl Proxy {
         if self.connected().await {
             return text("Dango is already running with its MCP server.");
         }
+        if instance_socket().is_ok() {
+            return failure("Another Dango is running. Quit it first: only one runs at a time.");
+        }
         let root = repo_root();
         let log_path = root.join("target").join("dango-ui-mcp.log");
         let child = std::fs::create_dir_all(root.join("target"))
@@ -210,10 +213,13 @@ fn failure(message: impl Into<String>) -> CallToolResult {
     CallToolResult::error(vec![ContentBlock::text(message)])
 }
 
-fn show() -> std::io::Result<()> {
+fn instance_socket() -> std::io::Result<interprocess::local_socket::Stream> {
     use interprocess::local_socket::{prelude::*, GenericNamespaced, Stream};
-    let mut stream = Stream::connect(INSTANCE_SOCKET.to_ns_name::<GenericNamespaced>()?)?;
-    stream.write_all(b"show\n")
+    Stream::connect(INSTANCE_SOCKET.to_ns_name::<GenericNamespaced>()?)
+}
+
+fn show() -> std::io::Result<()> {
+    instance_socket()?.write_all(b"show\n")
 }
 
 fn repo_root() -> PathBuf {
