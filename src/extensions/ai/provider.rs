@@ -93,6 +93,10 @@ pub enum AiError {
     Timeout,
     #[error("auth.json couldn't be read. Check the file in your config folder.")]
     KeyFileUnreadable,
+    #[error("Couldn't find {program}. Install it or set its path in your config file.")]
+    ProgramMissing { program: String },
+    #[error("Couldn't find {path}. Check the path in your config file.")]
+    PathMissing { path: String },
 }
 
 /// What the next poll of a running request produced.

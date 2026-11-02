@@ -1355,12 +1355,14 @@ dependencies = [
  "slint",
  "slint-build",
  "steamlocate",
+ "tempfile",
  "thiserror 2.0.20",
  "time",
  "tokio",
  "uiautomation",
  "url",
  "uuid",
+ "which",
  "windows 0.61.3",
  "windows-registry",
  "windows-sys 0.61.2",
@@ -8015,6 +8017,15 @@ dependencies = [
  "naga-types",
  "raw-window-handle",
  "static_assertions",
+]
+
+[[package]]
+name = "which"
+version = "8.0.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bae2f2b2b816647a1cab1acc91f5bd20812d53cb344382635ec2181940c8034f"
+dependencies = [
+ "libc",
 ]
 
 [[package]]

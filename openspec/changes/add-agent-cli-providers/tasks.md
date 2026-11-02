@@ -16,12 +16,12 @@
 
 - [x] 3.1 Add the per-kind argument builders for `claude` and `pi` from the design table (model, thinking); verify unit tests for each kind and each thinking level
 - [ ] 3.2 Check by hand, once per CLI with a throwaway prompt, that `claude -p --safe-mode --tools "" --output-format text --no-session-persistence` and `pi -p --no-tools --no-context-files --no-session` each read the prompt from stdin and answer with the existing sign-in; record the result in this task, and change the builder and design if a flag is refused
-  - claude: the author confirmed `-p --safe-mode` answers with the existing sign-in. Still to check: the prompt on stdin, together with the other fixed flags.
-  - pi: not checked yet.
+  - claude: confirmed. The full fixed flag set, with the prompt on stdin, from an empty folder, answered `pong` with exit 0.
+  - pi: no flag refused, and the prompt on stdin started a request. It failed because the `openai-codex` sign-in has expired ("Your session has ended"). The error goes to stderr with exit 1, which is what `ProgramFailed` expects. Still to check after signing in to pi again: that it answers. Without `--no-extensions`, pi prints warnings about the user's extension packages, so that flag matters.
 
 ## 4. Program lookup
 
-- [ ] 4.1 Add the platform-neutral search: configured absolute path, else process PATH + `platform::agent_search_dirs()`, deduplicated, through `which::which_in`; verify unit tests with temp folders: configured path wins, a relative or missing configured path gives `PathMissing` with "Couldn't find {path}. Check the path in your config file.", order is respected, a program added after a miss is found on the next call
+- [x] 4.1 Add the platform-neutral search: configured absolute path, else process PATH + `platform::agent_search_dirs()`, deduplicated, through `which::which_in`; verify unit tests with temp folders: configured path wins, a relative or missing configured path gives `PathMissing` with "Couldn't find {path}. Check the path in your config file.", order is respected, a program added after a miss is found on the next call
 - [ ] 4.2 Add the platform-neutral `PATH=` parser for `env` output; verify unit tests on sample output from zsh and fish, including a missing `PATH=` line
 - [ ] 4.3 Windows: `agent_search_dirs()` in `platform/windows` with the known dirs from the design (mise shims, `.local\bin`, `%APPDATA%\npm`, WinGet links, scoop shims); verify a Windows-only test that a `claude.cmd` in a temp folder is found by bare name
 - [ ] 4.4 macOS: `agent_search_dirs()` in `platform/macos` running `$SHELL -l -c env` in its own process group with a 10 s kill, cached with one re-probe on a miss, plus the known dirs; leave its test run as an open hand check for the Mac session (8.4)
