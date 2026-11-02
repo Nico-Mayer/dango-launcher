@@ -3,8 +3,9 @@
 //! shell identifier, bringing an already-running window forward first.
 
 use std::path::Path;
+use std::time::Duration;
 
-use windows::core::{Interface, HSTRING, PCWSTR, PWSTR};
+use windows::core::{Interface, HRESULT, HSTRING, PCWSTR, PWSTR};
 use windows::Win32::Foundation::{CloseHandle, ERROR_SUCCESS, HANDLE, HWND, LPARAM, SIZE, TRUE};
 use windows::Win32::Graphics::Gdi::{
     CreateCompatibleDC, DeleteDC, DeleteObject, GetDIBits, GetObjectW, BITMAP, BITMAPINFO,
@@ -30,6 +31,12 @@ use windows::Win32::UI::WindowsAndMessaging::{
 
 use crate::extensions::applications::{AppIndexer, IndexedApp, LaunchError};
 use crate::icon_cache::IconRgba;
+
+/// What `GetImage` returns while the shell is busy. The `windows` crate does
+/// not define it.
+const E_PENDING: HRESULT = HRESULT(0x8000000A_u32 as i32);
+const PENDING_RETRIES: u32 = 10;
+const PENDING_DELAY: Duration = Duration::from_millis(100);
 
 pub struct WindowsAppIndexer;
 
@@ -96,22 +103,30 @@ impl AppIndexer for WindowsAppIndexer {
 
 /// Renders the icon the shell shows for a parsing name, which is an
 /// `shell:AppsFolder` entry for an indexed application and an executable path
-/// for a running one. Shared so neither extension depends on the other.
+/// for a running one. Shared so neither extension depends on the other. Waits
+/// out a busy shell, so callers keep it off the path that first shows a view.
 pub fn icon_for(parsing_name: &str, size: u32) -> Option<IconRgba> {
     unsafe {
         init_com();
         let item: IShellItem =
             SHCreateItemFromParsingName(PCWSTR(HSTRING::from(parsing_name).as_ptr()), None).ok()?;
         let factory: IShellItemImageFactory = item.cast().ok()?;
-        let bitmap = factory
-            .GetImage(
-                SIZE {
-                    cx: size as i32,
-                    cy: size as i32,
-                },
-                SIIGBF_ICONONLY | SIIGBF_BIGGERSIZEOK,
-            )
-            .ok()?;
+        let size = SIZE {
+            cx: size as i32,
+            cy: size as i32,
+        };
+        let get = || factory.GetImage(size, SIIGBF_ICONONLY | SIIGBF_BIGGERSIZEOK);
+        let mut bitmap = get();
+        for _ in 0..PENDING_RETRIES {
+            match &bitmap {
+                Err(error) if error.code() == E_PENDING => {
+                    std::thread::sleep(PENDING_DELAY);
+                    bitmap = get();
+                }
+                _ => break,
+            }
+        }
+        let bitmap = bitmap.ok()?;
         let rgba = bitmap_to_rgba(bitmap);
         let _ = DeleteObject(bitmap.into());
         rgba
