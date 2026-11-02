@@ -807,9 +807,10 @@ mod tests {
         let item = &list_of(&tree).items[0];
         assert_eq!(item.title, file.file_name().unwrap().to_str().unwrap());
         let icon = item.icon.clone().unwrap();
+        // Windows' GetImage returns E_PENDING when the shell is busy (#28).
         assert!(
-            Path::new(&icon).exists(),
-            "the system icon is cached: {icon}"
+            icon == format!("{NAMED_ICON}file") || Path::new(&icon).exists(),
+            "the system icon is cached or the fallback: {icon}"
         );
     }
 
