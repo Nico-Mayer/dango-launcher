@@ -11,6 +11,8 @@ targets:
 skills:
   - name: rust-skills
     source: https://github.com/leonardomso/rust-skills
+  - name: ux-writing-skill
+    source: https://github.com/content-designer/ux-writing-skill
 
 mcp:
   servers:

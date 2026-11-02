@@ -295,6 +295,41 @@
         "rules/unsafe-safety-comment.md": "sha256:4892500c59f446eb8031fcf2cc98bf64f3323276abee0355409f4af53cbdcaab",
         "rules/unsafe-send-sync-manual.md": "sha256:106ca8ba1843ec8dfe9658c5db41fd99d106bcf2b8b4ece41e8db1dd347372f2"
       }
+    },
+    "ux-writing-skill": {
+      "source": "https://github.com/content-designer/ux-writing-skill",
+      "type": "github",
+      "installed_at": "2026-11-02T14:59:20.57597+01:00",
+      "repo_url": "https://github.com/content-designer/ux-writing-skill.git",
+      "version": "98cacde",
+      "commit": "98cacde4ba2dd10ed28df43a8d53eef1e321c539",
+      "file_hashes": {
+        ".gitattributes": "sha256:30c110430ae91c15c40dc23c54c976b835b9d6994b0867c1a6fccf2bbb29a7cd",
+        ".github/workflows/auto-rebuild-skill.yml": "sha256:0fb6770e35ada357bb67a6259c26c72b61af158469005d22fae1e9929c45d1e2",
+        ".github/workflows/build-skill.yml": "sha256:3c4052bf6500e7789de5e604521075dbe04591301a939d003cbebcfb6d8037f1",
+        ".github/workflows/main.yml": "sha256:72deee88f39ce7b3596c809905ae39e9171538b832b55dddd5f14bdb4e5e89d8",
+        ".gitignore": "sha256:a28551cce12cc19d559bfab45368b4dbca3f3305a6022c01fe181d8473c7e912",
+        "CHANGELOG.md": "sha256:b05b96f35abfed6dcda99b4ebdea14822ec2124ab58fd86a27b8d8b49c7cb176",
+        "CONTRIBUTING.md": "sha256:26a539d5c4fa8aed01c8422ccbd05cf21a2da03cae81cadcd2194bc608b02d4f",
+        "LICENSE": "sha256:6f3b004f129a7de55824bef23ca8fdde66adda81c5055bb6f357a4b769186a3b",
+        "README.md": "sha256:cd91a5041ba536a21bcbdce4bc2ff96128ada9704d687737f274daacc2abe4b8",
+        "SKILL.md": "sha256:67dda2a5ba7e26f69860e1018a37068ca201735ff8ae98199c143138d91b4550",
+        "VERSIONING.md": "sha256:edc7b81af65eb0015082f372792414d3669ba1113e3107d5513954ec0dccce38",
+        "build-skill.sh": "sha256:50a5c31e2e4a607f00b81af2589c61169ac3506ec3e99a5122278455487841ec",
+        "claude-ux-writing-skill-demo.mp4": "sha256:7eb70257593da06f682a3ddda54a9d260d4fc514f645237f5ca74b08f8da61a6",
+        "codex-ux-writing-skill-demo.mp4": "sha256:702cffbbb55021b0d2dedf6131da00b6156cb2934ca6f4ae00e9df2135536e73",
+        "dist/ux-writing-skill.zip": "sha256:bef7d9d1226cf0fccbb448ecd2cf9d0bbb0b4cb2146e5755c4c1905c4d3d4f46",
+        "docs/figma-integration.md": "sha256:72d4b14c4669a166536e8f3bf93d31a5b3a0ff20067bb59a283bba37b1ddd2a3",
+        "examples/real-world-improvements.md": "sha256:eae1497ec7d236a4e7e91e6855f91842ad2e6834b809ca15452527c299e7f78f",
+        "index.html": "sha256:f69315537879959cf187d9eb3cb22589672266a0c5b25ea98320161e5e6c3526",
+        "references/accessibility-guidelines.md": "sha256:58ea6f63b2156530bd7a7b422b828fbf8330978e989b71a3703ca2ebdb067ba0",
+        "references/content-usability-checklist.md": "sha256:29a7437f542b6ea3215f8cb1ec5295b93955385fc90811d1fbd7bf2e2c96dad3",
+        "references/patterns-detailed.md": "sha256:afc09a320f4b7bc23a62678da136a373afc1552c86a4d2e20648af8a04e323f6",
+        "references/voice-chart-template.md": "sha256:aef230903e2c93bc6c69fe3d9a12da7d5bd2dca36cf7688066481e549e4fb4f3",
+        "templates/empty-state-template.md": "sha256:efd184648b4b0399dc48049c157a3be3ef45157bb734b7b61f119d94710dda9d",
+        "templates/error-message-template.md": "sha256:728795bffb33b482169eb0f312798714d95ebb976d68a00d77dae32be4c5fd70",
+        "templates/onboarding-flow-template.md": "sha256:1c49b2427400263601f10679c12046be99125d1f7a81dee6b563a26618d7ed3b"
+      }
     }
   }
 }
