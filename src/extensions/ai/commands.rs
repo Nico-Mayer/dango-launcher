@@ -8,7 +8,7 @@
 use std::collections::BTreeMap;
 
 use crate::config::{CommandSettings, Config, ProviderSettings};
-use crate::templates::{Template, TemplateError};
+use crate::templates::Template;
 
 use super::provider::{Request, Thinking};
 
@@ -165,13 +165,8 @@ fn merge(
     if prompt.trim().is_empty() {
         return Err(format!("{EXTENSION_ID}: the command '{id}' has no prompt"));
     }
-    if let Err(TemplateError::Parse(detail) | TemplateError::Render(detail)) =
-        Template::parse(&prompt)
-    {
-        return Err(format!(
-            "{EXTENSION_ID}: the command '{id}' has a prompt that can't be read: {detail}"
-        ));
-    }
+    Template::parse(&prompt)
+        .map_err(|error| format!("{EXTENSION_ID}: the command '{id}': {error}"))?;
 
     let thinking = match overrides.thinking.as_deref() {
         None => None,
