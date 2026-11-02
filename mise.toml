@@ -37,3 +37,8 @@ interactive = true
 
 [settings]
 idiomatic_version_file_enable_tools = ["rust"]
+skills.dir = ".agents/skills"
+skills.auto_sync = true
+
+[hooks]
+postinstall = "mise skills sync --dir .claude/skills"
