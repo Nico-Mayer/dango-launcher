@@ -7,9 +7,10 @@ use slint::{ComponentHandle, Model, ModelRc, StyledText, VecModel};
 
 use super::height::{HEADING, ROW};
 use super::icon;
-use crate::protocol::{Accessory, ListItem, TagRole};
+use crate::protocol::{Accessory, ListItem, Status, TagRole};
 use crate::slint_shell::generated::{
-    AccessoryData, AccessoryKind, LauncherWindow, ListData, RowData, TagRole as SlintTagRole,
+    AccessoryData, AccessoryKind, LauncherWindow, ListData, RowData, Status as SlintStatus,
+    TagRole as SlintTagRole,
 };
 use crate::slint_shell::icons::Icons;
 use crate::slint_shell::keys;
@@ -178,6 +179,22 @@ fn accessory_data(accessory: &Accessory, icons: &Icons) -> AccessoryData {
             ..text(AccessoryKind::Tag, value)
         },
         Accessory::Kbd { shortcut } => text(AccessoryKind::Kbd, &keys::shortcut_label(shortcut)),
+        Accessory::Progress { value } => AccessoryData {
+            kind: AccessoryKind::Progress,
+            value: value.map_or(-1.0, |value| value.clamp(0.0, 1.0)),
+            ..Default::default()
+        },
+        Accessory::Status { status } => AccessoryData {
+            kind: AccessoryKind::Status,
+            status: match status {
+                Status::Working => SlintStatus::Working,
+                Status::NeedsInput => SlintStatus::NeedsInput,
+                Status::Done => SlintStatus::Done,
+                Status::Failed => SlintStatus::Failed,
+                Status::Queued => SlintStatus::Queued,
+            },
+            ..Default::default()
+        },
     }
 }
 

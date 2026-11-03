@@ -2,8 +2,10 @@ import { Theme } from "../theme.slint";
 import { Icon, IconKind } from "icon.slint";
 import { Kbd } from "kbd.slint";
 import { Tag, TagRole } from "tag.slint";
+import { Progress, ProgressKind } from "progress.slint";
+import { Dot, Status } from "dot.slint";
 
-export enum AccessoryKind { text, icon, tag, kbd }
+export enum AccessoryKind { text, icon, tag, kbd, progress, status }
 
 export struct AccessoryData {
     kind: AccessoryKind,
@@ -11,6 +13,9 @@ export struct AccessoryData {
     icon: image,
     icon-kind: IconKind,
     role: TagRole,
+    /// Below 0 is indeterminate.
+    value: float,
+    status: Status,
 }
 
 export component Accessory inherits HorizontalLayout {
@@ -43,6 +48,22 @@ export component Accessory inherits HorizontalLayout {
         alignment: center;
         Kbd {
             keys: root.data.text;
+        }
+    }
+    if root.data.kind == AccessoryKind.progress: VerticalLayout {
+        alignment: center;
+        Progress {
+            kind: ProgressKind.ring;
+            value: root.data.value;
+            width: 16px;
+            height: 16px;
+        }
+    }
+    if root.data.kind == AccessoryKind.status: VerticalLayout {
+        alignment: center;
+        Dot {
+            status: root.data.status;
+            announce: true;
         }
     }
 }

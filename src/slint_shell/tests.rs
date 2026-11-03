@@ -952,6 +952,49 @@ mod list_view {
         assert!(h.find("Accessory 4").is_none());
     }
 
+    fn progress_values(h: &Harness) -> Vec<String> {
+        i_slint_backend_testing::ElementQuery::from_root(&h.ui)
+            .match_descendants()
+            .match_accessible_role(i_slint_backend_testing::AccessibleRole::ProgressIndicator)
+            .find_all()
+            .iter()
+            .filter_map(|ring| ring.accessible_value().map(|value| value.to_string()))
+            .collect()
+    }
+
+    #[test]
+    fn progress_and_status_accessories_are_shown() {
+        let h = Harness::root(results(1));
+        h.view(tree(
+            vec![ListItem {
+                accessories: vec![
+                    Accessory::Progress { value: Some(0.42) },
+                    Accessory::Status {
+                        status: crate::protocol::Status::Working,
+                    },
+                ],
+                ..item(1)
+            }],
+            false,
+        ));
+        assert!(progress_values(&h).contains(&"42".to_string()));
+        assert!(h.find("Working").is_some());
+    }
+
+    #[test]
+    fn a_progress_value_out_of_range_is_clamped() {
+        let h = Harness::root(results(1));
+        h.view(tree(
+            vec![ListItem {
+                accessories: vec![Accessory::Progress { value: Some(1.5) }],
+                ..item(1)
+            }],
+            false,
+        ));
+        assert!(progress_values(&h).contains(&"100".to_string()));
+        assert!(h.find("Item 1").is_some());
+    }
+
     #[test]
     fn a_pushed_list_of_five_hundred_renders_fifty_rows() {
         let h = Harness::root(results(1));

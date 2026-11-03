@@ -174,6 +174,21 @@ protocol_types! {
             role: TagRole,
         },
         Kbd { shortcut: Shortcut },
+        Progress {
+            #[serde(default)]
+            value: Option<f32>,
+        },
+        Status { status: Status },
+    }
+
+    #[derive(Copy, Eq)]
+    #[serde(rename_all = "camelCase")]
+    pub enum Status {
+        Working,
+        NeedsInput,
+        Done,
+        Failed,
+        Queued,
     }
 
     #[derive(Default)]
@@ -349,5 +364,31 @@ mod tests {
         let view: DetailView = serde_json::from_str(r#"{"markdown":"Hi"}"#).unwrap();
         assert_eq!(view.image, None);
         assert_eq!(view.text, None);
+    }
+
+    #[test]
+    fn progress_and_status_accessories_round_trip() {
+        for (json, accessory) in [
+            (
+                r#"{"kind":"progress","value":0.42}"#,
+                Accessory::Progress { value: Some(0.42) },
+            ),
+            (
+                r#"{"kind":"progress"}"#,
+                Accessory::Progress { value: None },
+            ),
+            (
+                r#"{"kind":"status","status":"needsInput"}"#,
+                Accessory::Status {
+                    status: Status::NeedsInput,
+                },
+            ),
+        ] {
+            let read: Accessory = serde_json::from_str(json).unwrap();
+            assert_eq!(read, accessory);
+            let written: Accessory =
+                serde_json::from_str(&serde_json::to_string(&accessory).unwrap()).unwrap();
+            assert_eq!(written, accessory);
+        }
     }
 }

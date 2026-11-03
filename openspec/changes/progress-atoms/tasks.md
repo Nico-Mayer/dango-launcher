@@ -9,8 +9,8 @@
 
 ## 2. Progress and status accessories in the protocol
 
-- [ ] 2.1 In `src/protocol.rs`, add `Accessory::Progress { value: Option<f32> }` and `Accessory::Status { status: Status }`, with `Status` = working, needsInput, done, failed, queued (camelCase on the wire). Verify with serde round-trip tests in `src/protocol.rs` for `{"kind":"progress","value":0.42}`, `{"kind":"progress"}`, and `{"kind":"status","status":"needsInput"}`.
-- [ ] 2.2 Add `progress` and `status` to `AccessoryKind`, and `value` and `status` to `AccessoryData`, in `ui/atoms/accessory.slint`, rendering a 16 px `Progress { kind: ring }` and an announced `Dot`. Map the new variants in `src/slint_shell/render/list.rs`, clamping a progress value to 0 to 1 and sending -1 for no value. Verify with UI tests: a row with a ring at 0.42 and status working shows a progress indicator at 42 and a dot labelled "Working", and a ring at 1.5 reports 100 with the view shown as usual.
+- [x] 2.1 In `src/protocol.rs`, add `Accessory::Progress { value: Option<f32> }` and `Accessory::Status { status: Status }`, with `Status` = working, needsInput, done, failed, queued (camelCase on the wire). Verify with serde round-trip tests in `src/protocol.rs` for `{"kind":"progress","value":0.42}`, `{"kind":"progress"}`, and `{"kind":"status","status":"needsInput"}`.
+- [x] 2.2 Add `progress` and `status` to `AccessoryKind`, and `value` and `status` to `AccessoryData`, in `ui/atoms/accessory.slint`, rendering a 16 px `Progress { kind: ring }` and an announced `Dot`. Map the new variants in `src/slint_shell/render/list.rs`, clamping a progress value to 0 to 1 and sending -1 for no value. Verify with UI tests: a row with a ring at 0.42 and status working shows a progress indicator at 42 and a dot labelled "Working", and a ring at 1.5 reports 100 with the view shown as usual.
 
 ## 3. Busy marks that don't blink
 
