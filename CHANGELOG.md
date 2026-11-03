@@ -2,6 +2,11 @@
 
 All notable changes to Dango. Generated from commit history at release time.
 
+## [6.0.1] - 2026-11-03
+
+### Fixes
+
+- **ui:** Left-align the title after the back button
 ## [6.0.0] - 2026-11-03
 
 ### Features
