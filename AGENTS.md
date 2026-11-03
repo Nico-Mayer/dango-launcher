@@ -39,7 +39,7 @@ Alpha, no users. Breaking changes to config file, extension manifest, view proto
 
 - One Rust crate at repo root: all OS integration, business logic, UI. Rust in `src/`, `.slint` files in `ui/`.
 - Slint draws launcher + tray in Dango process, winit backend. UI = renderer of launcher snapshot, no logic. Look = design system in `openspec/specs/design-system`.
-- One theme, `Theme` global in `ui/theme.slint`. Every colour, radius, size, typeface from it, dark + light value. Reads OS scheme via std-widgets' `Palette.color-scheme`, only reason build keeps std-widgets style. Rust never passes colour.
+- One `Theme` global in `ui/theme.slint`. Every colour, radius, size, typeface from it. Colours use herdr role names, values from private `ThemeColors` preset: Graphite when dark, Paper when light. New theme = one more preset value, no component change. Reads OS scheme via std-widgets' `Palette.color-scheme`, only reason build keeps std-widgets style. Rust never passes colour.
 - `ui/` holds `theme.slint`, `atoms/` (icon, kbd, tag, accessory, dot, form controls), `shell/` (window, SearchBar, ActionBar, action panel), `views/` (list, grid, detail, form, empty view), and `app.slint`, exporting window, tray, globals. Each part maps to one design part.
 - Controls our own, built on `TextInput`, `FocusScope`, `TouchArea`, `PopupWindow`. std-widgets controls can't take our colours, radii, focus border (palette is `out`), so only `ScrollView` used from them. Control carries `accessible-role`, `-label`, `-value`, `-description` itself, inner `TextInput` set to `accessible-role:
   none`.
