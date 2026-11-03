@@ -220,6 +220,16 @@ fn highlighted(title: &str, positions: &[usize]) -> StyledText {
     StyledText::from_markdown(&markdown).unwrap_or_else(|_| StyledText::from_plain_text(title))
 }
 
+pub(super) fn slint_status(status: Status) -> SlintStatus {
+    match status {
+        Status::Working => SlintStatus::Working,
+        Status::NeedsInput => SlintStatus::NeedsInput,
+        Status::Done => SlintStatus::Done,
+        Status::Failed => SlintStatus::Failed,
+        Status::Queued => SlintStatus::Queued,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -231,15 +241,5 @@ mod tests {
         assert!(title.contains(r#"text: "C++ (x)""#), "{title}");
         assert!(title.contains("range: 0..1, style: Underline"), "{title}");
         assert!(title.contains("range: 4..5, style: Underline"), "{title}");
-    }
-}
-
-pub(super) fn slint_status(status: Status) -> SlintStatus {
-    match status {
-        Status::Working => SlintStatus::Working,
-        Status::NeedsInput => SlintStatus::NeedsInput,
-        Status::Done => SlintStatus::Done,
-        Status::Failed => SlintStatus::Failed,
-        Status::Queued => SlintStatus::Queued,
     }
 }
