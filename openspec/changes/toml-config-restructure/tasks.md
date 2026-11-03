@@ -30,7 +30,11 @@
 
 ## 4. Review
 
-- [ ] 4.1 Run the `ponytail-review` skill in a fresh subagent on this change's commits, without the apply context; record its findings here for the author to decide on
+- [x] 4.1 Run the `ponytail-review` skill in a fresh subagent on this change's commits, without the apply context; record its findings here for the author to decide on
+  - Must fix: `Config::tables()` (`src/config/mod.rs`) also lists `extensions` keys that name a built-in, such as `extensions."dango.window-management"`. `table()` resolves those to the built-in table, so its hotkeys are claimed twice and reported as conflicts with themselves. Fix: skip such keys in `tables()` and assert no duplicate ids.
+  - Should fix: clipboard defaults (500, 16, 256) are written in both `ClipboardTable::default` and `Bounds::default`. Derive one from the other.
+  - Nice to have: `an_old_json_file_alone_is_not_read` (`src/config/location.rs`) mostly proves that a missing `config.toml` loads as defaults; consider deleting it.
+  - Nice to have: `ExtensionTable::command` collects every command to find one; a direct map lookup in the macro is cheaper.
 
 ## Workflow follow-up
 
