@@ -391,6 +391,27 @@ mod search_bar {
     }
 
     #[test]
+    fn the_loading_bar_sweeps_while_loading() {
+        let h = Harness::root(results(3));
+        let mut tree = detail_tree("Working");
+        if let View::Detail(detail) = &mut tree.view {
+            detail.loading = true;
+        }
+        h.view(tree);
+        let sweep_x = || {
+            ElementHandle::find_by_element_id(&h.ui, "SearchBar::sweep")
+                .next()
+                .map(|sweep| sweep.absolute_position().x)
+        };
+        let before = sweep_x().expect("the sweep is shown while loading");
+        i_slint_backend_testing::mock_elapsed_time(std::time::Duration::from_millis(300));
+        assert_ne!(sweep_x(), Some(before));
+
+        h.view(detail_tree("Done"));
+        assert!(sweep_x().is_none());
+    }
+
+    #[test]
     fn a_form_shows_its_title_instead_of_the_query() {
         let h = Harness::root(results(3));
         h.view(form_tree());

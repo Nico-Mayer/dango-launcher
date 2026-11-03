@@ -196,13 +196,20 @@ export component SearchBar inherits Rectangle {
         }
     }
 
-    // Static: a busy state is shown, never animated.
+    // The only motion in the interface; see design-system.
     if Shell.loading: Rectangle {
         y: parent.height - 2px;
         height: 2px;
-        background: Theme.accent;
+        background: Theme.border;
+        clip: true;
         accessible-role: progress-indicator;
         accessible-label: "Loading…";
+
+        sweep := Rectangle {
+            width: parent.width * Theme.loading-sweep-width;
+            x: -self.width + (parent.width + self.width) * mod(animation-tick(), Theme.loading-sweep-period) / Theme.loading-sweep-period;
+            background: Theme.accent;
+        }
     }
     if !Shell.loading: Rectangle {
         y: parent.height - 1px;
