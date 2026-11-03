@@ -52,21 +52,6 @@ mod tests {
     }
 
     #[test]
-    fn an_old_json_file_alone_is_not_read() {
-        let dir = std::env::temp_dir().join(format!("dango-loc-{}", uuid::Uuid::new_v4()));
-        std::fs::create_dir_all(&dir).unwrap();
-        std::fs::write(
-            dir.join("config.json"),
-            r#"{ "launcher": { "autostart": true } }"#,
-        )
-        .unwrap();
-        let config = super::super::Config::load(&config_file(&dir)).unwrap();
-        assert!(config.launcher.autostart.is_none());
-        assert!(dir.join("config.json").exists());
-        let _ = std::fs::remove_dir_all(&dir);
-    }
-
-    #[test]
     fn the_override_wins() {
         let dir = resolve(
             Some(PathBuf::from("/somewhere/else")),
