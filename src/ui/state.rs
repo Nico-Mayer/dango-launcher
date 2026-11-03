@@ -916,7 +916,7 @@ impl Launcher {
             None => Mode::Root,
             Some(View::List(_)) => Mode::List,
             Some(View::Grid(_)) => Mode::Grid,
-            Some(View::Detail(_)) => Mode::Detail,
+            Some(View::Detail(_) | View::Progress(_)) => Mode::Detail,
             Some(View::Form(_)) => Mode::Form,
         }
     }
@@ -1040,6 +1040,7 @@ impl Launcher {
     fn view_actions(&self) -> &[Action] {
         match self.stack.last().map(|view| &view.tree.view) {
             Some(View::Detail(detail)) => &detail.actions,
+            Some(View::Progress(progress)) => &progress.actions,
             Some(View::Form(form)) => &form.actions,
             Some(View::List(_) | View::Grid(_)) | None => &[],
         }
@@ -1156,7 +1157,7 @@ impl Launcher {
                 self.entry_selected().map(|entry| entry.id().to_string())
             }
             Some(View::Form(form)) => form.item_id.clone(),
-            Some(View::Detail(_)) | None => None,
+            Some(View::Detail(_) | View::Progress(_)) | None => None,
         }
     }
 }
@@ -1254,6 +1255,7 @@ fn tree_actions(view: &View) -> Vec<&Action> {
             .chain(grid.empty_state.iter().flat_map(|state| &state.actions))
             .collect(),
         View::Detail(detail) => detail.actions.iter().collect(),
+        View::Progress(progress) => progress.actions.iter().collect(),
         View::Form(form) => form.actions.iter().collect(),
     }
 }
@@ -1322,6 +1324,6 @@ fn is_loading(view: &View) -> bool {
         View::List(list) => list.loading,
         View::Grid(grid) => grid.loading,
         View::Detail(detail) => detail.loading,
-        View::Form(_) => false,
+        View::Form(_) | View::Progress(_) => false,
     }
 }

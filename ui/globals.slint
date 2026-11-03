@@ -1,10 +1,11 @@
 import { IconKind } from "atoms/icon.slint";
 import { AccessoryData } from "atoms/accessory.slint";
 import { OptionData } from "atoms/dropdown.slint";
+import { Status } from "atoms/dot.slint";
 
 export enum ToastStyle { busy, success, failure }
 
-export enum ScreenKind { root, list, grid, detail, form, empty }
+export enum ScreenKind { root, list, grid, detail, form, progress, empty }
 
 /// A non-empty heading makes this a section heading rather than an item.
 export struct RowData {
@@ -127,6 +128,20 @@ export global EmptyData {
     in property <IconKind> icon-kind;
     in property <string> title;
     in property <string> hint;
+}
+
+export struct StepData {
+    title: string,
+    status: Status,
+}
+
+export global ProgressData {
+    in property <string> title;
+    in property <string> subtitle;
+    /// Below 0 is indeterminate.
+    in property <float> value: -1;
+    in property <string> detail;
+    in property <[StepData]> steps;
 }
 
 export global DetailData {

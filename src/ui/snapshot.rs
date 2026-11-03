@@ -1,5 +1,5 @@
 use crate::protocol::{
-    Action, EmptyState, FieldKind, FieldOption, GridItem, ListItem, Metadata, View,
+    Action, EmptyState, FieldKind, FieldOption, GridItem, ListItem, Metadata, Step, View,
 };
 
 use super::input::{Chord, Context, ResultItem};
@@ -92,6 +92,7 @@ snapshot_types! {
         Grid(GridBody),
         Detail(DetailBody),
         Form(FormBody),
+        Progress(ProgressBody),
     }
 
     pub struct ListBody {
@@ -148,6 +149,14 @@ snapshot_types! {
         pub markdown: String,
         pub text: Option<String>,
         pub metadata: Vec<Metadata>,
+    }
+
+    pub struct ProgressBody {
+        pub title: String,
+        pub subtitle: String,
+        pub value: Option<f32>,
+        pub detail: String,
+        pub steps: Vec<Step>,
     }
 
     pub struct FormBody {
@@ -439,6 +448,13 @@ impl Launcher {
                 markdown: detail.markdown.clone(),
                 text: detail.text.clone(),
                 metadata: detail.metadata.clone(),
+            }),
+            View::Progress(progress) => ViewBody::Progress(ProgressBody {
+                title: progress.title.clone(),
+                subtitle: progress.subtitle.clone(),
+                value: progress.value,
+                detail: progress.detail.clone(),
+                steps: progress.steps.clone(),
             }),
             View::Form(form) => ViewBody::Form(FormBody {
                 revision: view.form.revision,

@@ -8,6 +8,7 @@ import { Grid } from "../views/grid.slint";
 import { Detail } from "../views/detail.slint";
 import { EmptyView } from "../views/empty-view.slint";
 import { Form } from "../views/form.slint";
+import { ProgressView } from "../views/progress-view.slint";
 
 /// The SearchBar, one view, and the ActionBar, with the action panel
 /// floating above them.
@@ -96,6 +97,10 @@ export component LauncherWindow inherits Window {
                 height: parent.body-height;
             }
             if Shell.screen == ScreenKind.form: Form {
+                y: parent.body-top;
+                height: parent.body-height;
+            }
+            if Shell.screen == ScreenKind.progress: ProgressView {
                 y: parent.body-top;
                 height: parent.body-height;
             }

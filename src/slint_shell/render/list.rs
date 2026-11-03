@@ -188,13 +188,7 @@ fn accessory_data(accessory: &Accessory, icons: &Icons) -> AccessoryData {
         },
         Accessory::Status { status } => AccessoryData {
             kind: AccessoryKind::Status,
-            status: match status {
-                Status::Working => SlintStatus::Working,
-                Status::NeedsInput => SlintStatus::NeedsInput,
-                Status::Done => SlintStatus::Done,
-                Status::Failed => SlintStatus::Failed,
-                Status::Queued => SlintStatus::Queued,
-            },
+            status: slint_status(*status),
             ..Default::default()
         },
     }
@@ -237,5 +231,15 @@ mod tests {
         assert!(title.contains(r#"text: "C++ (x)""#), "{title}");
         assert!(title.contains("range: 0..1, style: Underline"), "{title}");
         assert!(title.contains("range: 4..5, style: Underline"), "{title}");
+    }
+}
+
+pub(super) fn slint_status(status: Status) -> SlintStatus {
+    match status {
+        Status::Working => SlintStatus::Working,
+        Status::NeedsInput => SlintStatus::NeedsInput,
+        Status::Done => SlintStatus::Done,
+        Status::Failed => SlintStatus::Failed,
+        Status::Queued => SlintStatus::Queued,
     }
 }

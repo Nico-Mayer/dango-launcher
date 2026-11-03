@@ -2302,3 +2302,41 @@ fn a_failed_command_does_not_come_back_as_running() {
     h.typed("R");
     assert_eq!(h.status(), "");
 }
+
+fn progress_tree() -> ViewTree {
+    use crate::protocol::{ProgressView, Status, Step};
+    ViewTree::new(View::Progress(ProgressView {
+        title: "Dango 0.5.0".into(),
+        subtitle: "You have 0.4.2".into(),
+        value: Some(0.62),
+        detail: "18.4 MB of 29.6 MB".into(),
+        steps: vec![
+            Step {
+                title: "Download".into(),
+                status: Status::Working,
+            },
+            Step {
+                title: "Restart".into(),
+                status: Status::Queued,
+            },
+        ],
+        actions: actions(),
+    }))
+}
+
+#[test]
+fn enter_on_a_progress_view_runs_its_primary_action() {
+    let mut h = Harness::view(progress_tree());
+    assert_eq!(h.snapshot().focus, Focus::Detail);
+    h.press("Enter");
+    let runs = h.runs();
+    assert_eq!(runs.len(), 1);
+    assert_eq!(runs[0].action_id, "open");
+}
+
+#[test]
+fn escape_leaves_a_progress_view() {
+    let mut h = Harness::view(progress_tree());
+    h.press("Escape");
+    assert!(matches!(h.snapshot().screen, Screen::Root(_)));
+}

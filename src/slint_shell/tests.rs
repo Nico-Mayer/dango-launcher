@@ -1999,3 +1999,60 @@ mod hud {
         assert!(ui.get_cut(), "the measure sees a cut");
     }
 }
+
+mod progress_view {
+    use super::*;
+    use crate::protocol::{ProgressView, Status, Step};
+
+    fn tree(value: Option<f32>) -> ViewTree {
+        ViewTree::new(View::Progress(ProgressView {
+            title: "Dango 0.5.0".into(),
+            subtitle: "You have 0.4.2".into(),
+            value,
+            detail: "18.4 MB of 29.6 MB".into(),
+            steps: [
+                ("Download", Status::Working),
+                ("Verify signature", Status::Queued),
+                ("Restart", Status::Queued),
+            ]
+            .into_iter()
+            .map(|(title, status)| Step {
+                title: title.into(),
+                status,
+            })
+            .collect(),
+            actions: Vec::new(),
+        }))
+    }
+
+    fn bar(h: &Harness) -> ElementHandle {
+        i_slint_backend_testing::ElementQuery::from_root(&h.ui)
+            .match_descendants()
+            .match_predicate(|element| {
+                element.accessible_description().as_deref() == Some("Dango 0.5.0")
+            })
+            .find_first()
+            .expect("the progress bar")
+    }
+
+    #[test]
+    fn a_progress_view_shows_its_bar_title_and_steps() {
+        let h = Harness::root(results(1));
+        h.view(tree(Some(0.62)));
+        assert_eq!(bar(&h).accessible_value().as_deref(), Some("62"));
+        assert!(h.find("Download, working").is_some());
+        assert!(h.find("Verify signature, queued").is_some());
+        assert!(h.find("Restart, queued").is_some());
+        assert!(h.find("You have 0.4.2").is_some());
+        assert!(h.find("18.4 MB of 29.6 MB").is_some());
+    }
+
+    #[test]
+    fn a_progress_view_without_a_value_is_indeterminate() {
+        let h = Harness::root(results(1));
+        h.view(tree(None));
+        let bar = bar(&h);
+        assert_eq!(bar.accessible_value().as_deref(), Some(""));
+        assert_eq!(bar.accessible_label().as_deref(), Some("Working"));
+    }
+}

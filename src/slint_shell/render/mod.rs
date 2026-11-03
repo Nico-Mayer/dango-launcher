@@ -11,6 +11,7 @@ mod height;
 pub mod hud;
 mod list;
 mod panel;
+mod progress;
 mod shell;
 
 use std::cell::RefCell;
@@ -131,6 +132,7 @@ impl Renderer {
                     detail = true;
                 }
                 ViewBody::Form(body) => self.form.write(body),
+                ViewBody::Progress(body) => progress::write(ui, body),
             },
         }
         if !typing(&snapshot.screen) {
@@ -234,6 +236,7 @@ fn screen_kind(screen: &Screen) -> ScreenKind {
             ViewBody::Grid(_) => ScreenKind::Grid,
             ViewBody::Detail(_) => ScreenKind::Detail,
             ViewBody::Form(_) => ScreenKind::Form,
+            ViewBody::Progress(_) => ScreenKind::Progress,
         },
     }
 }
