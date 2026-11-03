@@ -521,7 +521,7 @@ impl Launcher {
         self.busy_marks_shown().map(|text| Toast {
             style: ToastStyle::Busy,
             text: text.to_string(),
-            action: self.busy_toast_action(),
+            action: self.busy_cancel(),
         })
     }
 

@@ -89,6 +89,9 @@ pub(super) enum BusyMarks {
         id: u64,
         held: bool,
         text: String,
+        /// Shown for a background task, which draws no loading bar. Kept while
+        /// the marks linger after the work ends.
+        task: bool,
     },
 }
 
@@ -462,14 +465,16 @@ impl Launcher {
     /// Whether the busy marks are there for a task rather than for a command
     /// or a loading view, which also draw the SearchBar's bar.
     pub(super) fn busy_shows_task(&self) -> bool {
-        self.busy_marks_shown().is_some()
-            && self.working.is_none()
-            && !self.top_loading()
-            && self.busy_task().is_some()
+        matches!(self.busy_marks, BusyMarks::Shown { task: true, .. })
+    }
+
+    /// Whether a background task is what makes Dango busy right now.
+    fn busy_source_is_task(&self) -> bool {
+        self.working.is_none() && !self.top_loading() && self.busy_task().is_some()
     }
 
     /// The running task's Cancel, while the busy toast is showing that task.
-    fn busy_cancel(&self) -> Option<ToastAction> {
+    pub(super) fn busy_cancel(&self) -> Option<ToastAction> {
         if !self.busy_shows_task() {
             return None;
         }
@@ -480,6 +485,7 @@ impl Launcher {
 
     fn settle_busy_marks(&mut self, fx: &mut Vec<Effect>) {
         let busy = self.busy_text();
+        let for_task = self.busy_source_is_task();
         match (&mut self.busy_marks, busy) {
             (BusyMarks::Hidden, Some(_)) => {
                 let id = self.next_revision();
@@ -492,7 +498,10 @@ impl Launcher {
             (BusyMarks::Pending { .. }, None) | (BusyMarks::Shown { held: true, .. }, None) => {
                 self.busy_marks = BusyMarks::Hidden;
             }
-            (BusyMarks::Shown { text, .. }, Some(busy)) => *text = busy,
+            (BusyMarks::Shown { text, task, .. }, Some(busy)) => {
+                *text = busy;
+                *task = for_task;
+            }
             _ => {}
         }
     }
@@ -504,6 +513,7 @@ impl Launcher {
                     id: woke,
                     held: false,
                     text: self.busy_text().unwrap_or_default(),
+                    task: self.busy_source_is_task(),
                 };
                 fx.push(Effect::WakeBusyMarks {
                     id: woke,
@@ -540,6 +550,11 @@ impl Launcher {
         self.working = None;
         if self.refused(&tree) {
             return;
+        }
+        // The stack has one owner, who gets its actions: a view from another
+        // extension, such as an update retried from a toast, starts afresh.
+        if self.owner.as_deref() != Some(owner.as_str()) {
+            self.stack.clear();
         }
         self.owner = Some(owner);
         if self.shown_invocation == Some(invocation) && !self.stack.is_empty() {
@@ -645,10 +660,6 @@ impl Launcher {
             Some(toast) => toast.action.clone(),
             None => self.busy_cancel(),
         }
-    }
-
-    pub(super) fn busy_toast_action(&self) -> Option<ToastAction> {
-        self.busy_cancel()
     }
 
     /// A failure stays until the next key press or click.

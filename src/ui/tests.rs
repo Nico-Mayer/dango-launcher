@@ -2602,3 +2602,31 @@ fn a_task_ready_while_at_root_shows_a_toast_at_once() {
         Some("Dango 0.5.0 is ready to restart")
     );
 }
+
+#[test]
+fn a_view_from_another_extension_starts_its_own_stack() {
+    let mut h = Harness::view(list_tree(vec![list_item(1)]));
+    h.event(Event::Rendered {
+        owner: "dango.updates".into(),
+        context: Context::default(),
+        invocation: 7,
+        tree: Box::new(progress_tree()),
+    });
+    assert_eq!(h.launcher.stack.len(), 1);
+    h.press("Escape");
+    assert!(matches!(h.snapshot().screen, Screen::Root(_)));
+}
+
+#[test]
+fn a_task_s_lingering_marks_draw_no_loading_bar() {
+    let mut h = Harness::view(done_tree());
+    report(&mut h, task(1, running_task()));
+    h.wake_busy();
+    report(&mut h, task(1, crate::tasks::TaskStatus::Cancelled));
+    assert!(h.launcher.busy_marks_shown().is_some(), "the marks linger");
+    let Screen::View(view) = h.snapshot().screen else {
+        panic!("expected a view");
+    };
+    assert!(!view.busy);
+    assert!(h.snapshot().toast.unwrap().action.is_none());
+}
