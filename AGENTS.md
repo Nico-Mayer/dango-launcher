@@ -100,6 +100,7 @@ No millisecond budgets in specs or tests. Results depend on machine load, unreli
 - New Notepad (and likely other WinUI apps) can handle injected key late: Ctrl released right after V reads as plain `v`. Synthetic chords hold modifier briefly after key (`CHORD_HOLD`).
 - On Windows, `WS_EX_TOOLWINDOW` re-applied after each show: winit rewrites extended style from own flags on every visibility change (`apply_diff` in `window_state.rs`). Windows positions in physical pixels, macOS in logical points. Don't share positioning code.
 - winit `with_active(false)` holds for every show, not only first (`apply_diff` works on copy of flags). HUD window gets it from `with_winit_window_attributes_hook`, which runs when Slint makes window adapter, before component title set: hook can't tell windows apart by title, so `CREATING_HUD` flag set around HUD creation.
+- winit `set_cursor_hittest(false)` on Windows makes window `WS_EX_LAYERED | WS_EX_TRANSPARENT` but never calls `SetLayeredWindowAttributes`. Layered window without it draws nothing, so HUD's `did_show` sets full alpha.
 - macOS gates window management, paste, snippet expansion, reading selection behind Accessibility.
 - Never query system-wide AX element (`AXUIElement::new_system_wide`) from Dango while panel key: macOS answers in-process on calling thread, accesskit panics on `RefCell` main thread holds, Dango aborts. Ask frontmost app's element (pid from `NSWorkspace`) instead.
 - enigo's `Enigo::new` on macOS fails with `NoPermission` without Accessibility. Create on first use, never at startup.

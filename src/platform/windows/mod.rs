@@ -46,10 +46,11 @@ use windows_sys::Win32::UI::HiDpi::{GetDpiForMonitor, GetDpiForWindow, MDT_EFFEC
 use windows_sys::Win32::UI::WindowsAndMessaging::{
     AllowSetForegroundWindow, BringWindowToTop, GetCursorPos, GetForegroundWindow,
     GetWindowLongPtrW, GetWindowRect, GetWindowThreadProcessId, SetForegroundWindow,
-    SetWindowLongPtrW, SetWindowPos, SystemParametersInfoW, EVENT_SYSTEM_FOREGROUND, GWL_EXSTYLE,
-    HWND_TOPMOST, SPI_GETFOREGROUNDLOCKTIMEOUT, SPI_SETFOREGROUNDLOCKTIMEOUT, SWP_FRAMECHANGED,
-    SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SWP_NOZORDER, WINEVENT_OUTOFCONTEXT,
-    WINEVENT_SKIPOWNPROCESS, WS_EX_APPWINDOW, WS_EX_TOOLWINDOW, WS_EX_TOPMOST,
+    SetLayeredWindowAttributes, SetWindowLongPtrW, SetWindowPos, SystemParametersInfoW,
+    EVENT_SYSTEM_FOREGROUND, GWL_EXSTYLE, HWND_TOPMOST, LWA_ALPHA, SPI_GETFOREGROUNDLOCKTIMEOUT,
+    SPI_SETFOREGROUNDLOCKTIMEOUT, SWP_FRAMECHANGED, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE,
+    SWP_NOZORDER, WINEVENT_OUTOFCONTEXT, WINEVENT_SKIPOWNPROCESS, WS_EX_APPWINDOW,
+    WS_EX_TOOLWINDOW, WS_EX_TOPMOST,
 };
 
 use super::{HudWindow, LauncherWindow, RunningApp, SystemControl, SystemError};
@@ -200,7 +201,12 @@ impl HudWindow for WindowsHudWindow {
 
     fn did_show(&self, window: RawWindowHandle) {
         if let Some(hwnd) = hwnd(window) {
-            unsafe { apply_tool_window_style(hwnd) };
+            unsafe {
+                apply_tool_window_style(hwnd);
+                // winit makes a click-through window layered but never sets
+                // its alpha, and a layered window without one draws nothing.
+                SetLayeredWindowAttributes(hwnd, 0, 255, LWA_ALPHA);
+            }
         }
     }
 }
@@ -279,7 +285,7 @@ unsafe extern "system" fn foreground_changed(
     });
 }
 
-/// tao rewrites the extended style from its own flags whenever visibility
+/// winit rewrites the extended style from its own flags whenever visibility
 /// changes, which restores WS_EX_APPWINDOW and drops the tool window bit. So
 /// this runs after every show, not once at startup.
 unsafe fn apply_tool_window_style(hwnd: HWND) {

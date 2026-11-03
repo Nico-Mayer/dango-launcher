@@ -141,7 +141,7 @@ flag is set while the HUD window is created, and the window is touched then
 to make Slint create the adapter. `always-on-top` in the component gives the
 window level. After each show, `set_cursor_hittest(false)` through
 `WinitWindowAccessor` makes it click-through; winit sets and keeps the styles
-that needs.
+that needs, but on Windows not the layered window's alpha (see below).
 
 The rest sits behind a narrow trait in `src/platform/mod.rs`, implemented in
 `platform/windows` and `platform/macos`:
@@ -161,7 +161,10 @@ window list on macOS.
 - Windows: `place` finds the monitor under the cursor and centres the pill
   above the bottom of `rcWork`, in physical pixels at that monitor's DPI, with
   `SWP_NOACTIVATE`. `did_show` applies `WS_EX_TOOLWINDOW` and removes
-  `WS_EX_APPWINDOW` again, because winit rewrote the style on show.
+  `WS_EX_APPWINDOW` again, because winit rewrote the style on show. It also
+  calls `SetLayeredWindowAttributes` with full alpha: `set_cursor_hittest`
+  makes the window `WS_EX_LAYERED` but winit never sets its alpha, and a
+  layered window without one draws nothing.
 - macOS: `attach` reclasses the window to plain `NSPanel`, not the launcher's
   `DangoPanel`: that class answers yes to `canBecomeKeyWindow` and writes the
   global `PANEL_IS_KEY` in `becomeKeyWindow`. A borderless `NSPanel` already
@@ -180,9 +183,8 @@ Rejected: the display holding the focused window. On macOS that needs AX or a
 window list, and `NSScreen::mainScreen` could not be shown to follow another
 app's window.
 
-Rejected: setting `WS_EX_TRANSPARENT | WS_EX_LAYERED` by hand. A layered
-window stays invisible until `SetLayeredWindowAttributes` is called, and
-winit's `set_cursor_hittest` already handles it.
+Rejected: setting `WS_EX_TRANSPARENT | WS_EX_LAYERED` by hand. winit's
+`set_cursor_hittest` sets both and keeps them across its style rewrites.
 
 ### D5. Text
 
