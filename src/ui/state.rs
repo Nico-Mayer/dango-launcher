@@ -1084,16 +1084,12 @@ impl Launcher {
     /// Root results in the order they are drawn: pinned, then suggestions,
     /// then everything else.
     pub(super) fn root_order(&self) -> impl Iterator<Item = &ResultItem> {
-        let pinned = self.results.iter().filter(|item| item.pinned);
-        let suggested = self
-            .results
-            .iter()
-            .filter(|item| !item.pinned && item.suggested);
-        let rest = self
-            .results
-            .iter()
-            .filter(|item| !item.pinned && !item.suggested);
-        pinned.chain(suggested).chain(rest)
+        let answer = self.results.iter().filter(|item| item.answer);
+        let rows = || self.results.iter().filter(|item| !item.answer);
+        let pinned = rows().filter(|item| item.pinned);
+        let suggested = rows().filter(|item| !item.pinned && item.suggested);
+        let rest = rows().filter(|item| !item.pinned && !item.suggested);
+        answer.chain(pinned).chain(suggested).chain(rest)
     }
 
     pub(super) fn root_selected(&self) -> Option<&ResultItem> {

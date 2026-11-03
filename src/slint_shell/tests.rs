@@ -241,6 +241,7 @@ fn result(n: usize) -> ResultItem {
         match_positions: Vec::new(),
         suggested: false,
         pinned: false,
+        answer: false,
     }
 }
 
@@ -2100,5 +2101,67 @@ mod toast_action {
             toast.accessible_description().as_deref(),
             Some(format!("Failed. Retry, {chord}").as_str())
         );
+    }
+}
+
+mod inline_answer {
+    use super::*;
+
+    fn answer() -> ResultItem {
+        ResultItem {
+            extension_id: "dango.calculator".into(),
+            id: "4".into(),
+            title: "4".into(),
+            answer: true,
+            ..result(0)
+        }
+    }
+
+    fn answered(rows: Vec<ResultItem>) -> Harness {
+        let h = Harness::new();
+        h.type_text("2+2");
+        let mut items = vec![answer()];
+        items.extend(rows);
+        h.event(Event::Results {
+            query: "2+2".into(),
+            items,
+            complete: true,
+        });
+        h
+    }
+
+    #[test]
+    fn the_card_shows_and_is_selected() {
+        let h = answered(results(2));
+        let card = h.find("2+2 = 4").expect("the answer card");
+        assert_eq!(card.accessible_item_selected(), Some(true));
+        assert_eq!(h.row("Result 1").accessible_item_selected(), Some(false));
+    }
+
+    #[test]
+    fn the_card_adds_its_height() {
+        let h = Harness::new();
+        h.type_text("2+2");
+        h.event(Event::Results {
+            query: "2+2".into(),
+            items: results(2),
+            complete: true,
+        });
+        let without = h.height();
+        let mut items = vec![answer()];
+        items.extend(results(2));
+        h.event(Event::Results {
+            query: "2+2".into(),
+            items,
+            complete: true,
+        });
+        assert_eq!(h.height(), without + 64.0);
+    }
+
+    #[test]
+    fn an_answer_alone_shows_no_empty_view() {
+        let h = answered(Vec::new());
+        assert!(h.find("2+2 = 4").is_some());
+        assert!(h.find("No results for “2+2”").is_none());
     }
 }

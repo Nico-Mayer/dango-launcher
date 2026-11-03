@@ -64,11 +64,20 @@ snapshot_types! {
 
     pub struct RootScreen {
         pub query: Text,
+        /// The calculator's answer, shown as a card above the sections.
+        pub answer: Option<AnswerCard>,
         pub sections: Vec<Section>,
         pub selected: Option<String>,
         pub empty: Option<EmptyText>,
         /// More results may still arrive for the query.
         pub settling: bool,
+    }
+
+    pub struct AnswerCard {
+        pub id: String,
+        pub expression: String,
+        pub answer: String,
+        pub selected: bool,
     }
 
     /// A text field's value. The renderer writes `text` into the field only
@@ -339,8 +348,23 @@ impl Launcher {
 
     fn root_screen(&self) -> RootScreen {
         let pick = |keep: fn(&ResultItem) -> bool| -> Vec<ResultItem> {
-            self.results.iter().filter(|r| keep(r)).cloned().collect()
+            self.results
+                .iter()
+                .filter(|r| !r.answer && keep(r))
+                .cloned()
+                .collect()
         };
+        let selected = self.root_selected().map(|item| item.id.clone());
+        let answer = self
+            .results
+            .iter()
+            .find(|item| item.answer)
+            .map(|item| AnswerCard {
+                id: item.id.clone(),
+                expression: self.query.trim().to_string(),
+                answer: item.title.clone(),
+                selected: selected.as_deref() == Some(item.id.as_str()),
+            });
         let pinned = pick(|r| r.pinned);
         let suggested = pick(|r| !r.pinned && r.suggested);
         let rest = pick(|r| !r.pinned && !r.suggested);
@@ -363,8 +387,9 @@ impl Launcher {
                 text: self.query.clone(),
                 revision: self.query_revision,
             },
+            answer,
             sections,
-            selected: self.root_selected().map(|item| item.id.clone()),
+            selected,
             // Said only once every provider has answered, so a slow one does
             // not flash it up between keystrokes.
             empty: (self.results.is_empty() && !self.query.is_empty() && self.results_complete)

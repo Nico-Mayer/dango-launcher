@@ -307,6 +307,7 @@ impl Core {
             Some(context.title.clone())
         };
         ui::ResultItem {
+            answer: c.source == crate::search::Source::Answer,
             context,
             extension_id: c.extension_id,
             id: c.id,

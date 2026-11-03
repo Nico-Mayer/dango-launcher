@@ -43,6 +43,7 @@ fn result(n: usize) -> ResultItem {
         match_positions: Vec::new(),
         suggested: false,
         pinned: false,
+        answer: false,
     }
 }
 
@@ -2629,4 +2630,119 @@ fn a_task_s_lingering_marks_draw_no_loading_bar() {
     };
     assert!(!view.busy);
     assert!(h.snapshot().toast.unwrap().action.is_none());
+}
+
+fn answer_item() -> ResultItem {
+    ResultItem {
+        extension_id: "dango.calculator".into(),
+        context: Context {
+            title: "Calculator".into(),
+            icon: None,
+        },
+        id: "4".into(),
+        title: "4".into(),
+        subtitle: None,
+        icon: None,
+        actions: vec![
+            Action {
+                id: "copy".into(),
+                title: "Copy answer".into(),
+                ..Default::default()
+            },
+            Action {
+                id: "paste".into(),
+                title: "Paste answer".into(),
+                ..Default::default()
+            },
+        ],
+        match_positions: Vec::new(),
+        suggested: false,
+        pinned: false,
+        answer: true,
+    }
+}
+
+fn answered(results: Vec<ResultItem>) -> Harness {
+    let mut h = Harness::new();
+    h.typed("2+2");
+    let mut items = vec![answer_item()];
+    items.extend(results);
+    h.event(Event::Results {
+        query: "2+2".into(),
+        items,
+        complete: true,
+    });
+    h
+}
+
+#[test]
+fn a_query_with_an_answer_selects_the_card() {
+    let h = answered(results(2));
+    let root = h.root_screen();
+    let card = root.answer.expect("the answer card");
+    assert_eq!(
+        (card.expression.as_str(), card.answer.as_str()),
+        ("2+2", "4")
+    );
+    assert!(card.selected);
+    assert!(root
+        .sections
+        .iter()
+        .all(|section| section.items.iter().all(|item| !item.answer)));
+    assert_eq!(root.selected.as_deref(), Some("4"));
+}
+
+#[test]
+fn arrows_move_between_the_card_and_the_results() {
+    let mut h = answered(results(2));
+    h.press("ArrowDown");
+    assert_eq!(h.root_screen().selected.as_deref(), Some("result-1"));
+    h.press("ArrowUp");
+    assert_eq!(h.root_screen().selected.as_deref(), Some("4"));
+    h.press("ArrowUp");
+    assert_eq!(h.root_screen().selected.as_deref(), Some("4"));
+}
+
+#[test]
+fn enter_on_the_card_copies_the_answer() {
+    let mut h = answered(results(2));
+    let snapshot = h.snapshot();
+    assert_eq!(snapshot.footer.context.title, "Calculator");
+    assert_eq!(
+        snapshot.footer.primary_label.as_deref(),
+        Some("Copy answer")
+    );
+    h.press("Enter");
+    let runs = h.runs();
+    assert_eq!(runs.len(), 1);
+    assert_eq!(
+        (
+            runs[0].extension_id.as_str(),
+            runs[0].item_id.as_str(),
+            runs[0].action_id.as_str()
+        ),
+        ("dango.calculator", "4", "copy")
+    );
+}
+
+#[test]
+fn the_panel_offers_copy_and_paste() {
+    let mut h = answered(results(2));
+    h.command("k");
+    let titles: Vec<String> = h
+        .snapshot()
+        .panel
+        .actions
+        .iter()
+        .map(|action| action.title.clone())
+        .collect();
+    assert_eq!(titles, ["Copy answer", "Paste answer"]);
+}
+
+#[test]
+fn an_answer_alone_shows_no_empty_view() {
+    let h = answered(Vec::new());
+    let root = h.root_screen();
+    assert!(root.answer.is_some());
+    assert!(root.empty.is_none());
 }

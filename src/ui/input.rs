@@ -149,6 +149,8 @@ pub struct ResultItem {
     pub match_positions: Vec<usize>,
     pub suggested: bool,
     pub pinned: bool,
+    /// The calculator's answer to the query, drawn as the card above the rows.
+    pub answer: bool,
 }
 
 /// A name and icon the ActionBar shows for where the user is.

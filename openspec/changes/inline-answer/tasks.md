@@ -23,7 +23,7 @@
 
 ## 2. The answer card in root search
 
-- [ ] 2.1 In `src/ui/snapshot.rs`, split a `Source::Answer` item out of the root sections into `RootScreen.answer`, keeping it first in `root_order()`. Add `Theme.answer-height` (64 px), an `AnswerData` global (expression, answer, selected), `ui/shell/inline-answer.slint`, and `src/slint_shell/render/answer.rs` as the global's only writer.
+- [x] 2.1 In `src/ui/snapshot.rs`, split a `Source::Answer` item out of the root sections into `RootScreen.answer`, keeping it first in `root_order()`. Add `Theme.answer-height` (64 px), an `AnswerData` global (expression, answer, selected), `ui/shell/inline-answer.slint`, and `src/slint_shell/render/answer.rs` as the global's only writer.
 
   The card shows:
   - the query in muted text on the left, the `arrow-right` icon, and the answer large on the right;
@@ -46,7 +46,7 @@
 
 ## 3. Checks and review
 
-- [ ] 3.1 Run `mise run check` and `cargo test`. Verify both pass.
+- [x] 3.1 Run `mise run check` and `cargo test`. Verify both pass.
 - [ ] 3.2 Run the `ponytail-review` skill in a fresh subagent on this change's commits, without the apply context. Report the findings to the author. Verify that the findings are listed in the session.
 
 ## Workflow follow-up

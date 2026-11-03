@@ -147,6 +147,15 @@ export global ProgressData {
     in property <[StepData]> steps;
 }
 
+export global AnswerData {
+    in property <bool> shown;
+    in property <string> id;
+    in property <string> expression;
+    in property <string> answer;
+    in property <bool> selected;
+    in property <image> arrow;
+}
+
 export global DetailData {
     in property <image> image;
     in property <bool> has-image;
