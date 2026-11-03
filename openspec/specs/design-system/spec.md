@@ -9,37 +9,62 @@ is one shell around one view and reads like every other.
 
 ### Requirement: The theme follows the operating system
 
-Dango SHALL have a dark and a light theme and SHALL show the one that matches
-the operating system's appearance setting. When the setting changes, the
-launcher SHALL use the new theme the next time it is painted, without a
-restart. Dango SHALL NOT read or create a theme file, and SHALL NOT offer a
-theme picker.
+Dango SHALL have two themes, Graphite, which is dark, and Paper, which is light,
+and SHALL show the one that matches the operating system's appearance setting.
+When the setting changes, the launcher SHALL use the new theme the next time it
+is painted, without a restart. Dango SHALL NOT read or create a theme file, and
+SHALL NOT offer a theme picker.
 
 #### Scenario: Dark appearance on Windows
 
 - **WHEN** Windows is set to the dark app mode and the launcher is shown
-- **THEN** the launcher uses the dark theme
+- **THEN** the launcher uses the Graphite theme
 
 #### Scenario: Light appearance on Windows
 
 - **WHEN** Windows is set to the light app mode and the launcher is shown
-- **THEN** the launcher uses the light theme
+- **THEN** the launcher uses the Paper theme
 
 #### Scenario: Dark appearance on macOS
 
 - **WHEN** macOS is set to the dark appearance and the launcher is shown
-- **THEN** the launcher uses the dark theme
+- **THEN** the launcher uses the Graphite theme
 
 #### Scenario: Light appearance on macOS
 
 - **WHEN** macOS is set to the light appearance and the launcher is shown
-- **THEN** the launcher uses the light theme
+- **THEN** the launcher uses the Paper theme
 
 #### Scenario: The setting changes while Dango runs
 
 - **WHEN** the operating system's appearance changes while Dango is running and
   the user then shows the launcher
 - **THEN** the launcher uses the matching theme without Dango being restarted
+
+### Requirement: Dango's own colours come from the active theme
+
+Every colour Dango draws itself, its surfaces, text, lines, and marks, SHALL
+come from the active theme. Content brings its own colours and keeps them:
+application icons, favicons, image previews, and colour tiles a command
+declares. The two themes SHALL differ only in colour, never in the size or
+position of any part.
+
+#### Scenario: Switching theme changes Dango's colours
+
+- **WHEN** the operating system's appearance changes from dark to light and the
+  launcher is shown
+- **THEN** the launcher's surfaces, text, and selection use the light theme
+
+#### Scenario: Content keeps its colours
+
+- **WHEN** a grid shows a colour tile declared as `#ff0000` in either theme
+- **THEN** the tile is drawn in `#ff0000`
+
+#### Scenario: Switching theme keeps the layout
+
+- **WHEN** the same results are shown once in the dark theme and once in the
+  light theme
+- **THEN** every part has the same size and position in both
 
 ### Requirement: Text uses the bundled type faces
 
@@ -64,8 +89,8 @@ The launcher SHALL show, from top to bottom, the SearchBar, exactly one view,
 and the ActionBar. The view is a list, a grid, a detail, a form, or an empty
 view. Overlays SHALL float above these regions and SHALL NOT move them.
 
-The launcher SHALL be 720 logical pixels wide. The SearchBar SHALL be 56
-logical pixels high, the ActionBar 40, and a list row 40.
+The launcher SHALL be 720 logical pixels wide. The SearchBar SHALL be 64
+logical pixels high, the ActionBar 44, and a list row 44.
 
 #### Scenario: Root search
 
@@ -75,8 +100,8 @@ logical pixels high, the ActionBar 40, and a list row 40.
 #### Scenario: Sizes at default text scale
 
 - **WHEN** root search is shown at the default text scale
-- **THEN** the launcher is 720 logical pixels wide, the SearchBar is 56 high,
-  each result row is 40 high, and the ActionBar is 40 high
+- **THEN** the launcher is 720 logical pixels wide, the SearchBar is 64 high,
+  each result row is 44 high, and the ActionBar is 44 high
 
 ### Requirement: The SearchBar holds the query and shows where the user is
 
@@ -154,24 +179,29 @@ SHALL open the action panel.
 ### Requirement: A toast reports status in the ActionBar
 
 A toast SHALL replace the ActionBar's context while it shows. A toast has a
-style and one line of text. A busy toast SHALL show a muted dot and stay while
-its work runs. A success toast SHALL show an accent dot and disappear after
-about two seconds. A failure toast SHALL show a danger dot and stay until the
-next key press or click. The dot SHALL NOT move. Assistive technology SHALL be
-told the toast's text and whether it reports a failure. Showing a toast SHALL
-NOT take focus.
+style and one line of text. A busy toast SHALL show a dot in the working role
+and stay while its work runs. A success toast SHALL show a dot in the done role
+and disappear after about two seconds. A failure toast SHALL show a dot in the
+danger role and stay until the next key press or click. The dot SHALL NOT move.
+Assistive technology SHALL be told the toast's text and whether it reports a
+failure. Showing a toast SHALL NOT take focus.
 
 #### Scenario: A success toast
 
 - **WHEN** an action that keeps the launcher open reports success with a toast
-- **THEN** the toast shows with an accent dot and is gone after about two
-  seconds, and the context returns
+- **THEN** the toast shows with a dot in the done role and is gone after about
+  two seconds, and the context returns
 
 #### Scenario: A failure toast stays
 
 - **WHEN** an action fails
-- **THEN** a failure toast shows its sentence with a danger dot
+- **THEN** a failure toast shows its sentence with a dot in the danger role
 - **AND** it stays until the user presses a key or clicks
+
+#### Scenario: A busy toast
+
+- **WHEN** a view is marked loading
+- **THEN** the busy toast shows a dot in the working role
 
 #### Scenario: Typing is not interrupted
 
@@ -188,8 +218,8 @@ The launcher SHALL build every surface from the same small parts:
   border.
 - A key chord is drawn as keys in Geist Mono, using the platform's names as the
   view protocol requires.
-- A tag is short text in a rounded outline coloured by the accent, muted, or
-  danger role.
+- A tag is short text in its role's colour on a rounded, faint fill of the same
+  role. Its role is accent, muted, or danger.
 - An accessory is text, an icon, a tag, or a key chord. A row shows at most
   three, right-aligned.
 
@@ -204,6 +234,12 @@ The launcher SHALL build every surface from the same small parts:
 
 - **WHEN** an item declares four accessories
 - **THEN** the row shows the first three
+
+#### Scenario: A tag in the accent role
+
+- **WHEN** an item declares the tag "Link" in the accent role
+- **THEN** "Link" is drawn in the accent colour on a faint accent fill, with no
+  outline
 
 ### Requirement: Each view kind has one layout
 
@@ -268,12 +304,13 @@ The launcher SHALL build every surface from the same small parts:
 
 ### Requirement: Selection, hover, and focus are told apart
 
-The selected row, tile, or action SHALL be filled with the selection role. A
+The selected row, tile, or action SHALL be filled with the selected role. A
 hovered one SHALL be filled with the hover role, which SHALL be clearly weaker
-than selection, following the list-navigation requirements. A focused form
-control SHALL show a border in the accent role. A surface that keeps focus in
-its input and moves a selection SHALL show that selection, not a focus ring
-around the surface.
+than selected, following the list-navigation requirements. Selected text in an
+input SHALL be filled with the selection role. A focused form control SHALL
+show a border in the accent role. A surface that keeps focus in its input and
+moves a selection SHALL show that selection, not a focus ring around the
+surface.
 
 #### Scenario: Hovering another row
 
@@ -285,6 +322,12 @@ around the surface.
 - **WHEN** the user presses Tab in a form
 - **THEN** the next control shows the accent border and the previous one loses
   it
+
+#### Scenario: Selecting text in the SearchBar
+
+- **WHEN** the user selects the query text in the SearchBar
+- **THEN** the selected text is filled with the selection role, not the
+  selected role
 
 ### Requirement: Overlays own the keyboard until they close
 

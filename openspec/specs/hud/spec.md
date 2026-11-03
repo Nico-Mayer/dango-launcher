@@ -67,7 +67,7 @@ Assistive technology SHALL be told the text and whether it reports a failure.
 #### Scenario: A success HUD
 
 - **WHEN** the HUD reports a copy
-- **THEN** it shows the accent dot and "Copied to clipboard"
+- **THEN** it shows a dot in the done role and "Copied to clipboard"
 
 #### Scenario: The HUD follows the system theme
 
