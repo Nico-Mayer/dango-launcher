@@ -134,11 +134,9 @@ of hide: the launcher SHALL reset its view state and SHALL NOT cancel the
 command, whose next view brings the launcher back. Reading a selection SHALL
 NOT hide the launcher at all (see `selection-and-paste`).
 
-A failure message the user has not seen SHALL be the one exception to a reset.
-An action that hides the launcher as part of its work can only report a failure
-once the window is gone, so a failure SHALL survive the reset and be shown on
-the next activation. It SHALL be cleared as soon as the user types, runs
-another action, or presses Escape.
+A failure reported while the launcher is hidden SHALL NOT be kept for the next
+activation, whether the launcher was reset or held. The HUD shows it instead
+(see `hud`).
 
 #### Scenario: State does not leak between invocations
 
@@ -222,13 +220,15 @@ another action, or presses Escape.
 #### Scenario: A failure from a dismissing action is shown afterwards
 
 - **WHEN** an action hides the launcher and then fails
-- **THEN** the next activation shows that failure's message
+- **THEN** the HUD shows that failure's message at once
+- **AND** the next activation shows no failure toast
 
 #### Scenario: The user clears a carried failure
 
-- **WHEN** a carried failure is on screen and the user types, runs an action, or
-  presses Escape
-- **THEN** the message goes away
+- **WHEN** a failure was reported while the launcher was held by an interrupting
+  hide, and the user shows the launcher within the grace period
+- **THEN** the held view is back without a failure toast, because the HUD
+  already showed the message
 
 ### Requirement: Dismissal
 

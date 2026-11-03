@@ -206,8 +206,10 @@ first-wins conflict handling as command bindings.
 - **WHEN** a bound application's name matches nothing in the index and the user
   presses its chord
 - **THEN** nothing is launched
-- **AND** the missing application is surfaced through the tray status line and
-  the log, naming the entry
+- **AND** the HUD reads "Can't open {name} because it isn't installed", with the
+  entry's name
+- **AND** the log names the entry
+- **AND** the tray status line is unchanged
 
 #### Scenario: A binding for an application installed later
 
@@ -219,6 +221,12 @@ first-wins conflict handling as command bindings.
 
 - **WHEN** an application's hotkey is written as a per-platform table
 - **THEN** each platform registers its own chord and ignores the other's
+
+#### Scenario: The application fails to open
+
+- **WHEN** the user presses an application's chord and the launch fails
+- **THEN** the HUD shows the launch's failure sentence
+- **AND** the log names the entry and the tray status line is unchanged
 
 ### Requirement: A refused command or application hotkey is surfaced
 
