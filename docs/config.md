@@ -1,6 +1,6 @@
 # Dango configuration
 
-Every setting in config.json. Generated from the code; do not edit by hand.
+Every setting in config.toml. Generated from the code; do not edit by hand.
 
 ## Top level
 

@@ -41,15 +41,15 @@ while it runs shows the launcher.
 
 ## Configuration
 
-Dango reads `~/.config/dango/config.json` (or `$DANGO_CONFIG_DIR`). Every
+Dango reads `~/.config/dango/config.toml` (or `$DANGO_CONFIG_DIR`). Every
 setting is optional and listed in `docs/config.md`. Run the Open Config File
-command from the launcher to open it in the app your system uses for `.json`
+command from the launcher to open it in the app your system uses for `.toml`
 files. It creates the file if there is none yet.
 
 Dango writes `config.schema.json` beside the config file on every start. Put
-`"$schema": "./config.schema.json"` at the top of yours and your editor will
-complete and check it. The schema file is generated, so keep it out of the git
-repository that holds your dotfiles.
+`#:schema ./config.schema.json` on the first line of yours and an editor with a
+TOML language server (Taplo, Tombi) will complete and check it. The schema file
+is generated, so keep it out of the git repository that holds your dotfiles.
 
 API keys for the AI commands live beside it in `auth.json`, in plain text, one
 entry per provider. See `docs/auth.example.json`. **Keep `auth.json` out of

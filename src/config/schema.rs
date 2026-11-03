@@ -304,7 +304,7 @@ fn commands(manifest: &Manifest, description: Value) -> Value {
 /// from `$defs` are rendered once and linked to.
 pub fn reference(schema: &Value) -> String {
     let mut out = String::from(
-        "# Dango configuration\n\nEvery setting in config.json. Generated from the code; \
+        "# Dango configuration\n\nEvery setting in config.toml. Generated from the code; \
          do not edit by hand.\n",
     );
     let mut writer = Reference {
