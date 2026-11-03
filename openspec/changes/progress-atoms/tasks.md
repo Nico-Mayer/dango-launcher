@@ -14,15 +14,15 @@
 
 ## 3. Busy marks that don't blink
 
-- [ ] 3.1 In `src/ui/`, add the busy-mark state from design.md: `Hidden | Pending{id} | Shown{id, held}`, fed by `working.is_some() || top view loading`, a new id on every entry into `Pending`, `Effect::WakeBusyMarks { id, stage }` (`Delay`, `Hold`), and `Event::BusyMarksWoke { id }`. Make `ViewScreen.busy` and the busy toast (both "Running X…" and "Loading…") follow the marks. Delete `RootScreen.busy`. Verify with reducer tests in `src/ui/tests.rs` for each scenario in the "Busy marks do not blink" requirement:
+- [x] 3.1 In `src/ui/`, add the busy-mark state from design.md: `Hidden | Pending{id} | Shown{id, held}`, fed by `working.is_some() || top view loading`, a new id on every entry into `Pending`, `Effect::WakeBusyMarks { id, stage }` (`Delay`, `Hold`), and `Event::BusyMarksWoke { id }`. Make `ViewScreen.busy` and the busy toast (both "Running X…" and "Loading…") follow the marks. Delete `RootScreen.busy`. Verify with reducer tests in `src/ui/tests.rs` for each scenario in the "Busy marks do not blink" requirement:
   - a fast command shows no toast;
   - "Running X…" passes to "Loading…" without a gap;
   - marks stay until the hold wake;
   - a streamed loading view keeps the same id and state;
   - leaving clears at once;
   - a stale id is ignored.
-- [ ] 3.2 Update the existing tests that expect busy marks the moment work starts, by sending `BusyMarksWoke` where marks are expected: in `src/ui/tests.rs`, tests using the `detail_tree` fixture (`loading: true`, around line 75) whose effect lists now include `WakeBusyMarks`, the busy test around line 835, and the `root_screen().busy` test around line 1823 (move it to the toast); in `src/slint_shell/tests.rs`, the loading-bar tests around lines 393 and 410 and the busy-toast test. Verify with `cargo test`.
-- [ ] 3.3 In `src/app/mod.rs`, add `BUSY_MARK_DELAY` (150 ms) and `BUSY_MARK_HOLD` (400 ms), and run `WakeBusyMarks` like `ExpireToast`: pick the duration by `stage`, sleep, and apply `BusyMarksWoke`. Verify with an app test in `src/app/tests.rs`: a view that stays loading past the delay gets busy marks, and one that finishes sooner never does.
+- [x] 3.2 Update the existing tests that expect busy marks the moment work starts, by sending `BusyMarksWoke` where marks are expected: in `src/ui/tests.rs`, tests using the `detail_tree` fixture (`loading: true`, around line 75) whose effect lists now include `WakeBusyMarks`, the busy test around line 835, and the `root_screen().busy` test around line 1823 (move it to the toast); in `src/slint_shell/tests.rs`, the loading-bar tests around lines 393 and 410 and the busy-toast test. Verify with `cargo test`.
+- [x] 3.3 In `src/app/mod.rs`, add `BUSY_MARK_DELAY` (150 ms) and `BUSY_MARK_HOLD` (400 ms), and run `WakeBusyMarks` like `ExpireToast`: pick the duration by `stage`, sleep, and apply `BusyMarksWoke`. Verify with an app test in `src/app/tests.rs`: a view that stays loading past the delay gets busy marks, and one that finishes sooner never does.
 
 ## 4. Skeleton rows
 

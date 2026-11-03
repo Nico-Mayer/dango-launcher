@@ -65,7 +65,6 @@ snapshot_types! {
         pub sections: Vec<Section>,
         pub selected: Option<String>,
         pub empty: Option<EmptyText>,
-        pub busy: bool,
         /// More results may still arrive for the query.
         pub settling: bool,
     }
@@ -355,7 +354,6 @@ impl Launcher {
                     description: None,
                     truncate: true,
                 }),
-            busy: self.working.is_some(),
             settling: !self.results_complete,
         }
     }
@@ -471,7 +469,7 @@ impl Launcher {
             }),
         };
         ViewScreen {
-            busy: is_busy(&view.tree.view),
+            busy: self.busy_marks_shown().is_some(),
             body,
         }
     }
@@ -491,19 +489,10 @@ impl Launcher {
                 text: toast.text.clone(),
             });
         }
-        let busy = |text: String| {
-            Some(Toast {
-                style: ToastStyle::Busy,
-                text,
-            })
-        };
-        if let Some(title) = &self.working {
-            return busy(format!("Running {title}…"));
-        }
-        match self.stack.last() {
-            Some(view) if is_busy(&view.tree.view) => busy("Loading…".to_string()),
-            _ => None,
-        }
+        self.busy_marks_shown().map(|text| Toast {
+            style: ToastStyle::Busy,
+            text: text.to_string(),
+        })
     }
 
     fn footer(&self, actions: &[Action]) -> Footer {
@@ -589,14 +578,5 @@ impl EmptyText {
             description: None,
             truncate: false,
         }
-    }
-}
-
-fn is_busy(view: &View) -> bool {
-    match view {
-        View::List(list) => list.loading,
-        View::Grid(grid) => grid.loading,
-        View::Detail(detail) => detail.loading,
-        View::Form(_) => false,
     }
 }

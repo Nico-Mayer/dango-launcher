@@ -902,3 +902,40 @@ async fn an_application_hotkey_whose_launch_fails_is_reported_in_the_hud() {
     );
     assert!(!core.tray().config_error);
 }
+
+fn a_loading_view() -> ViewTree {
+    ViewTree::new(View::List(ListView {
+        loading: true,
+        ..ListView::default()
+    }))
+}
+
+fn busy(shell: &RecordingShell) -> bool {
+    matches!(shell.last_snapshot().screen, Screen::View(view) if view.busy)
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_view_loading_past_the_delay_shows_busy_marks() {
+    let (core, shell) = core("");
+    core.toggle();
+    let work = start_work(&core);
+    work.push_view(a_loading_view());
+    settle().await;
+    assert!(!busy(&shell), "not before the delay");
+    tokio::time::sleep(Duration::from_millis(200)).await;
+    assert!(busy(&shell));
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_view_done_before_the_delay_never_shows_busy_marks() {
+    let (core, shell) = core("");
+    core.toggle();
+    let work = start_work(&core);
+    work.push_view(a_loading_view());
+    settle().await;
+    work.push_view(a_view());
+    for _ in 0..10 {
+        tokio::time::sleep(Duration::from_millis(50)).await;
+        assert!(!busy(&shell));
+    }
+}

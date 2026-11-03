@@ -6,7 +6,7 @@ use crate::protocol::{
     Section, Shortcut, View, ViewTree, FILTER_ACTION, GRID_COLUMNS, PROTOCOL_VERSION,
 };
 
-use super::effect::{ActionRequest, Effect, Origin};
+use super::effect::{ActionRequest, BusyStage, Effect, Origin};
 use super::input::{Chord, Context, Event, Input, Intent, ResultItem, TemplateInspection};
 use crate::ranking::fuzzy;
 
@@ -46,6 +46,7 @@ pub struct Launcher {
     /// A tree that cannot be drawn, shown in place of a view until Escape.
     pub(super) view_error: Option<ViewError>,
     pub(super) toast: Option<HeldToast>,
+    pub(super) busy_marks: BusyMarks,
     /// What the launcher reports while it is off screen. Set while it is still
     /// visible, it waits for the hide.
     pub(super) hud: Option<HeldToast>,
@@ -59,6 +60,22 @@ pub(super) struct HeldToast {
     pub(super) id: u64,
     pub(super) style: ToastStyle,
     pub(super) text: String,
+}
+
+/// The loading bar and busy toast wait a moment before they appear and, once
+/// shown, stay a moment, so fast work never blinks them.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub(super) enum BusyMarks {
+    #[default]
+    Hidden,
+    Pending {
+        id: u64,
+    },
+    Shown {
+        id: u64,
+        held: bool,
+        text: String,
+    },
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -178,6 +195,7 @@ impl Launcher {
             Input::Intent(intent) => self.intent(intent, &mut effects),
             Input::Event(event) => self.event(event, &mut effects),
         }
+        self.settle_busy_marks(&mut effects);
         if self.panel.is_some() && self.available_actions().is_empty() {
             self.panel = None;
         }
@@ -296,6 +314,7 @@ impl Launcher {
                     });
                 }
             }
+            Event::BusyMarksWoke { id } => self.busy_marks_woke(id, fx),
             Event::ToastExpired { id } => {
                 if self.toast.as_ref().is_some_and(|toast| toast.id == id) {
                     self.toast = None;
@@ -323,7 +342,63 @@ impl Launcher {
         self.view_error = None;
         self.working = None;
         self.toast = None;
+        self.busy_marks = BusyMarks::Hidden;
         fx.push(Effect::Search(String::new()));
+    }
+
+    /// What the busy toast says while Dango is busy, and nothing otherwise.
+    pub(super) fn busy_text(&self) -> Option<String> {
+        if let Some(title) = &self.working {
+            return Some(format!("Running {title}…"));
+        }
+        self.stack
+            .last()
+            .filter(|view| is_loading(&view.tree.view))
+            .map(|_| "Loading…".to_string())
+    }
+
+    fn settle_busy_marks(&mut self, fx: &mut Vec<Effect>) {
+        let busy = self.busy_text();
+        match (&mut self.busy_marks, busy) {
+            (BusyMarks::Hidden, Some(_)) => {
+                let id = self.next_revision();
+                self.busy_marks = BusyMarks::Pending { id };
+                fx.push(Effect::WakeBusyMarks {
+                    id,
+                    stage: BusyStage::Delay,
+                });
+            }
+            (BusyMarks::Pending { .. }, None) | (BusyMarks::Shown { held: true, .. }, None) => {
+                self.busy_marks = BusyMarks::Hidden;
+            }
+            (BusyMarks::Shown { text, .. }, Some(busy)) => *text = busy,
+            _ => {}
+        }
+    }
+
+    fn busy_marks_woke(&mut self, woke: u64, fx: &mut Vec<Effect>) {
+        match &mut self.busy_marks {
+            BusyMarks::Pending { id } if *id == woke => {
+                self.busy_marks = BusyMarks::Shown {
+                    id: woke,
+                    held: false,
+                    text: self.busy_text().unwrap_or_default(),
+                };
+                fx.push(Effect::WakeBusyMarks {
+                    id: woke,
+                    stage: BusyStage::Hold,
+                });
+            }
+            BusyMarks::Shown { id, held, .. } if *id == woke && !*held => *held = true,
+            _ => {}
+        }
+    }
+
+    pub(super) fn busy_marks_shown(&self) -> Option<&str> {
+        match &self.busy_marks {
+            BusyMarks::Shown { text, .. } => Some(text),
+            _ => None,
+        }
     }
 
     fn rendered(
@@ -641,6 +716,7 @@ impl Launcher {
             self.abandoned_invocation = self.last_invocation;
             self.shown_invocation = None;
             self.stack.pop();
+            self.busy_marks = BusyMarks::Hidden;
             let revision = self.next_revision();
             match self.stack.last_mut() {
                 Some(view) => view.query_revision = revision,
@@ -1238,4 +1314,13 @@ fn step<'a>(
         (Some(i), false) => i.saturating_sub(1),
     };
     ids.get(next).map(|id| id.to_string())
+}
+
+pub(super) fn is_loading(view: &View) -> bool {
+    match view {
+        View::List(list) => list.loading,
+        View::Grid(grid) => grid.loading,
+        View::Detail(detail) => detail.loading,
+        View::Form(_) => false,
+    }
 }

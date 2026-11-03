@@ -129,6 +129,9 @@ pub enum Event {
     ToastExpired {
         id: u64,
     },
+    BusyMarksWoke {
+        id: u64,
+    },
 }
 
 #[derive(Clone, Debug, PartialEq)]

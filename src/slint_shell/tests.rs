@@ -97,8 +97,25 @@ impl Harness {
         harness
     }
 
+    /// Lets the busy marks' next wait pass, as the shell's timer would.
+    fn wake_busy(&self) {
+        let pending = self
+            .effects
+            .borrow()
+            .iter()
+            .rev()
+            .find_map(|effect| match effect {
+                Effect::WakeBusyMarks { id, .. } => Some(*id),
+                _ => None,
+            });
+        if let Some(id) = pending {
+            self.event(Event::BusyMarksWoke { id });
+        }
+    }
+
     fn event(&self, event: Event) {
-        self.launcher.borrow_mut().apply(Input::Event(event));
+        let fx = self.launcher.borrow_mut().apply(Input::Event(event));
+        self.effects.borrow_mut().extend(fx);
         let snapshot = self.launcher.borrow().snapshot();
         render::publish(
             &mut self.renderer.borrow_mut(),
@@ -470,6 +487,7 @@ mod search_bar {
             detail.loading = true;
         }
         h.view(tree);
+        h.wake_busy();
         let bar = ElementHandle::find_by_accessible_label(&h.ui, "Loading…").find(|element| {
             element.accessible_role()
                 == Some(i_slint_backend_testing::AccessibleRole::ProgressIndicator)
@@ -485,6 +503,7 @@ mod search_bar {
             detail.loading = true;
         }
         h.view(tree);
+        h.wake_busy();
         let sweep_x = || {
             ElementHandle::find_by_element_id(&h.ui, "Progress::sweep")
                 .next()
@@ -495,6 +514,8 @@ mod search_bar {
         assert_ne!(sweep_x(), Some(before));
 
         h.view(detail_tree("Done"));
+        assert!(sweep_x().is_some(), "the bar stays its minimum time");
+        h.wake_busy();
         assert!(sweep_x().is_none());
     }
 
@@ -593,6 +614,7 @@ mod toast {
             "
 ",
         );
+        h.wake_busy();
         assert_eq!(
             h.shell().get_toast_style(),
             super::super::generated::ToastStyle::Busy

@@ -37,6 +37,8 @@ const DEFAULT_RESET_AFTER_SECS: u32 = 60;
 const PERMISSION_POLL: Duration = Duration::from_secs(2);
 
 const TOAST_LIFETIME: Duration = Duration::from_secs(2);
+const BUSY_MARK_DELAY: Duration = Duration::from_millis(150);
+const BUSY_MARK_HOLD: Duration = Duration::from_millis(400);
 /// Longer than a success, so a whole sentence can be read: nothing but time
 /// takes a failure HUD away.
 const FAILURE_HUD_LIFETIME: Duration = Duration::from_secs(4);
@@ -236,6 +238,17 @@ impl Core {
                 }));
             }
             ui::Effect::ReportPaint(probe) => self.latency.finish(probe),
+            ui::Effect::WakeBusyMarks { id, stage } => {
+                let after = match stage {
+                    ui::BusyStage::Delay => BUSY_MARK_DELAY,
+                    ui::BusyStage::Hold => BUSY_MARK_HOLD,
+                };
+                let core = self.clone();
+                self.runtime.spawn(async move {
+                    tokio::time::sleep(after).await;
+                    core.apply(ui::Input::Event(ui::Event::BusyMarksWoke { id }));
+                });
+            }
             ui::Effect::ExpireToast { id, style } => {
                 let lifetime = match style {
                     ui::ToastStyle::Failure => FAILURE_HUD_LIFETIME,

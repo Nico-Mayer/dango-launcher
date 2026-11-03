@@ -5,6 +5,7 @@ use crate::protocol::{
 };
 
 use super::snapshot::{DetailBody, Focus, ListBody, RootScreen, Screen, ViewBody};
+use super::state::BusyMarks;
 use super::*;
 
 fn actions() -> Vec<Action> {
@@ -192,6 +193,19 @@ impl Harness {
 
     fn finish(&mut self, request: ActionRequest, outcome: ActionOutcome) -> Vec<Effect> {
         self.event(Event::ActionFinished { request, outcome })
+    }
+
+    /// Lets the busy marks' next wait pass, as the shell's timer would.
+    fn wake_busy(&mut self) {
+        match self.launcher.busy_marks {
+            BusyMarks::Pending { id }
+            | BusyMarks::Shown {
+                id, held: false, ..
+            } => {
+                self.event(Event::BusyMarksWoke { id });
+            }
+            _ => {}
+        }
     }
 
     fn snapshot(&self) -> Snapshot {
@@ -832,6 +846,7 @@ fn enter_on_an_empty_view_runs_its_first_action() {
 fn enter_in_a_detail_view_runs_the_view_s_primary_action_on_no_item() {
     let mut h = Harness::view(detail_tree("Working…"));
     assert_eq!(h.snapshot().focus, Focus::Detail);
+    h.wake_busy();
     assert_eq!(h.status(), "Loading…");
     h.press("Enter");
     let runs = h.runs();
@@ -1813,14 +1828,14 @@ fn a_running_command_shows_a_busy_toast_until_it_fails_or_resets() {
     h.results("", vec![command]);
     let effects = h.press("Enter");
     assert_eq!(
-        effects,
-        vec![Effect::InvokeCommand {
+        effects[0],
+        Effect::InvokeCommand {
             command_id: "result-1".into(),
             query: String::new(),
-        }]
+        }
     );
+    h.wake_busy();
     assert_eq!(h.status(), "Running Clipboard History…");
-    assert!(h.root_screen().busy);
     h.event(Event::Failed("Couldn't paste".into()));
     assert_eq!(h.status(), "");
     assert!(h.failure().is_some());
@@ -1847,6 +1862,7 @@ fn a_hotkey_failure_while_held_keeps_the_running_status() {
         held: true,
         probe: None,
     });
+    h.wake_busy();
     assert_eq!(h.status(), "Running Clipboard History…");
 }
 
@@ -2140,4 +2156,126 @@ fn showing_the_launcher_removes_the_hud() {
     assert_eq!(hud_text(&h), None);
     h.event(Event::Hidden);
     assert_eq!(hud_text(&h), None);
+}
+
+fn running(h: &mut Harness) {
+    let mut command = result(1);
+    command.title = "Clipboard History".into();
+    command.actions.clear();
+    h.results("", vec![command]);
+    h.press("Enter");
+}
+
+fn done_tree() -> ViewTree {
+    ViewTree::new(View::Detail(DetailView {
+        markdown: "Done".into(),
+        actions: actions(),
+        ..Default::default()
+    }))
+}
+
+fn marks_id(h: &Harness) -> Option<u64> {
+    match h.launcher.busy_marks {
+        BusyMarks::Pending { id } | BusyMarks::Shown { id, .. } => Some(id),
+        BusyMarks::Hidden => None,
+    }
+}
+
+#[test]
+fn a_fast_command_shows_no_busy_toast() {
+    let mut h = Harness::new();
+    running(&mut h);
+    assert_eq!(h.status(), "", "nothing before the delay");
+    h.render(3, done_tree());
+    assert_eq!(h.launcher.busy_marks, BusyMarks::Hidden);
+    h.event(Event::BusyMarksWoke { id: u64::MAX });
+    assert_eq!(h.status(), "");
+}
+
+#[test]
+fn running_passes_to_loading_without_a_gap() {
+    let mut h = Harness::new();
+    running(&mut h);
+    h.wake_busy();
+    assert_eq!(h.status(), "Running Clipboard History…");
+    let id = marks_id(&h);
+    h.render(3, detail_tree("Working"));
+    assert_eq!(h.status(), "Loading…");
+    assert_eq!(marks_id(&h), id, "the same marks carry on");
+}
+
+#[test]
+fn busy_marks_stay_until_their_hold_passes() {
+    let mut h = Harness::view(detail_tree("Working"));
+    h.wake_busy();
+    assert_eq!(h.status(), "Loading…");
+    h.render(1, done_tree());
+    assert_eq!(h.status(), "Loading…", "shown its minimum time");
+    h.wake_busy();
+    assert_eq!(h.status(), "");
+    assert_eq!(h.launcher.busy_marks, BusyMarks::Hidden);
+}
+
+#[test]
+fn a_hold_that_passes_while_busy_keeps_the_marks() {
+    let mut h = Harness::view(detail_tree("Working"));
+    h.wake_busy();
+    h.wake_busy();
+    assert_eq!(h.status(), "Loading…");
+    h.render(1, done_tree());
+    assert_eq!(h.status(), "");
+}
+
+#[test]
+fn a_streamed_view_keeps_its_busy_marks() {
+    let mut h = Harness::view(detail_tree("Work"));
+    h.wake_busy();
+    let shown = h.launcher.busy_marks.clone();
+    for text in ["Worki", "Workin", "Working"] {
+        let effects = h.event(Event::Rendered {
+            owner: "fixture".into(),
+            context: Context {
+                title: "Fixture Command".into(),
+                icon: None,
+            },
+            invocation: 1,
+            tree: Box::new(detail_tree(text)),
+        });
+        assert!(!effects
+            .iter()
+            .any(|effect| matches!(effect, Effect::WakeBusyMarks { .. })));
+    }
+    assert_eq!(h.launcher.busy_marks, shown);
+}
+
+#[test]
+fn leaving_a_view_clears_its_busy_marks_at_once() {
+    let mut h = Harness::view(detail_tree("Working"));
+    h.wake_busy();
+    assert_eq!(h.status(), "Loading…");
+    h.press("Escape");
+    assert_eq!(h.status(), "");
+    assert_eq!(h.launcher.busy_marks, BusyMarks::Hidden);
+}
+
+#[test]
+fn a_stale_wake_is_ignored() {
+    let mut h = Harness::view(detail_tree("Working"));
+    let pending = h.launcher.busy_marks.clone();
+    let id = marks_id(&h).unwrap();
+    h.event(Event::BusyMarksWoke { id: id + 1 });
+    assert_eq!(h.launcher.busy_marks, pending);
+    assert_eq!(h.status(), "");
+}
+
+#[test]
+fn every_wait_for_busy_marks_takes_a_new_id() {
+    let mut h = Harness::view(detail_tree("Working"));
+    let first = marks_id(&h).unwrap();
+    h.render(1, done_tree());
+    h.render(1, detail_tree("Again"));
+    let second = marks_id(&h).unwrap();
+    assert_ne!(first, second);
+    h.event(Event::BusyMarksWoke { id: first });
+    assert_eq!(h.status(), "", "the old wake does not show the new marks");
 }
