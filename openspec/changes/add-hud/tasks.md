@@ -18,7 +18,7 @@
 ## 3. Failures go to the HUD while hidden
 
 - [x] 3.1 Make `show_failure` set a failure HUD instead of a toast while hidden, and drop the failure kept across `reset`; verify reducer tests for a failure after a dismissing action, a failure during the grace period, and no failure toast on the next activation, and update the existing carried-failure tests
-- [ ] 3.2 Route through `Event::Failed`, still logged and no longer through `report_problem`: `dispatch_command`'s `run_command` error, and from `dispatch_application` the missing application ("Can't open {name} because it isn't installed"), the failed launch (its own sentence), and the missing extension ("Turn on Applications to use app hotkeys"); verify `Core` tests with the recording shell that each shows a HUD and leaves the tray status unchanged
+- [x] 3.2 Route through `Event::Failed`, still logged and no longer through `report_problem`: `dispatch_command`'s `run_command` error, and from `dispatch_application` the missing application ("Can't open {name} because it isn't installed"), the failed launch (its own sentence), and the missing extension ("Can't open {name}"); verify `Core` tests with the recording shell that each shows a HUD and leaves the tray status unchanged
 - [ ] 3.3 Add to `AGENTS.md` platform traps: winit's `with_active(false)` holds for every show, not only the first; the HUD is a plain `NSPanel` because `DangoPanel` can become key and writes the global `PANEL_IS_KEY`; verify `mise run check`
 
 ## 4. Hand checks on Windows

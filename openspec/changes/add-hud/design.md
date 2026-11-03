@@ -101,8 +101,8 @@ Hotkey paths join the same route through `Event::Failed`:
 - a missing application, with "Can't open {name} because it isn't installed"
 - a failed launch from `dispatch_application`, with the launch's own failure
   sentence
-- a missing applications extension, with "Turn on Applications to use app
-  hotkeys"
+- a missing applications extension, with "Can't open {name}". Production
+  always registers the extension, so this only guards a test setup
 
 All are still written to the log. They no longer call `report_problem`, so the
 tray line stays for config and registration problems. The ambiguity note for
@@ -192,7 +192,7 @@ New strings, checked with the ux-writing skill against `interface-copy`:
 |-------|------|
 | HUD after a copy closes the launcher | "Copied to clipboard" |
 | HUD for an application hotkey with no app | "Can't open {name} because it isn't installed" |
-| HUD for an application hotkey with the Applications extension off | "Turn on Applications to use app hotkeys" |
+| HUD for an application hotkey with no applications extension | "Can't open {name}" |
 
 "Copied to clipboard" is taken from the design handover's toast example.
 Every other HUD text is an existing failure sentence, unchanged.

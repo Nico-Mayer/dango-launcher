@@ -7,6 +7,7 @@ use tokio::runtime::Handle;
 use super::{Core, Services, ViewRunner, RESULT_LIMIT};
 use crate::config::{Config, FileConfig};
 use crate::extension::{Extension, ExtensionHost, HostResolver};
+use crate::extensions::applications::{AppIndex, ApplicationsExtension, FakeIndexer};
 use crate::hotkeys::{self, testing::FakeGrab, Registry};
 use crate::invocation::{InvocationContext, Invoker, Runner};
 use crate::protocol::{ListView, View, ViewTree};
@@ -62,6 +63,20 @@ fn core_with_parts(
     ai: Option<super::AiParts>,
     shell: Arc<RecordingShell>,
 ) -> (Arc<Core>, Arc<RecordingShell>) {
+    core_with_applications(config_json, grab, extensions, ai, shell, None)
+}
+
+fn core_with_applications(
+    config_json: &str,
+    grab: FakeGrab,
+    mut extensions: Vec<Arc<dyn Extension>>,
+    ai: Option<super::AiParts>,
+    shell: Arc<RecordingShell>,
+    applications: Option<Arc<ApplicationsExtension>>,
+) -> (Arc<Core>, Arc<RecordingShell>) {
+    if let Some(applications) = &applications {
+        extensions.push(applications.clone());
+    }
     let config = Config::parse(config_json).unwrap();
     let (launcher, _) = hotkeys::launcher(&config);
     let config = Arc::new(FileConfig::new(
@@ -89,7 +104,7 @@ fn core_with_parts(
         frecency,
         learned,
         contexts,
-        applications: None,
+        applications,
         ai,
         clipboard: None,
         hotkeys: Registry::new(Box::new(grab), launcher),
@@ -460,10 +475,25 @@ async fn a_refused_launcher_hotkey_on_reload_keeps_the_old_one_and_reports_it() 
 }
 
 #[tokio::test]
-async fn a_hotkey_for_a_missing_command_is_reported() {
-    let (core, _) = core("");
+async fn a_hotkey_for_a_missing_command_is_reported_in_the_hud() {
+    let (core, shell) = core("");
     core.dispatch_command("x.missing");
-    assert!(core.tray().config_error);
+    assert_eq!(
+        hud(&shell).as_deref(),
+        Some("That command is no longer available")
+    );
+    assert!(!core.tray().config_error);
+}
+
+#[tokio::test]
+async fn an_application_hotkey_without_its_application_is_reported_in_the_hud() {
+    let (core, shell) = core("");
+    core.dispatch_application("Visual Studio Code");
+    assert_eq!(
+        hud(&shell).as_deref(),
+        Some("Can't open Visual Studio Code")
+    );
+    assert!(!core.tray().config_error);
 }
 
 #[tokio::test]
@@ -768,7 +798,8 @@ fn copied(core: &Arc<Core>) {
 }
 
 fn hud(shell: &RecordingShell) -> Option<String> {
-    shell.last_snapshot().hud.map(|hud| hud.text)
+    let published = shell.published.lock().unwrap();
+    published.last()?.hud.as_ref().map(|hud| hud.text.clone())
 }
 
 type Hide = fn(&Arc<Core>);
@@ -817,4 +848,57 @@ async fn a_failure_while_hidden_shows_in_the_hud_for_four_seconds() {
     assert_eq!(hud(&shell), None);
     core.toggle();
     assert!(shell.last_snapshot().toast.is_none());
+}
+
+fn with_code(launch_fails: bool) -> (Arc<Core>, Arc<RecordingShell>) {
+    let indexer = Arc::new(FakeIndexer::with_apps(&[("code", "Code", None)]));
+    if launch_fails {
+        indexer.make_launch_fail_not_found();
+    }
+    let index = AppIndex::new(indexer, None);
+    index.rebuild();
+    let applications = Arc::new(ApplicationsExtension::new(
+        index,
+        crate::icon_cache::IconCache::in_temp(),
+    ));
+    core_with_applications(
+        "",
+        FakeGrab::default(),
+        Vec::new(),
+        None,
+        Arc::new(RecordingShell::default()),
+        Some(applications),
+    )
+}
+
+async fn wait_for_hud(shell: &RecordingShell) -> Option<String> {
+    for _ in 0..200 {
+        if let Some(text) = hud(shell) {
+            return Some(text);
+        }
+        tokio::time::sleep(Duration::from_millis(5)).await;
+    }
+    None
+}
+
+#[tokio::test]
+async fn an_application_hotkey_for_an_app_not_installed_is_reported_in_the_hud() {
+    let (core, shell) = with_code(false);
+    core.dispatch_application("Slack");
+    assert_eq!(
+        hud(&shell).as_deref(),
+        Some("Can't open Slack because it isn't installed")
+    );
+    assert!(!core.tray().config_error);
+}
+
+#[tokio::test]
+async fn an_application_hotkey_whose_launch_fails_is_reported_in_the_hud() {
+    let (core, shell) = with_code(true);
+    core.dispatch_application("Code");
+    assert_eq!(
+        wait_for_hud(&shell).await.as_deref(),
+        Some("Couldn't open Code")
+    );
+    assert!(!core.tray().config_error);
 }

@@ -619,7 +619,7 @@ impl Core {
         let command_id = command_id.to_string();
         self.on_main_thread(move || {
             if let Err(error) = core.run_command(&command_id) {
-                core.report_problem(&format!("{command_id}: {error}"));
+                core.report_failure(&format!("{command_id}: {error}"), error.to_string());
             }
         });
     }
@@ -630,12 +630,18 @@ impl Core {
     /// another machine starts working the moment the application is installed.
     fn dispatch_application(self: &Arc<Self>, name: &str) {
         let Some(applications) = &self.services.applications else {
-            self.report_problem("application hotkeys need the applications extension");
+            self.report_failure(
+                "application hotkeys need the applications extension",
+                format!("Can't open {name}"),
+            );
             return;
         };
         let target = match hotkeys::resolve_application(name, applications.find_by_name(name)) {
             hotkeys::Resolution::Missing(message) => {
-                self.report_problem(&message);
+                self.report_failure(
+                    &message,
+                    format!("Can't open {name} because it isn't installed"),
+                );
                 return;
             }
             hotkeys::Resolution::Launch {
@@ -662,9 +668,10 @@ impl Core {
             );
             match outcome {
                 ActionOutcome::Done => core.hide_after_launch(),
-                ActionOutcome::Failed(message) => {
-                    core.report_problem(&format!("application \"{}\": {message}", target.name))
-                }
+                ActionOutcome::Failed(message) => core.report_failure(
+                    &format!("application \"{}\": {message}", target.name),
+                    message,
+                ),
                 ActionOutcome::Started
                 | ActionOutcome::Toast(_)
                 | ActionOutcome::CopyToClipboard(_)
@@ -674,8 +681,16 @@ impl Core {
         });
     }
 
-    /// A hotkey press or a file edit that went wrong has no launcher on screen
-    /// to say so; the tray status line and the log are where it is visible.
+    /// A hotkey press that went wrong: the launcher says so, in the HUD while
+    /// it is hidden, and the log keeps the detail.
+    fn report_failure(self: &Arc<Self>, detail: &str, message: String) {
+        crate::log::append(detail);
+        self.apply(ui::Input::Event(ui::Event::Failed(message)));
+    }
+
+    /// A file edit that went wrong, or a hotkey binding Dango could not honour,
+    /// has no launcher on screen to say so; the tray status line and the log
+    /// are where it is visible.
     fn report_problem(&self, message: &str) {
         crate::log::append(message);
         self.reported_problem.store(true, Ordering::SeqCst);
