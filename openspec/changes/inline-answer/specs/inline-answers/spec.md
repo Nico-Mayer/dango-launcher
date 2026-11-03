@@ -12,8 +12,8 @@ card above the results, so the answer is one key away.
 Root search SHALL show an answer when the query contains an operator (+, -, *,
 /, ^, %) or the words "to", "in", or "as" between values, and Dango can work
 it out. A dot SHALL be the decimal separator in the query and the answer. A
-query with a comma between digits, or without an answer, SHALL show no answer
-card. Working out an answer SHALL NOT delay typing or the results.
+query with a comma between digits, a date such as "2024-11-04", or no answer
+SHALL show no answer card. Working out an answer SHALL NOT delay typing or the results.
 
 #### Scenario: Arithmetic
 
@@ -33,6 +33,11 @@ card. Working out an answer SHALL NOT delay typing or the results.
 #### Scenario: A comma as the decimal separator
 
 - **WHEN** the user types "1,5*2" at root
+- **THEN** no answer card is shown
+
+#### Scenario: A date
+
+- **WHEN** the user types "2024-11-04" at root
 - **THEN** no answer card is shown
 
 #### Scenario: Names that hold a digit
