@@ -48,7 +48,7 @@ impl FileConfig {
     /// that exists is left alone, whatever it contains.
     pub fn ensure_file(&self) -> Result<PathBuf, String> {
         if !self.path.exists() {
-            let text = format!("{{\n  \"$schema\": \"{SCHEMA_REF}\",\n  \"version\": 1\n}}");
+            let text = format!("#:schema {SCHEMA_REF}\n");
             self.write(&text)
                 .map_err(|error| format!("{}: {error}", self.path.display()))?;
         }
@@ -150,16 +150,14 @@ mod tests {
     }
 
     #[test]
-    fn ensure_file_creates_a_missing_file_with_the_version_only() {
+    fn ensure_file_creates_a_missing_file_pointing_at_the_schema() {
         let dir = temp_dir("ensure-missing");
         let path = dir.join("nested").join("config.toml");
         let store = FileConfig::new(path.clone(), Config::default());
         assert_eq!(store.ensure_file().unwrap(), path);
         let on_disk = std::fs::read_to_string(&path).unwrap();
-        assert_eq!(
-            on_disk,
-            "{\n  \"$schema\": \"./config.schema.json\",\n  \"version\": 1\n}"
-        );
+        assert_eq!(on_disk, "#:schema ./config.schema.json\n");
+        assert!(Config::parse(&on_disk).is_ok());
         assert_eq!(
             store.own_write.lock().unwrap().as_deref(),
             Some(on_disk.as_str())

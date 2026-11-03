@@ -36,10 +36,6 @@ pub enum ConfigError {
 /// The whole configuration.
 #[derive(Debug, Clone, Default, Serialize, Deserialize, JsonSchema)]
 pub struct Config {
-    /// Where your editor finds this schema. Dango writes it beside the config
-    /// file, so `./config.schema.json` is the value to use.
-    #[serde(rename = "$schema", default, skip_serializing_if = "Option::is_none")]
-    pub schema: Option<String>,
     /// The config schema version. Leave it at 1.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub version: Option<u32>,

@@ -556,7 +556,6 @@ mod tests {
     }
 
     const FULL: &str = r#"
-        "$schema" = "./config.schema.json"
         version = 1
         hyperkey = { shift = false, tap = "escape" }
         selection = { excluded-applications = "Zed" }

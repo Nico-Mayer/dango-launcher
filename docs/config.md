@@ -6,7 +6,6 @@ Every setting in config.json. Generated from the code; do not edit by hand.
 
 | Setting | Type | Default | Values | Description |
 | --- | --- | --- | --- | --- |
-| `$schema` | string |  |  | Where your editor finds this schema. Dango writes it beside the config file, so `./config.schema.json` is the value to use. |
 | `extensions` | object |  |  | Per-extension settings, keyed by extension id. |
 | `hyperkey` | [Hyperkey](#hyperkey) |  |  | CapsLock, remapped to act as the hyper modifier system-wide. Present means on; leave it out to turn it off. On macOS it uses F18, so a hotkey with `f18` does not work while it is on. |
 | `launcher` | [Launcher](#launcher) |  |  | Settings of the launcher itself. |

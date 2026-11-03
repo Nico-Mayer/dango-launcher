@@ -584,10 +584,8 @@ pub mod tests {
         let path = config.ensure_file().unwrap();
         assert_eq!(
             std::fs::read_to_string(&path).unwrap(),
-            "{
-  \"$schema\": \"./config.schema.json\",
-  \"version\": 1
-}"
+            "#:schema ./config.schema.json
+"
         );
         assert_eq!(*opener.opened.lock().unwrap(), std::slice::from_ref(&path));
         assert!(matches!(
