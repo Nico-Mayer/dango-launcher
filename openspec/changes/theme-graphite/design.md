@@ -92,12 +92,12 @@ is the guard.
 | `background` (window), `surface` (action panel, dropdown and filter popups) | `popover` | Design: "popover = launcher, menus" |
 | - | `chrome` | ActionBar fill |
 | `surface` (inputs) | `surface` | Text field, text area, dropdown, checkbox |
-| `raised` | `raised` | Keycaps, icon placeholder |
+| `raised` | `raised` | Key chord fill, icon placeholder, tile fill |
 | `border` | `border` | Hairlines, launcher frame, HUD pill |
 | - | `input` | Border of text field, text area, dropdown, checkbox |
 | `text` | `foreground` | |
 | `muted` | `muted` | |
-| - | `dim` | Placeholders (SearchBar, form fields) |
+| - | `dim` | Placeholders (SearchBar, action panel filter) |
 | `accent` | `accent` | Red to `#a7b4c6` (Graphite), `#5b6b82` (Paper) |
 | `selection` on rows, tiles, actions, filter options | `selected` | |
 | `selection` as text selection colour | `selection` | Now accent-tinted |
