@@ -690,7 +690,8 @@ impl Core {
                 | ActionOutcome::CopyToClipboard(_)
                 | ActionOutcome::Copied
                 | ActionOutcome::Replaced(_)
-                | ActionOutcome::Removed(_) => {}
+                | ActionOutcome::Removed(_)
+                | ActionOutcome::Back => {}
             }
         });
     }

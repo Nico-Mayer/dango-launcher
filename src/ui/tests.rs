@@ -2340,3 +2340,26 @@ fn escape_leaves_a_progress_view() {
     h.press("Escape");
     assert!(matches!(h.snapshot().screen, Screen::Root(_)));
 }
+
+#[test]
+fn an_action_answering_back_leaves_the_view() {
+    let mut h = Harness::new();
+    h.results("", results(3));
+    h.render(1, progress_tree());
+    let request = ActionRequest {
+        origin: Origin::View,
+        extension_id: "fixture".into(),
+        item_id: String::new(),
+        action_id: "open".into(),
+        values: None,
+        query: None,
+    };
+    let effects = h.finish(request, ActionOutcome::Back);
+    assert!(effects.contains(&Effect::CancelInvocation));
+    assert!(matches!(h.snapshot().screen, Screen::Root(_)));
+    h.render(1, progress_tree());
+    assert!(
+        matches!(h.snapshot().screen, Screen::Root(_)),
+        "a later render from the left view is dropped"
+    );
+}

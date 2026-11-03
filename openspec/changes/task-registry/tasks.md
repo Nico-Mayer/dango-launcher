@@ -6,7 +6,7 @@
 - [x] 1.2 Add `ScreenKind.progress`, a `ProgressData` global (title, subtitle, value, detail, steps), and `ui/views/progress-view.slint` laid out as the design-system delta says: title + muted subtitle, a 4 px `Progress { kind: bar }`, muted detail, and step rows with an unannounced `Dot` before each title. Queued titles are muted, and each row's accessible label is "<title>, <status word>". Add `ViewBody::Progress` to the snapshot, and `src/slint_shell/render/progress.rs` as the global's only writer (clamp the value, -1 for none). Send progress views to the `MAX` arm in `render/height.rs`. Verify with UI tests in `src/slint_shell/tests.rs`:
   - a progress view at 0.62 with three steps shows a bar reporting 62, the steps labelled like "Download, working", and the title and subtitle;
   - one without a value shows an indeterminate bar.
-- [ ] 1.3 Add `ActionOutcome::Back` in `src/extension/mod.rs`, handled in `action_finished` like Escape: pop one view and abandon the invocation. Verify with a reducer test: an action finishing with `Back` on a pushed view shows the view below, and a later render from that invocation is dropped.
+- [x] 1.3 Add `ActionOutcome::Back` in `src/extension/mod.rs`, handled in `action_finished` like Escape: pop one view and abandon the invocation. Verify with a reducer test: an action finishing with `Back` on a pushed view shows the view below, and a later render from that invocation is dropped.
 
 ## 2. Toast actions
 

@@ -480,6 +480,12 @@ impl Launcher {
                     self.replace_top(*tree, fx);
                 }
             }
+            (ActionOutcome::Back, Origin::View) => {
+                if !self.stack.is_empty() {
+                    self.escape(fx);
+                }
+            }
+            (ActionOutcome::Back, Origin::Root) => {}
             (ActionOutcome::Toast(text), _) => self.show_success(text, fx),
             (ActionOutcome::Failed(message), _) => self.show_failure(message, fx),
         }
