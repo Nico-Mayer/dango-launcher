@@ -547,55 +547,73 @@ mod tests {
         jsonschema::validator_for(&schema()).expect("the schema compiles")
     }
 
-    fn accepts(text: &str) -> bool {
-        validator().is_valid(&serde_json::from_str(text).expect("valid JSON"))
+    fn instance(text: &str) -> Value {
+        toml::from_str(text).expect("valid TOML")
     }
 
-    const FULL: &str = r#"{
-        "$schema": "./config.schema.json",
-        "version": 1,
-        "launcher": { "hotkey": { "macos": "cmd+space", "windows": "ctrl+space" }, "autostart": true, "reset-after": 90 },
-        "hyperkey": { "shift": false, "tap": "escape" },
-        "selection": { "excluded-applications": "Zed" },
-        "extensions": {
-            "dango.clipboard": {
-                "enabled": true,
-                "preferences": { "entries": 200, "excluded-applications": "1Password", "primary-action": "copy" }
-            },
-            "dango.quicklinks": { "preferences": { "favicons": false } },
-            "dango.applications": {
-                "apps": {
-                    "Safari": { "hotkey": "hyper+b" },
-                    "editor": { "name": { "macos": "TextEdit", "windows": "Notepad" }, "hotkey": "hyper+e" }
-                }
-            },
-            "dango.ai": {
-                "providers": {
-                    "anthropic": { "kind": "anthropic", "model": "claude-sonnet-5" },
-                    "local": { "kind": "ollama", "baseUrl": "http://localhost:11434" }
-                },
-                "preferences": { "provider": "anthropic", "thinking": "low" },
-                "commands": {
-                    "improve-writing": { "provider": "anthropic", "thinking": "low", "output": "paste", "hotkey": "hyper+i" },
-                    "make-longer": { "enabled": false },
-                    "review-rust": { "title": "Review Rust", "prompt": "Review {{ selection }}", "alias": "rr" }
-                }
-            },
-            "dango.window-management": {
-                "commands": { "left-half": { "alias": "lh", "hotkey": "hyper+left" } }
-            },
-            "dango.system": {
-                "commands": { "open-config": { "hotkey": "hyper+comma" } }
-            }
-        }
-    }"#;
+    fn accepts(text: &str) -> bool {
+        validator().is_valid(&instance(text))
+    }
+
+    const FULL: &str = r#"
+        "$schema" = "./config.schema.json"
+        version = 1
+        hyperkey = { shift = false, tap = "escape" }
+        selection = { excluded-applications = "Zed" }
+
+        [launcher]
+        hotkey = { macos = "cmd+space", windows = "ctrl+space" }
+        autostart = true
+        reset-after = 90
+
+        [extensions]
+        "dango.quicklinks" = { preferences = { favicons = false } }
+        "dango.window-management" = { commands = { left-half = { alias = "lh", hotkey = "hyper+left" } } }
+        "dango.system" = { commands = { open-config = { hotkey = "hyper+comma" } } }
+
+        [extensions."dango.clipboard"]
+        enabled = true
+
+        [extensions."dango.clipboard".preferences]
+        entries = 200
+        excluded-applications = "1Password"
+        primary-action = "copy"
+
+        [extensions."dango.applications".apps]
+        Safari = { hotkey = "hyper+b" }
+
+        [extensions."dango.applications".apps.editor]
+        name = { macos = "TextEdit", windows = "Notepad" }
+        hotkey = "hyper+e"
+
+        [extensions."dango.ai"]
+        preferences = { provider = "anthropic", thinking = "low" }
+
+        [extensions."dango.ai".providers]
+        anthropic = { kind = "anthropic", model = "claude-sonnet-5" }
+        local = { kind = "ollama", baseUrl = "http://localhost:11434" }
+
+        [extensions."dango.ai".commands]
+        make-longer = { enabled = false }
+
+        [extensions."dango.ai".commands.improve-writing]
+        provider = "anthropic"
+        thinking = "low"
+        output = "paste"
+        hotkey = "hyper+i"
+
+        [extensions."dango.ai".commands.review-rust]
+        title = "Review Rust"
+        prompt = "Review {{ selection }}"
+        alias = "rr"
+    "#;
 
     #[test]
     fn a_full_config_is_accepted() {
         let validator = validator();
-        let instance: Value = serde_json::from_str(FULL).unwrap();
+        let full = instance(FULL);
         let errors: Vec<String> = validator
-            .iter_errors(&instance)
+            .iter_errors(&full)
             .map(|e| e.to_string())
             .collect();
         assert!(errors.is_empty(), "{errors:#?}");
@@ -604,82 +622,107 @@ mod tests {
 
     #[test]
     fn reset_after_is_a_whole_number_of_seconds() {
-        assert!(accepts(r#"{ "launcher": { "reset-after": 0 } }"#));
-        assert!(accepts(r#"{ "launcher": { "reset-after": 300 } }"#));
-        assert!(!accepts(r#"{ "launcher": { "reset-after": -5 } }"#));
-        assert!(!accepts(r#"{ "launcher": { "reset-after": 1.5 } }"#));
+        assert!(accepts(r#"launcher = { reset-after = 0 }"#));
+        assert!(accepts(r#"launcher = { reset-after = 300 }"#));
+        assert!(!accepts(r#"launcher = { reset-after = -5 }"#));
+        assert!(!accepts(r#"launcher = { reset-after = 1.5 }"#));
     }
 
     #[test]
     fn a_misspelt_key_is_rejected() {
-        assert!(!accepts(r#"{ "launcher": { "hotkeys": "alt+space" } }"#));
+        assert!(!accepts(r#"launcher = { hotkeys = "alt+space" }"#));
         assert!(!accepts(
-            r#"{ "extensions": { "dango.clipboard": { "preferences": { "entry": 1 } } } }"#
+            r#"extensions = { "dango.clipboard" = { preferences = { entry = 1 } } }"#
         ));
     }
 
     #[test]
     fn an_extension_dango_does_not_ship_is_rejected() {
         assert!(!accepts(
-            r#"{ "extensions": { "dango.future": { "enabled": true } } }"#
+            r#"extensions = { "dango.future" = { enabled = true } }"#
         ));
     }
 
     #[test]
     fn user_named_entries_are_accepted_and_checked() {
         assert!(accepts(
-            r#"{ "extensions": { "dango.applications": { "apps": { "Mine": { "hotkey": "hyper+m" } } } } }"#
+            r#"
+                extensions = { "dango.applications" = { apps = { Mine = { hotkey = "hyper+m" } } } }
+            "#
         ));
         assert!(!accepts(
-            r#"{ "extensions": { "dango.applications": { "apps": { "Mine": { "hotkeys": "hyper+m" } } } } }"#
+            r#"
+                extensions = { "dango.applications" = { apps = { Mine = { hotkeys = "hyper+m" } } } }
+            "#
         ));
         assert!(accepts(
-            r#"{ "extensions": { "dango.ai": { "providers": { "mine": { "kind": "ollama" } } } } }"#
+            r#"
+                extensions = { "dango.ai" = { providers = { mine = { kind = "ollama" } } } }
+            "#
         ));
         assert!(accepts(
-            r#"{ "extensions": { "dango.ai": { "commands": { "mine": { "title": "T", "prompt": "p" } } } } }"#
+            r#"
+                extensions = { "dango.ai" = { commands = { mine = { title = "T", prompt = "p" } } } }
+            "#
         ));
         assert!(!accepts(
-            r#"{ "extensions": { "dango.ai": { "commands": { "mine": { "prompts": "p" } } } } }"#
+            r#"
+                extensions = { "dango.ai" = { commands = { mine = { prompts = "p" } } } }
+            "#
         ));
     }
 
     #[test]
     fn an_ai_only_setting_is_rejected_for_another_extension() {
         assert!(!accepts(
-            r#"{ "extensions": { "dango.window-management": { "commands": { "left-half": { "prompt": "p" } } } } }"#
+            r#"
+                [extensions]
+                "dango.window-management" = { commands = { left-half = { prompt = "p" } } }
+            "#
         ));
         assert!(!accepts(
-            r#"{ "extensions": { "dango.system": { "commands": { "lock": { "output": "copy" } } } } }"#
+            r#"
+                extensions = { "dango.system" = { commands = { lock = { output = "copy" } } } }
+            "#
         ));
     }
 
     #[test]
     fn a_command_dango_does_not_ship_is_rejected_outside_ai() {
         assert!(!accepts(
-            r#"{ "extensions": { "dango.system": { "commands": { "reboot": { "alias": "r" } } } } }"#
+            r#"
+                extensions = { "dango.system" = { commands = { reboot = { alias = "r" } } } }
+            "#
         ));
     }
 
     #[test]
     fn enumerated_values_are_checked() {
         assert!(!accepts(
-            r#"{ "extensions": { "dango.ai": { "providers": { "x": { "kind": "mistral" } } } } }"#
+            r#"
+                extensions = { "dango.ai" = { providers = { x = { kind = "mistral" } } } }
+            "#
         ));
         assert!(!accepts(
-            r#"{ "extensions": { "dango.ai": { "commands": { "x": { "thinking": "deep" } } } } }"#
+            r#"
+                extensions = { "dango.ai" = { commands = { x = { thinking = "deep" } } } }
+            "#
         ));
         assert!(!accepts(
-            r#"{ "extensions": { "dango.ai": { "commands": { "x": { "output": "speak" } } } } }"#
+            r#"
+                extensions = { "dango.ai" = { commands = { x = { output = "speak" } } } }
+            "#
         ));
         assert!(!accepts(
-            r#"{ "extensions": { "dango.ai": { "preferences": { "thinking": "deep" } } } }"#
+            r#"extensions = { "dango.ai" = { preferences = { thinking = "deep" } } }"#
         ));
         assert!(!accepts(
-            r#"{ "extensions": { "dango.clipboard": { "preferences": { "primary-action": "speak" } } } }"#
+            r#"
+                extensions = { "dango.clipboard" = { preferences = { primary-action = "speak" } } }
+            "#
         ));
-        assert!(!accepts(r#"{ "hyperkey": { "key": "capslock" } }"#));
-        assert!(!accepts(r#"{ "hyperkey": { "tap": "lft" } }"#));
+        assert!(!accepts(r#"hyperkey = { key = "capslock" }"#));
+        assert!(!accepts(r#"hyperkey = { tap = "lft" }"#));
     }
 
     #[test]

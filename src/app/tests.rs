@@ -118,7 +118,7 @@ async fn settle() {
 
 #[tokio::test]
 async fn the_hotkey_shows_the_launcher_and_activates_it() {
-    let (core, shell) = core("{}");
+    let (core, shell) = core("");
     core.toggle();
     assert_eq!(shell.calls(), [Call::Show]);
     assert_eq!(shell.last_snapshot().activation.count, 1);
@@ -126,7 +126,7 @@ async fn the_hotkey_shows_the_launcher_and_activates_it() {
 
 #[tokio::test]
 async fn an_action_without_an_item_records_no_use() {
-    let (core, _) = core("{}");
+    let (core, _) = core("");
     core.record_use("dango.snippets", "", Some("sig"));
     core.record_use("dango.snippets", "sig", None);
 
@@ -137,7 +137,7 @@ async fn an_action_without_an_item_records_no_use() {
 
 #[tokio::test]
 async fn the_hotkey_again_hides_and_hands_focus_back() {
-    let (core, shell) = core("{}");
+    let (core, shell) = core("");
     core.toggle();
     core.toggle();
     assert_eq!(
@@ -153,7 +153,7 @@ async fn the_hotkey_again_hides_and_hands_focus_back() {
 
 #[tokio::test(start_paused = true)]
 async fn a_held_launcher_keeps_the_query_until_the_hold_runs_out() {
-    let (core, shell) = core(r#"{ "launcher": { "reset-after": 5 } }"#);
+    let (core, shell) = core(r#"launcher = { reset-after = 5 }"#);
     core.toggle();
     type_query(&core, "fire");
     core.toggle();
@@ -165,7 +165,7 @@ async fn a_held_launcher_keeps_the_query_until_the_hold_runs_out() {
 
 #[tokio::test(start_paused = true)]
 async fn showing_within_the_hold_continues_where_the_user_left_off() {
-    let (core, shell) = core(r#"{ "launcher": { "reset-after": 5 } }"#);
+    let (core, shell) = core(r#"launcher = { reset-after = 5 }"#);
     core.toggle();
     type_query(&core, "fire");
     core.toggle();
@@ -177,7 +177,7 @@ async fn showing_within_the_hold_continues_where_the_user_left_off() {
 
 #[tokio::test]
 async fn a_zero_hold_resets_at_once() {
-    let (core, shell) = core(r#"{ "launcher": { "reset-after": 0 } }"#);
+    let (core, shell) = core(r#"launcher = { reset-after = 0 }"#);
     core.toggle();
     type_query(&core, "fire");
     core.toggle();
@@ -186,7 +186,7 @@ async fn a_zero_hold_resets_at_once() {
 
 #[tokio::test]
 async fn escape_on_an_empty_root_dismisses() {
-    let (core, shell) = core("{}");
+    let (core, shell) = core("");
     core.toggle();
     core.dispatch(Intent::Key {
         chord: Chord::plain("Escape"),
@@ -204,7 +204,7 @@ async fn escape_on_an_empty_root_dismisses() {
 
 #[tokio::test(start_paused = true)]
 async fn a_dismiss_resets_at_once_and_drops_a_running_command() {
-    let (core, shell) = core("{}");
+    let (core, shell) = core("");
     core.toggle();
     type_query(&core, "fire");
     let work = start_work(&core);
@@ -222,7 +222,7 @@ fn shows_a_view(shell: &RecordingShell) -> bool {
 
 #[tokio::test(start_paused = true)]
 async fn a_held_launcher_keeps_a_commands_view_for_the_next_activation() {
-    let (core, shell) = core(r#"{ "launcher": { "reset-after": 5 } }"#);
+    let (core, shell) = core(r#"launcher = { reset-after = 5 }"#);
     core.toggle();
     let work = start_work(&core);
     core.toggle();
@@ -243,7 +243,7 @@ async fn a_held_launcher_keeps_a_commands_view_for_the_next_activation() {
 
 #[tokio::test(start_paused = true)]
 async fn a_command_still_working_when_the_hold_runs_out_is_dropped() {
-    let (core, shell) = core(r#"{ "launcher": { "reset-after": 5 } }"#);
+    let (core, shell) = core(r#"launcher = { reset-after = 5 }"#);
     core.toggle();
     let work = start_work(&core);
     core.toggle();
@@ -256,7 +256,7 @@ async fn a_command_still_working_when_the_hold_runs_out_is_dropped() {
 
 #[tokio::test(start_paused = true)]
 async fn a_hide_for_work_comes_back_with_the_commands_view() {
-    let (core, shell) = core("{}");
+    let (core, shell) = core("");
     core.toggle();
     let work = start_work(&core);
     core.hide_for_work();
@@ -277,7 +277,7 @@ async fn a_hide_for_work_comes_back_with_the_commands_view() {
 
 #[tokio::test(start_paused = true)]
 async fn a_hide_for_work_while_hidden_keeps_the_held_query() {
-    let (core, shell) = core("{}");
+    let (core, shell) = core("");
     core.toggle();
     type_query(&core, "fire");
     core.toggle();
@@ -288,7 +288,7 @@ async fn a_hide_for_work_while_hidden_keeps_the_held_query() {
 
 #[tokio::test]
 async fn showing_a_visible_launcher_does_not_show_it_again() {
-    let (core, shell) = core("{}");
+    let (core, shell) = core("");
     core.toggle();
     core.show(None);
     assert_eq!(shell.calls(), [Call::Show]);
@@ -296,7 +296,7 @@ async fn showing_a_visible_launcher_does_not_show_it_again() {
 
 #[tokio::test]
 async fn focus_loss_hides_without_taking_focus_back() {
-    let (core, shell) = core("{}");
+    let (core, shell) = core("");
     core.toggle();
     core.hide_on_focus_loss();
     core.hide_on_focus_loss();
@@ -345,14 +345,14 @@ async fn quitting_stops_running_agent_programs() {
         clipboard: None,
         runner: Arc::new(NoRunner),
     };
-    let (core, _) = core_with_ai("{}", FakeGrab::default(), Vec::new(), Some(ai));
+    let (core, _) = core_with_ai("", FakeGrab::default(), Vec::new(), Some(ai));
     core.quit();
     assert_eq!(client.0.load(std::sync::atomic::Ordering::SeqCst), 1);
 }
 
 #[tokio::test]
 async fn quitting_releases_the_hotkeys_and_quits_the_shell() {
-    let (core, shell) = core("{}");
+    let (core, shell) = core("");
     core.quit();
     assert_eq!(shell.calls(), [Call::Quit]);
 }
@@ -361,31 +361,29 @@ async fn quitting_releases_the_hotkeys_and_quits_the_shell() {
 async fn a_refused_launcher_hotkey_on_reload_keeps_the_old_one_and_reports_it() {
     let refused = HotKey::new(Some(Modifiers::CONTROL), Code::Space);
     let (core, _) = core_with_grab(
-        "{}",
+        "",
         FakeGrab {
             refused: vec![refused],
             ..Default::default()
         },
     );
-    core.apply_config_reload(Config::parse(
-        r#"{ "launcher": { "hotkey": "ctrl+space" } }"#,
-    ));
+    core.apply_config_reload(Config::parse(r#"launcher = { hotkey = "ctrl+space" }"#));
     assert_ne!(core.services.hotkeys.launcher(), refused);
     assert!(core.tray().config_error);
 }
 
 #[tokio::test]
 async fn a_hotkey_for_a_missing_command_is_reported() {
-    let (core, _) = core("{}");
+    let (core, _) = core("");
     core.dispatch_command("x.missing");
     assert!(core.tray().config_error);
 }
 
 #[tokio::test]
 async fn a_clean_reload_keeps_a_reported_problem_on_the_tray() {
-    let (core, _) = core("{}");
+    let (core, _) = core("");
     core.report_problem("snippets.json: broken");
-    core.apply_config_reload(Config::parse("{}"));
+    core.apply_config_reload(Config::parse(""));
     assert!(core.tray().config_error);
 }
 
@@ -504,14 +502,14 @@ fn press(core: &Arc<Core>, key: &str) {
 
 #[tokio::test]
 async fn a_command_disabled_by_a_reload_leaves_search_and_a_stale_result_fails() {
-    let (core, shell) = core("{}");
+    let (core, shell) = core("");
     core.services
         .host
         .lock()
         .unwrap()
         .register(two_commands())
         .unwrap();
-    core.apply_config_reload(Config::parse("{}"));
+    core.apply_config_reload(Config::parse(""));
 
     core.toggle();
     type_query(&core, "fire");
@@ -519,7 +517,7 @@ async fn a_command_disabled_by_a_reload_leaves_search_and_a_stale_result_fails()
     assert_eq!(root_ids(&shell), ["x.drop", "x.keep"]);
 
     core.apply_config_reload(Config::parse(
-        r#"{ "extensions": { "x": { "commands": { "drop": { "enabled": false } } } } }"#,
+        r#"extensions = { x = { commands = { drop = { enabled = false } } } }"#,
     ));
 
     if selected(&shell).as_deref() != Some("x.drop") {
@@ -553,7 +551,7 @@ async fn launching_a_game_hides_the_launcher() {
     let list = GameList::new(FakeSource::with(&[(1091500, "Cyberpunk 2077")]));
     let opener = Arc::new(FakeOpener::default());
     let extension = Arc::new(GamesExtension::new(list, opener.clone()));
-    let (core, shell) = core_with("{}", FakeGrab::default(), vec![extension]);
+    let (core, shell) = core_with("", FakeGrab::default(), vec![extension]);
     core.toggle();
     let outcome = core.run_action(&crate::ui::ActionRequest {
         origin: crate::ui::Origin::View,
@@ -599,21 +597,21 @@ fn x_candidate(source: crate::search::Source, pinned: bool) -> crate::search::Ca
 
 #[tokio::test]
 async fn a_root_item_shows_its_extension_name() {
-    let (core, _) = core_with("{}", FakeGrab::default(), vec![two_commands()]);
+    let (core, _) = core_with("", FakeGrab::default(), vec![two_commands()]);
     let item = core.result_item(x_candidate(crate::search::Source::RootItem, false));
     assert_eq!(item.subtitle.as_deref(), Some("X"));
 }
 
 #[tokio::test]
 async fn a_command_shows_its_extension_name() {
-    let (core, _) = core_with("{}", FakeGrab::default(), vec![two_commands()]);
+    let (core, _) = core_with("", FakeGrab::default(), vec![two_commands()]);
     let item = core.result_item(x_candidate(crate::search::Source::Command, false));
     assert_eq!(item.subtitle.as_deref(), Some("X"));
 }
 
 #[tokio::test]
 async fn a_pinned_item_shows_its_status_line() {
-    let (core, _) = core_with("{}", FakeGrab::default(), vec![two_commands()]);
+    let (core, _) = core_with("", FakeGrab::default(), vec![two_commands()]);
     let item = core.result_item(x_candidate(crate::search::Source::RootItem, true));
     assert_eq!(item.subtitle.as_deref(), Some("Needs attention"));
 }

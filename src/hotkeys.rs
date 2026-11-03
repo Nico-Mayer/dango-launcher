@@ -355,12 +355,11 @@ mod tests {
     #[test]
     fn a_clean_set_binds_every_command() {
         let c = config(
-            r#"{ "extensions": {
-                "dango.window-management": { "commands": {
-                    "left-half": { "hotkey": "ctrl+alt+left" },
-                    "right-half": { "hotkey": "ctrl+alt+right" }
-                } }
-            } }"#,
+            r#"
+                [extensions."dango.window-management".commands]
+                left-half = { hotkey = "ctrl+alt+left" }
+                right-half = { hotkey = "ctrl+alt+right" }
+            "#,
         );
         let result = bindings(&c, launcher());
         assert_eq!(result.bindings.len(), 2);
@@ -370,10 +369,10 @@ mod tests {
     #[test]
     fn two_commands_on_one_chord_first_wins_and_is_reported() {
         let c = config(
-            r#"{ "extensions": { "x": { "commands": {
-                "alpha": { "hotkey": "ctrl+alt+j" },
-                "beta": { "hotkey": "ctrl+alt+j" }
-            } } } }"#,
+            r#"
+                [extensions.x]
+                commands = { alpha = { hotkey = "ctrl+alt+j" }, beta = { hotkey = "ctrl+alt+j" } }
+            "#,
         );
         let result = bindings(&c, launcher());
         assert_eq!(result.bindings.len(), 1);
@@ -389,9 +388,7 @@ mod tests {
 
     #[test]
     fn a_command_on_the_launcher_chord_is_reported() {
-        let c = config(
-            r#"{ "extensions": { "x": { "commands": { "a": { "hotkey": "alt+space" } } } } }"#,
-        );
+        let c = config(r#"extensions = { x = { commands = { a = { hotkey = "alt+space" } } } }"#);
         let result = bindings(&c, launcher());
         assert!(result.bindings.is_empty());
         assert_eq!(result.conflicts.len(), 1);
@@ -400,9 +397,7 @@ mod tests {
 
     #[test]
     fn an_unparseable_hotkey_is_reported() {
-        let c = config(
-            r#"{ "extensions": { "x": { "commands": { "a": { "hotkey": "ctrl+nope" } } } } }"#,
-        );
+        let c = config(r#"extensions = { x = { commands = { a = { hotkey = "ctrl+nope" } } } }"#);
         let result = bindings(&c, launcher());
         assert!(result.bindings.is_empty());
         assert_eq!(result.conflicts.len(), 1);
@@ -412,10 +407,11 @@ mod tests {
     #[test]
     fn an_application_is_bound_by_its_shown_name() {
         let c = config(
-            r#"{ "extensions": { "dango.applications": { "apps": {
-                "Safari": { "hotkey": "ctrl+alt+b" },
-                "code": { "name": "Visual Studio Code", "hotkey": "ctrl+alt+c" }
-            } } } }"#,
+            r#"
+                [extensions."dango.applications".apps]
+                Safari = { hotkey = "ctrl+alt+b" }
+                code = { name = "Visual Studio Code", hotkey = "ctrl+alt+c" }
+            "#,
         );
         let result = bindings(&c, launcher());
         assert!(result.conflicts.is_empty());
@@ -432,10 +428,11 @@ mod tests {
     #[test]
     fn an_application_and_a_command_on_one_chord_are_reported_by_name() {
         let c = config(
-            r#"{ "extensions": {
-                "dango.applications": { "apps": { "Safari": { "hotkey": "ctrl+alt+j" } } },
-                "x": { "commands": { "alpha": { "hotkey": "ctrl+alt+j" } } }
-            } }"#,
+            r#"
+                [extensions]
+                "dango.applications" = { apps = { Safari = { hotkey = "ctrl+alt+j" } } }
+                x = { commands = { alpha = { hotkey = "ctrl+alt+j" } } }
+            "#,
         );
         let result = bindings(&c, launcher());
         assert_eq!(result.bindings.len(), 1);
@@ -456,9 +453,11 @@ mod tests {
         #[cfg(not(target_os = "macos"))]
         let other = "macos";
         let c = config(&format!(
-            r#"{{ "extensions": {{ "dango.applications": {{ "apps": {{
-                "elsewhere": {{ "name": {{ "{other}": "Only There" }}, "hotkey": "ctrl+alt+e" }}
-            }} }} }} }}"#
+            r#"
+                [extensions."dango.applications".apps.elsewhere]
+                name = {{ {other} = "Only There" }}
+                hotkey = "ctrl+alt+e"
+            "#
         ));
         let result = bindings(&c, launcher());
         assert!(result.bindings.is_empty());
@@ -510,15 +509,14 @@ mod tests {
 
     #[test]
     fn an_invalid_launcher_hotkey_falls_back_and_says_why() {
-        let (chord, problem) =
-            super::launcher(&config(r#"{ "launcher": { "hotkey": "ctrl+nope" } }"#));
+        let (chord, problem) = super::launcher(&config(r#"launcher = { hotkey = "ctrl+nope" }"#));
         assert_eq!(chord, launcher());
         assert!(problem.is_some());
     }
 
     #[test]
     fn a_bare_launcher_hotkey_falls_back_and_says_why() {
-        let (chord, problem) = super::launcher(&config(r#"{ "launcher": { "hotkey": "space" } }"#));
+        let (chord, problem) = super::launcher(&config(r#"launcher = { hotkey = "space" }"#));
         assert_eq!(chord, launcher());
         assert!(problem.unwrap().contains("no modifier"));
     }
@@ -526,11 +524,12 @@ mod tests {
     #[test]
     fn a_command_on_a_bare_key_is_reported_and_others_stay() {
         let c = config(
-            r#"{ "extensions": { "x": { "commands": {
-                "alpha": { "hotkey": "k" },
-                "beta": { "hotkey": "ctrl+alt+j" },
-                "gamma": { "hotkey": "f19" }
-            } } } }"#,
+            r#"
+                [extensions.x.commands]
+                alpha = { hotkey = "k" }
+                beta = { hotkey = "ctrl+alt+j" }
+                gamma = { hotkey = "f19" }
+            "#,
         );
         let result = bindings(&c, launcher());
         let targets: Vec<_> = result.bindings.iter().map(|b| b.target.clone()).collect();
@@ -549,9 +548,10 @@ mod tests {
     #[test]
     fn a_disabled_command_gets_no_binding() {
         let c = config(
-            r#"{ "extensions": { "x": { "commands": {
-                "a": { "hotkey": "ctrl+alt+j", "enabled": false }
-            } } } }"#,
+            r#"
+                [extensions]
+                x = { commands = { a = { hotkey = "ctrl+alt+j", enabled = false } } }
+            "#,
         );
         let result = bindings(&c, launcher());
         assert!(result.bindings.is_empty());
@@ -561,10 +561,11 @@ mod tests {
     #[test]
     fn a_disabled_command_leaves_its_chord_to_an_enabled_one() {
         let c = config(
-            r#"{ "extensions": { "x": { "commands": {
-                "alpha": { "hotkey": "ctrl+alt+j", "enabled": false },
-                "beta": { "hotkey": "ctrl+alt+j" }
-            } } } }"#,
+            r#"
+                [extensions.x.commands]
+                alpha = { hotkey = "ctrl+alt+j", enabled = false }
+                beta = { hotkey = "ctrl+alt+j" }
+            "#,
         );
         let result = bindings(&c, launcher());
         assert_eq!(result.bindings.len(), 1);
@@ -574,7 +575,7 @@ mod tests {
 
     #[test]
     fn commands_without_a_hotkey_are_ignored() {
-        let c = config(r#"{ "extensions": { "x": { "commands": { "a": { "alias": "aa" } } } } }"#);
+        let c = config(r#"extensions = { x = { commands = { a = { alias = "aa" } } } }"#);
         let result = bindings(&c, launcher());
         assert!(result.bindings.is_empty());
         assert!(result.conflicts.is_empty());
@@ -583,11 +584,12 @@ mod tests {
     #[test]
     fn a_hotkey_on_a_disabled_command_is_named() {
         let c = config(
-            r#"{ "extensions": { "dango.ai": { "commands": {
-                "make-longer": { "hotkey": "ctrl+alt+l", "enabled": false },
-                "summarize": { "hotkey": "ctrl+alt+s" },
-                "fix": { "enabled": false }
-            } } } }"#,
+            r#"
+                [extensions."dango.ai".commands]
+                make-longer = { hotkey = "ctrl+alt+l", enabled = false }
+                summarize = { hotkey = "ctrl+alt+s" }
+                fix = { enabled = false }
+            "#,
         );
         assert_eq!(
             disabled_with_hotkey(&c),
@@ -606,14 +608,14 @@ mod tests {
 
     #[test]
     fn a_press_on_the_launcher_chord_toggles_the_launcher() {
-        let (registry, _) = registry("{}");
+        let (registry, _) = registry("");
         let pressed = registry.pressed(launcher().id(), HotKeyState::Pressed);
         assert_eq!(pressed, Some(Pressed::Launcher));
     }
 
     #[test]
     fn a_release_does_nothing() {
-        let (registry, _) = registry("{}");
+        let (registry, _) = registry("");
         assert_eq!(
             registry.pressed(launcher().id(), HotKeyState::Released),
             None
@@ -622,9 +624,8 @@ mod tests {
 
     #[test]
     fn a_press_on_a_binding_names_its_target() {
-        let (registry, _) = registry(
-            r#"{ "extensions": { "x": { "commands": { "a": { "hotkey": "ctrl+alt+j" } } } } }"#,
-        );
+        let (registry, _) =
+            registry(r#"extensions = { x = { commands = { a = { hotkey = "ctrl+alt+j" } } } }"#);
         let chord = HotKey::new(Some(Modifiers::CONTROL | Modifiers::ALT), Code::KeyJ);
         assert_eq!(
             registry.pressed(chord.id(), HotKeyState::Pressed),
@@ -634,11 +635,10 @@ mod tests {
 
     #[test]
     fn a_reload_gives_back_chords_no_longer_bound() {
-        let (registry, held) = registry(
-            r#"{ "extensions": { "x": { "commands": { "a": { "hotkey": "ctrl+alt+j" } } } } }"#,
-        );
+        let (registry, held) =
+            registry(r#"extensions = { x = { commands = { a = { hotkey = "ctrl+alt+j" } } } }"#);
         assert_eq!(held.lock().unwrap().len(), 2);
-        registry.apply(&config("{}"));
+        registry.apply(&config(""));
         assert_eq!(*held.lock().unwrap(), vec![launcher()]);
     }
 
@@ -651,7 +651,7 @@ mod tests {
         };
         let registry = Registry::new(Box::new(grab), launcher());
         let conflicts = registry.apply(&config(
-            r#"{ "extensions": { "x": { "commands": { "a": { "hotkey": "ctrl+alt+j" } } } } }"#,
+            r#"extensions = { x = { commands = { a = { hotkey = "ctrl+alt+j" } } } }"#,
         ));
         assert_eq!(conflicts.len(), 1);
         assert_eq!(registry.pressed(refused.id(), HotKeyState::Pressed), None);
@@ -659,7 +659,7 @@ mod tests {
 
     #[test]
     fn a_new_launcher_chord_replaces_the_old_one() {
-        let (registry, held) = registry("{}");
+        let (registry, held) = registry("");
         let chord = HotKey::new(Some(Modifiers::CONTROL), Code::Space);
         registry.replace_launcher(chord).unwrap();
         assert_eq!(*held.lock().unwrap(), vec![chord]);
@@ -689,9 +689,8 @@ mod tests {
 
     #[test]
     fn quitting_releases_every_chord() {
-        let (registry, held) = registry(
-            r#"{ "extensions": { "x": { "commands": { "a": { "hotkey": "ctrl+alt+j" } } } } }"#,
-        );
+        let (registry, held) =
+            registry(r#"extensions = { x = { commands = { a = { hotkey = "ctrl+alt+j" } } } }"#);
         registry.release_all();
         assert!(held.lock().unwrap().is_empty());
     }

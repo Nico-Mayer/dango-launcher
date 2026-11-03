@@ -99,8 +99,9 @@ mod tests {
 
     #[test]
     fn reads_a_preference_and_falls_back() {
-        let text =
-            r#"{ "extensions": { "dango.clipboard": { "preferences": { "max_entries": 200 } } } }"#;
+        let text = r#"
+                extensions = { "dango.clipboard" = { preferences = { max_entries = 200 } } }
+            "#;
         let store = FileConfig::new(temp_path("pref"), Config::parse(text).unwrap());
         assert_eq!(
             store.get("dango.clipboard", "max_entries"),
@@ -117,18 +118,19 @@ mod tests {
 
     #[test]
     fn disabled_in_the_file_reads_disabled() {
-        let text = r#"{ "extensions": { "x": { "enabled": false } } }"#;
+        let text = r#"extensions = { x = { enabled = false } }"#;
         let store = FileConfig::new(temp_path("dis"), Config::parse(text).unwrap());
         assert!(!store.is_enabled("x"));
     }
 
     #[test]
     fn a_command_is_enabled_unless_the_file_says_false() {
-        let text = r#"{ "extensions": { "x": { "commands": {
-            "on": { "enabled": true },
-            "off": { "enabled": false },
-            "plain": { "alias": "p" }
-        } } } }"#;
+        let text = r#"
+            [extensions.x.commands]
+            on = { enabled = true }
+            off = { enabled = false }
+            plain = { alias = "p" }
+        "#;
         let store = FileConfig::new(temp_path("cmd"), Config::parse(text).unwrap());
         assert!(store.is_command_enabled("x", "on"));
         assert!(!store.is_command_enabled("x", "off"));

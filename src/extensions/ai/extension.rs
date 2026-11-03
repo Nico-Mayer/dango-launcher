@@ -556,13 +556,15 @@ mod tests {
         }
     }
 
-    const LOCAL: &str = r#"{ "extensions": { "dango.ai": { "providers": {
-        "local": { "kind": "ollama", "model": "qwen3:8b" }
-    } } } }"#;
+    const LOCAL: &str = r#"
+        [extensions]
+        "dango.ai" = { providers = { local = { kind = "ollama", model = "qwen3:8b" } } }
+    "#;
 
-    const HOSTED: &str = r#"{ "extensions": { "dango.ai": { "providers": {
-        "anthropic": { "kind": "anthropic", "model": "claude-sonnet-5" }
-    } } } }"#;
+    const HOSTED: &str = r#"
+        [extensions."dango.ai"]
+        providers = { anthropic = { kind = "anthropic", model = "claude-sonnet-5" } }
+    "#;
 
     struct Fixture {
         extension: AiExtension,
@@ -673,10 +675,11 @@ mod tests {
 
     #[test]
     fn a_prompt_that_does_not_ask_for_the_selection_never_reads_it() {
-        let config = r#"{ "extensions": { "dango.ai": {
-            "providers": { "local": { "kind": "ollama", "model": "qwen3:8b" } },
-            "commands": { "joke": { "title": "Joke", "prompt": "Tell me a joke." } }
-        } } }"#;
+        let config = r#"
+            [extensions."dango.ai"]
+            providers = { local = { kind = "ollama", model = "qwen3:8b" } }
+            commands = { joke = { title = "Joke", prompt = "Tell me a joke." } }
+        "#;
         let fixture = fixture(
             config,
             Scripted::answering(&["Why did..."]),
@@ -772,7 +775,9 @@ mod tests {
     #[test]
     fn an_agent_program_is_asked_without_a_key_file() {
         let fixture = fixture_with_keys(
-            r#"{ "extensions": { "dango.ai": { "providers": { "claude": { "kind": "claude" } } } } }"#,
+            r#"
+                extensions = { "dango.ai" = { providers = { claude = { kind = "claude" } } } }
+            "#,
             Scripted::answering(&["Better."]),
             selected("text"),
             FixedKeys(None),
@@ -785,9 +790,12 @@ mod tests {
     #[test]
     fn an_openai_server_on_this_machine_is_asked_without_a_key() {
         let fixture = fixture_with_keys(
-            r#"{ "extensions": { "dango.ai": { "providers": {
-                "studio": { "kind": "openai", "baseUrl": "http://localhost:1234/v1", "model": "qwen3" }
-            } } } }"#,
+            r#"
+                [extensions."dango.ai".providers.studio]
+                kind = "openai"
+                baseUrl = "http://localhost:1234/v1"
+                model = "qwen3"
+            "#,
             Scripted::answering(&["Better."]),
             selected("text"),
             FixedKeys(Some("sk-test")),
@@ -799,10 +807,11 @@ mod tests {
 
     #[test]
     fn a_command_set_to_paste_puts_the_answer_where_the_user_was() {
-        let config = r#"{ "extensions": { "dango.ai": {
-            "providers": { "local": { "kind": "ollama", "model": "qwen3:8b" } },
-            "commands": { "improve-writing": { "output": "paste" } }
-        } } }"#;
+        let config = r#"
+            [extensions."dango.ai"]
+            providers = { local = { kind = "ollama", model = "qwen3:8b" } }
+            commands = { improve-writing = { output = "paste" } }
+        "#;
         let fixture = fixture(
             config,
             Scripted::answering(&["Better text."]),
@@ -817,10 +826,11 @@ mod tests {
 
     #[test]
     fn a_command_set_to_copy_leaves_the_answer_on_the_clipboard() {
-        let config = r#"{ "extensions": { "dango.ai": {
-            "providers": { "local": { "kind": "ollama", "model": "qwen3:8b" } },
-            "commands": { "summarize": { "output": "copy" } }
-        } } }"#;
+        let config = r#"
+            [extensions."dango.ai"]
+            providers = { local = { kind = "ollama", model = "qwen3:8b" } }
+            commands = { summarize = { output = "copy" } }
+        "#;
         let fixture = fixture(
             config,
             Scripted::answering(&["Short."]),
@@ -839,10 +849,11 @@ mod tests {
 
     #[test]
     fn an_empty_answer_is_neither_pasted_nor_copied() {
-        let config = r#"{ "extensions": { "dango.ai": {
-            "providers": { "local": { "kind": "ollama", "model": "qwen3:8b" } },
-            "commands": { "improve-writing": { "output": "paste" } }
-        } } }"#;
+        let config = r#"
+            [extensions."dango.ai"]
+            providers = { local = { kind = "ollama", model = "qwen3:8b" } }
+            commands = { improve-writing = { output = "paste" } }
+        "#;
         let fixture = fixture(config, Scripted::answering(&["  "]), selected("bad"));
         let sink = Arc::new(Recorded::default());
         run(&fixture, "improve-writing", sink.clone());
@@ -857,10 +868,11 @@ mod tests {
 
     #[test]
     fn the_answer_is_pasted_without_surrounding_whitespace() {
-        let config = r#"{ "extensions": { "dango.ai": {
-            "providers": { "local": { "kind": "ollama", "model": "qwen3:8b" } },
-            "commands": { "improve-writing": { "output": "paste" } }
-        } } }"#;
+        let config = r#"
+            [extensions."dango.ai"]
+            providers = { local = { kind = "ollama", model = "qwen3:8b" } }
+            commands = { improve-writing = { output = "paste" } }
+        "#;
         let fixture = fixture(
             config,
             Scripted::answering(&[

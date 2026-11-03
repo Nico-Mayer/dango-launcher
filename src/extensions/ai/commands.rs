@@ -301,7 +301,7 @@ mod tests {
 
     #[test]
     fn the_shipped_set_needs_no_configuration() {
-        let built = build(&config("{}"));
+        let built = build(&config(""));
         assert_eq!(built.commands.len(), SHIPPED.len());
         assert!(built.problems.is_empty());
         assert_eq!(
@@ -316,7 +316,7 @@ mod tests {
 
     #[test]
     fn only_translate_asks_the_user_for_anything() {
-        let built = build(&config("{}"));
+        let built = build(&config(""));
         for command in &built.commands {
             let template = Template::parse(&command.prompt).unwrap();
             let asks = !template.prompts().is_empty();
@@ -332,9 +332,13 @@ mod tests {
     #[test]
     fn a_shipped_command_can_be_overridden_in_place() {
         let built = build(&config(
-            r#"{ "extensions": { "dango.ai": { "commands": {
-                "improve-writing": { "provider": "local", "model": "qwen3:8b", "thinking": "low", "output": "paste" }
-            } } } }"#,
+            r#"
+                [extensions."dango.ai".commands.improve-writing]
+                provider = "local"
+                model = "qwen3:8b"
+                thinking = "low"
+                output = "paste"
+            "#,
         ));
         let command = find(&built, "improve-writing").unwrap();
         assert_eq!(
@@ -354,9 +358,10 @@ mod tests {
     #[test]
     fn a_rewritten_prompt_replaces_the_shipped_one() {
         let built = build(&config(
-            r#"{ "extensions": { "dango.ai": { "commands": {
-                "summarize": { "prompt": "One sentence only.\n\n{{ selection }}" }
-            } } } }"#,
+            r#"
+                [extensions."dango.ai"]
+                commands = { summarize = { prompt = "One sentence only.\n\n{{ selection }}" } }
+            "#,
         ));
         assert_eq!(
             find(&built, "summarize").unwrap().prompt,
@@ -367,7 +372,9 @@ mod tests {
     #[test]
     fn a_shipped_command_can_be_turned_off() {
         let built = build(&config(
-            r#"{ "extensions": { "dango.ai": { "commands": { "make-longer": { "enabled": false } } } } }"#,
+            r#"
+                extensions = { "dango.ai" = { commands = { make-longer = { enabled = false } } } }
+            "#,
         ));
         assert!(find(&built, "make-longer").is_none());
         assert_eq!(built.commands.len(), SHIPPED.len() - 1, "others survived");
@@ -377,9 +384,10 @@ mod tests {
     #[test]
     fn a_title_and_a_prompt_add_a_command_of_the_users_own() {
         let built = build(&config(
-            r#"{ "extensions": { "dango.ai": { "commands": {
-                "review-rust": { "title": "Review Rust", "prompt": "Review.\n\n{{ selection }}" }
-            } } } }"#,
+            r#"
+                [extensions."dango.ai".commands]
+                review-rust = { title = "Review Rust", prompt = "Review.\n\n{{ selection }}" }
+            "#,
         ));
         let command = find(&built, "review-rust").unwrap();
         assert_eq!(command.title, "Review Rust");
@@ -390,10 +398,11 @@ mod tests {
     #[test]
     fn an_entry_that_is_neither_is_reported_and_skipped() {
         let built = build(&config(
-            r#"{ "extensions": { "dango.ai": { "commands": {
-                "half-written": { "title": "Half Written" },
-                "review-rust": { "title": "Review Rust", "prompt": "Review.\n\n{{ selection }}" }
-            } } } }"#,
+            r#"
+                [extensions."dango.ai".commands]
+                half-written = { title = "Half Written" }
+                review-rust = { title = "Review Rust", prompt = "Review.\n\n{{ selection }}" }
+            "#,
         ));
         assert!(find(&built, "half-written").is_none());
         assert!(
@@ -407,10 +416,10 @@ mod tests {
     #[test]
     fn an_unknown_thinking_level_or_output_is_reported_and_skipped() {
         let built = build(&config(
-            r#"{ "extensions": { "dango.ai": { "commands": {
-                "summarize": { "thinking": "max" },
-                "explain": { "output": "speak" }
-            } } } }"#,
+            r#"
+                [extensions."dango.ai"]
+                commands = { summarize = { thinking = "max" }, explain = { output = "speak" } }
+            "#,
         ));
         assert!(find(&built, "summarize").is_none());
         assert!(find(&built, "explain").is_none());
@@ -426,10 +435,11 @@ mod tests {
     #[test]
     fn a_prompt_that_cannot_be_parsed_is_reported_and_skipped() {
         let built = build(&config(
-            r#"{ "extensions": { "dango.ai": { "commands": {
-                "explain": { "prompt": "Explain {{ selection" },
-                "broken": { "title": "Broken", "prompt": "unclosed {{ name" }
-            } } } }"#,
+            r#"
+                [extensions."dango.ai".commands]
+                explain = { prompt = "Explain {{ selection" }
+                broken = { title = "Broken", prompt = "unclosed {{ name" }
+            "#,
         ));
         assert!(find(&built, "explain").is_none());
         assert!(find(&built, "broken").is_none());
@@ -448,7 +458,9 @@ mod tests {
     #[test]
     fn an_entry_with_only_a_hotkey_keeps_the_shipped_command() {
         let built = build(&config(
-            r#"{ "extensions": { "dango.ai": { "commands": { "explain": { "hotkey": "hyper+e" } } } } }"#,
+            r#"
+                extensions = { "dango.ai" = { commands = { explain = { hotkey = "hyper+e" } } } }
+            "#,
         ));
         assert!(find(&built, "explain").is_some());
         assert!(built.problems.is_empty());
@@ -470,13 +482,18 @@ mod tests {
         }
     }
 
-    const TWO_PROVIDERS: &str = r#"{ "extensions": { "dango.ai": {
-        "preferences": { "provider": "anthropic", "thinking": "medium" },
-        "providers": {
-            "anthropic": { "kind": "anthropic", "model": "claude-sonnet-5" },
-            "local": { "kind": "ollama", "baseUrl": "http://localhost:11434", "model": "qwen3:8b" }
-        }
-    } } }"#;
+    const TWO_PROVIDERS: &str = r#"
+        [extensions."dango.ai"]
+        preferences = { provider = "anthropic", thinking = "medium" }
+
+        [extensions."dango.ai".providers]
+        anthropic = { kind = "anthropic", model = "claude-sonnet-5" }
+
+        [extensions."dango.ai".providers.local]
+        kind = "ollama"
+        baseUrl = "http://localhost:11434"
+        model = "qwen3:8b"
+    "#;
 
     #[test]
     fn a_command_naming_nothing_takes_the_defaults() {
@@ -489,7 +506,7 @@ mod tests {
 
     #[test]
     fn a_thinking_level_dango_does_not_have_reads_as_the_default() {
-        let text = TWO_PROVIDERS.replace("\"thinking\": \"medium\"", "\"thinking\": \"deep\"");
+        let text = TWO_PROVIDERS.replace("thinking = \"medium\"", "thinking = \"deep\"");
         let providers = Providers::from_config(&config(&text));
         let request = providers.resolve(&command(None, None, None)).unwrap();
         assert_eq!(request.thinking, Thinking::Off);
@@ -529,9 +546,10 @@ mod tests {
     #[test]
     fn the_only_provider_is_the_default_without_saying_so() {
         let providers = Providers::from_config(&config(
-            r#"{ "extensions": { "dango.ai": { "providers": {
-                "local": { "kind": "ollama", "model": "qwen3:8b" }
-            } } } }"#,
+            r#"
+                [extensions]
+                "dango.ai" = { providers = { local = { kind = "ollama", model = "qwen3:8b" } } }
+            "#,
         ));
         let request = providers.resolve(&command(None, None, None)).unwrap();
         assert_eq!(request.provider, "local");
@@ -544,7 +562,7 @@ mod tests {
 
     #[test]
     fn no_provider_at_all_says_to_set_one_up() {
-        let providers = Providers::from_config(&config("{}"));
+        let providers = Providers::from_config(&config(""));
         let error = providers.resolve(&command(None, None, None)).unwrap_err();
         assert!(matches!(error, NotReady::NoProvider), "{error}");
     }
@@ -552,10 +570,11 @@ mod tests {
     #[test]
     fn several_providers_and_no_default_asks_for_a_default() {
         let providers = Providers::from_config(&config(
-            r#"{ "extensions": { "dango.ai": { "providers": {
-                "anthropic": { "kind": "anthropic", "model": "claude-sonnet-5" },
-                "local": { "kind": "ollama", "model": "qwen3:8b" }
-            } } } }"#,
+            r#"
+                [extensions."dango.ai".providers]
+                anthropic = { kind = "anthropic", model = "claude-sonnet-5" }
+                local = { kind = "ollama", model = "qwen3:8b" }
+            "#,
         ));
         let error = providers.resolve(&command(None, None, None)).unwrap_err();
         assert!(matches!(error, NotReady::NoDefault), "{error}");
@@ -564,10 +583,11 @@ mod tests {
     #[test]
     fn a_command_naming_its_provider_needs_no_default() {
         let providers = Providers::from_config(&config(
-            r#"{ "extensions": { "dango.ai": { "providers": {
-                "anthropic": { "kind": "anthropic", "model": "claude-sonnet-5" },
-                "local": { "kind": "ollama", "model": "qwen3:8b" }
-            } } } }"#,
+            r#"
+                [extensions."dango.ai".providers]
+                anthropic = { kind = "anthropic", model = "claude-sonnet-5" }
+                local = { kind = "ollama", model = "qwen3:8b" }
+            "#,
         ));
         let request = providers
             .resolve(&command(Some("local"), None, None))
@@ -587,7 +607,9 @@ mod tests {
     #[test]
     fn a_provider_with_no_model_anywhere_says_so() {
         let providers = Providers::from_config(&config(
-            r#"{ "extensions": { "dango.ai": { "providers": { "local": { "kind": "ollama" } } } } }"#,
+            r#"
+                extensions = { "dango.ai" = { providers = { local = { kind = "ollama" } } } }
+            "#,
         ));
         let error = providers.resolve(&command(None, None, None)).unwrap_err();
         assert!(
@@ -603,9 +625,10 @@ mod tests {
     #[test]
     fn an_agent_program_with_no_model_uses_its_own_default() {
         let providers = Providers::from_config(&config(
-            r#"{ "extensions": { "dango.ai": { "providers": {
-                "claude": { "kind": "claude", "path": "C:/tools/claude.exe" }
-            } } } }"#,
+            r#"
+                [extensions."dango.ai"]
+                providers = { claude = { kind = "claude", path = "C:/tools/claude.exe" } }
+            "#,
         ));
         let request = providers.resolve(&command(None, None, None)).unwrap();
         assert_eq!(request.kind, ProviderKind::Claude);

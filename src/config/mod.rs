@@ -1,4 +1,4 @@
-//! Dango's configuration file: one `config.json` the user keeps in their
+//! Dango's configuration file: one `config.toml` the user keeps in their
 //! dotfiles and shares over git.
 //!
 //! The file is the source of truth for the launcher hotkey, per-extension
@@ -27,7 +27,7 @@ pub use store::FileConfig;
 
 #[derive(Debug, thiserror::Error)]
 pub enum ConfigError {
-    #[error("the configuration file is not valid JSON: {0}")]
+    #[error("the configuration file is not valid: {0}")]
     Parse(String),
     #[error("the configuration file could not be read: {0}")]
     Read(String),
@@ -343,14 +343,9 @@ pub struct CommandSettings {
 }
 
 impl Config {
-    /// Parses configuration from JSON text. Unknown keys are ignored.
+    /// Parses configuration from TOML text. Unknown keys are ignored.
     pub fn parse(text: &str) -> Result<Config, ConfigError> {
-        // An empty or whitespace-only file is a valid empty configuration
-        // rather than a JSON error, so a `touch`ed file behaves like no file.
-        if text.trim().is_empty() {
-            return Ok(Config::default());
-        }
-        serde_json::from_str(text).map_err(|error| ConfigError::Parse(error.to_string()))
+        toml::from_str(text).map_err(|error| ConfigError::Parse(error.to_string()))
     }
 
     /// Loads from a path. A missing file is the default configuration, not an
@@ -418,14 +413,17 @@ mod tests {
 
     #[test]
     fn a_full_file_parses() {
-        let text = r#"{
-          "version": 1,
-          "launcher": { "hotkey": "alt+space" },
-          "extensions": {
-            "dango.clipboard": { "enabled": false, "preferences": { "max_entries": 200 } },
-            "dango.window-management": { "commands": { "left-half": { "alias": "lh" } } }
-          }
-        }"#;
+        let text = r#"
+            version = 1
+            launcher = { hotkey = "alt+space" }
+
+            [extensions."dango.clipboard"]
+            enabled = false
+            preferences = { max_entries = 200 }
+
+            [extensions."dango.window-management".commands.left-half]
+            alias = "lh"
+        "#;
         let config = Config::parse(text).unwrap();
         assert_eq!(config.version, Some(1));
         assert_eq!(config.enabled("dango.clipboard"), Some(false));
@@ -441,17 +439,22 @@ mod tests {
 
     #[test]
     fn unknown_keys_are_ignored() {
-        let text = r#"{
-          "version": 1,
-          "somethingFuturistic": { "on": true },
-          "extensions": {
-            "dango.future": { "enabled": true, "somethingNew": 42 },
-            "dango.ai": {
-              "providers": { "local": { "kind": "ollama", "keepAlive": "10m" } },
-              "commands": { "make-longer": { "enabled": false, "later": [1, 2] } }
-            }
-          }
-        }"#;
+        let text = r#"
+            version = 1
+            somethingFuturistic = { on = true }
+
+            [extensions."dango.future"]
+            enabled = true
+            somethingNew = 42
+
+            [extensions."dango.ai".providers.local]
+            kind = "ollama"
+            keepAlive = "10m"
+
+            [extensions."dango.ai".commands.make-longer]
+            enabled = false
+            later = [1, 2]
+        "#;
         let config = Config::parse(text).unwrap();
         assert_eq!(config.enabled("dango.future"), Some(true));
         assert_eq!(
@@ -462,7 +465,7 @@ mod tests {
 
     #[test]
     fn an_empty_hyperkey_block_turns_it_on_with_defaults() {
-        let config = Config::parse(r#"{ "hyperkey": {} }"#).unwrap();
+        let config = Config::parse("[hyperkey]").unwrap();
         let hyperkey = config.hyperkey.as_ref().expect("hyperkey present");
         assert!(hyperkey.shift, "shift defaults on");
         assert!(hyperkey.tap.is_none());
@@ -474,7 +477,7 @@ mod tests {
 
     #[test]
     fn a_hyperkey_can_exclude_shift() {
-        let config = Config::parse(r#"{ "hyperkey": { "shift": false } }"#).unwrap();
+        let config = Config::parse("hyperkey = { shift = false }").unwrap();
         assert!(!config.hyperkey.as_ref().unwrap().shift);
         assert_eq!(
             config.hyper_modifiers(),
@@ -484,13 +487,13 @@ mod tests {
 
     #[test]
     fn a_leftover_hyperkey_key_is_ignored() {
-        let config = Config::parse(r#"{ "hyperkey": { "key": "f13" } }"#).unwrap();
+        let config = Config::parse(r#"hyperkey = { key = "f13" }"#).unwrap();
         assert!(config.hyperkey.is_some());
     }
 
     #[test]
     fn no_hyperkey_still_means_full_hyper() {
-        let config = Config::parse("{}").unwrap();
+        let config = Config::parse("").unwrap();
         assert!(config.hyperkey.is_none());
         assert_eq!(
             config.hyper_modifiers(),
@@ -500,7 +503,7 @@ mod tests {
 
     #[test]
     fn a_missing_section_falls_back() {
-        let config = Config::parse("{}").unwrap();
+        let config = Config::parse("").unwrap();
         assert_eq!(config.version, None);
         assert_eq!(config.enabled("anything"), None);
         assert_eq!(config.preference("anything", "key"), None);
@@ -514,22 +517,26 @@ mod tests {
     }
 
     #[test]
-    fn invalid_json_is_reported_not_panicked() {
-        let error = Config::parse("{ not json ").unwrap_err();
+    fn invalid_toml_is_reported_with_its_line() {
+        let error = Config::parse(
+            "version = 1
+launcher = { not toml",
+        )
+        .unwrap_err();
         assert!(matches!(error, ConfigError::Parse(_)));
+        assert!(error.to_string().contains("line 2"), "{error}");
     }
 
     #[test]
     fn a_wrong_typed_value_is_reported() {
         // `enabled` must be a boolean; a string is a typed error, not a panic.
-        let error =
-            Config::parse(r#"{ "extensions": { "x": { "enabled": "yes" } } }"#).unwrap_err();
+        let error = Config::parse(r#"extensions = { x = { enabled = "yes" } }"#).unwrap_err();
         assert!(matches!(error, ConfigError::Parse(_)));
     }
 
     #[test]
     fn load_of_a_missing_file_is_the_default() {
-        let path = std::env::temp_dir().join("dango-does-not-exist-xyz.json");
+        let path = std::env::temp_dir().join("dango-does-not-exist-xyz.toml");
         let _ = std::fs::remove_file(&path);
         let config = Config::load(&path).unwrap();
         assert_eq!(config.version, None);
@@ -537,14 +544,13 @@ mod tests {
 
     #[test]
     fn application_bindings_parse_in_both_shapes() {
-        let text = r#"{
-          "extensions": { "dango.applications": { "apps": {
-            "Safari": { "hotkey": "hyper+b" },
-            "terminal": { "name": { "macos": "Terminal", "windows": "Windows Terminal" }, "hotkey": "hyper+t" },
-            "elsewhere": { "name": { "windows": "Only There" }, "hotkey": "hyper+e" },
-            "renamed": { "name": "Visual Studio Code", "hotkey": "hyper+c" }
-          } } }
-        }"#;
+        let text = r#"
+            [extensions."dango.applications".apps]
+            Safari = { hotkey = "hyper+b" }
+            terminal = { name = { macos = "Terminal", windows = "Windows Terminal" }, hotkey = "hyper+t" }
+            elsewhere = { name = { windows = "Only There" }, hotkey = "hyper+e" }
+            renamed = { name = "Visual Studio Code", hotkey = "hyper+c" }
+        "#;
         let config = Config::parse(text).unwrap();
         let apps = &config.extensions["dango.applications"].apps;
         assert_eq!(apps["Safari"].name_for_platform("Safari"), Some("Safari"));
@@ -582,8 +588,7 @@ mod tests {
     #[test]
     fn a_selection_block_parses() {
         let config =
-            Config::parse(r#"{ "selection": { "excluded-applications": "Zed, Neovim" } }"#)
-                .unwrap();
+            Config::parse(r#"selection = { excluded-applications = "Zed, Neovim" }"#).unwrap();
         assert_eq!(config.selection.excluded(), ["Zed", "Neovim"]);
         assert!(config.selection.refuses("zed"), "matched ignoring case");
         assert!(!config.selection.refuses("Notepad"));
@@ -591,7 +596,7 @@ mod tests {
 
     #[test]
     fn no_selection_block_excludes_nothing() {
-        let config = Config::parse("{}").unwrap();
+        let config = Config::parse("").unwrap();
         assert!(config.selection.excluded().is_empty());
         assert!(!config.selection.refuses("Zed"));
     }
@@ -599,7 +604,8 @@ mod tests {
     #[test]
     fn an_unrecognised_provider_kind_is_a_config_error() {
         let error = Config::parse(
-            r#"{ "extensions": { "dango.ai": { "providers": { "future": { "kind": "mistral" } } } } }"#,
+            r#"[extensions."dango.ai".providers.future]
+            kind = "mistral""#,
         )
         .unwrap_err();
         assert!(error.to_string().contains("mistral"), "{error}");
@@ -608,7 +614,9 @@ mod tests {
     #[test]
     fn a_program_is_not_a_provider_kind() {
         let error = Config::parse(
-            r#"{ "extensions": { "dango.ai": { "providers": { "claude": { "kind": "cli", "command": "claude" } } } } }"#,
+            r#"[extensions."dango.ai".providers.claude]
+            kind = "cli"
+            command = "claude""#,
         )
         .unwrap_err();
         assert!(error.to_string().contains("cli"), "{error}");
@@ -617,7 +625,8 @@ mod tests {
     #[test]
     fn codex_is_not_a_provider_kind() {
         let error = Config::parse(
-            r#"{ "extensions": { "dango.ai": { "providers": { "codex": { "kind": "codex" } } } } }"#,
+            r#"[extensions."dango.ai".providers.codex]
+            kind = "codex""#,
         )
         .unwrap_err();
         assert!(error.to_string().contains("codex"), "{error}");
@@ -625,12 +634,13 @@ mod tests {
 
     #[test]
     fn an_agent_provider_round_trips_with_its_path() {
-        let text = r#"{ "extensions": { "dango.ai": { "providers": {
-            "claude": { "kind": "claude", "model": "sonnet", "path": "C:/tools/claude.exe" },
-            "pi": { "kind": "pi" }
-        } } } }"#;
+        let text = r#"
+            [extensions."dango.ai".providers]
+            claude = { kind = "claude", model = "sonnet", path = "C:/tools/claude.exe" }
+            pi = { kind = "pi" }
+        "#;
         let config = Config::parse(text).unwrap();
-        let again = Config::parse(&serde_json::to_string(&config).unwrap()).unwrap();
+        let again = Config::parse(&toml::to_string(&config).unwrap()).unwrap();
         let providers = &again.extensions["dango.ai"].providers;
 
         let claude = &providers["claude"];

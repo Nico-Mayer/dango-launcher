@@ -2,10 +2,10 @@
 
 ## 1. Read `config.toml`
 
-- [ ] 1.1 Add `toml` as a direct dependency and parse `Config` with `toml::from_str`; keep the empty-file case; verify `cargo test config` with every config fixture in `src/config/` rewritten as TOML, and a test that a syntax error's message names its line
+- [x] 1.1 Add `toml` as a direct dependency and parse `Config` with `toml::from_str`; keep the empty-file case; verify `cargo test config` with every config fixture in `src/config/` rewritten as TOML, and a test that a syntax error's message names its line
 - [ ] 1.2 Rename the file to `config.toml` in `location.rs`, the watcher, and Open Config File; verify the watcher and system command tests (`cargo test watch`, `cargo test system`) with fixtures named `config.toml`, and a test that a `config.json` alone in the directory loads as defaults
 - [ ] 1.3 Drop the `$schema` field from `Config` and make the created file start with `#:schema ./config.schema.json`; verify a `store.rs` test that `ensure_file` writes that first line and the result parses
-- [ ] 1.4 Rewrite every JSON config literal in tests outside `src/config/` (`app/tests.rs`, `hotkeys.rs`, `ai/commands.rs`, others found by `rg 'r#"\{' src`) as TOML in the current structure; verify `cargo test` passes
+- [x] 1.4 Rewrite every JSON config literal in tests outside `src/config/` (`app/tests.rs`, `hotkeys.rs`, `ai/commands.rs`, others found by `rg 'r#"\{' src`) as TOML in the current structure; verify `cargo test` passes
 - [ ] 1.5 Update README's configuration section for `config.toml` and the `#:schema` line, regenerate `docs/config.md` (`env DANGO_UPDATE_DOCS=1 cargo test the_settings_reference_is_current`) with its header naming `config.toml`; verify `the_settings_reference_is_current` passes
 
 ## 2. Typed tables per built-in
