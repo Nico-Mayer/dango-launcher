@@ -104,9 +104,16 @@ key. Unverified that every app handles events posted this way; the hand check
 covers a native app, a browser and Zed. If it fails, fallback is to resign key
 on the panel without hiding it, decided in that Mac session.
 
+Mac hand check: TextEdit, Firefox and Zed all handle it. Fallback not needed.
+
 ### macOS: trust only real answers
 
 `MacSelection::read`:
+- asks only the frontmost application's element, never the system-wide one.
+  While the panel is key, macOS answers a system-wide query (focused element
+  or focused application) in-process on the reader thread, and accesskit
+  panics on a `RefCell` the main thread holds, aborting Dango (found in the
+  Mac hand check);
 - skips any focused element whose pid is Dango's own (`AXUIElementGetPid`);
 - treats `""` as Empty only if the element also has `AXSelectedTextRange`;
   otherwise Unavailable.
@@ -145,8 +152,8 @@ No manifest or view protocol change. No new user-facing strings; one removed:
 - [Editor copies the current line when nothing is selected] → Zed does this on
   Ctrl+Insert, as on Ctrl+C, so the read returns that line instead of
   "Select some text first". No chord avoids it. Accepted (Windows hand check).
-- [`CGEventPostToPid` ignored by some macOS apps] → Mac hand check; fallback
-  plan above.
+- [`CGEventPostToPid` ignored by some macOS apps] → Mac hand check passed in
+  TextEdit, Firefox, Zed; fallback plan above if another app ignores it.
 - [Late foreground event hides the launcher after the lend] → handler re-checks
   the current foreground.
 

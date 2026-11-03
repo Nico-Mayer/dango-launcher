@@ -100,6 +100,7 @@ No millisecond budgets in specs or tests. Results depend on machine load, unreli
 - New Notepad (and likely other WinUI apps) can handle injected key late: Ctrl released right after V reads as plain `v`. Synthetic chords hold modifier briefly after key (`CHORD_HOLD`).
 - On Windows, `WS_EX_TOOLWINDOW` re-applied after each show: tao rewrote extended style on every visibility change, nobody checked whether winit does. Windows positions in physical pixels, macOS in logical points. Don't share positioning code.
 - macOS gates window management, paste, snippet expansion, reading selection behind Accessibility.
+- Never query system-wide AX element (`AXUIElement::new_system_wide`) from Dango while panel key: macOS answers in-process on calling thread, accesskit panics on `RefCell` main thread holds, Dango aborts. Ask frontmost app's element (pid from `NSWorkspace`) instead.
 - enigo's `Enigo::new` on macOS fails with `NoPermission` without Accessibility. Create on first use, never at startup.
 - Keyboard `CGEventTap`s on macOS need Input Monitoring to see events; active one (hyperkey) also needs Accessibility, or creation is refused. Input Monitoring grant applies only after restart; Accessibility grant applies at once.
 - Revoking Accessibility under running active tap stalls all keyboard + mouse input system-wide. Permission poller restarts hyperkey on any permission change, so new tap matches current grants.

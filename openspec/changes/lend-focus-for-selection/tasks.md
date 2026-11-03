@@ -35,8 +35,12 @@ Mac handoff, written on Windows 2026-11-03. Read before starting:
 
 - [x] 4.1 In `MacSelection::read`, skip focused elements whose pid is Dango's own, and treat `""` as Empty only when the element has `AXSelectedTextRange`; verify `cargo test` and a macOS compile in CI (`mise run check` on the Mac)
 - [x] 4.2 Post `MacKeys::copy`'s Cmd+C to the frontmost application's pid with `CGEvent::post_to_pid`, then remove the stopgap: `MacHandoff::hides_launcher_to_copy`, and the trait method, its branch in `selection_through_clipboard` and `a_handoff_that_hides_to_copy_hides_only_for_the_copy` once no platform needs it; verify `cargo test` and a macOS compile
-- [ ] 4.3 Hand check on macOS with `dango-ui`: select text in TextEdit, a browser and Zed, run Improve Writing from root search and from a command hotkey; the launcher stays key and on screen, the selection is read, the clipboard is unchanged. If the posted copy is ignored, record which app and decide the fallback in design.md
-- [ ] 4.4 Hand check on macOS: with nothing selected in TextEdit, run Improve Writing; the launcher shows "Select some text first" and no Cmd+C was needed
+- [x] 4.3 Hand check on macOS with `dango-ui`: select text in TextEdit, a browser and Zed, run Improve Writing from root search and from a command hotkey; the launcher stays key and on screen, the selection is read, the clipboard is unchanged. If the posted copy is ignored, record which app and decide the fallback in design.md
+  - Done 2026-11-03 on macOS with a scratch config. TextEdit, Firefox and Zed pass from root search and from a command hotkey: answer shown, clipboard marker unchanged, the app behind stays frontmost, real keystrokes after Escape reach the search field. No app ignored the posted Cmd+C, so no fallback needed.
+  - TextEdit answers through AX. Zed (focused element is a bare `AXWindow`) and Firefox (no AX text without accessibility on) go through the posted copy.
+  - First runs crashed Dango (abort) in Zed and Firefox: with no answer from the app, the read asked the system-wide AX element, which macOS answers in-process while the panel is key, and accesskit panicked. Fixed in `fix(macos): never ask the system-wide AX element`; then 10 Zed and 5 Firefox hotkey reads in a row without a crash.
+- [x] 4.4 Hand check on macOS: with nothing selected in TextEdit, run Improve Writing; the launcher shows "Select some text first" and no Cmd+C was needed
+  - Done 2026-11-03. TextEdit answers `""` with `AXSelectedTextRange` (checked with an AX probe), the launcher shows "Select some text first" at once, clipboard unchanged. Absence of the Cmd+C inferred from that answer and the unit tests (Empty sends no keystroke), not observed with an event tap.
 
 ## 5. Review
 
