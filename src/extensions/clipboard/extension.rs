@@ -122,7 +122,7 @@ impl Extension for ClipboardExtension {
             ACTION_RESTORE => match self.history.content(item_id) {
                 Ok(content) => {
                     self.watcher.restore(&content);
-                    ActionOutcome::Done
+                    ActionOutcome::Copied
                 }
                 Err(error) => ActionOutcome::Failed(error.to_string()),
             },
@@ -829,7 +829,7 @@ total-megabytes = 8",
 
         assert!(matches!(
             extension.perform_action(&id, ACTION_RESTORE, &FormValues::new()),
-            ActionOutcome::Done
+            ActionOutcome::Copied
         ));
         assert_eq!(
             *clipboard.0.lock().unwrap(),
@@ -1151,7 +1151,7 @@ total-megabytes = 8",
 
         assert_eq!(
             extension.perform_action(&id, ACTION_RESTORE, &FormValues::new()),
-            ActionOutcome::Done
+            ActionOutcome::Copied
         );
         assert_eq!(
             *clipboard.0.lock().unwrap(),
@@ -1169,7 +1169,7 @@ total-megabytes = 8",
 
         assert_eq!(
             extension.perform_action(&id, ACTION_RESTORE, &FormValues::new()),
-            ActionOutcome::Done
+            ActionOutcome::Copied
         );
         assert_eq!(
             *clipboard.0.lock().unwrap(),

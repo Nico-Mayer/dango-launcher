@@ -111,6 +111,9 @@ pub enum Event {
     },
     /// A command failed, or refused to start.
     Failed(String),
+    /// A hotkey press failed. Unlike `Failed`, a command still running from
+    /// the launcher keeps running.
+    HotkeyFailed(String),
     TemplateInspected {
         field: String,
         source: String,
@@ -121,6 +124,8 @@ pub enum Event {
         probe: Option<u64>,
     },
     Reset,
+    /// The launcher is off screen, for whatever reason it was hidden.
+    Hidden,
     ToastExpired {
         id: u64,
     },

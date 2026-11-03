@@ -46,13 +46,17 @@ pub struct Launcher {
     /// A tree that cannot be drawn, shown in place of a view until Escape.
     pub(super) view_error: Option<ViewError>,
     pub(super) toast: Option<HeldToast>,
+    /// What the launcher reports while it is off screen. Set while it is still
+    /// visible, it waits for the hide.
+    pub(super) hud: Option<HeldToast>,
+    pub(super) visible: bool,
 }
 
 /// A toast the launcher holds until it expires or is cleared. Busy toasts are
 /// not held: they follow the work that shows them.
 #[derive(Clone, Debug, PartialEq)]
 pub(super) struct HeldToast {
-    id: u64,
+    pub(super) id: u64,
     pub(super) style: ToastStyle,
     pub(super) text: String,
 }
@@ -249,9 +253,10 @@ impl Launcher {
                 self.action_finished(request, outcome, fx)
             }
             Event::Failed(message) => {
-                self.show_failure(message);
+                self.show_failure(message, fx);
                 self.working = None;
             }
+            Event::HotkeyFailed(message) => self.show_failure(message, fx),
             Event::TemplateInspected {
                 field,
                 source,
@@ -264,6 +269,8 @@ impl Launcher {
                 }
             }
             Event::Activated { held, probe } => {
+                self.visible = true;
+                self.hud = None;
                 self.activations += 1;
                 self.probe = probe;
                 if held {
@@ -271,21 +278,35 @@ impl Launcher {
                 }
             }
             Event::Reset => self.reset(fx),
+            Event::Hidden => {
+                self.visible = false;
+                // A command that pastes asks for the hide and goes on working,
+                // so its failure can land just before the window is gone.
+                if let Some(toast) = self
+                    .toast
+                    .take_if(|toast| toast.style == ToastStyle::Failure)
+                {
+                    self.show_hud(ToastStyle::Failure, toast.text, fx);
+                    return;
+                }
+                if let Some(hud) = &self.hud {
+                    fx.push(Effect::ExpireToast {
+                        id: hud.id,
+                        style: hud.style,
+                    });
+                }
+            }
             Event::ToastExpired { id } => {
                 if self.toast.as_ref().is_some_and(|toast| toast.id == id) {
                     self.toast = None;
+                }
+                if self.hud.as_ref().is_some_and(|hud| hud.id == id) {
+                    self.hud = None;
                 }
             }
         }
     }
 
-    /// A failure deliberately survives this.
-    ///
-    /// An action that pastes hides the launcher before it does the work, so it
-    /// can only report a failure once the window is already gone, and whether
-    /// that report arrives before or after this reset is a race. The message is
-    /// carried to the next activation instead, and cleared as soon as the user
-    /// types, acts, or presses Escape.
     fn reset(&mut self, fx: &mut Vec<Effect>) {
         self.query.clear();
         self.query_revision = self.next_revision();
@@ -301,6 +322,7 @@ impl Launcher {
         self.panel = None;
         self.view_error = None;
         self.working = None;
+        self.toast = None;
         fx.push(Effect::Search(String::new()));
     }
 
@@ -342,9 +364,12 @@ impl Launcher {
             // A plain success already hid the launcher. A start reports through
             // the render channel and pushes its own view.
             (ActionOutcome::Done | ActionOutcome::Started, _) => {}
-            (ActionOutcome::CopyToClipboard(text), _) => {
-                fx.push(Effect::CopyText(text));
+            (outcome @ (ActionOutcome::CopyToClipboard(_) | ActionOutcome::Copied), _) => {
+                if let ActionOutcome::CopyToClipboard(text) = outcome {
+                    fx.push(Effect::CopyText(text));
+                }
                 fx.push(Effect::Dismiss);
+                self.show_hud(ToastStyle::Success, "Copied to clipboard".into(), fx);
             }
             // A root action that produces a view opens it. A snippet needing
             // arguments has to ask before it can do anything.
@@ -380,7 +405,7 @@ impl Launcher {
                 }
             }
             (ActionOutcome::Toast(text), _) => self.show_success(text, fx),
-            (ActionOutcome::Failed(message), _) => self.show_failure(message),
+            (ActionOutcome::Failed(message), _) => self.show_failure(message, fx),
         }
     }
 
@@ -392,7 +417,13 @@ impl Launcher {
         true
     }
 
-    fn show_failure(&mut self, text: String) {
+    /// Off screen nobody would see a toast, and it would be stale by the next
+    /// activation, so the HUD says it instead.
+    fn show_failure(&mut self, text: String, fx: &mut Vec<Effect>) {
+        if !self.visible {
+            self.show_hud(ToastStyle::Failure, text, fx);
+            return;
+        }
         let id = self.next_revision();
         self.toast = Some(HeldToast {
             id,
@@ -419,7 +450,20 @@ impl Launcher {
             style: ToastStyle::Success,
             text,
         });
-        fx.push(Effect::ExpireToast { id });
+        fx.push(Effect::ExpireToast {
+            id,
+            style: ToastStyle::Success,
+        });
+    }
+
+    /// The time runs from when the HUD can be seen, so one set while the
+    /// launcher is still on screen starts its time at the hide.
+    fn show_hud(&mut self, style: ToastStyle, text: String, fx: &mut Vec<Effect>) {
+        let id = self.next_revision();
+        self.hud = Some(HeldToast { id, style, text });
+        if !self.visible {
+            fx.push(Effect::ExpireToast { id, style });
+        }
     }
 
     fn push(&mut self, tree: ViewTree, context: Context, fx: &mut Vec<Effect>) {

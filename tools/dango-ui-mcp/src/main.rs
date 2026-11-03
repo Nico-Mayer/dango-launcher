@@ -199,10 +199,21 @@ impl Proxy {
         if let Some(handle) = arguments.get("windowHandle") {
             return Ok(handle.clone());
         }
+        // The HUD is a window too, and lists first once it has shown. The
+        // launcher is always the taller one.
         let windows = self.call("list_windows", json!({})).await?;
-        windows["windowHandles"][0]
-            .as_object()
-            .map(|handle| Value::Object(handle.clone()))
+        let mut tallest: Option<(f64, Value)> = None;
+        for handle in windows["windowHandles"].as_array().into_iter().flatten() {
+            let properties = self
+                .call("get_window_properties", json!({ "windowHandle": handle }))
+                .await?;
+            let height = properties["size"]["height"].as_f64().unwrap_or(0.0);
+            if tallest.as_ref().is_none_or(|(best, _)| height > *best) {
+                tallest = Some((height, handle.clone()));
+            }
+        }
+        tallest
+            .map(|(_, handle)| handle)
             .ok_or_else(|| "Dango has no window open.".into())
     }
 
@@ -321,7 +332,7 @@ impl ServerHandler for Proxy {
 fn own_tools() -> Vec<Tool> {
     let window_handle = json!({
         "type": "object",
-        "description": "Optional. Defaults to the first window from list_windows.",
+        "description": "Optional. Defaults to the launcher, the tallest window.",
         "properties": {"index": {"type": "string"}, "generation": {"type": "string"}},
     });
     vec![

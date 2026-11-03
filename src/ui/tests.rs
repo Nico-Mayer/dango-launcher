@@ -119,8 +119,13 @@ struct Harness {
 
 impl Harness {
     fn new() -> Self {
+        let mut launcher = Launcher::new();
+        launcher.apply(Input::Event(Event::Activated {
+            held: false,
+            probe: None,
+        }));
         Self {
-            launcher: Launcher::new(),
+            launcher,
             effects: Vec::new(),
         }
     }
@@ -1636,8 +1641,8 @@ fn a_reset_while_the_panel_is_open_closes_it_and_the_next_open_starts_fresh() {
         };
         h.command("k");
         h.press("ArrowDown");
+        h.event(Event::Hidden);
         h.event(Event::Reset);
-        h.event(Event::Failed("Couldn't paste".into()));
         h.results("", results(18));
         h.event(Event::Activated {
             held: false,
@@ -1645,7 +1650,6 @@ fn a_reset_while_the_panel_is_open_closes_it_and_the_next_open_starts_fresh() {
         });
         let snapshot = h.snapshot();
         assert!(!snapshot.panel.open);
-        assert_eq!(h.failure().as_deref(), Some("Couldn't paste"));
         assert_eq!(snapshot.focus, Focus::RootInput);
         h.command("k");
         assert_eq!(h.panel_selected().as_deref(), Some("open"));
@@ -1750,38 +1754,54 @@ fn bindings_hold_the_shortcuts_of_the_current_selection() {
 }
 
 #[test]
-fn a_failure_survives_reset_either_way_round_and_clears_on_typing_acting_or_escape() {
-    for before_reset in [true, false] {
-        for clear in ["typing", "action", "Escape"] {
-            let mut h = Harness::root(18);
-            if before_reset {
-                h.event(Event::Failed("Couldn't paste".into()));
-            }
-            h.event(Event::Reset);
-            if !before_reset {
-                h.event(Event::Failed("Couldn't paste".into()));
-            }
-            h.results("", results(18));
-            h.event(Event::Activated {
-                held: false,
-                probe: None,
-            });
-            assert!(h.failure().is_some());
-            assert_eq!(h.snapshot().focus, Focus::RootInput);
-            match clear {
-                "typing" => {
-                    h.typed("Result");
-                }
-                "action" => {
-                    h.press("Enter");
-                }
-                _ => {
-                    h.press("Escape");
-                }
-            }
-            assert!(h.failure().is_none(), "{before_reset} {clear}");
+fn a_failure_around_a_hide_goes_to_the_hud_either_way_round() {
+    for before_hide in [true, false] {
+        let mut h = Harness::root(18);
+        if before_hide {
+            h.event(Event::Failed("Couldn't paste".into()));
         }
+        let mut effects = h.event(Event::Hidden);
+        h.event(Event::Reset);
+        if !before_hide {
+            effects = h.event(Event::Failed("Couldn't paste".into()));
+        }
+        assert_eq!(
+            hud_text(&h).as_deref(),
+            Some("Couldn't paste"),
+            "{before_hide}"
+        );
+        assert!(matches!(
+            effects.as_slice(),
+            [Effect::ExpireToast {
+                style: ToastStyle::Failure,
+                ..
+            }]
+        ));
+        h.results("", results(18));
+        h.event(Event::Activated {
+            held: false,
+            probe: None,
+        });
+        assert!(h.failure().is_none(), "{before_hide}");
+        assert_eq!(hud_text(&h), None);
     }
+}
+
+#[test]
+fn a_failure_while_held_goes_to_the_hud_and_not_into_the_held_view() {
+    let mut h = Harness::view(detail_tree("x"));
+    h.event(Event::Hidden);
+    h.event(Event::Failed("That command is no longer available".into()));
+    assert_eq!(
+        hud_text(&h).as_deref(),
+        Some("That command is no longer available")
+    );
+    h.event(Event::Activated {
+        held: true,
+        probe: None,
+    });
+    assert!(h.failure().is_none());
+    assert!(matches!(h.view_body(), ViewBody::Detail(_)));
 }
 
 #[test]
@@ -1810,6 +1830,24 @@ fn a_running_command_shows_a_busy_toast_until_it_fails_or_resets() {
     assert_eq!(h.status(), "");
     h.typed("Result");
     assert_eq!(h.status(), "");
+}
+
+#[test]
+fn a_hotkey_failure_while_held_keeps_the_running_status() {
+    let mut h = Harness::root(18);
+    let mut command = result(1);
+    command.title = "Clipboard History".into();
+    command.actions.clear();
+    h.results("", vec![command]);
+    h.press("Enter");
+    h.event(Event::Hidden);
+    h.event(Event::HotkeyFailed("Can't open Zed".into()));
+    assert_eq!(hud_text(&h).as_deref(), Some("Can't open Zed"));
+    h.event(Event::Activated {
+        held: true,
+        probe: None,
+    });
+    assert_eq!(h.status(), "Running Clipboard History…");
 }
 
 #[test]
@@ -1886,7 +1924,7 @@ fn finish_with_toast(h: &mut Harness, text: &str) -> u64 {
     let request = h.runs().last().unwrap().clone();
     let effects = h.finish(request, ActionOutcome::Toast(text.into()));
     match effects.as_slice() {
-        [Effect::ExpireToast { id }] => *id,
+        [Effect::ExpireToast { id, .. }] => *id,
         other => panic!("expected one expiry, got {other:?}"),
     }
 }
@@ -2009,4 +2047,97 @@ fn a_reset_does_not_abandon_the_running_command() {
     h.event(Event::Reset);
     h.render(1, detail_tree("after work"));
     assert!(matches!(h.view_body(), ViewBody::Detail(_)));
+}
+
+// HUD
+
+fn copy_from_root(h: &mut Harness) -> Vec<Effect> {
+    h.press("Enter");
+    let request = h.runs().last().unwrap().clone();
+    h.finish(request, ActionOutcome::CopyToClipboard("x".into()))
+}
+
+fn hud_text(h: &Harness) -> Option<String> {
+    h.snapshot().hud.map(|hud| hud.text)
+}
+
+fn hud_expiry(effects: &[Effect]) -> u64 {
+    match effects {
+        [Effect::ExpireToast { id, .. }] => *id,
+        other => panic!("expected one expiry, got {other:?}"),
+    }
+}
+
+#[test]
+fn a_copy_dismisses_and_shows_its_hud_only_once_hidden() {
+    let mut h = Harness::root(3);
+    let effects = copy_from_root(&mut h);
+    assert_eq!(effects, vec![Effect::CopyText("x".into()), Effect::Dismiss]);
+    assert!(h.snapshot().toast.is_none());
+    assert_eq!(hud_text(&h), None);
+    let effects = h.event(Event::Hidden);
+    let id = hud_expiry(&effects);
+    assert_eq!(hud_text(&h).as_deref(), Some("Copied to clipboard"));
+    assert_eq!(
+        effects,
+        vec![Effect::ExpireToast {
+            id,
+            style: ToastStyle::Success
+        }]
+    );
+    h.event(Event::ToastExpired { id });
+    assert_eq!(hud_text(&h), None);
+}
+
+#[test]
+fn an_action_that_copied_itself_dismisses_and_shows_the_copy_hud() {
+    let mut h = Harness::root(3);
+    h.press("Enter");
+    let request = h.runs().last().unwrap().clone();
+    let effects = h.finish(request, ActionOutcome::Copied);
+    assert_eq!(effects, vec![Effect::Dismiss]);
+    h.event(Event::Hidden);
+    assert_eq!(hud_text(&h).as_deref(), Some("Copied to clipboard"));
+}
+
+#[test]
+fn a_stale_expiry_leaves_a_newer_hud() {
+    let mut h = Harness::root(3);
+    copy_from_root(&mut h);
+    let first = hud_expiry(&h.event(Event::Hidden));
+    h.event(Event::Activated {
+        held: false,
+        probe: None,
+    });
+    copy_from_root(&mut h);
+    let second = hud_expiry(&h.event(Event::Hidden));
+    assert_ne!(first, second);
+    h.event(Event::ToastExpired { id: first });
+    assert_eq!(hud_text(&h).as_deref(), Some("Copied to clipboard"));
+    assert_eq!(h.snapshot().hud.unwrap().id, second);
+}
+
+#[test]
+fn a_newer_hud_replaces_the_one_showing() {
+    let mut h = Harness::root(3);
+    copy_from_root(&mut h);
+    let first = hud_expiry(&h.event(Event::Hidden));
+    let effects = copy_from_root(&mut h);
+    let second = hud_expiry(&effects[2..]);
+    assert_ne!(first, second);
+    assert_eq!(h.snapshot().hud.unwrap().id, second);
+}
+
+#[test]
+fn showing_the_launcher_removes_the_hud() {
+    let mut h = Harness::root(3);
+    copy_from_root(&mut h);
+    h.event(Event::Hidden);
+    h.event(Event::Activated {
+        held: false,
+        probe: None,
+    });
+    assert_eq!(hud_text(&h), None);
+    h.event(Event::Hidden);
+    assert_eq!(hud_text(&h), None);
 }

@@ -46,13 +46,14 @@ use windows_sys::Win32::UI::HiDpi::{GetDpiForMonitor, GetDpiForWindow, MDT_EFFEC
 use windows_sys::Win32::UI::WindowsAndMessaging::{
     AllowSetForegroundWindow, BringWindowToTop, GetCursorPos, GetForegroundWindow,
     GetWindowLongPtrW, GetWindowRect, GetWindowThreadProcessId, SetForegroundWindow,
-    SetWindowLongPtrW, SetWindowPos, SystemParametersInfoW, EVENT_SYSTEM_FOREGROUND, GWL_EXSTYLE,
-    HWND_TOPMOST, SPI_GETFOREGROUNDLOCKTIMEOUT, SPI_SETFOREGROUNDLOCKTIMEOUT, SWP_FRAMECHANGED,
-    SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SWP_NOZORDER, WINEVENT_OUTOFCONTEXT,
-    WINEVENT_SKIPOWNPROCESS, WS_EX_APPWINDOW, WS_EX_TOOLWINDOW, WS_EX_TOPMOST,
+    SetLayeredWindowAttributes, SetWindowLongPtrW, SetWindowPos, SystemParametersInfoW,
+    EVENT_SYSTEM_FOREGROUND, GWL_EXSTYLE, HWND_TOPMOST, LWA_ALPHA, SPI_GETFOREGROUNDLOCKTIMEOUT,
+    SPI_SETFOREGROUNDLOCKTIMEOUT, SWP_FRAMECHANGED, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE,
+    SWP_NOZORDER, WINEVENT_OUTOFCONTEXT, WINEVENT_SKIPOWNPROCESS, WS_EX_APPWINDOW,
+    WS_EX_TOOLWINDOW, WS_EX_TOPMOST,
 };
 
-use super::{LauncherWindow, RunningApp, SystemControl, SystemError};
+use super::{HudWindow, LauncherWindow, RunningApp, SystemControl, SystemError};
 
 #[derive(Default)]
 pub struct WindowsLauncherWindow {
@@ -87,20 +88,9 @@ impl LauncherWindow for WindowsLauncherWindow {
             return;
         };
         unsafe {
-            // The cursor is the most reliable signal for the display the user
-            // is looking at.
-            let mut cursor = POINT { x: 0, y: 0 };
-            GetCursorPos(&mut cursor);
-            let monitor = MonitorFromPoint(cursor, MONITOR_DEFAULTTOPRIMARY);
-            let mut info: MONITORINFO = std::mem::zeroed();
-            info.cbSize = std::mem::size_of::<MONITORINFO>() as u32;
-            if GetMonitorInfoW(monitor, &mut info) == 0 {
+            let Some((area, target_dpi)) = cursor_work_area() else {
                 return;
-            }
-            let (mut target_dpi, mut unused) = (0u32, 0u32);
-            if GetDpiForMonitor(monitor, MDT_EFFECTIVE_DPI, &mut target_dpi, &mut unused) != 0 {
-                return;
-            }
+            };
             let window_dpi = GetDpiForWindow(hwnd);
             let mut rect: RECT = std::mem::zeroed();
             if window_dpi == 0 || GetWindowRect(hwnd, &mut rect) == 0 {
@@ -109,7 +99,6 @@ impl LauncherWindow for WindowsLauncherWindow {
             let scale = f64::from(target_dpi) / f64::from(window_dpi);
             let width = f64::from(rect.right - rect.left) * scale;
             let height = super::LAUNCHER_MAX_HEIGHT * f64::from(target_dpi) / 96.0;
-            let area = info.rcWork;
             let (x, y) = super::launcher_origin(
                 f64::from(area.left),
                 f64::from(area.top),
@@ -171,6 +160,75 @@ impl LauncherWindow for WindowsLauncherWindow {
     }
 }
 
+pub struct WindowsHudWindow;
+
+impl HudWindow for WindowsHudWindow {
+    /// In physical pixels at the target display's DPI, as the launcher is.
+    fn place(&self, window: RawWindowHandle) {
+        let Some(hwnd) = hwnd(window) else {
+            return;
+        };
+        unsafe {
+            let Some((area, target_dpi)) = cursor_work_area() else {
+                return;
+            };
+            let window_dpi = GetDpiForWindow(hwnd);
+            let mut rect: RECT = std::mem::zeroed();
+            if window_dpi == 0 || GetWindowRect(hwnd, &mut rect) == 0 {
+                return;
+            }
+            let scale = f64::from(target_dpi) / f64::from(window_dpi);
+            let (x, y) = super::hud_origin(
+                f64::from(area.left),
+                f64::from(area.top),
+                f64::from(area.right - area.left),
+                f64::from(area.bottom - area.top),
+                f64::from(rect.right - rect.left) * scale,
+                f64::from(rect.bottom - rect.top) * scale,
+                super::HUD_MARGIN * f64::from(target_dpi) / 96.0,
+            );
+            SetWindowPos(
+                hwnd,
+                std::ptr::null_mut(),
+                x.round() as i32,
+                y.round() as i32,
+                0,
+                0,
+                SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE,
+            );
+        }
+    }
+
+    fn did_show(&self, window: RawWindowHandle) {
+        if let Some(hwnd) = hwnd(window) {
+            unsafe {
+                apply_tool_window_style(hwnd);
+                // winit makes a click-through window layered but never sets
+                // its alpha, and a layered window without one draws nothing.
+                SetLayeredWindowAttributes(hwnd, 0, 255, LWA_ALPHA);
+            }
+        }
+    }
+}
+
+/// The work area and DPI of the display under the cursor, the most reliable
+/// signal for the display the user is looking at.
+unsafe fn cursor_work_area() -> Option<(RECT, u32)> {
+    let mut cursor = POINT { x: 0, y: 0 };
+    GetCursorPos(&mut cursor);
+    let monitor = MonitorFromPoint(cursor, MONITOR_DEFAULTTOPRIMARY);
+    let mut info: MONITORINFO = std::mem::zeroed();
+    info.cbSize = std::mem::size_of::<MONITORINFO>() as u32;
+    if GetMonitorInfoW(monitor, &mut info) == 0 {
+        return None;
+    }
+    let (mut dpi, mut unused) = (0u32, 0u32);
+    if GetDpiForMonitor(monitor, MDT_EFFECTIVE_DPI, &mut dpi, &mut unused) != 0 {
+        return None;
+    }
+    Some((info.rcWork, dpi))
+}
+
 thread_local! {
     static FOCUS_LOST: RefCell<Option<Box<dyn Fn()>>> = const { RefCell::new(None) };
 }
@@ -227,7 +285,7 @@ unsafe extern "system" fn foreground_changed(
     });
 }
 
-/// tao rewrites the extended style from its own flags whenever visibility
+/// winit rewrites the extended style from its own flags whenever visibility
 /// changes, which restores WS_EX_APPWINDOW and drops the tool window bit. So
 /// this runs after every show, not once at startup.
 unsafe fn apply_tool_window_style(hwnd: HWND) {

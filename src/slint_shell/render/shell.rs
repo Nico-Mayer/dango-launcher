@@ -51,11 +51,7 @@ pub fn write(
         Some(toast) => {
             shell.set_toast_shown(true);
             shell.set_toast_text(toast.text.as_str().into());
-            shell.set_toast_style(match toast.style {
-                ToastStyle::Busy => SlintToastStyle::Busy,
-                ToastStyle::Success => SlintToastStyle::Success,
-                ToastStyle::Failure => SlintToastStyle::Failure,
-            });
+            shell.set_toast_style(toast_style(toast.style));
         }
         None => shell.set_toast_shown(false),
     }
@@ -94,5 +90,13 @@ pub fn write(
             .unwrap_or(0);
         search.set_filter_options(ModelRc::from(Rc::new(VecModel::from(options))));
         search.set_filter_current(current as i32);
+    }
+}
+
+pub(super) fn toast_style(style: ToastStyle) -> SlintToastStyle {
+    match style {
+        ToastStyle::Busy => SlintToastStyle::Busy,
+        ToastStyle::Success => SlintToastStyle::Success,
+        ToastStyle::Failure => SlintToastStyle::Failure,
     }
 }

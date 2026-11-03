@@ -4,6 +4,8 @@
 
 mod index;
 
+#[cfg(test)]
+pub(crate) use index::tests::FakeIndexer;
 pub use index::{AppIndex, AppIndexer, IndexedApp, LaunchError};
 
 use std::sync::Arc;
