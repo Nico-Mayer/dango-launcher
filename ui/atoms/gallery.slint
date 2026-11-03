@@ -4,6 +4,7 @@ import { Tag, TagRole } from "tag.slint";
 import { Accessory, AccessoryKind } from "accessory.slint";
 import { Dot, Status } from "dot.slint";
 import { Progress, ProgressKind } from "progress.slint";
+import { Skeleton } from "skeleton.slint";
 
 /// Every atom on its own, for the UI tests.
 export component AtomGallery inherits Window {
@@ -70,6 +71,9 @@ export component AtomGallery inherits Window {
             value: 0.62;
             height: 4px;
             accessible-description: "Bar";
+        }
+        Skeleton {
+            height: 3 * 44px;
         }
     }
 }

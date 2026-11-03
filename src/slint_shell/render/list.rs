@@ -42,6 +42,7 @@ impl Writer {
 
     pub fn root(&mut self, ui: &LauncherWindow, root: &RootScreen, icons: &Icons) {
         ui.global::<ListData>().set_detail_pane(false);
+        ui.global::<ListData>().set_skeleton(false);
         let selected = root.selected.as_deref();
         let rows = root.sections.iter().flat_map(|section| {
             let heading = section.heading.iter().map(|title| heading(title, None));
@@ -56,6 +57,7 @@ impl Writer {
 
     pub fn view(&mut self, ui: &LauncherWindow, list: &ListBody, icons: &Icons) {
         ui.global::<ListData>().set_detail_pane(list.pane.is_some());
+        ui.global::<ListData>().set_skeleton(list.skeleton);
         let selected = list.selected.as_deref();
         let rows = list.sections.iter().flat_map(|section| {
             let heading = section

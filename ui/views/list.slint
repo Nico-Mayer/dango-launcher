@@ -2,6 +2,7 @@ import { ScrollView } from "std-widgets.slint";
 import { Theme } from "../theme.slint";
 import { Icon } from "../atoms/icon.slint";
 import { Accessory } from "../atoms/accessory.slint";
+import { Skeleton } from "../atoms/skeleton.slint";
 import { Intents, ListData, RowData, Shell } from "../globals.slint";
 import { Detail } from "detail.slint";
 
@@ -142,6 +143,11 @@ export component List inherits Rectangle {
                 }
             }
         }
+    }
+
+    if ListData.skeleton: Skeleton {
+        y: Theme.list-padding;
+        height: parent.height - 2 * Theme.list-padding;
     }
 
     if ListData.detail-pane: Rectangle {

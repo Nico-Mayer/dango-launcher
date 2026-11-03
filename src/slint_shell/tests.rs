@@ -1017,6 +1017,48 @@ mod list_view {
         assert!(h.find("Item 1").is_some());
     }
 
+    fn loading(items: Vec<ListItem>) -> ViewTree {
+        ViewTree::new(View::List(ListView {
+            loading: true,
+            items,
+            ..Default::default()
+        }))
+    }
+
+    fn skeleton_shown(h: &Harness) -> bool {
+        h.ui.global::<ListData>().get_skeleton()
+            && ElementHandle::find_by_element_type_name(&h.ui, "Skeleton")
+                .next()
+                .is_some()
+    }
+
+    #[test]
+    fn a_cold_loading_list_shows_skeleton_rows_at_full_height() {
+        let h = Harness::root(results(1));
+        h.view(loading(Vec::new()));
+        assert!(skeleton_shown(&h));
+        assert_eq!(h.shell().get_screen(), ScreenKind::List);
+        assert_eq!(h.height(), 480.0);
+    }
+
+    #[test]
+    fn arriving_items_replace_the_skeleton() {
+        let h = Harness::root(results(1));
+        h.view(loading(Vec::new()));
+        h.view(loading(vec![item(1)]));
+        assert!(!skeleton_shown(&h));
+        assert!(h.find("Item 1").is_some());
+    }
+
+    #[test]
+    fn a_refreshing_list_filtered_to_nothing_shows_no_skeleton() {
+        let h = Harness::root(results(1));
+        h.view(loading(vec![item(1)]));
+        h.type_text("zzz");
+        assert!(h.find("Item 1").is_none());
+        assert!(!skeleton_shown(&h));
+    }
+
     #[test]
     fn a_pushed_list_of_five_hundred_renders_fifty_rows() {
         let h = Harness::root(results(1));

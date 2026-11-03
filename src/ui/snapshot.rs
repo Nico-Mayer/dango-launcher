@@ -102,6 +102,8 @@ snapshot_types! {
         pub pane: Option<DetailBody>,
         pub selected: Option<String>,
         pub empty: Option<EmptyText>,
+        /// Loading with nothing declared yet: placeholder rows fill the body.
+        pub skeleton: bool,
     }
 
     /// The view's filter dropdown with the option it shows.
@@ -400,6 +402,7 @@ impl Launcher {
                     }),
                     selected: list_selected.map(|item| item.id.clone()),
                     empty,
+                    skeleton: list.loading && list.items.is_empty(),
                 })
             }
             View::Grid(grid) => {

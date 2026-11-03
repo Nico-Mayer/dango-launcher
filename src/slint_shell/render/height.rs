@@ -30,7 +30,9 @@ pub fn height(snapshot: &Snapshot) -> f32 {
             list(headings, rows)
         }
         Screen::View(view) => match &view.body {
-            ViewBody::List(body) if body.empty.is_none() && body.pane.is_none() => {
+            ViewBody::List(body)
+                if body.empty.is_none() && body.pane.is_none() && !body.skeleton =>
+            {
                 let headings = body.sections.iter().filter(|s| s.title.is_some()).count();
                 let rows: usize = body.sections.iter().map(|s| s.items.len()).sum();
                 list(headings, rows)

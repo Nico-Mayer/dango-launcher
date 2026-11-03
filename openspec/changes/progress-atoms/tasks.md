@@ -26,8 +26,8 @@
 
 ## 4. Skeleton rows
 
-- [ ] 4.1 Add `ui/atoms/skeleton.slint` (`Skeleton` fills its height with `floor(height / Theme.row-height)` rows, each with an icon square and a title bar in `Theme.raised`, children `accessible-role: none`). Add it to `AtomGallery`. Verify with `cargo test` (gallery compiles and builds).
-- [ ] 4.2 Give the snapshot's list body a `skeleton` flag when the view is loading and its declared items are empty, in place of the empty state. Do not set it when the query filters every item out. Set `ListData.skeleton` in `src/slint_shell/render/list.rs`, and set it to false on the root path. Draw `Skeleton` in `ui/views/list.slint`. In `src/slint_shell/render/height.rs`, let a skeleton list fall into the `_ => MAX` arm. Verify with UI tests: a loading list with no items shows the skeleton at maximum height and no empty state; the first items replace it in one render; a loading list with items filtered to nothing shows no skeleton.
+- [x] 4.1 Add `ui/atoms/skeleton.slint` (`Skeleton` fills its height with `floor(height / Theme.row-height)` rows, each with an icon square and a title bar in `Theme.raised`, children `accessible-role: none`). Add it to `AtomGallery`. Verify with `cargo test` (gallery compiles and builds).
+- [x] 4.2 Give the snapshot's list body a `skeleton` flag when the view is loading and its declared items are empty, in place of the empty state. Do not set it when the query filters every item out. Set `ListData.skeleton` in `src/slint_shell/render/list.rs`, and set it to false on the root path. Draw `Skeleton` in `ui/views/list.slint`. In `src/slint_shell/render/height.rs`, let a skeleton list fall into the `_ => MAX` arm. Verify with UI tests: a loading list with no items shows the skeleton at maximum height and no empty state; the first items replace it in one render; a loading list with items filtered to nothing shows no skeleton.
 
 ## 5. Checks and review
 
