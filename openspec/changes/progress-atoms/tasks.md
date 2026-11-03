@@ -31,7 +31,7 @@
 
 ## 5. Checks and review
 
-- [ ] 5.1 Run `mise run check` and `cargo test`. Verify both pass.
+- [x] 5.1 Run `mise run check` and `cargo test`. Verify both pass.
 - [ ] 5.2 Run the `ponytail-review` skill in a fresh subagent on this change's commits, without the apply context. Report the findings to the author. Verify that the findings are listed in the session.
 
 ## Workflow follow-up
