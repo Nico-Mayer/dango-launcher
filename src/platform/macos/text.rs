@@ -17,6 +17,9 @@ use enigo::{Direction, Enigo, Key, Keyboard as _, Settings};
 use objc2_app_kit::NSWorkspace;
 use objc2_application_services::{AXError, AXUIElement};
 use objc2_core_foundation::{CFRetained, CFString, CFType};
+use objc2_core_graphics::{CGEvent, CGEventFlags, CGEventSource, CGEventSourceStateID};
+
+use super::DANGO_INJECTED;
 
 use crate::text::{
     with_deadline, DirectSelection, Handoff, Keys, Lend, MainThread, Selected, TextError,
@@ -25,6 +28,10 @@ use crate::text::{
 const FOCUSED_ELEMENT: &str = "AXFocusedUIElement";
 const SELECTED_TEXT: &str = "AXSelectedText";
 const SELECTED_TEXT_RANGE: &str = "AXSelectedTextRange";
+
+const KEY_COMMAND: u16 = 55;
+/// `kVK_ANSI_C`. The C key sits in the same place on the US and German layouts.
+const KEY_C: u16 = 8;
 
 /// How long to wait for the target application to take the paste before the
 /// clipboard is put back. macOS offers no signal that a paste has been handled,
@@ -133,8 +140,26 @@ fn keystroke_failed() -> TextError {
 }
 
 impl Keys for MacKeys {
+    /// Posted to the frontmost application's process rather than through
+    /// enigo, which posts to the key window: the launcher panel stays key
+    /// during a read.
     fn copy(&self) -> Result<(), TextError> {
-        self.chord('c')
+        let pid = frontmost_pid().ok_or_else(keystroke_failed)?;
+        let source =
+            CGEventSource::new(CGEventSourceStateID::Private).ok_or_else(keystroke_failed)?;
+        CGEventSource::set_user_data(Some(&source), DANGO_INJECTED);
+        for (keycode, down, flags) in [
+            (KEY_COMMAND, true, CGEventFlags::MaskCommand),
+            (KEY_C, true, CGEventFlags::MaskCommand),
+            (KEY_C, false, CGEventFlags::MaskCommand),
+            (KEY_COMMAND, false, CGEventFlags::empty()),
+        ] {
+            let event = CGEvent::new_keyboard_event(Some(&source), keycode, down)
+                .ok_or_else(keystroke_failed)?;
+            CGEvent::set_flags(Some(&event), flags);
+            CGEvent::post_to_pid(pid, Some(&event));
+        }
+        Ok(())
     }
 
     fn paste(&self) -> Result<(), TextError> {
@@ -184,12 +209,6 @@ impl Handoff for MacHandoff {
     /// already frontmost and the panel stays key.
     fn lend_to_previous(&self) -> Lend {
         Lend::nothing_to_give_back()
-    }
-
-    // Stopgap until Cmd+C is posted to the frontmost pid (task 4.2 of
-    // lend-focus-for-selection): enigo posts to the key window, the panel.
-    fn hides_launcher_to_copy(&self) -> bool {
-        true
     }
 
     fn settle_after_paste(&self) {

@@ -70,11 +70,6 @@ pub trait Handoff: Send + Sync {
     /// launcher stays on screen. Dropping the lend takes the foreground back,
     /// also when it failed part way.
     fn lend_to_previous(&self) -> Lend;
-    /// Whether the copy fallback must hide the launcher first, because the
-    /// copy chord goes to the launcher's key window otherwise.
-    fn hides_launcher_to_copy(&self) -> bool {
-        false
-    }
     /// Called after the paste keystroke and before the clipboard is restored.
     /// Windows asks the target to answer a no-op message, which it only does
     /// once it has handled the paste. macOS has no such signal and waits.
@@ -305,11 +300,6 @@ impl TextExchange {
     /// copy removes the ambiguity: if it survives, the copy did nothing.
     fn selection_through_clipboard(&self) -> Result<Option<String>, TextError> {
         let saved = self.read_clipboard();
-
-        if self.handoff.hides_launcher_to_copy() {
-            self.launcher.dismiss();
-            self.handoff.yield_to_previous()?;
-        }
 
         let sentinel = format!("dango-selection-{}", uuid::Uuid::new_v4());
         self.own_writes.expect(&Content::Text(sentinel.clone()));
@@ -677,7 +667,6 @@ mod tests {
     struct FakeHandoff {
         fails: Option<TextError>,
         lend_fails: Option<TextError>,
-        hides_to_copy: bool,
         yielded: Mutex<usize>,
         lent: Mutex<usize>,
         returned: Arc<Mutex<usize>>,
@@ -714,9 +703,6 @@ mod tests {
                 None => Ok(()),
             };
             Lend::new(ready, move || *returned.lock().unwrap() += 1)
-        }
-        fn hides_launcher_to_copy(&self) -> bool {
-            self.hides_to_copy
         }
         fn settle_after_paste(&self) {}
     }
@@ -1350,37 +1336,6 @@ mod tests {
             clipboard.now(),
             Some(Content::Text("what the user had".into()))
         );
-    }
-
-    #[test]
-    fn a_handoff_that_hides_to_copy_hides_only_for_the_copy() {
-        for (direct, dismissals) in [
-            (Selected::Text("selected".into()), 0),
-            (Selected::Unavailable, 1),
-        ] {
-            let clipboard = holding("what the user had");
-            let keys = Arc::new(FakeKeys {
-                permitted: true,
-                pastes_into: Some(clipboard.clone()),
-                ..Default::default()
-            });
-            let handoff = Arc::new(FakeHandoff {
-                hides_to_copy: true,
-                ..Default::default()
-            });
-            let launcher = Arc::new(FakeLauncher::default());
-            let exchange = exchange_with(
-                clipboard,
-                keys,
-                handoff,
-                Some(Arc::new(FakeDirect(direct.clone()))),
-                launcher.clone(),
-            );
-
-            exchange.selection().unwrap();
-
-            assert_eq!(launcher.dismissals(), dismissals, "{direct:?}");
-        }
     }
 
     #[test]
