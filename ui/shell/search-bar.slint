@@ -1,4 +1,5 @@
 import { Theme } from "../theme.slint";
+import { Progress, ProgressKind } from "../atoms/progress.slint";
 import { Icon, IconKind } from "../atoms/icon.slint";
 import { Intents, Search, Shell } from "../globals.slint";
 
@@ -196,20 +197,13 @@ export component SearchBar inherits Rectangle {
         }
     }
 
-    // The only motion in the interface; see design-system.
-    if Shell.loading: Rectangle {
+    if Shell.loading: Progress {
+        kind: ProgressKind.bar;
         y: parent.height - 2px;
         height: 2px;
-        background: Theme.border;
-        clip: true;
-        accessible-role: progress-indicator;
+        track: Theme.border;
+        fill: Theme.accent;
         accessible-label: "Loading…";
-
-        sweep := Rectangle {
-            width: parent.width * Theme.loading-sweep-width;
-            x: -self.width + (parent.width + self.width) * mod(animation-tick(), Theme.loading-sweep-period) / Theme.loading-sweep-period;
-            background: Theme.accent;
-        }
     }
     if !Shell.loading: Rectangle {
         y: parent.height - 1px;

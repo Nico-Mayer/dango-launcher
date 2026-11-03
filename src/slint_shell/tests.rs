@@ -486,7 +486,7 @@ mod search_bar {
         }
         h.view(tree);
         let sweep_x = || {
-            ElementHandle::find_by_element_id(&h.ui, "SearchBar::sweep")
+            ElementHandle::find_by_element_id(&h.ui, "Progress::sweep")
                 .next()
                 .map(|sweep| sweep.absolute_position().x)
         };

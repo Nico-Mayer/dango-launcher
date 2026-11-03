@@ -10,7 +10,7 @@ export component Progress inherits Rectangle {
     in property <float> value: -1;
     in property <color> track: Theme.raised;
     in property <color> fill: Theme.working;
-    in property <duration> period: 1.2s;
+    in property <duration> period: Theme.loading-sweep-period;
     property <bool> indeterminate: root.value < 0;
     property <float> turn: mod(animation-tick(), root.period) / root.period;
 
@@ -28,7 +28,7 @@ export component Progress inherits Rectangle {
             width: parent.width * clamp(root.value, 0, 1);
             background: root.fill;
         }
-        if root.indeterminate: Rectangle {
+        if root.indeterminate: sweep := Rectangle {
             width: parent.width * Theme.loading-sweep-width;
             x: -self.width + (parent.width + self.width) * root.turn;
             background: root.fill;
