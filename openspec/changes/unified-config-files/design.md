@@ -160,7 +160,7 @@ Checked against `interface-copy`:
 | Where | Before | After |
 |---|---|---|
 | Record parse error (log, tray) | `snippets.json: The file isn't valid JSON: <message>` | `snippets.toml: <message>` |
-| Record wrong type (log, tray) | none, JSON ignored it | `snippets.toml: line <n>: name must be text` |
+| Record wrong type (log, tray) | none, JSON ignored it | `snippets.toml: Line <n>: name must be text` |
 | Record file broken | `Fix the error in snippets.json first` | `Fix the error in snippets.toml first` |
 | Record write failed | `Couldn't save, check that snippets.json isn't read-only` | `Couldn't save, check that snippets.toml isn't read-only` |
 | Startup notice | `snippets.json has an error, see dango.log` | `snippets.toml has an error, see dango.log` |
