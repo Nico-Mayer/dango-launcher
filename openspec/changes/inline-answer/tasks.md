@@ -1,45 +1,53 @@
 # Tasks
 
-## 1. The calculator extension
+## 1. The calculator as a root provider
 
 - [ ] 1.1 Add `fend-core = "1.5.9"` to `Cargo.toml`. Add `src/extensions/calculator/` with `CalculatorExtension`:
-  - a manifest with no commands and no root items, named "Calculator";
-  - `answer(query) -> Option<Answer { expression, result }>`, which applies the digit-or-operator gate and calls `fend_core::evaluate_preview_with_interrupt` with a deadline interrupt, with no exchange-rate handler;
-  - `perform_action` with `copy` → `CopyToClipboard(result)` and `paste` through the text exchange, as `extensions/ai` pastes.
+  - a manifest named "Calculator" with `root_items: true`, listed in `builtin_manifests()`;
+  - the gate from design.md (an operator or " to ", " in ", " as "; no comma between digits);
+  - `fend_core::evaluate_preview_with_interrupt` with a 100 ms deadline, run on `spawn_blocking`;
+  - a `RootProvider` that returns one `Source::Answer` candidate: id = the clean answer, title = the shown answer ("approx. " → "≈ "), actions "Copy answer" and "Paste answer";
+  - `perform_action`: `copy` → `CopyToClipboard(item_id)`, and `paste` through the text exchange, as `extensions/ai` pastes.
 
-  Verify with unit tests in the module:
-  - "2+2" → "4", "5 km to m" → "5000 m", "1.5 * 2" → "3";
-  - "firefox", "pi", "", and "2048" give none;
+  Add `Source::Answer`. Verify with unit tests in the module:
+  - "2+2" → "4", "5 km to m" → "5000 m", "1.5 * 2" → "3", "17*23" → "391";
+  - "5 km in miles" → title "≈ 3.1068559612 miles", id "3.1068559612 miles";
+  - "firefox", "pi", "4k", "2fa", "1h", "1,5*2", "2048", and "" give none;
   - `copy` answers `CopyToClipboard`;
-  - `paste` without a text exchange fails with its sentence;
+  - `paste` without a text exchange fails with "Dango can't reach other apps right now";
   - the manifest validates.
+- [ ] 1.2 Register the extension in `src/app/startup.rs` with the text exchange. Make the ranker in `src/ranking/` pass `Source::Answer` through first and unranked. In `run_action` (`src/app/mod.rs`), skip `record_use` for `dango.calculator`. Verify with:
+  - a ranking test: an answer candidate comes first, above a pinned item;
+  - an app test: an action on `dango.calculator` that answers `Done` records no frecency;
+  - `cargo test`.
 
-  Fix the spec scenario strings if fend writes them differently.
-- [ ] 1.2 Register the extension in `src/app/startup.rs`, hand it the text exchange, and hold it as `Services.calculator`. Verify with `cargo test` and an app test that "Calculator" is in the extension contexts.
+## 2. The answer card in root search
 
-## 2. The answer in root search
+- [ ] 2.1 In `src/ui/snapshot.rs`, split a `Source::Answer` item out of the root sections into `RootScreen.answer`, keeping it first in `root_order()`. Add `Theme.answer-height` (64 px), an `AnswerData` global (expression, answer, selected), `ui/shell/inline-answer.slint`, and `src/slint_shell/render/answer.rs` as the global's only writer.
 
-- [ ] 2.1 Add `Event::Answer { query, answer: Option<Answer> }`. In `Core::search`, run `calculator.answer` on `spawn_blocking` and apply the event. In the reducer:
-  - keep the answer when the query matches, keep the last one until the next arrives, and clear it on an empty query;
-  - select `ANSWER_ID` when a new answer arrives for a new query;
-  - Arrow Up from the first result selects the card, and Arrow Down from the card selects the first result;
-  - Enter on the card runs "Copy answer", and the panel lists "Copy answer" and "Paste answer", both as requests to `dango.calculator` with the answer as the item;
-  - the footer reads "Calculator", "Copy answer";
-  - with an answer and no results, there is no empty view.
+  The card shows:
+  - the query in muted text on the left, the `arrow-right` icon, and the answer large on the right;
+  - the `selected` and `hover` fills as rows have;
+  - a single click calls `Intents.activate`;
+  - the accessible role `list-item` and the label "<expression> = <answer>".
 
-  Put the answer in `RootScreen`. Verify with reducer tests in `src/ui/tests.rs` for each scenario in the `inline-answers` delta and the new `list-navigation` scenario, a stale answer for an old query being dropped, and an app test that typing "2+2" yields an answer in the snapshot.
+  Place it under the SearchBar at root, start the list below it, and add its height in `render/height.rs`. Add the `calculator` and `arrow-right` icons to `src/slint_shell/icons.rs`. Verify:
+  - **Reducer tests** in `src/ui/tests.rs`:
+    - a new query with an answer selects it;
+    - Arrow Down goes to the first result, and Arrow Up comes back and stays;
+    - Enter runs "Copy answer";
+    - the panel lists both actions;
+    - the footer reads "Calculator", "Copy answer";
+    - with only the answer, there is no empty view.
+  - **UI tests** in `src/slint_shell/tests.rs`:
+    - "2+2 = 4" is found and marked selected;
+    - the window grows by 64;
+    - an answer alone shows the card and no "No results".
 
-## 3. The card
+## 3. Checks and review
 
-- [ ] 3.1 Add `Theme.answer-height` (64 px), an `AnswerData` global, `ui/shell/inline-answer.slint` (expression muted left, arrow, answer large right, `selected` fill, click to select, accessible label "<expression> = <answer>"), and `src/slint_shell/render/answer.rs` as its only writer. Place the card under the SearchBar at root and start the list below it. Add the card's height in `render/height.rs`. Verify with UI tests in `src/slint_shell/tests.rs`:
-  - "2+2 = 4" is found, and is selected when the snapshot selects it;
-  - the window height grows by 64;
-  - with no results, the card shows and the empty view does not.
-
-## 4. Checks and review
-
-- [ ] 4.1 Run `mise run check` and `cargo test`. Verify both pass.
-- [ ] 4.2 Run the `ponytail-review` skill in a fresh subagent on this change's commits, without the apply context. Report the findings to the author. Verify that the findings are listed in the session.
+- [ ] 3.1 Run `mise run check` and `cargo test`. Verify both pass.
+- [ ] 3.2 Run the `ponytail-review` skill in a fresh subagent on this change's commits, without the apply context. Report the findings to the author. Verify that the findings are listed in the session.
 
 ## Workflow follow-up
 
