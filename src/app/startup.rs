@@ -62,7 +62,10 @@ pub fn start(startup: Startup) -> Arc<Core> {
     let (initial_config, config_error) = match config::Config::load(&config_path) {
         Ok(config) => (config, None),
         Err(error) => {
-            crate::log::append(&format!("{error}, using the built-in defaults"));
+            crate::log::append(&format!(
+                "{}\nUsing the built-in defaults.",
+                error.to_string().trim_end()
+            ));
             (config::Config::default(), Some(error.to_string()))
         }
     };
