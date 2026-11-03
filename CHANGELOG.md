@@ -2,6 +2,12 @@
 
 All notable changes to Dango. Generated from commit history at release time.
 
+## [6.1.0] - 2026-11-03
+
+### Features
+
+- **ai:** Name the provider while waiting for it
+- **ui:** Sweep the loading bar while loading
 ## [6.0.1] - 2026-11-03
 
 ### Fixes
