@@ -752,3 +752,55 @@ async fn a_pinned_item_shows_its_status_line() {
     let item = core.result_item(x_candidate(crate::search::Source::RootItem, true));
     assert_eq!(item.subtitle.as_deref(), Some("Needs attention"));
 }
+
+fn copied(core: &Arc<Core>) {
+    core.apply(crate::ui::Input::Event(crate::ui::Event::ActionFinished {
+        request: crate::ui::ActionRequest {
+            origin: crate::ui::Origin::Root,
+            extension_id: "test".into(),
+            item_id: "item".into(),
+            action_id: "copy".into(),
+            values: None,
+            query: None,
+        },
+        outcome: crate::extension::ActionOutcome::CopyToClipboard("x".into()),
+    }));
+}
+
+fn hud(shell: &RecordingShell) -> Option<String> {
+    shell.last_snapshot().hud.map(|hud| hud.text)
+}
+
+type Hide = fn(&Arc<Core>);
+
+#[tokio::test]
+async fn every_hide_path_tells_the_launcher_it_is_hidden() {
+    let hides: [(&str, Hide); 5] = [
+        ("hotkey", |core| core.toggle()),
+        ("escape", escape),
+        ("launch", |core| core.hide_after_launch()),
+        ("focus loss", |core| core.hide_on_focus_loss()),
+        ("for work", |core| core.hide_for_work()),
+    ];
+    for (name, hide) in hides {
+        let (core, shell) = core("");
+        core.toggle();
+        hide(&core);
+        copied(&core);
+        assert_eq!(
+            hud(&shell).as_deref(),
+            Some("Copied to clipboard"),
+            "{name}"
+        );
+    }
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_success_hud_goes_after_two_seconds() {
+    let (core, shell) = core("");
+    copied(&core);
+    tokio::time::sleep(Duration::from_millis(1900)).await;
+    assert!(hud(&shell).is_some());
+    tokio::time::sleep(Duration::from_millis(200)).await;
+    assert_eq!(hud(&shell), None);
+}

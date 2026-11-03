@@ -24,6 +24,8 @@ snapshot_types! {
         pub bindings: Vec<Binding>,
         pub screen: Screen,
         pub toast: Option<Toast>,
+        /// Shown in its own window, only while the launcher is hidden.
+        pub hud: Option<Hud>,
         pub footer: Footer,
         pub panel: Panel,
     }
@@ -170,6 +172,13 @@ snapshot_types! {
         pub text: String,
     }
 
+    pub struct Hud {
+        /// A new id is a new HUD, even with the same text.
+        pub id: u64,
+        pub style: ToastStyle,
+        pub text: String,
+    }
+
     pub struct Footer {
         /// In root search the selected result's extension, in a view its
         /// command.
@@ -221,6 +230,11 @@ impl Launcher {
                 (None, Some(view)) => Screen::View(self.view_screen(view, selected)),
             },
             toast: self.toast(),
+            hud: self.hud.as_ref().filter(|_| !self.visible).map(|hud| Hud {
+                id: hud.id,
+                style: hud.style,
+                text: hud.text.clone(),
+            }),
             footer: self.footer(actions),
             panel: Panel {
                 selected: self.panel_selected(&panel_actions),

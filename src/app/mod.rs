@@ -37,6 +37,9 @@ const DEFAULT_RESET_AFTER_SECS: u32 = 60;
 const PERMISSION_POLL: Duration = Duration::from_secs(2);
 
 const TOAST_LIFETIME: Duration = Duration::from_secs(2);
+/// Longer than a success, so a whole sentence can be read: nothing but time
+/// takes a failure HUD away.
+const FAILURE_HUD_LIFETIME: Duration = Duration::from_secs(4);
 
 pub struct Core {
     shell: Arc<dyn Shell>,
@@ -233,10 +236,14 @@ impl Core {
                 }));
             }
             ui::Effect::ReportPaint(probe) => self.latency.finish(probe),
-            ui::Effect::ExpireToast { id } => {
+            ui::Effect::ExpireToast { id, style } => {
+                let lifetime = match style {
+                    ui::ToastStyle::Failure => FAILURE_HUD_LIFETIME,
+                    ui::ToastStyle::Success | ui::ToastStyle::Busy => TOAST_LIFETIME,
+                };
                 let core = self.clone();
                 self.runtime.spawn(async move {
-                    tokio::time::sleep(TOAST_LIFETIME).await;
+                    tokio::time::sleep(lifetime).await;
                     core.apply(ui::Input::Event(ui::Event::ToastExpired { id }));
                 });
             }
@@ -372,6 +379,7 @@ impl Core {
     }
 
     fn settle_hide(self: &Arc<Self>, reason: HideReason) {
+        self.apply(ui::Input::Event(ui::Event::Hidden));
         match reason {
             HideReason::Interrupted => {
                 let period = self.reset_after();

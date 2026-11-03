@@ -46,13 +46,17 @@ pub struct Launcher {
     /// A tree that cannot be drawn, shown in place of a view until Escape.
     pub(super) view_error: Option<ViewError>,
     pub(super) toast: Option<HeldToast>,
+    /// What the launcher reports while it is off screen. Set while it is still
+    /// visible, it waits for the hide.
+    pub(super) hud: Option<HeldToast>,
+    pub(super) visible: bool,
 }
 
 /// A toast the launcher holds until it expires or is cleared. Busy toasts are
 /// not held: they follow the work that shows them.
 #[derive(Clone, Debug, PartialEq)]
 pub(super) struct HeldToast {
-    id: u64,
+    pub(super) id: u64,
     pub(super) style: ToastStyle,
     pub(super) text: String,
 }
@@ -264,6 +268,8 @@ impl Launcher {
                 }
             }
             Event::Activated { held, probe } => {
+                self.visible = true;
+                self.hud = None;
                 self.activations += 1;
                 self.probe = probe;
                 if held {
@@ -271,9 +277,21 @@ impl Launcher {
                 }
             }
             Event::Reset => self.reset(fx),
+            Event::Hidden => {
+                self.visible = false;
+                if let Some(hud) = &self.hud {
+                    fx.push(Effect::ExpireToast {
+                        id: hud.id,
+                        style: hud.style,
+                    });
+                }
+            }
             Event::ToastExpired { id } => {
                 if self.toast.as_ref().is_some_and(|toast| toast.id == id) {
                     self.toast = None;
+                }
+                if self.hud.as_ref().is_some_and(|hud| hud.id == id) {
+                    self.hud = None;
                 }
             }
         }
@@ -345,6 +363,7 @@ impl Launcher {
             (ActionOutcome::CopyToClipboard(text), _) => {
                 fx.push(Effect::CopyText(text));
                 fx.push(Effect::Dismiss);
+                self.show_hud(ToastStyle::Success, "Copied to clipboard".into(), fx);
             }
             // A root action that produces a view opens it. A snippet needing
             // arguments has to ask before it can do anything.
@@ -419,7 +438,20 @@ impl Launcher {
             style: ToastStyle::Success,
             text,
         });
-        fx.push(Effect::ExpireToast { id });
+        fx.push(Effect::ExpireToast {
+            id,
+            style: ToastStyle::Success,
+        });
+    }
+
+    /// The time runs from when the HUD can be seen, so one set while the
+    /// launcher is still on screen starts its time at the hide.
+    fn show_hud(&mut self, style: ToastStyle, text: String, fx: &mut Vec<Effect>) {
+        let id = self.next_revision();
+        self.hud = Some(HeldToast { id, style, text });
+        if !self.visible {
+            fx.push(Effect::ExpireToast { id, style });
+        }
     }
 
     fn push(&mut self, tree: ViewTree, context: Context, fx: &mut Vec<Effect>) {

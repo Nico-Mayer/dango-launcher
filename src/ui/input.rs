@@ -121,6 +121,8 @@ pub enum Event {
         probe: Option<u64>,
     },
     Reset,
+    /// The launcher is off screen, for whatever reason it was hidden.
+    Hidden,
     ToastExpired {
         id: u64,
     },

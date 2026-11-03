@@ -119,8 +119,13 @@ struct Harness {
 
 impl Harness {
     fn new() -> Self {
+        let mut launcher = Launcher::new();
+        launcher.apply(Input::Event(Event::Activated {
+            held: false,
+            probe: None,
+        }));
         Self {
-            launcher: Launcher::new(),
+            launcher,
             effects: Vec::new(),
         }
     }
@@ -1886,7 +1891,7 @@ fn finish_with_toast(h: &mut Harness, text: &str) -> u64 {
     let request = h.runs().last().unwrap().clone();
     let effects = h.finish(request, ActionOutcome::Toast(text.into()));
     match effects.as_slice() {
-        [Effect::ExpireToast { id }] => *id,
+        [Effect::ExpireToast { id, .. }] => *id,
         other => panic!("expected one expiry, got {other:?}"),
     }
 }
@@ -2009,4 +2014,86 @@ fn a_reset_does_not_abandon_the_running_command() {
     h.event(Event::Reset);
     h.render(1, detail_tree("after work"));
     assert!(matches!(h.view_body(), ViewBody::Detail(_)));
+}
+
+// HUD
+
+fn copy_from_root(h: &mut Harness) -> Vec<Effect> {
+    h.press("Enter");
+    let request = h.runs().last().unwrap().clone();
+    h.finish(request, ActionOutcome::CopyToClipboard("x".into()))
+}
+
+fn hud_text(h: &Harness) -> Option<String> {
+    h.snapshot().hud.map(|hud| hud.text)
+}
+
+fn hud_expiry(effects: &[Effect]) -> u64 {
+    match effects {
+        [Effect::ExpireToast { id, .. }] => *id,
+        other => panic!("expected one expiry, got {other:?}"),
+    }
+}
+
+#[test]
+fn a_copy_dismisses_and_shows_its_hud_only_once_hidden() {
+    let mut h = Harness::root(3);
+    let effects = copy_from_root(&mut h);
+    assert_eq!(effects, vec![Effect::CopyText("x".into()), Effect::Dismiss]);
+    assert!(h.snapshot().toast.is_none());
+    assert_eq!(hud_text(&h), None);
+    let effects = h.event(Event::Hidden);
+    let id = hud_expiry(&effects);
+    assert_eq!(hud_text(&h).as_deref(), Some("Copied to clipboard"));
+    assert_eq!(
+        effects,
+        vec![Effect::ExpireToast {
+            id,
+            style: ToastStyle::Success
+        }]
+    );
+    h.event(Event::ToastExpired { id });
+    assert_eq!(hud_text(&h), None);
+}
+
+#[test]
+fn a_stale_expiry_leaves_a_newer_hud() {
+    let mut h = Harness::root(3);
+    copy_from_root(&mut h);
+    let first = hud_expiry(&h.event(Event::Hidden));
+    h.event(Event::Activated {
+        held: false,
+        probe: None,
+    });
+    copy_from_root(&mut h);
+    let second = hud_expiry(&h.event(Event::Hidden));
+    assert_ne!(first, second);
+    h.event(Event::ToastExpired { id: first });
+    assert_eq!(hud_text(&h).as_deref(), Some("Copied to clipboard"));
+    assert_eq!(h.snapshot().hud.unwrap().id, second);
+}
+
+#[test]
+fn a_newer_hud_replaces_the_one_showing() {
+    let mut h = Harness::root(3);
+    copy_from_root(&mut h);
+    let first = hud_expiry(&h.event(Event::Hidden));
+    let effects = copy_from_root(&mut h);
+    let second = hud_expiry(&effects[2..]);
+    assert_ne!(first, second);
+    assert_eq!(h.snapshot().hud.unwrap().id, second);
+}
+
+#[test]
+fn showing_the_launcher_removes_the_hud() {
+    let mut h = Harness::root(3);
+    copy_from_root(&mut h);
+    h.event(Event::Hidden);
+    h.event(Event::Activated {
+        held: false,
+        probe: None,
+    });
+    assert_eq!(hud_text(&h), None);
+    h.event(Event::Hidden);
+    assert_eq!(hud_text(&h), None);
 }

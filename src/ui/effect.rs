@@ -1,5 +1,7 @@
 use crate::extension::FormValues;
 
+use super::state::ToastStyle;
+
 /// Work the shell does on the launcher's behalf. What comes of it returns as an
 /// `Event`, so the launcher itself never waits.
 #[derive(Clone, Debug, PartialEq)]
@@ -18,9 +20,11 @@ pub enum Effect {
         source: String,
     },
     ReportPaint(u64),
-    /// Answered with `Event::ToastExpired` after a success toast's time is up.
+    /// Answered with `Event::ToastExpired` once a success toast's or a HUD's
+    /// time is up. The style decides how long that is.
     ExpireToast {
         id: u64,
+        style: ToastStyle,
     },
 }
 

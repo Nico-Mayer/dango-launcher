@@ -2,10 +2,10 @@
 
 ## 1. HUD state in the reducer
 
-- [ ] 1.1 Add `Event::Hidden`, sent from `Core::settle_hide` so every hide path reports it, and track visibility in the reducer with `Event::Activated`; verify a `Core` test with the recording shell that `hide`, `hide_after_launch`, `hide_on_focus_loss`, and `hide_for_work` each reach the reducer as hidden
-- [ ] 1.2 Add `Hud { id, style, text }` to the reducer and `hud` to `Snapshot`, exposed only while hidden; give `Effect::ExpireToast` the style and use it and `Event::ToastExpired` for the HUD too, from the one id counter, emitted when the HUD becomes visible, per design D2; `Event::Activated` clears it; verify reducer tests in `src/ui/tests.rs` for a stale expiry ignored, a newer HUD replacing an older one, activation clearing the HUD, and a HUD set while visible appearing only after `Event::Hidden`
-- [ ] 1.3 Make `CopyToClipboard` set a pending success HUD "Copied to clipboard" next to `CopyText` and `Dismiss`; verify a reducer test that the copy emits both effects, leaves no toast, and shows the HUD after `Event::Hidden`
-- [ ] 1.4 Wait `TOAST_LIFETIME` for success and a new `FAILURE_HUD_LIFETIME` of about four seconds for a failure in `Core::run_effect`; verify a `Core` test with the recording shell and paused tokio time that each HUD is gone after its lifetime
+- [x] 1.1 Add `Event::Hidden`, sent from `Core::settle_hide` so every hide path reports it, and track visibility in the reducer with `Event::Activated`; verify a `Core` test with the recording shell that `hide`, `hide_after_launch`, `hide_on_focus_loss`, and `hide_for_work` each reach the reducer as hidden
+- [x] 1.2 Add `Hud { id, style, text }` to the reducer and `hud` to `Snapshot`, exposed only while hidden; give `Effect::ExpireToast` the style and use it and `Event::ToastExpired` for the HUD too, from the one id counter, emitted when the HUD becomes visible, per design D2; `Event::Activated` clears it; verify reducer tests in `src/ui/tests.rs` for a stale expiry ignored, a newer HUD replacing an older one, activation clearing the HUD, and a HUD set while visible appearing only after `Event::Hidden`
+- [x] 1.3 Make `CopyToClipboard` set a pending success HUD "Copied to clipboard" next to `CopyText` and `Dismiss`; verify a reducer test that the copy emits both effects, leaves no toast, and shows the HUD after `Event::Hidden`
+- [x] 1.4 Wait `TOAST_LIFETIME` for success and a new `FAILURE_HUD_LIFETIME` of about four seconds for a failure in `Core::run_effect`; verify a `Core` test with the recording shell and paused tokio time that each HUD is gone after its lifetime
 
 ## 2. HUD window
 
