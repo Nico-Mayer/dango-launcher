@@ -164,9 +164,9 @@ impl Keys for MacKeys {
 }
 
 /// The launcher is a non-activating panel, so the application the user was in
-/// never stopped being the active one and there is nothing to restore. What has
-/// to be true is that the panel is off screen and no longer taking keys, which
-/// the caller has already asked for by the time this runs.
+/// never stopped being the active one and there is nothing to restore. Before a
+/// keystroke the panel has to be off screen and no longer taking keys, which
+/// the caller has already asked for by the time `yield_to_previous` runs.
 pub struct MacHandoff;
 
 impl Handoff for MacHandoff {
@@ -183,6 +183,12 @@ impl Handoff for MacHandoff {
     /// already frontmost and the panel stays key.
     fn lend_to_previous(&self) -> Lend {
         Lend::nothing_to_give_back()
+    }
+
+    // Stopgap until Cmd+C is posted to the frontmost pid (task 4.2 of
+    // lend-focus-for-selection): enigo posts to the key window, the panel.
+    fn hides_launcher_to_copy(&self) -> bool {
+        true
     }
 
     fn settle_after_paste(&self) {
