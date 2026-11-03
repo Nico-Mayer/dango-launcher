@@ -203,6 +203,9 @@ impl Inner {
             return Ok(self.available());
         }
         let found = self.source.check().await?;
+        if self.task_state().is_some() {
+            return Ok(self.available());
+        }
         self.available.lock().unwrap().clone_from(&found);
         Ok(found)
     }
@@ -237,11 +240,22 @@ impl Inner {
         let Some(version) = self.available() else {
             return ActionOutcome::Failed("That action isn't available".into());
         };
-        let Some(ctx) = self.runner.as_ref().and_then(|runner| runner.start()) else {
+        // Held to the end, so two quick presses can't start two downloads.
+        let mut current = self.task.lock().unwrap();
+        // A retry from the failed view replaces that view rather than piling a
+        // second one on top of it.
+        let live = self
+            .view
+            .lock()
+            .unwrap()
+            .clone()
+            .filter(|ctx| !ctx.is_cancelled());
+        let Some(ctx) = live.or_else(|| self.runner.as_ref().and_then(|runner| runner.start()))
+        else {
             return ActionOutcome::Failed("The update can't start right now".into());
         };
         *self.view.lock().unwrap() = Some(ctx);
-        if let Some(state) = self.task_state() {
+        if let Some(state) = current.as_ref().and_then(TaskHandle::state) {
             self.show(&state);
             return ActionOutcome::Started;
         }
@@ -258,7 +272,8 @@ impl Inner {
         if let Some(state) = state {
             self.show(&state);
         }
-        *self.task.lock().unwrap() = Some(task.clone());
+        *current = Some(task.clone());
+        drop(current);
         let inner = self.clone();
         self.runtime
             .spawn(async move { inner.download(task, &version).await });
@@ -528,13 +543,17 @@ mod tests {
         view.steps.iter().map(|step| step.status).collect()
     }
 
-    struct FixedRunner(Arc<Recorded>);
+    struct FixedRunner {
+        views: Arc<Recorded>,
+        starts: Arc<std::sync::atomic::AtomicUsize>,
+    }
 
     impl Runner for FixedRunner {
         fn start(&self) -> Option<Arc<InvocationContext>> {
+            self.starts.fetch_add(1, Ordering::SeqCst);
             Some(Arc::new(InvocationContext::for_test(
                 EXTENSION_ID,
-                self.0.clone(),
+                self.views.clone(),
             )))
         }
     }
@@ -543,6 +562,9 @@ mod tests {
         extension: UpdatesExtension,
         source: Arc<FakeSource>,
         views: Arc<Recorded>,
+        tasks: Arc<Tasks>,
+        reports: Arc<Mutex<Vec<TaskState>>>,
+        starts: Arc<std::sync::atomic::AtomicUsize>,
     }
 
     fn fixture(source: FakeSource) -> Fixture {
@@ -552,18 +574,28 @@ mod tests {
     fn build(source: FakeSource, enabled: bool) -> Fixture {
         let source = Arc::new(source);
         let views = Arc::new(Recorded::default());
+        let starts = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let reports = Arc::new(Mutex::new(Vec::new()));
+        let sink = reports.clone();
+        let tasks = Tasks::new(move |state| sink.lock().unwrap().push(state));
         let extension = UpdatesExtension::new(
             source.clone(),
             "0.4.0",
             enabled,
             Handle::current(),
-            Some(Arc::new(FixedRunner(views.clone()))),
-            Tasks::new(|_| {}),
+            Some(Arc::new(FixedRunner {
+                views: views.clone(),
+                starts: starts.clone(),
+            })),
+            tasks.clone(),
         );
         Fixture {
             extension,
             source,
             views,
+            tasks,
+            reports,
+            starts,
         }
     }
 
@@ -820,6 +852,15 @@ mod tests {
             tokio::task::yield_now().await;
         }
         gate.notify_waiters();
+        assert_eq!(
+            fixture
+                .reports
+                .lock()
+                .unwrap()
+                .last()
+                .map(|state| &state.status),
+            Some(&TaskStatus::Cancelled)
+        );
         assert!(fixture.source.installed.lock().unwrap().is_empty());
         assert!(fixture.extension.inner.ready.lock().unwrap().is_none());
         assert_eq!(fixture.items().await[0].actions[0].title, "Install update");
@@ -893,6 +934,73 @@ mod tests {
         let ready = &fixture.items().await[0];
         assert_eq!(ready.title, "Dango 0.5.0 is ready to restart");
         assert_eq!(ready.actions[0].title, "Restart now");
+    }
+
+    #[tokio::test]
+    async fn retrying_in_the_failed_view_replaces_it() {
+        let fixture = fixture(FakeSource {
+            download_error: Some(UpdateError::Download("reset by peer".into())),
+            ..FakeSource::finding("0.5.0")
+        });
+        fixture.download_to_the_end().await;
+        assert_eq!(fixture.act(ACTION_INSTALL), ActionOutcome::Started);
+        assert_eq!(
+            fixture.starts.load(Ordering::SeqCst),
+            1,
+            "the retry reuses the failed view's invocation"
+        );
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn two_quick_installs_start_one_download() {
+        let gate = Arc::new(tokio::sync::Notify::new());
+        let fixture = Arc::new(fixture(FakeSource {
+            gate: Some(gate.clone()),
+            ..FakeSource::finding("0.5.0")
+        }));
+        fixture.extension.inner.check().await.unwrap();
+        let barrier = Arc::new(std::sync::Barrier::new(2));
+        let presses: Vec<_> = (0..2)
+            .map(|_| {
+                let fixture = fixture.clone();
+                let barrier = barrier.clone();
+                std::thread::spawn(move || {
+                    barrier.wait();
+                    fixture.act(ACTION_INSTALL)
+                })
+            })
+            .collect();
+        for press in presses {
+            assert_eq!(press.join().unwrap(), ActionOutcome::Started);
+        }
+        assert_eq!(fixture.tasks.running().len(), 1);
+        gate.notify_waiters();
+    }
+
+    #[tokio::test]
+    async fn a_check_answering_after_the_download_starts_changes_nothing() {
+        let check_gate = Arc::new(tokio::sync::Notify::new());
+        let gate = Arc::new(tokio::sync::Notify::new());
+        let fixture = fixture(FakeSource {
+            gate: Some(gate.clone()),
+            check_gate: Some(check_gate.clone()),
+            ..FakeSource::finding("0.5.0")
+        });
+        check_gate.notify_one();
+        fixture.extension.inner.check().await.unwrap();
+
+        let inner = fixture.extension.inner.clone();
+        let checking = tokio::spawn(async move { inner.check().await });
+        tokio::task::yield_now().await;
+        fixture.act(ACTION_INSTALL);
+        *fixture.source.found.lock().unwrap() = Some("0.5.1".into());
+        check_gate.notify_one();
+        assert_eq!(checking.await.unwrap().unwrap().as_deref(), Some("0.5.0"));
+        assert_eq!(
+            fixture.extension.inner.available().as_deref(),
+            Some("0.5.0")
+        );
+        gate.notify_waiters();
     }
 
     #[tokio::test]

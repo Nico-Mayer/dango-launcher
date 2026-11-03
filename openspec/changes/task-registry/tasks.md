@@ -56,10 +56,11 @@
   - `select!` on the cancel signal, reporting `Cancelled` and answering `Back`;
   - "Restart now" installs the kept update.
 
-  Skip scheduled checks while a task runs or waits ready. Remove `installing` and `shown`. Keep `task: Option<TaskHandle>`, so "Install update" while running shows the view again. Change the source's `install` to take the kept update. Verify with tests in `src/extensions/updates/mod.rs` using the fake source:
+  Answer no new version from a check while a task runs or waits ready, including a check that was already on its way. Remove `installing` and `shown`. Keep `task: Option<TaskHandle>`, so "Install update" while running shows the view again. Verify with tests in `src/extensions/updates/mod.rs` using the fake source:
   - step order and statuses;
   - ready waits without installing;
-  - "Restart now" installs once and uses the kept update after a newer check;
+  - "Restart now" installs once;
+  - a check that answers after the download started changes nothing;
   - cancel reports `Cancelled` and installs nothing;
   - download and signature errors each report their sentence with Retry;
   - no scheduled check while ready.

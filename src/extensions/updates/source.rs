@@ -224,6 +224,8 @@ pub mod testing {
         pub installed: Mutex<Vec<Vec<u8>>>,
         /// When set, the download waits for it before it ends.
         pub gate: Option<std::sync::Arc<tokio::sync::Notify>>,
+        /// When set, a check waits for it before it answers.
+        pub check_gate: Option<std::sync::Arc<tokio::sync::Notify>>,
     }
 
     impl FakeSource {
@@ -243,6 +245,9 @@ pub mod testing {
     impl UpdateSource for FakeSource {
         async fn check(&self) -> Result<Option<String>, UpdateError> {
             *self.checks.lock().unwrap() += 1;
+            if let Some(gate) = &self.check_gate {
+                gate.notified().await;
+            }
             match self.check_error.lock().unwrap().clone() {
                 Some(error) => Err(error),
                 None => Ok(self.found.lock().unwrap().clone()),
