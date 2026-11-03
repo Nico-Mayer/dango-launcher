@@ -2,7 +2,7 @@ import { Icon, IconKind } from "icon.slint";
 import { Kbd } from "kbd.slint";
 import { Tag, TagRole } from "tag.slint";
 import { Accessory, AccessoryKind } from "accessory.slint";
-import { Dot, ToastStyle } from "dot.slint";
+import { Dot, Status } from "dot.slint";
 import { Progress, ProgressKind } from "progress.slint";
 
 /// Every atom on its own, for the UI tests.
@@ -24,8 +24,27 @@ export component AtomGallery inherits Window {
             data: { kind: AccessoryKind.text, text: "2m" };
         }
         Dot {
-            style: ToastStyle.busy;
-            label: "Busy";
+            status: Status.working;
+            announce: true;
+        }
+        Dot {
+            status: Status.needs-input;
+            announce: true;
+        }
+        Dot {
+            status: Status.done;
+            announce: true;
+        }
+        Dot {
+            status: Status.failed;
+            announce: true;
+        }
+        Dot {
+            status: Status.queued;
+            announce: true;
+        }
+        Dot {
+            status: Status.done;
         }
         Progress {
             kind: ProgressKind.ring;

@@ -283,7 +283,13 @@ mod atoms {
         let gallery = AtomGallery::new().unwrap();
         gallery.set_chord(keys::panel_label().into());
         gallery.show().unwrap();
-        for label in ["Icon", "Link", "2m", "Busy", keys::panel_label().as_str()] {
+        for label in [
+            "Icon",
+            "Link",
+            "2m",
+            "Working",
+            keys::panel_label().as_str(),
+        ] {
             assert!(
                 ElementHandle::find_by_accessible_label(&gallery, label)
                     .next()
@@ -337,9 +343,25 @@ mod atoms {
     fn an_indeterminate_ring_says_it_is_working() {
         let gallery = gallery();
         let ring = ElementHandle::find_by_accessible_label(&gallery, "Working")
-            .next()
+            .find(|element| {
+                element.accessible_role()
+                    == Some(i_slint_backend_testing::AccessibleRole::ProgressIndicator)
+            })
             .expect("the indeterminate ring");
         assert_eq!(ring.accessible_value().as_deref(), Some(""));
+    }
+
+    #[test]
+    fn an_announced_dot_names_its_state() {
+        let gallery = gallery();
+        for label in ["Working", "Needs input", "Done", "Failed", "Queued"] {
+            assert!(
+                ElementHandle::find_by_accessible_label(&gallery, label)
+                    .any(|element| element.accessible_role()
+                        == Some(i_slint_backend_testing::AccessibleRole::Image)),
+                "a dot is labelled {label}"
+            );
+        }
     }
 
     #[test]

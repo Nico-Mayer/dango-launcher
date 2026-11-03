@@ -1,8 +1,8 @@
 import { Theme } from "../theme.slint";
 import { Icon, IconKind } from "../atoms/icon.slint";
 import { Kbd } from "../atoms/kbd.slint";
-import { Dot, ToastStyle } from "../atoms/dot.slint";
-import { Intents, Shell } from "../globals.slint";
+import { Dot, Status } from "../atoms/dot.slint";
+import { Intents, Shell, ToastStyle } from "../globals.slint";
 
 /// Where the user is, or a toast, and what Enter does.
 export component ActionBar inherits Rectangle {
@@ -28,7 +28,8 @@ export component ActionBar inherits Rectangle {
             if Shell.toast-shown: VerticalLayout {
                 alignment: center;
                 Dot {
-                    style: Shell.toast-style;
+                    status: Shell.toast-style == ToastStyle.failure ? Status.failed
+                        : Shell.toast-style == ToastStyle.success ? Status.done : Status.working;
                 }
             }
             if !Shell.toast-shown && Shell.context-icon-kind != IconKind.none: VerticalLayout {
