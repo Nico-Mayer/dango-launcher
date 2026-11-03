@@ -119,12 +119,13 @@ restart.
 Running an AI command SHALL put a view on screen that fills in as the answer
 arrives, rather than waiting for the whole answer. The launcher SHALL stay
 responsive throughout, and the view SHALL show that work is in progress until
-the answer is complete.
+the answer is complete. Until the first text arrives, the view SHALL name the
+provider it is waiting for, by the name the user gave it in the config file.
 
 #### Scenario: A view appears before the answer does
 
-- **WHEN** an AI command is invoked
-- **THEN** a view showing that it is working is on screen at once, without
+- **WHEN** an AI command using the provider named `work` is invoked
+- **THEN** a view reading "Waiting for work…" is on screen at once, without
   waiting for the provider
 - **AND** it is replaced by the answer as the answer arrives
 
