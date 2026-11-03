@@ -17,7 +17,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, RwLock};
 
 use schemars::JsonSchema;
-use toml_edit::{value, DocumentMut, Item, Table, TableLike};
+use toml_edit::{DocumentMut, Item, Table, TableLike};
 
 use crate::browser::Browser;
 use crate::config::{line_of, write_user_file, UserFile};
@@ -45,8 +45,6 @@ pub enum RecordError {
     Parse(String),
     #[error("Line {line}: {field} must be text")]
     NotText { line: usize, field: String },
-    #[error("Line {line}: {id} must be a table")]
-    NotATable { line: usize, id: String },
     #[error("Couldn't read the file: {0}")]
     Read(String),
     #[error("A snippet that asks for input can't have a keyword")]
@@ -348,8 +346,8 @@ impl Records {
                 }
             };
             let table = record_table(doc, &id).ok_or(RecordError::Gone)?;
-            table.insert("name", value(name.trim()));
-            table.insert(kind.body_field(), value(body));
+            set_text(table, "name", name.trim());
+            set_text(table, kind.body_field(), body);
             if kind == Kind::Snippet {
                 set_or_remove(table, "keyword", keyword);
             }
@@ -460,11 +458,23 @@ fn record_table<'d>(doc: &'d mut DocumentMut, id: &str) -> Option<&'d mut dyn Ta
     doc.get_mut(id)?.as_table_like_mut()
 }
 
+/// Sets a field only when its text changes, and keeps the comment beside it:
+/// replacing a value in `toml_edit` replaces its decor too.
+fn set_text(table: &mut dyn TableLike, key: &str, text: &str) {
+    let old = table.get(key).and_then(Item::as_value);
+    if old.and_then(|old| old.as_str()) == Some(text) {
+        return;
+    }
+    let mut new = toml_edit::Value::from(text);
+    if let Some(old) = old {
+        *new.decor_mut() = old.decor().clone();
+    }
+    table.insert(key, Item::Value(new));
+}
+
 fn set_or_remove(table: &mut dyn TableLike, key: &str, text: Option<String>) {
     match text {
-        Some(text) => {
-            table.insert(key, value(text));
-        }
+        Some(text) => set_text(table, key, &text),
         None => {
             table.remove(key);
         }
@@ -482,7 +492,8 @@ fn load(path: &Path, kind: Kind) -> Result<Loaded, RecordError> {
 
 /// Parses a records file. A table without a name is not shown, and a field
 /// of the wrong type makes the file invalid with its line, as a wrong type
-/// does in the config file.
+/// does in the config file. A top-level key that is not a table is not a
+/// record, so it is left for whatever understands it.
 fn parse(text: &str, kind: Kind) -> Result<Loaded, RecordError> {
     let document =
         toml_edit::Document::parse(text).map_err(|error| RecordError::Parse(error.to_string()))?;
@@ -492,10 +503,7 @@ fn parse(text: &str, kind: Kind) -> Result<Loaded, RecordError> {
             continue;
         }
         let Some(table) = item.as_table_like() else {
-            return Err(RecordError::NotATable {
-                line: line_of(text, item.span()),
-                id: id.to_string(),
-            });
+            continue;
         };
         if let Some(record) = project(text, kind, id, table)? {
             records.push(record);
@@ -525,21 +533,22 @@ fn project(
             }),
         }
     };
-    let Some(name) = field("name")? else {
-        return Ok(None);
+    let name = field("name")?;
+    let body = field(kind.body_field())?.unwrap_or_default();
+    let keyword = match kind {
+        Kind::Snippet => field("keyword")?,
+        Kind::Quicklink => None,
     };
-    Ok(Some(Record {
+    let browser = match kind {
+        Kind::Snippet => None,
+        Kind::Quicklink => field("browser")?,
+    };
+    Ok(name.map(|name| Record {
         id: id.to_string(),
         name,
-        body: field(kind.body_field())?.unwrap_or_default(),
-        keyword: match kind {
-            Kind::Snippet => field("keyword")?,
-            Kind::Quicklink => None,
-        },
-        browser: match kind {
-            Kind::Snippet => None,
-            Kind::Quicklink => field("browser")?,
-        },
+        body,
+        keyword,
+        browser,
     }))
 }
 
@@ -752,6 +761,7 @@ mod tests {
             .collect();
         assert!(order.windows(2).all(|pair| pair[0] < pair[1]), "{on_disk}");
         assert!(on_disk.contains("https://two.example/new"), "{on_disk}");
+        assert!(on_disk.contains("name = \"Two\" # the second"), "{on_disk}");
     }
 
     #[test]
@@ -763,8 +773,25 @@ mod tests {
             .unwrap_err();
         assert_eq!(error.to_string(), "Line 6: name must be text");
         assert_eq!(records.all().unwrap().len(), 1, "last good kept");
-        let error = records.reload("a = \"loose\"\n").unwrap_err();
-        assert_eq!(error.to_string(), "Line 1: a must be a table");
+        let error = records.reload("[a]\ntemplate = 3\n").unwrap_err();
+        assert_eq!(error.to_string(), "Line 2: template must be text");
+    }
+
+    #[test]
+    fn an_unknown_top_level_key_is_kept_and_ignored() {
+        let records = records(Kind::Quicklink);
+        records
+            .reload("default-browser = \"firefox\"\n\n[docs]\nname = \"Docs\"\nurl = \"https://example.com\"\n")
+            .unwrap();
+        assert_eq!(records.all().unwrap().len(), 1);
+        records
+            .update("docs", "Docs", "https://example.com/new", None)
+            .unwrap();
+        let on_disk = std::fs::read_to_string(records.path()).unwrap();
+        assert!(
+            on_disk.contains("default-browser = \"firefox\""),
+            "{on_disk}"
+        );
     }
 
     #[test]
@@ -881,10 +908,7 @@ mod tests {
         // The quicklink file uses "url" as its body key.
         let on_disk = std::fs::read_to_string(quicklinks.path()).unwrap();
         assert!(
-            on_disk.contains(
-                "
-url = "
-            ),
+            on_disk.contains("\nurl = "),
             "quicklink body key: {on_disk}"
         );
     }
