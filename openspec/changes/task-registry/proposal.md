@@ -22,7 +22,7 @@ status dots it uses.
 - **Background toast:** while a task runs and the user is anywhere other than
   its ProgressView, the ActionBar shows a busy toast with the task and its
   progress. A task that ends while the launcher is hidden reports its result
-  as a toast on the next open.
+  as a toast on the next open, and a failure also shows in the HUD at once.
 - **Cancel:** every running task offers Cancel (Ctrl+. on Windows, Cmd+. on
   macOS) in its ProgressView and in its background toast.
 - **Toast action:** a toast can carry one action, shown after its text with
@@ -33,7 +33,7 @@ status dots it uses.
     download is verified. It no longer installs and restarts on its own.
   - Enter runs "Restart now". "Install later" leaves it, and the update item
     in root search then offers "Restart now".
-  - The steps are check, download, verify, and install.
+  - The steps are download, verify signature, and restart.
 
 ## Non-goals
 
@@ -67,12 +67,16 @@ Cmd+. on macOS.
 - `view-protocol`: a fifth view kind, the progress view.
 - `design-system`:
   - The shell holds a progress view.
+  - A running task is a busy source that shows a toast but no loading bar.
   - The progress view has its own layout.
   - A toast can carry one action with its chord.
+- `launcher-shell`: a background task is not cancelled by a hide or the grace
+  period, and its result is kept for the next open.
 - `app-updates`:
   - The install flow waits at "Ready to restart".
   - The update can be cancelled and retried.
-  - A failure while hidden shows as a toast on the next open.
+  - A failure while hidden shows in the HUD at once and as a toast on the next
+    open.
 
 ## Impact
 
@@ -85,7 +89,8 @@ Cmd+. on macOS.
 - New `ui/views/progress-view.slint`. `ui/shell/action-bar.slint` gets the
   toast action. New renderer `src/slint_shell/render/progress.rs` and a
   `ProgressData` global.
-- `src/extensions/updates/`: the install flow on a task. The source's
-  download and install split at "Ready to restart".
+- `src/extensions/updates/`: the install flow on a task, with the download and
+  the install split at "Ready to restart".
+- `src/extension/mod.rs`: `ActionOutcome::Back` pops one view.
 - Tests in `src/ui/tests.rs`, `src/slint_shell/tests.rs`, `src/app/tests.rs`,
   and `src/extensions/updates/`.

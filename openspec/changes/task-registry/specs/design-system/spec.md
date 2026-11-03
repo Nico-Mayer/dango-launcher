@@ -140,3 +140,52 @@ a failure. Showing a toast SHALL NOT take focus.
 
 - **WHEN** a toast appears while the user types in the SearchBar
 - **THEN** every character still reaches the SearchBar
+
+### Requirement: Busy marks do not blink
+
+The busy marks, the SearchBar's loading bar and the busy toast, SHALL appear
+only once Dango has been busy for about 150 milliseconds. Dango is busy while a
+command invoked from root search has not finished or shown a view, while the
+top view is marked loading, or while a background task runs and its progress
+view is not shown. A running background task SHALL show only the busy toast,
+never the loading bar. Once shown, the marks SHALL stay for at least
+about 400 milliseconds, even if the work ends sooner. While Dango stays busy,
+replacing the view SHALL NOT restart the marks. Leaving the view or a reset
+SHALL remove them at once.
+
+#### Scenario: A fast command
+
+- **WHEN** a command invoked from root search finishes within about 150
+  milliseconds
+- **THEN** no busy toast is shown
+
+#### Scenario: A slow command shows a view that loads
+
+- **WHEN** a command takes a second to show a view marked loading, and the
+  view loads for another second
+- **THEN** the busy toast appears after a short moment reading "Running"
+  followed by the command's title, then reads "Loading…" without disappearing
+  in between
+
+#### Scenario: Busy marks stay a moment
+
+- **WHEN** the busy marks have just appeared and the work then ends
+- **THEN** the marks stay until they have been shown for about 400
+  milliseconds, and are then removed
+
+#### Scenario: A streamed view keeps its marks steady
+
+- **WHEN** a command replaces a view marked loading many times a second
+- **THEN** the busy marks stay shown and the loading bar's sweep continues
+  without restarting
+
+#### Scenario: Leaving clears at once
+
+- **WHEN** the user leaves a view while its busy marks are shown
+- **THEN** the marks are gone in the same frame
+
+#### Scenario: A background task shows no loading bar
+
+- **WHEN** an update downloads and the user opens clipboard history
+- **THEN** the busy toast shows the download and the SearchBar shows no
+  loading bar

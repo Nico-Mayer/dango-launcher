@@ -9,8 +9,8 @@ version and the running version. On an empty query it SHALL be listed above
 every other result except the permission warnings. It SHALL be found by
 searching for "update" or "Dango". Its primary action SHALL be "Install update"
 while nothing is downloading, "Show progress" while the update downloads, and
-"Restart now" once the update is ready to install. Once ready, the item SHALL
-read "Dango 0.5.0 is ready to install".
+"Restart now" once the update is ready to restart. Once ready, the item SHALL
+read "Dango 0.5.0 is ready to restart".
 
 #### Scenario: The update item on an empty query
 
@@ -27,7 +27,7 @@ read "Dango 0.5.0 is ready to install".
 #### Scenario: The update item once ready
 
 - **WHEN** the update has downloaded and was left with "Install later"
-- **THEN** the item reads "Dango 0.5.0 is ready to install" and its primary
+- **THEN** the item reads "Dango 0.5.0 is ready to restart" and its primary
   action is "Restart now"
 
 #### Scenario: A permission warning and an update together on macOS
@@ -49,8 +49,8 @@ read "Dango 0.5.0 is ready to install".
 
 Dango SHALL download an update only as the result of "Install update", and SHALL
 install it only as the result of "Restart now". The update SHALL run as a task
-(see background-tasks) with four steps: "Check for updates", "Download",
-"Verify signature", and "Install and restart". While it downloads, its progress
+(see background-tasks) with three steps: "Download", "Verify signature", and
+"Restart". While it downloads, its progress
 view SHALL be titled "Dango" followed by the new version, name the running
 version in its subtitle, and show the bytes received and, when known, the total.
 Dango SHALL verify the download's signature against the key built into Dango
@@ -73,8 +73,8 @@ again.
 #### Scenario: Ready to restart
 
 - **WHEN** the download is verified while its progress view is shown
-- **THEN** the "Install and restart" step needs input, the detail reads "Ready
-  to restart", and the ActionBar shows "Restart now" with the Enter key
+- **THEN** the "Restart" step needs input, the detail reads "Ready to
+  restart", and the ActionBar shows "Restart now" with the Enter key
 - **AND** nothing is installed until the user confirms
 
 #### Scenario: Installing on Windows
@@ -110,7 +110,7 @@ again.
 
 - **WHEN** the user dismisses the launcher while an update downloads
 - **THEN** the download continues and, once verified, the update waits as ready
-  to install
+  to restart
 
 #### Scenario: Nothing installs without confirmation
 
@@ -126,3 +126,36 @@ again.
 
 - **WHEN** autostart is on and an update is installed on macOS
 - **THEN** the updated Dango starts at the next login
+
+### Requirement: The user can check for updates on demand
+
+A built-in "Check for Updates" command SHALL check at once and show the result
+in the launcher. If an update is found, the result SHALL offer "Install
+update", and the update item SHALL appear in root search.
+
+#### Scenario: Checking
+
+- **WHEN** the user runs "Check for Updates"
+- **THEN** the launcher shows "Checking for updates" until the check ends
+
+#### Scenario: An update is found
+
+- **WHEN** the user runs "Check for Updates" and version 0.5.0 is available
+- **THEN** the launcher shows "Dango 0.5.0 is available" with "Install update" as the primary action
+- **AND** the update item is at the top of root search the next time the launcher opens
+
+#### Scenario: Already up to date
+
+- **WHEN** the user runs "Check for Updates" and the running version is the newest
+- **THEN** the launcher shows "You have the latest version" and the running version
+
+#### Scenario: The check fails
+
+- **WHEN** the user runs "Check for Updates" and the check fails
+- **THEN** the launcher shows "Couldn't check for updates. Check your connection and try again."
+
+#### Scenario: Development build
+
+- **WHEN** the user runs "Check for Updates" in a development build
+- **THEN** the launcher shows "Updates are off in development builds."
+- **AND** no update request is made
