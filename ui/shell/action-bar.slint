@@ -2,6 +2,7 @@ import { Theme } from "../theme.slint";
 import { Icon, IconKind } from "../atoms/icon.slint";
 import { Kbd } from "../atoms/kbd.slint";
 import { Dot, Status } from "../atoms/dot.slint";
+import { Progress, ProgressKind } from "../atoms/progress.slint";
 import { Intents, Shell, ToastStyle } from "../globals.slint";
 
 /// Where the user is, or a toast, and what Enter does.
@@ -25,11 +26,18 @@ export component ActionBar inherits Rectangle {
         HorizontalLayout {
             horizontal-stretch: 1;
             spacing: Theme.gap;
-            if Shell.toast-shown: VerticalLayout {
+            if Shell.toast-shown && Shell.toast-style == ToastStyle.busy: VerticalLayout {
+                alignment: center;
+                Progress {
+                    kind: ProgressKind.ring;
+                    width: 12px;
+                    height: 12px;
+                }
+            }
+            if Shell.toast-shown && Shell.toast-style != ToastStyle.busy: VerticalLayout {
                 alignment: center;
                 Dot {
-                    status: Shell.toast-style == ToastStyle.failure ? Status.failed
-                        : Shell.toast-style == ToastStyle.success ? Status.done : Status.working;
+                    status: Shell.toast-style == ToastStyle.failure ? Status.failed : Status.done;
                 }
             }
             if !Shell.toast-shown && Shell.context-icon-kind != IconKind.none: VerticalLayout {

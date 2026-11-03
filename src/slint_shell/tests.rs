@@ -598,6 +598,11 @@ mod toast {
             super::super::generated::ToastStyle::Busy
         );
         assert!(h.find("Running Clipboard History…").is_some());
+        let spinner = h.find("Working").expect("the busy toast's spinner");
+        assert_eq!(
+            spinner.accessible_role(),
+            Some(i_slint_backend_testing::AccessibleRole::ProgressIndicator)
+        );
     }
 
     #[test]
