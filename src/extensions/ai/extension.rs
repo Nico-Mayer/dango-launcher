@@ -117,7 +117,6 @@ impl Extension for AiExtension {
 const NO_ANSWER: &str = "The model returned no text";
 const NO_SELECTION: &str = "Select some text first";
 const UNREADABLE_PROMPT: &str = "Fix this command's prompt in your config file";
-const WORKING: &str = "Working…";
 
 impl Inner {
     fn find(&self, command_id: &str) -> Option<&AiCommand> {
@@ -151,7 +150,8 @@ impl Inner {
             return;
         };
 
-        ctx.push_view(detail_tree(WORKING, true, false));
+        let waiting = format!("Waiting for {}…", request.provider);
+        ctx.push_view(detail_tree(&waiting, true, false));
 
         let limit = limit_for(&request);
         let chunks = self.client.stream(request);
@@ -620,7 +620,7 @@ mod tests {
     }
 
     #[test]
-    fn the_first_view_says_it_is_working_and_carries_no_actions() {
+    fn the_first_view_names_the_provider_and_carries_no_actions() {
         let fixture = fixture(LOCAL, Scripted::answering(&["Better."]), selected("text"));
         let sink = Arc::new(Recorded::default());
         run(&fixture, "improve-writing", sink.clone());
@@ -628,7 +628,7 @@ mod tests {
         let View::Detail(first) = &sink.trees.lock().unwrap()[0].view.clone() else {
             panic!("expected a detail view");
         };
-        assert_eq!(first.markdown, "Working…");
+        assert_eq!(first.markdown, "Waiting for local…");
         assert!(first.loading, "the first view is not marked loading");
         assert!(
             first.actions.is_empty(),

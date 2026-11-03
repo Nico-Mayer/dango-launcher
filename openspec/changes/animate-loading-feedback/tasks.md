@@ -2,7 +2,7 @@
 
 ## 1. AI command names its provider
 
-- [ ] 1.1 In `src/extensions/ai/extension.rs`, push the first view with the body "Waiting for {provider}…" from `Request.provider`, in place of `WORKING`, and remove the constant; verify by extending the existing streaming test: the first view is loading with markdown "Waiting for {provider}…" for the scripted provider's name, and the last view is not loading
+- [x] 1.1 In `src/extensions/ai/extension.rs`, push the first view with the body "Waiting for {provider}…" from `Request.provider`, in place of `WORKING`, and remove the constant; verify by extending the existing streaming test: the first view is loading with markdown "Waiting for {provider}…" for the scripted provider's name, and the last view is not loading
 
 ## 2. Loading bar sweep
 
