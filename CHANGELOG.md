@@ -2,6 +2,34 @@
 
 All notable changes to Dango. Generated from commit history at release time.
 
+## [6.2.0] - 2026-11-03
+
+### Features
+
+- **ui:** Hold a hud while the launcher is hidden
+- **ui:** Show the hud in its own window
+- **ui:** Report hidden failures in the hud
+- **hotkeys:** Report press failures in the hud
+
+### Fixes
+
+- **hud:** Make the hud visible on windows
+- **clipboard:** Show the copy hud for history copies
+- **hud:** Keep the busy toast on a hotkey failure
+- **dango-ui:** Default to the launcher, not the hud
+
+### Documentation
+
+- **agents:** Record hud window traps
+- **hud:** Check off the windows copy hand check
+- **hud:** Check off the review task
+- **hud:** Check off the macos compile task
+- **hud:** Record the macos hand checks
+- **hud:** Check off the macos copy hand check
+- **hud:** Check off the macos hand checks
+- **hud:** Target the elevated window in hand check
+- **hud:** Check off the windows hand checks
+- **hud:** Archive add-hud and sync specs
 ## [6.1.0] - 2026-11-03
 
 ### Features
