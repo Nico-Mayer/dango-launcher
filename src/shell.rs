@@ -79,14 +79,37 @@ pub mod testing {
         Quit,
     }
 
-    /// Runs main-thread work inline and records everything else.
+    type Work = Box<dyn FnOnce() + Send>;
+
+    /// Runs main-thread work inline, or queued until `run_main_thread` once
+    /// `queue_main_thread` is called, and records everything else.
     #[derive(Default)]
     pub struct RecordingShell {
         pub calls: Mutex<Vec<Call>>,
         pub published: Mutex<Vec<Snapshot>>,
+        queued: Mutex<Option<Vec<Work>>>,
     }
 
     impl RecordingShell {
+        pub fn queue_main_thread(&self) {
+            *self.queued.lock().unwrap() = Some(Vec::new());
+        }
+
+        pub fn run_main_thread(&self) {
+            loop {
+                let work: Vec<Work> = match self.queued.lock().unwrap().as_mut() {
+                    Some(queue) => std::mem::take(queue),
+                    None => return,
+                };
+                if work.is_empty() {
+                    return;
+                }
+                for item in work {
+                    item();
+                }
+            }
+        }
+
         pub fn calls(&self) -> Vec<Call> {
             self.calls.lock().unwrap().clone()
         }
@@ -115,7 +138,14 @@ pub mod testing {
                 .push(Call::Hide { restore_focus });
         }
         fn on_main_thread(&self, work: Box<dyn FnOnce() + Send>) {
-            work();
+            let mut queued = self.queued.lock().unwrap();
+            match queued.as_mut() {
+                Some(queue) => queue.push(work),
+                None => {
+                    drop(queued);
+                    work();
+                }
+            }
         }
         fn set_tray(&self, tray: &TrayStatus) {
             self.calls.lock().unwrap().push(Call::Tray(tray.clone()));
