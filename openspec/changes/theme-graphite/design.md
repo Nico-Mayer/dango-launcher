@@ -89,9 +89,9 @@ is the guard.
 
 | Old role | New role | Notes |
 |---|---|---|
-| `background` (window) | `popover` | Design: "popover = launcher, menus" |
+| `background` (window), `surface` (action panel, dropdown and filter popups) | `popover` | Design: "popover = launcher, menus" |
 | - | `chrome` | ActionBar fill |
-| `surface` | `surface` | Inputs, action panel, dropdown popup |
+| `surface` (inputs) | `surface` | Text field, text area, dropdown, checkbox |
 | `raised` | `raised` | Keycaps, icon placeholder |
 | `border` | `border` | Hairlines, launcher frame, HUD pill |
 | - | `input` | Border of text field, text area, dropdown, checkbox |

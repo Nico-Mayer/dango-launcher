@@ -9,7 +9,7 @@ export component ActionBar inherits Rectangle {
     /// The context or toast does not fit and is cut off.
     out property <bool> label-cut: label.preferred-width > label.width;
     height: Theme.action-bar-height;
-    background: Theme.raised;
+    background: Theme.chrome;
 
     Rectangle {
         y: 0;
@@ -42,7 +42,7 @@ export component ActionBar inherits Rectangle {
             }
             label := Text {
                 text: Shell.toast-shown ? Shell.toast-text : Shell.context;
-                color: Shell.toast-shown && Shell.toast-style == ToastStyle.failure ? Theme.text : Theme.muted;
+                color: Shell.toast-shown && Shell.toast-style == ToastStyle.failure ? Theme.foreground : Theme.muted;
                 font-size: Theme.text-small;
                 vertical-alignment: center;
                 overflow: elide;
@@ -57,7 +57,7 @@ export component ActionBar inherits Rectangle {
             spacing: Theme.gap;
             Text {
                 text: Shell.primary-label;
-                color: Theme.text;
+                color: Theme.foreground;
                 font-size: Theme.text-small;
                 vertical-alignment: center;
                 overflow: elide;
@@ -94,7 +94,7 @@ export component ActionBar inherits Rectangle {
                     spacing: 6px;
                     Text {
                         text: "Actions";
-                        color: actions-touch.has-hover ? Theme.text : Theme.muted;
+                        color: actions-touch.has-hover ? Theme.foreground : Theme.muted;
                         font-size: Theme.text-small;
                         vertical-alignment: center;
                         accessible-role: none;

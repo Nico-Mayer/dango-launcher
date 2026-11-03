@@ -34,7 +34,7 @@ export component Checkbox inherits FocusScope {
                 height: 16px;
                 border-radius: Theme.radius / 2;
                 border-width: 1px;
-                border-color: root.has-focus ? Theme.accent : Theme.border;
+                border-color: root.has-focus ? Theme.accent : Theme.input;
                 background: Theme.surface;
                 if root.checked: Rectangle {
                     width: 8px;
@@ -46,7 +46,7 @@ export component Checkbox inherits FocusScope {
         }
         Text {
             text: root.label;
-            color: Theme.text;
+            color: Theme.foreground;
             font-size: Theme.text-body;
             vertical-alignment: center;
             accessible-role: none;

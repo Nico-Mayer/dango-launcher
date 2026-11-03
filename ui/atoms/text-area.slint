@@ -11,7 +11,7 @@ export component TextArea inherits Rectangle {
     background: Theme.surface;
     border-radius: Theme.radius / 2;
     border-width: 1px;
-    border-color: input.has-focus ? Theme.accent : Theme.border;
+    border-color: input.has-focus ? Theme.accent : Theme.input;
     clip: true;
     accessible-role: text-input;
     accessible-label: root.label;
@@ -31,9 +31,9 @@ export component TextArea inherits Rectangle {
         text: root.value;
         single-line: false;
         wrap: word-wrap;
-        color: Theme.text;
+        color: Theme.foreground;
         selection-background-color: Theme.selection;
-        selection-foreground-color: Theme.text;
+        selection-foreground-color: Theme.foreground;
         font-size: Theme.text-body;
         accessible-role: none;
         edited => {

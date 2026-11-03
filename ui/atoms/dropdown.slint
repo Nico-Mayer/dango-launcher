@@ -49,7 +49,7 @@ export component Dropdown inherits FocusScope {
         background: Theme.surface;
         border-radius: Theme.radius / 2;
         border-width: 1px;
-        border-color: root.has-focus ? Theme.accent : Theme.border;
+        border-color: root.has-focus ? Theme.accent : Theme.input;
         HorizontalLayout {
             padding-left: 10px;
             padding-right: 10px;
@@ -57,7 +57,7 @@ export component Dropdown inherits FocusScope {
             Text {
                 horizontal-stretch: 1;
                 text: root.options[root.current].title;
-                color: Theme.text;
+                color: Theme.foreground;
                 font-size: Theme.text-body;
                 vertical-alignment: center;
                 overflow: elide;
@@ -84,7 +84,7 @@ export component Dropdown inherits FocusScope {
         y: root.height + 4px;
         width: root.width;
         Rectangle {
-            background: Theme.surface;
+            background: Theme.popover;
             border-radius: Theme.radius;
             border-width: 1px;
             border-color: Theme.border;
@@ -96,7 +96,7 @@ export component Dropdown inherits FocusScope {
                 for option[index] in root.options: Rectangle {
                     height: Theme.panel-row-height;
                     border-radius: Theme.radius / 2;
-                    background: index == root.current ? Theme.selection
+                    background: index == root.current ? Theme.selected
                         : option-touch.has-hover ? Theme.hover : transparent;
                     accessible-role: list-item;
                     accessible-label: option.title;
@@ -107,7 +107,7 @@ export component Dropdown inherits FocusScope {
                     Text {
                         x: 10px;
                         text: option.title;
-                        color: Theme.text;
+                        color: Theme.foreground;
                         font-size: Theme.text-body;
                         vertical-alignment: center;
                         accessible-role: none;

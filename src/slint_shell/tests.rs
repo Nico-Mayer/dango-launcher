@@ -250,13 +250,25 @@ mod theme {
 
         palette.set_color_scheme(ColorScheme::Dark);
         assert!(theme.get_dark());
-        assert_eq!(theme.get_surface(), Color::from_rgb_u8(0x1e, 0x1e, 0x21));
-        assert_eq!(theme.get_muted(), Color::from_rgb_u8(0x9a, 0x9a, 0xa2));
+        assert_eq!(theme.get_popover(), Color::from_rgb_u8(0x1f, 0x20, 0x24));
+        assert_eq!(theme.get_foreground(), Color::from_rgb_u8(0xec, 0xec, 0xee));
+        assert_eq!(theme.get_accent(), Color::from_rgb_u8(0xa7, 0xb4, 0xc6));
 
         palette.set_color_scheme(ColorScheme::Light);
         assert!(!theme.get_dark());
-        assert_eq!(theme.get_surface(), Color::from_rgb_u8(0xff, 0xff, 0xff));
-        assert_eq!(theme.get_muted(), Color::from_rgb_u8(0x6b, 0x6b, 0x72));
+        assert_eq!(theme.get_popover(), Color::from_rgb_u8(0xff, 0xff, 0xff));
+        assert_eq!(theme.get_foreground(), Color::from_rgb_u8(0x1c, 0x1c, 0x1f));
+        assert_eq!(theme.get_accent(), Color::from_rgb_u8(0x5b, 0x6b, 0x82));
+    }
+
+    #[test]
+    fn selected_rows_and_selected_text_differ() {
+        let h = Harness::new();
+        let theme = h.ui.global::<Theme>();
+        for scheme in [ColorScheme::Dark, ColorScheme::Light] {
+            h.ui.global::<StdPalette>().set_color_scheme(scheme);
+            assert_ne!(theme.get_selected(), theme.get_selection());
+        }
     }
 }
 
@@ -874,12 +886,12 @@ mod list_view {
     }
 
     #[test]
-    fn hover_is_weaker_than_selection() {
+    fn hover_is_weaker_than_selected() {
         let h = Harness::new();
         let theme = h.ui.global::<Theme>();
         for scheme in [ColorScheme::Dark, ColorScheme::Light] {
             h.ui.global::<StdPalette>().set_color_scheme(scheme);
-            assert!(theme.get_hover().alpha() < theme.get_selection().alpha());
+            assert!(theme.get_hover().alpha() < theme.get_selected().alpha());
         }
     }
 

@@ -4,23 +4,124 @@ import { Palette } from "std-widgets.slint";
 import "fonts/Geist-Variable.ttf";
 import "fonts/GeistMono-Variable.ttf";
 
-/// Every colour, radius, size, and type face on every surface. The scheme
-/// follows the operating system through the std-widgets palette, which reads
-/// it when nothing sets it.
+struct ThemeColors {
+    canvas: color,
+    chrome: color,
+    background: color,
+    surface: color,
+    popover: color,
+    raised: color,
+    hover: color,
+    selected: color,
+    selection: color,
+    border: color,
+    input: color,
+    foreground: color,
+    muted: color,
+    dim: color,
+    accent: color,
+    accent-foreground: color,
+    solid: color,
+    solid-foreground: color,
+    working: color,
+    blocked: color,
+    done: color,
+    idle: color,
+    unknown: color,
+    danger: color,
+    shadow: color,
+}
+
+/// Every colour, radius, size, and type face on every surface. Colours use
+/// herdr's role names. The scheme follows the operating system through the
+/// std-widgets palette, which reads it when nothing sets it: Graphite when
+/// dark, Paper when light.
 export global Theme {
     out property <bool> dark: Palette.color-scheme == ColorScheme.dark;
 
-    out property <color> background: root.dark ? #161618 : #fbfbfa;
-    out property <color> surface: root.dark ? #1e1e21 : #ffffff;
-    out property <color> raised: root.dark ? #26262a : #f1f1ef;
-    out property <color> border: root.dark ? #2f2f34 : #e4e4e1;
-    out property <color> text: root.dark ? #ededef : #18181b;
-    out property <color> muted: root.dark ? #9a9aa2 : #6b6b72;
-    out property <color> accent: root.dark ? #ff6363 : #c0282d;
-    out property <color> selection: root.dark ? #ffffff12 : #0000000e;
-    out property <color> hover: root.dark ? #ffffff08 : #00000006;
-    out property <color> danger: root.dark ? #ff8080 : #b71c1c;
-    out property <color> shadow: root.dark ? #00000080 : #00000030;
+    property <ThemeColors> graphite: {
+        canvas: #0f1012,
+        chrome: #141518,
+        background: #17181b,
+        surface: #1b1c20,
+        popover: #1f2024,
+        raised: #26282d,
+        hover: #ffffff0d,
+        selected: #ffffff14,
+        selection: #a7b4c647,
+        border: #ffffff12,
+        input: #ffffff21,
+        foreground: #ececee,
+        muted: #9a9ca4,
+        dim: #6c6f77,
+        accent: #a7b4c6,
+        accent-foreground: #101114,
+        solid: #ececee,
+        solid-foreground: #141518,
+        working: #7aa2f7,
+        blocked: #e6a85a,
+        done: #7fc48a,
+        idle: #6c6f77,
+        unknown: #4a4d54,
+        danger: #ef7a6e,
+        shadow: #00000080,
+    };
+
+    property <ThemeColors> paper: {
+        canvas: #ecebe7,
+        chrome: #f3f2ef,
+        background: #fbfaf8,
+        surface: #ffffff,
+        popover: #ffffff,
+        raised: #efeeea,
+        hover: #0000000a,
+        selected: #0000000f,
+        selection: #5b6b8238,
+        border: #00000014,
+        input: #00000026,
+        foreground: #1c1c1f,
+        muted: #62646b,
+        dim: #8d8f95,
+        accent: #5b6b82,
+        accent-foreground: #ffffff,
+        solid: #1c1c1f,
+        solid-foreground: #ffffff,
+        working: #3b6fd0,
+        blocked: #b8742a,
+        done: #3f8a4c,
+        idle: #8d8f95,
+        unknown: #b5b6ba,
+        danger: #c8473b,
+        shadow: #00000030,
+    };
+
+    property <ThemeColors> colors: root.dark ? root.graphite : root.paper;
+
+    out property <color> canvas: root.colors.canvas;
+    out property <color> chrome: root.colors.chrome;
+    out property <color> background: root.colors.background;
+    out property <color> surface: root.colors.surface;
+    out property <color> popover: root.colors.popover;
+    out property <color> raised: root.colors.raised;
+    out property <color> hover: root.colors.hover;
+    out property <color> selected: root.colors.selected;
+    out property <color> selection: root.colors.selection;
+    out property <color> border: root.colors.border;
+    out property <color> input: root.colors.input;
+    out property <color> foreground: root.colors.foreground;
+    out property <color> muted: root.colors.muted;
+    out property <color> dim: root.colors.dim;
+    out property <color> accent: root.colors.accent;
+    out property <color> accent-foreground: root.colors.accent-foreground;
+    out property <color> solid: root.colors.solid;
+    out property <color> solid-foreground: root.colors.solid-foreground;
+    out property <color> working: root.colors.working;
+    out property <color> blocked: root.colors.blocked;
+    out property <color> done: root.colors.done;
+    out property <color> idle: root.colors.idle;
+    out property <color> unknown: root.colors.unknown;
+    out property <color> danger: root.colors.danger;
+    out property <color> shadow: root.colors.shadow;
 
     out property <length> radius: 8px;
     out property <length> gap: 8px;

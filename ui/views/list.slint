@@ -47,7 +47,7 @@ component Row inherits Rectangle {
         x: 6px;
         width: parent.width - 6px - root.right-inset;
         border-radius: Theme.radius;
-        background: root.data.selected ? Theme.selection
+        background: root.data.selected ? Theme.selected
             : touch.has-hover && !Shell.pointer-resting ? Theme.hover : transparent;
 
         HorizontalLayout {
@@ -72,7 +72,7 @@ component Row inherits Rectangle {
                         x: 0;
                         width: parent.width;
                         text: root.data.title;
-                        default-color: Theme.text;
+                        default-color: Theme.foreground;
                         default-font-size: Theme.text-body;
                         max-lines: 1;
                         vertical-alignment: center;

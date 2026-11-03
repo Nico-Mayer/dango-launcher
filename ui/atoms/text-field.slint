@@ -11,7 +11,7 @@ export component TextField inherits Rectangle {
     background: Theme.surface;
     border-radius: Theme.radius / 2;
     border-width: 1px;
-    border-color: input.has-focus ? Theme.accent : Theme.border;
+    border-color: input.has-focus ? Theme.accent : Theme.input;
     accessible-role: text-input;
     accessible-label: root.label;
     accessible-value: root.password ? "" : input.text;
@@ -29,9 +29,9 @@ export component TextField inherits Rectangle {
         text: root.value;
         single-line: true;
         input-type: root.password ? InputType.password : InputType.text;
-        color: Theme.text;
+        color: Theme.foreground;
         selection-background-color: Theme.selection;
-        selection-foreground-color: Theme.text;
+        selection-foreground-color: Theme.foreground;
         font-size: Theme.text-body;
         vertical-alignment: center;
         accessible-role: none;

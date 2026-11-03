@@ -72,7 +72,7 @@ export component SearchBar inherits Rectangle {
                     x: 0;
                     width: parent.width;
                     text: input.text == "" && input.preedit-text == "" ? Search.placeholder : "";
-                    color: Theme.muted;
+                    color: Theme.dim;
                     font-size: Theme.text-large;
                     vertical-alignment: center;
                     overflow: elide;
@@ -83,9 +83,9 @@ export component SearchBar inherits Rectangle {
                     width: parent.width;
                     height: parent.height;
                     single-line: true;
-                    color: Theme.text;
+                    color: Theme.foreground;
                     selection-background-color: Theme.selection;
-                    selection-foreground-color: Theme.text;
+                    selection-foreground-color: Theme.foreground;
                     font-size: Theme.text-large;
                     vertical-alignment: center;
                     accessible-role: none;
@@ -100,7 +100,7 @@ export component SearchBar inherits Rectangle {
                 width: parent.width;
                 height: parent.height;
                 text: Shell.title;
-                color: Theme.text;
+                color: Theme.foreground;
                 font-size: Theme.text-large;
                 font-weight: 500;
                 vertical-alignment: center;
@@ -154,7 +154,7 @@ export component SearchBar inherits Rectangle {
                     y: parent.height + 4px;
                     width: 200px;
                     Rectangle {
-                        background: Theme.surface;
+                        background: Theme.popover;
                         border-radius: Theme.radius;
                         border-width: 1px;
                         border-color: Theme.border;
@@ -166,7 +166,7 @@ export component SearchBar inherits Rectangle {
                             for option[index] in Search.filter-options: Rectangle {
                                 height: Theme.panel-row-height;
                                 border-radius: Theme.radius / 2;
-                                background: index == Search.filter-current ? Theme.selection
+                                background: index == Search.filter-current ? Theme.selected
                                     : option-touch.has-hover ? Theme.hover : transparent;
                                 accessible-role: list-item;
                                 accessible-label: option.title;
@@ -177,7 +177,7 @@ export component SearchBar inherits Rectangle {
                                 Text {
                                     x: 10px;
                                     text: option.title;
-                                    color: Theme.text;
+                                    color: Theme.foreground;
                                     font-size: Theme.text-body;
                                     vertical-alignment: center;
                                     accessible-role: none;

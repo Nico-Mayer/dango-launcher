@@ -21,7 +21,7 @@ export component HudWindow inherits Window {
     pill := Rectangle {
         width: min(parent.width, label.preferred-width + 2 * Theme.hud-padding + dot.width + Theme.gap);
         height: parent.height;
-        background: Theme.raised;
+        background: Theme.popover;
         border-radius: self.height / 2;
         border-width: 1px;
         border-color: Theme.border;
@@ -40,7 +40,7 @@ export component HudWindow inherits Window {
 
             label := Text {
                 text: root.text;
-                color: root.style == ToastStyle.failure ? Theme.text : Theme.muted;
+                color: root.style == ToastStyle.failure ? Theme.foreground : Theme.muted;
                 font-size: Theme.text-small;
                 vertical-alignment: center;
                 overflow: elide;
