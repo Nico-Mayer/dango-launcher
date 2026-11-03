@@ -142,6 +142,9 @@ No manifest or view protocol change. No new user-facing strings; one removed:
   top; only title-bar tint changes. Accepted.
 - [Ctrl+Insert unsupported in some app] → the read reports "Select some text
   first" there, as today for GPUI apps. No destructive side effect.
+- [Editor copies the current line when nothing is selected] → Zed does this on
+  Ctrl+Insert, as on Ctrl+C, so the read returns that line instead of
+  "Select some text first". No chord avoids it. Accepted (Windows hand check).
 - [`CGEventPostToPid` ignored by some macOS apps] → Mac hand check; fallback
   plan above.
 - [Late foreground event hides the launcher after the lend] → handler re-checks

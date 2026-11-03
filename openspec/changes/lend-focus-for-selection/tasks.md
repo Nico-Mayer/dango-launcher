@@ -18,9 +18,9 @@
 - [x] 3.4 Hand check on Windows with `dango-ui` and `scripts/send-keys.ps1`: select text in Notepad, a browser, Windows Terminal and Zed, run Improve Writing from root search and from a command hotkey; the launcher stays on screen, the selection is read, typing goes to the launcher after, the clipboard is unchanged
   - Done 2026-11-03 with a scratch config. Notepad, Brave, Windows Terminal (non-elevated profile) and Zed pass from root search and from a command hotkey; clipboard unchanged, typing reaches the launcher after.
   - First runs hid the launcher: winit sends `Focused(false)` on the lend, and the command hotkey started the read before the show. Fixed in `fix(windows): keep launcher up during a lent read`.
-- [ ] 3.5 Hand check on Windows: with nothing selected in Zed and in Herdr, run Improve Writing; the launcher stays and shows "Select some text first", Windows Terminal running a program is not interrupted by the copy
+- [x] 3.5 Hand check on Windows: with nothing selected in Zed and in Herdr, run Improve Writing; the launcher stays and shows "Select some text first", Windows Terminal running a program is not interrupted by the copy
   - Herdr: passes, shows "Select some text first". Windows Terminal running `ping -t`: not interrupted.
-  - Zed: fails. With no selection Zed copies the current line on Ctrl+Insert, so the line is sent to the model. Open: decide in design/spec.
+  - Zed: with no selection Zed copies the current line on Ctrl+Insert, so the line is sent to the model. Accepted by the author, recorded in design.md risks.
 
 ## 4. macOS
 
