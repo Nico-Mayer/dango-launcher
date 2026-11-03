@@ -675,6 +675,7 @@ impl Core {
                 ActionOutcome::Started
                 | ActionOutcome::Toast(_)
                 | ActionOutcome::CopyToClipboard(_)
+                | ActionOutcome::Copied
                 | ActionOutcome::Replaced(_)
                 | ActionOutcome::Removed(_) => {}
             }

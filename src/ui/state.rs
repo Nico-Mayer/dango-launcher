@@ -363,8 +363,10 @@ impl Launcher {
             // A plain success already hid the launcher. A start reports through
             // the render channel and pushes its own view.
             (ActionOutcome::Done | ActionOutcome::Started, _) => {}
-            (ActionOutcome::CopyToClipboard(text), _) => {
-                fx.push(Effect::CopyText(text));
+            (outcome @ (ActionOutcome::CopyToClipboard(_) | ActionOutcome::Copied), _) => {
+                if let ActionOutcome::CopyToClipboard(text) = outcome {
+                    fx.push(Effect::CopyText(text));
+                }
                 fx.push(Effect::Dismiss);
                 self.show_hud(ToastStyle::Success, "Copied to clipboard".into(), fx);
             }

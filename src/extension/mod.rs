@@ -25,6 +25,9 @@ pub enum ActionOutcome {
     /// launcher stays where it is.
     Started,
     CopyToClipboard(String),
+    /// The action put something on the clipboard itself, such as an image or
+    /// files that plain text can't carry.
+    Copied,
     /// The action changed what the view was showing, so the view is replaced
     /// and the user stays where they are. Removing one of a list of things is
     /// the case that needs it: hiding the launcher after each one would make

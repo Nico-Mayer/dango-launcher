@@ -2072,6 +2072,17 @@ fn a_copy_dismisses_and_shows_its_hud_only_once_hidden() {
 }
 
 #[test]
+fn an_action_that_copied_itself_dismisses_and_shows_the_copy_hud() {
+    let mut h = Harness::root(3);
+    h.press("Enter");
+    let request = h.runs().last().unwrap().clone();
+    let effects = h.finish(request, ActionOutcome::Copied);
+    assert_eq!(effects, vec![Effect::Dismiss]);
+    h.event(Event::Hidden);
+    assert_eq!(hud_text(&h).as_deref(), Some("Copied to clipboard"));
+}
+
+#[test]
 fn a_stale_expiry_leaves_a_newer_hud() {
     let mut h = Harness::root(3);
     copy_from_root(&mut h);

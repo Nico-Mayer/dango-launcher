@@ -202,8 +202,11 @@ Every other HUD text is an existing failure sentence, unchanged.
 ### Contracts
 
 No change to the extension manifest or the view protocol's wire format.
-`ActionOutcome` is unchanged; only what the launcher does with
-`CopyToClipboard` and `Failed` while hidden changes.
+`ActionOutcome` gains `Copied`, for an action that put something on the
+clipboard itself: clipboard history's copy restores images and files, which
+`CopyToClipboard`'s text can't carry. The reducer treats it as a copy without
+`CopyText`. Otherwise only what the launcher does with `CopyToClipboard` and
+`Failed` while hidden changes.
 
 ## Risks / Trade-offs
 
