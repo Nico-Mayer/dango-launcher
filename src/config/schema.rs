@@ -502,7 +502,7 @@ mod tests {
 
     const FULL: &str = r#"
         version = 1
-        hyperkey = { shift = false, tap = "escape" }
+        hyperkey = { enabled = true, shift = false, tap = "escape" }
         selection = { excluded-applications = "Zed" }
         quicklinks = { favicons = false }
         window-management = { commands = { left-half = { alias = "lh", hotkey = "hyper+left" } } }

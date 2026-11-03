@@ -47,11 +47,10 @@ pub struct Config {
     /// Settings of the launcher itself.
     #[serde(default, skip_serializing_if = "Launcher::is_empty")]
     pub launcher: Launcher,
-    /// CapsLock, remapped to act as the hyper modifier system-wide.
-    /// Present means on; leave it out to turn it off. On macOS it uses F18,
-    /// so a hotkey with `f18` does not work while it is on.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub hyperkey: Option<Hyperkey>,
+    /// CapsLock, remapped to act as the hyper modifier system-wide. On macOS
+    /// it uses F18, so a hotkey with `f18` does not work while it is on.
+    #[serde(default)]
+    pub hyperkey: Hyperkey,
     /// How Dango reads the text you have selected.
     #[serde(default, skip_serializing_if = "Selection::is_empty")]
     pub selection: Selection,
@@ -110,6 +109,9 @@ pub const BUILT_IN_TABLES: [&str; 10] = [
 /// fires from this one key.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct Hyperkey {
+    /// Whether CapsLock acts as the hyper modifier. Default false.
+    #[serde(default)]
+    pub enabled: bool,
     /// Whether Shift is part of the combination. Default true; false emits
     /// Ctrl+Alt+Super, which leaves typed characters unshifted.
     #[serde(default = "default_true", skip_serializing_if = "is_true")]
@@ -124,6 +126,7 @@ pub struct Hyperkey {
 impl Default for Hyperkey {
     fn default() -> Self {
         Self {
+            enabled: false,
             shift: true,
             tap: None,
         }
@@ -378,12 +381,17 @@ impl Config {
         self.table(extension_id)?.command(command_id)?.enabled
     }
 
+    /// The hyperkey's settings when it is turned on.
+    pub fn active_hyperkey(&self) -> Option<&Hyperkey> {
+        Some(&self.hyperkey).filter(|hyperkey| hyperkey.enabled)
+    }
+
     /// The modifier set the hyperkey emits, and therefore what a `hyper` chord
     /// must expand to for the two to match. Always Ctrl+Alt+Super, plus Shift
     /// unless the hyperkey turns it off. With no hyperkey configured this is the
     /// full four, so a `hyper` chord stays registrable.
     pub fn hyper_modifiers(&self) -> Modifiers {
-        let shift = self.hyperkey.as_ref().map(|h| h.shift).unwrap_or(true);
+        let shift = self.active_hyperkey().is_none_or(|hyperkey| hyperkey.shift);
         let mut mods = Modifiers::CONTROL | Modifiers::ALT | Modifiers::SUPER;
         if shift {
             mods |= Modifiers::SHIFT;
@@ -446,9 +454,9 @@ mod tests {
     }
 
     #[test]
-    fn an_empty_hyperkey_block_turns_it_on_with_defaults() {
-        let config = Config::parse("[hyperkey]").unwrap();
-        let hyperkey = config.hyperkey.as_ref().expect("hyperkey present");
+    fn enabled_alone_turns_the_hyperkey_on_with_defaults() {
+        let config = Config::parse("hyperkey = { enabled = true }").unwrap();
+        let hyperkey = config.active_hyperkey().expect("hyperkey on");
         assert!(hyperkey.shift, "shift defaults on");
         assert!(hyperkey.tap.is_none());
         assert_eq!(
@@ -459,8 +467,8 @@ mod tests {
 
     #[test]
     fn a_hyperkey_can_exclude_shift() {
-        let config = Config::parse("hyperkey = { shift = false }").unwrap();
-        assert!(!config.hyperkey.as_ref().unwrap().shift);
+        let config = Config::parse("hyperkey = { enabled = true, shift = false }").unwrap();
+        assert!(!config.active_hyperkey().unwrap().shift);
         assert_eq!(
             config.hyper_modifiers(),
             Modifiers::CONTROL | Modifiers::ALT | Modifiers::SUPER
@@ -469,14 +477,24 @@ mod tests {
 
     #[test]
     fn a_leftover_hyperkey_key_is_ignored() {
-        let config = Config::parse(r#"hyperkey = { key = "f13" }"#).unwrap();
-        assert!(config.hyperkey.is_some());
+        let config = Config::parse(r#"hyperkey = { enabled = true, key = "f13" }"#).unwrap();
+        assert!(config.active_hyperkey().is_some());
+    }
+
+    #[test]
+    fn a_hyperkey_table_without_enabled_leaves_it_off() {
+        let config = Config::parse(r#"hyperkey = { tap = "escape" }"#).unwrap();
+        assert!(config.active_hyperkey().is_none());
+        assert!(Config::parse("[hyperkey]")
+            .unwrap()
+            .active_hyperkey()
+            .is_none());
     }
 
     #[test]
     fn no_hyperkey_still_means_full_hyper() {
         let config = Config::parse("").unwrap();
-        assert!(config.hyperkey.is_none());
+        assert!(config.active_hyperkey().is_none());
         assert_eq!(
             config.hyper_modifiers(),
             Modifiers::CONTROL | Modifiers::ALT | Modifiers::SHIFT | Modifiers::SUPER

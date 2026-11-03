@@ -974,14 +974,14 @@ fn apply_hyperkey(file_config: &FileConfig, slot: &Mutex<HyperkeySlot>) -> Optio
     let mut slot = slot.lock().unwrap();
     let shared = file_config.shared();
     let config = shared.read().unwrap();
-    let settings = config.hyperkey.as_ref().map(|h| (h.shift, h.tap.clone()));
+    let settings = config.active_hyperkey().map(|h| (h.shift, h.tap.clone()));
     if slot.settings == settings && (settings.is_none() || slot.running.is_some()) {
         return None;
     }
     slot.running = None;
     slot.settings = settings;
 
-    let hyperkey = config.hyperkey.as_ref()?;
+    let hyperkey = config.active_hyperkey()?;
     let mods = config.hyper_modifiers();
     let spec = platform::HyperkeySpec {
         trigger: platform::HyperkeyTrigger::CapsLock,
