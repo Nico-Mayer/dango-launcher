@@ -24,6 +24,7 @@ use crate::text::{
 
 const FOCUSED_ELEMENT: &str = "AXFocusedUIElement";
 const SELECTED_TEXT: &str = "AXSelectedText";
+const SELECTED_TEXT_RANGE: &str = "AXSelectedTextRange";
 
 /// How long to wait for the target application to take the paste before the
 /// clipboard is put back. macOS offers no signal that a paste has been handled,
@@ -217,15 +218,9 @@ impl DirectSelection for MacSelection {
 }
 
 fn read(pid: Option<i32>) -> Selected {
-    pid.and_then(|pid| selected_text_from(unsafe { AXUIElement::new_application(pid) }))
-        .or_else(|| selected_text_from(unsafe { AXUIElement::new_system_wide() }))
-        .map_or(Selected::Unavailable, |text| {
-            if text.is_empty() {
-                Selected::Empty
-            } else {
-                Selected::Text(text)
-            }
-        })
+    pid.and_then(|pid| answer_from(unsafe { AXUIElement::new_application(pid) }))
+        .or_else(|| answer_from(unsafe { AXUIElement::new_system_wide() }))
+        .unwrap_or(Selected::Unavailable)
 }
 
 fn frontmost_pid() -> Option<i32> {
@@ -234,15 +229,52 @@ fn frontmost_pid() -> Option<i32> {
         .map(|app| app.processIdentifier())
 }
 
-fn selected_text_from(root: CFRetained<AXUIElement>) -> Option<String> {
+fn answer_from(root: CFRetained<AXUIElement>) -> Option<Selected> {
     unsafe {
         let focused = copy_attribute(&root, FOCUSED_ELEMENT)
             .ok()
             .flatten()?
             .downcast::<AXUIElement>()
             .ok()?;
-        let selected = copy_attribute(&focused, SELECTED_TEXT).ok().flatten()?;
-        Some(selected.downcast::<CFString>().ok()?.to_string())
+        let text = copy_attribute(&focused, SELECTED_TEXT)
+            .ok()
+            .flatten()
+            .and_then(|value| value.downcast::<CFString>().ok())
+            .map(|text| text.to_string());
+        let answer = Answer {
+            own: element_pid(&focused) == Some(std::process::id() as libc::pid_t),
+            text,
+            has_range: matches!(copy_attribute(&focused, SELECTED_TEXT_RANGE), Ok(Some(_))),
+        };
+        answer.selected()
+    }
+}
+
+fn element_pid(element: &AXUIElement) -> Option<libc::pid_t> {
+    let mut pid: libc::pid_t = 0;
+    let status = unsafe { element.pid(NonNull::from(&mut pid)) };
+    (status == AXError::Success).then_some(pid)
+}
+
+struct Answer {
+    own: bool,
+    text: Option<String>,
+    has_range: bool,
+}
+
+impl Answer {
+    /// GPUI apps answer `""` for an element with no text at all, and the
+    /// panel's own search field answers `""` too. Neither is a real "nothing
+    /// selected", so both go to the copy fallback.
+    fn selected(self) -> Option<Selected> {
+        if self.own {
+            return None;
+        }
+        match self.text? {
+            text if !text.is_empty() => Some(Selected::Text(text)),
+            _ if self.has_range => Some(Selected::Empty),
+            _ => None,
+        }
     }
 }
 
@@ -261,5 +293,48 @@ unsafe fn copy_attribute(
         }
         AXError::NoValue | AXError::AttributeUnsupported => Ok(None),
         other => Err(other),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn answer(own: bool, text: Option<&str>, has_range: bool) -> Option<Selected> {
+        Answer {
+            own,
+            text: text.map(str::to_owned),
+            has_range,
+        }
+        .selected()
+    }
+
+    #[test]
+    fn selected_text_is_the_answer() {
+        assert_eq!(
+            answer(false, Some("hello"), true),
+            Some(Selected::Text("hello".into()))
+        );
+    }
+
+    #[test]
+    fn an_empty_answer_with_a_range_is_empty() {
+        assert_eq!(answer(false, Some(""), true), Some(Selected::Empty));
+    }
+
+    #[test]
+    fn an_empty_answer_without_a_range_is_no_answer() {
+        assert_eq!(answer(false, Some(""), false), None);
+    }
+
+    #[test]
+    fn dangos_own_element_is_no_answer() {
+        assert_eq!(answer(true, Some(""), true), None);
+        assert_eq!(answer(true, Some("query"), true), None);
+    }
+
+    #[test]
+    fn an_element_without_selected_text_is_no_answer() {
+        assert_eq!(answer(false, None, true), None);
     }
 }
