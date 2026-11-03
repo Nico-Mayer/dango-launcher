@@ -2,8 +2,8 @@
 
 ## 1. Sizes from the design
 
-- [ ] 1.1 In `ui/theme.slint`, set `row-height` to 44 px, `search-height` to 64 px, `action-bar-height` to 44 px, and `list-padding` to 8 px. In `src/slint_shell/render/height.rs`, set `ROW` to `44.0`, `SEARCH_BAR` to `64.0`, `ACTION_BAR` to `44.0`, and `LIST_PADDING` to `8.0` in the same commit. Verify with `cargo test` after the size tests in 1.2 pass.
-- [ ] 1.2 Update the size tests in `src/slint_shell/tests.rs`: rename `a_row_is_forty_pixels_high` to `a_row_is_forty_four_pixels_high` and expect 44, and rewrite the window height sums (`56.0 + 6.0 + n * 40.0 + 6.0 + 40.0`, around line 1410) to `64 + 8 + n * 44 + 8 + 44`. Check that `LIST_BOTTOM` and the `detail_bottom - 40.0` asserts (ActionBar height, not row height) follow the new ActionBar height of 44. Verify with `cargo test`.
+- [x] 1.1 In `ui/theme.slint`, set `row-height` to 44 px, `search-height` to 64 px, `action-bar-height` to 44 px, and `list-padding` to 8 px. In `src/slint_shell/render/height.rs`, set `ROW` to `44.0`, `SEARCH_BAR` to `64.0`, `ACTION_BAR` to `44.0`, and `LIST_PADDING` to `8.0` in the same commit. Verify with `cargo test` after the size tests in 1.2 pass.
+- [x] 1.2 Update the size tests in `src/slint_shell/tests.rs`: rename `a_row_is_forty_pixels_high` to `a_row_is_forty_four_pixels_high` and expect 44, and rewrite the window height sums (`56.0 + 6.0 + n * 40.0 + 6.0 + 40.0`, around line 1410) to `64 + 8 + n * 44 + 8 + 44`. Check that `LIST_BOTTOM` and the `detail_bottom - 40.0` asserts (ActionBar height, not row height) follow the new ActionBar height of 44. Verify with `cargo test`.
 
 ## 2. Theme presets and new roles
 

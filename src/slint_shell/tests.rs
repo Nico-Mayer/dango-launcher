@@ -18,8 +18,12 @@ use crate::protocol::{
 use crate::shell::TrayStatus;
 use crate::ui::{Context, Effect, Event, Input, Intent, Launcher, ResultItem, TemplateInspection};
 
-const LIST_TOP: f32 = 56.0 + 6.0;
-const LIST_BOTTOM: f32 = 480.0 - 40.0 - 6.0;
+const SEARCH_BAR: f32 = 64.0;
+const ACTION_BAR: f32 = 44.0;
+const LIST_PADDING: f32 = 8.0;
+const ROW: f32 = 44.0;
+const LIST_TOP: f32 = SEARCH_BAR + LIST_PADDING;
+const LIST_BOTTOM: f32 = 480.0 - ACTION_BAR - LIST_PADDING;
 
 struct Harness {
     ui: LauncherWindow,
@@ -836,9 +840,9 @@ mod list_view {
     }
 
     #[test]
-    fn a_row_is_forty_pixels_high() {
+    fn a_row_is_forty_four_pixels_high() {
         let h = Harness::root(results(3));
-        assert_eq!(h.row("Result 1").size().height, 40.0);
+        assert_eq!(h.row("Result 1").size().height, ROW);
     }
 
     #[test]
@@ -938,7 +942,7 @@ mod detail {
         let value = h.find("Terminal").expect("the metadata is drawn");
         (
             value.absolute_position().y + value.size().height,
-            LIST_BOTTOM + 6.0,
+            480.0 - ACTION_BAR,
         )
     }
 
@@ -948,7 +952,7 @@ mod detail {
         let (bottom, detail_bottom) = metadata_bottom(&h, "One line");
         let body = h.find("One line").unwrap();
         assert!(
-            bottom > detail_bottom - 40.0,
+            bottom > detail_bottom - ACTION_BAR,
             "{bottom} near {detail_bottom}"
         );
         assert!(bottom - body.absolute_position().y > 200.0);
@@ -960,7 +964,7 @@ mod detail {
         let long = (1..=200).map(|n| format!("line {n}\n")).collect::<String>();
         let (bottom, detail_bottom) = metadata_bottom(&h, &long);
         assert!(bottom <= detail_bottom, "{bottom} within {detail_bottom}");
-        assert!(bottom > detail_bottom - 40.0);
+        assert!(bottom > detail_bottom - ACTION_BAR);
     }
 
     #[test]
@@ -1276,10 +1280,13 @@ mod grid {
         let h = Harness::root(results(1));
         h.view(grid_tree(7));
         let content = h.ui.global::<GridData>().get_content_height();
-        assert!((h.height() - (56.0 + content + 40.0)).abs() < 0.01);
+        assert!((h.height() - (SEARCH_BAR + content + ACTION_BAR)).abs() < 0.01);
         let last = h.row("Tile 7");
         let bottom = last.absolute_position().y + last.size().height;
-        assert!(bottom <= h.height() - 40.0, "the last row is not cut off");
+        assert!(
+            bottom <= h.height() - ACTION_BAR,
+            "the last row is not cut off"
+        );
     }
 }
 
@@ -1410,7 +1417,10 @@ mod window_height {
     #[test]
     fn three_results_make_a_short_window() {
         let h = Harness::root(results(3));
-        assert_eq!(h.height(), 56.0 + 6.0 + 3.0 * 40.0 + 6.0 + 40.0);
+        assert_eq!(
+            h.height(),
+            SEARCH_BAR + LIST_PADDING + 3.0 * ROW + LIST_PADDING + ACTION_BAR
+        );
     }
 
     #[test]
@@ -1435,13 +1445,19 @@ mod window_height {
             items: results(8),
             complete: false,
         });
-        assert_eq!(h.height(), 56.0 + 6.0 + 8.0 * 40.0 + 6.0 + 40.0);
+        assert_eq!(
+            h.height(),
+            SEARCH_BAR + LIST_PADDING + 8.0 * ROW + LIST_PADDING + ACTION_BAR
+        );
         h.event(Event::Results {
             query: "re".into(),
             items: results(2),
             complete: true,
         });
-        assert_eq!(h.height(), 56.0 + 6.0 + 2.0 * 40.0 + 6.0 + 40.0);
+        assert_eq!(
+            h.height(),
+            SEARCH_BAR + LIST_PADDING + 2.0 * ROW + LIST_PADDING + ACTION_BAR
+        );
     }
 
     #[test]
@@ -1551,7 +1567,7 @@ mod action_panel {
                 element.accessible_role() == Some(i_slint_backend_testing::AccessibleRole::List)
             })
             .expect("the action panel");
-        assert_eq!(h.height(), panel.size().height + 40.0 + 2.0 * 8.0);
+        assert_eq!(h.height(), panel.size().height + ACTION_BAR + 2.0 * 8.0);
     }
 
     #[test]
