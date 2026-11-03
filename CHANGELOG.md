@@ -2,6 +2,48 @@
 
 All notable changes to Dango. Generated from commit history at release time.
 
+## [5.0.0] - 2026-11-03
+
+### Features
+
+- **config:** Parse the config file as toml
+- **config:** Read config.toml instead of config.json
+- **config:** Point at the schema with a #:schema line
+- **config:** [**breaking**] Give each built-in its own table
+- **config:** [**breaking**] Turn the hyperkey on with enabled
+- **config:** [**breaking**] List selection exclusions as an array
+- **config:** [**breaking**] Name the grace period reset-after-seconds
+- **text:** Lend the foreground to read a selection
+- **windows:** Copy selection with Ctrl+Insert
+
+### Fixes
+
+- **config:** List a built-in table only once
+- **windows:** Keep launcher up while foreground is lent
+- **windows:** Keep launcher up during a lent read
+- **macos:** Hide panel before the copy fallback
+- **macos:** Trust only real AX selection answers
+- **macos:** Post the copy chord to the frontmost pid
+- **macos:** Never ask the system-wide AX element
+- **macos:** Skip Dango as the app behind a read
+
+### Refactoring
+
+- **config:** Share clipboard defaults with bounds
+- **text:** [**breaking**] Drop selection exclusion list
+
+### Documentation
+
+- Describe config.toml and the schema line
+- **config:** Say settings, not preferences
+
+### Maintenance
+
+- **config:** Keep reserved names out of tables
+- **config:** Drop the json file test
+- **app:** Show failed selection read at once
+- **app:** Pin hotkey command run behind the show
+- **ui:** Use a current message for toast width
 ## [4.1.0] - 2026-11-02
 
 ### Features
