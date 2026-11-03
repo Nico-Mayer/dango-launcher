@@ -2,7 +2,7 @@
 //! dotfiles and shares over git.
 //!
 //! The file is the source of truth for the launcher hotkey, per-extension
-//! enable/disable, preferences, aliases, command and application hotkeys, and
+//! enable/disable, settings, aliases, command and application hotkeys, and
 //! the commands themselves for an extension that builds them from configuration.
 //! Data stays in SQLite. Everything here is about reading that file safely:
 //! it is optional, a bad file never takes the app down, and keys the running
