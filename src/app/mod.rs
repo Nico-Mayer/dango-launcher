@@ -399,7 +399,7 @@ impl Core {
             .shared()
             .read()
             .ok()
-            .and_then(|config| config.launcher.reset_after)
+            .and_then(|config| config.launcher.reset_after_seconds)
             .unwrap_or(DEFAULT_RESET_AFTER_SECS);
         Duration::from_secs(seconds.into())
     }

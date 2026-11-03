@@ -511,7 +511,7 @@ mod tests {
         [launcher]
         hotkey = { macos = "cmd+space", windows = "ctrl+space" }
         autostart = true
-        reset-after = 90
+        reset-after-seconds = 90
 
         [clipboard]
         enabled = true
@@ -563,10 +563,10 @@ mod tests {
 
     #[test]
     fn reset_after_is_a_whole_number_of_seconds() {
-        assert!(accepts(r#"launcher = { reset-after = 0 }"#));
-        assert!(accepts(r#"launcher = { reset-after = 300 }"#));
-        assert!(!accepts(r#"launcher = { reset-after = -5 }"#));
-        assert!(!accepts(r#"launcher = { reset-after = 1.5 }"#));
+        assert!(accepts(r#"launcher = { reset-after-seconds = 0 }"#));
+        assert!(accepts(r#"launcher = { reset-after-seconds = 300 }"#));
+        assert!(!accepts(r#"launcher = { reset-after-seconds = -5 }"#));
+        assert!(!accepts(r#"launcher = { reset-after-seconds = 1.5 }"#));
     }
 
     #[test]

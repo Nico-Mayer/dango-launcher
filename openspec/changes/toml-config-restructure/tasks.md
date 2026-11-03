@@ -24,7 +24,7 @@
 
 - [x] 3.1 Give `Hyperkey` an `enabled` field defaulting to false and replace `Option<Hyperkey>` checks with it; verify hyperkey config tests: no table is off, a table without `enabled` is off, `enabled = true` alone is on with Shift and no tap key
 - [x] 3.2 Make `selection.excluded-applications` a `Vec<String>`; verify the selection refusal tests read a list and match ignoring case
-- [ ] 3.3 Rename `launcher.reset-after` to `reset-after-seconds`; verify the grace period tests and that the schema rejects `-5` and `1.5`
+- [x] 3.3 Rename `launcher.reset-after` to `reset-after-seconds`; verify the grace period tests and that the schema rejects `-5` and `1.5`
 - [ ] 3.4 Add a test over all built-in manifests that no table name is `version`, `launcher`, `hyperkey`, `selection`, or `extensions`, and that no table struct has a setting named `enabled` or `commands` other than the reserved fields; verify it passes and fails when a manifest id is changed to `dango.launcher`
 - [ ] 3.5 Regenerate `docs/config.md` and run `mise run check`; verify both pass
 

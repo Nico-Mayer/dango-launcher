@@ -153,7 +153,7 @@ async fn the_hotkey_again_hides_and_hands_focus_back() {
 
 #[tokio::test(start_paused = true)]
 async fn a_held_launcher_keeps_the_query_until_the_hold_runs_out() {
-    let (core, shell) = core(r#"launcher = { reset-after = 5 }"#);
+    let (core, shell) = core(r#"launcher = { reset-after-seconds = 5 }"#);
     core.toggle();
     type_query(&core, "fire");
     core.toggle();
@@ -165,7 +165,7 @@ async fn a_held_launcher_keeps_the_query_until_the_hold_runs_out() {
 
 #[tokio::test(start_paused = true)]
 async fn showing_within_the_hold_continues_where_the_user_left_off() {
-    let (core, shell) = core(r#"launcher = { reset-after = 5 }"#);
+    let (core, shell) = core(r#"launcher = { reset-after-seconds = 5 }"#);
     core.toggle();
     type_query(&core, "fire");
     core.toggle();
@@ -177,7 +177,7 @@ async fn showing_within_the_hold_continues_where_the_user_left_off() {
 
 #[tokio::test]
 async fn a_zero_hold_resets_at_once() {
-    let (core, shell) = core(r#"launcher = { reset-after = 0 }"#);
+    let (core, shell) = core(r#"launcher = { reset-after-seconds = 0 }"#);
     core.toggle();
     type_query(&core, "fire");
     core.toggle();
@@ -222,7 +222,7 @@ fn shows_a_view(shell: &RecordingShell) -> bool {
 
 #[tokio::test(start_paused = true)]
 async fn a_held_launcher_keeps_a_commands_view_for_the_next_activation() {
-    let (core, shell) = core(r#"launcher = { reset-after = 5 }"#);
+    let (core, shell) = core(r#"launcher = { reset-after-seconds = 5 }"#);
     core.toggle();
     let work = start_work(&core);
     core.toggle();
@@ -243,7 +243,7 @@ async fn a_held_launcher_keeps_a_commands_view_for_the_next_activation() {
 
 #[tokio::test(start_paused = true)]
 async fn a_command_still_working_when_the_hold_runs_out_is_dropped() {
-    let (core, shell) = core(r#"launcher = { reset-after = 5 }"#);
+    let (core, shell) = core(r#"launcher = { reset-after-seconds = 5 }"#);
     core.toggle();
     let work = start_work(&core);
     core.toggle();

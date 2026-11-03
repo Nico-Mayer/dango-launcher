@@ -186,12 +186,12 @@ pub struct Launcher {
     /// time continues where you left off. Default 60. 0 resets to root search
     /// at once.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub reset_after: Option<u32>,
+    pub reset_after_seconds: Option<u32>,
 }
 
 impl Launcher {
     fn is_empty(&self) -> bool {
-        self.hotkey.is_none() && self.autostart.is_none() && self.reset_after.is_none()
+        self.hotkey.is_none() && self.autostart.is_none() && self.reset_after_seconds.is_none()
     }
 }
 
