@@ -273,6 +273,7 @@ impl Launcher {
             Event::Failed(message) => {
                 self.show_failure(message, fx);
                 self.working = None;
+                self.busy_marks = BusyMarks::Hidden;
             }
             Event::HotkeyFailed(message) => self.show_failure(message, fx),
             Event::TemplateInspected {
@@ -1316,7 +1317,7 @@ fn step<'a>(
     ids.get(next).map(|id| id.to_string())
 }
 
-pub(super) fn is_loading(view: &View) -> bool {
+fn is_loading(view: &View) -> bool {
     match view {
         View::List(list) => list.loading,
         View::Grid(grid) => grid.loading,

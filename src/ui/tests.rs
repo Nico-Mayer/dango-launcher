@@ -1840,6 +1840,7 @@ fn a_running_command_shows_a_busy_toast_until_it_fails_or_resets() {
     assert_eq!(h.status(), "");
     assert!(h.failure().is_some());
     h.press("Enter");
+    h.wake_busy();
     assert_eq!(h.status(), "Running Clipboard History…");
     h.event(Event::Reset);
     assert_eq!(h.status(), "");
@@ -2186,9 +2187,10 @@ fn a_fast_command_shows_no_busy_toast() {
     let mut h = Harness::new();
     running(&mut h);
     assert_eq!(h.status(), "", "nothing before the delay");
+    let late = marks_id(&h).unwrap();
     h.render(3, done_tree());
     assert_eq!(h.launcher.busy_marks, BusyMarks::Hidden);
-    h.event(Event::BusyMarksWoke { id: u64::MAX });
+    h.event(Event::BusyMarksWoke { id: late });
     assert_eq!(h.status(), "");
 }
 
@@ -2278,4 +2280,25 @@ fn every_wait_for_busy_marks_takes_a_new_id() {
     assert_ne!(first, second);
     h.event(Event::BusyMarksWoke { id: first });
     assert_eq!(h.status(), "", "the old wake does not show the new marks");
+}
+
+#[test]
+fn a_reset_clears_the_busy_marks_at_once() {
+    let mut h = Harness::view(detail_tree("Working"));
+    h.wake_busy();
+    assert_eq!(h.status(), "Loading…");
+    h.event(Event::Reset);
+    assert_eq!(h.launcher.busy_marks, BusyMarks::Hidden);
+    assert_eq!(h.status(), "");
+}
+
+#[test]
+fn a_failed_command_does_not_come_back_as_running() {
+    let mut h = Harness::new();
+    running(&mut h);
+    h.wake_busy();
+    assert_eq!(h.status(), "Running Clipboard History…");
+    h.event(Event::Failed("Couldn't paste".into()));
+    h.typed("R");
+    assert_eq!(h.status(), "");
 }
