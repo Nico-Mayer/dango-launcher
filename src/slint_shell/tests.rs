@@ -117,6 +117,11 @@ impl Harness {
         let fx = self.launcher.borrow_mut().apply(Input::Event(event));
         self.effects.borrow_mut().extend(fx);
         let snapshot = self.launcher.borrow().snapshot();
+        self.publish(snapshot);
+    }
+
+    /// Draws a snapshot the state machine could not make on its own.
+    fn publish(&self, snapshot: crate::ui::Snapshot) {
         render::publish(
             &mut self.renderer.borrow_mut(),
             &self.ui,
@@ -2054,5 +2059,46 @@ mod progress_view {
         let bar = bar(&h);
         assert_eq!(bar.accessible_value().as_deref(), Some(""));
         assert_eq!(bar.accessible_label().as_deref(), Some("Working"));
+    }
+}
+
+mod toast_action {
+    use super::super::keys;
+    use super::*;
+    use crate::protocol::{Modifier, Shortcut};
+    use crate::ui::{ActionRequest, Origin, ToastAction};
+
+    #[test]
+    fn a_failure_toast_shows_its_action_and_chord() {
+        let h = Harness::root(results(3));
+        h.event(Event::Failed("Couldn't download the update.".into()));
+        let mut snapshot = h.launcher.borrow().snapshot();
+        let shortcut = Shortcut {
+            key: "r".into(),
+            modifiers: vec![Modifier::Cmd],
+        };
+        if let Some(toast) = snapshot.toast.as_mut() {
+            toast.action = Some(ToastAction {
+                title: "Retry".into(),
+                shortcut: shortcut.clone(),
+                request: ActionRequest {
+                    origin: Origin::Root,
+                    extension_id: "dango.updates".into(),
+                    item_id: "update".into(),
+                    action_id: "install".into(),
+                    values: None,
+                    query: None,
+                },
+            });
+        }
+        h.publish(snapshot);
+        let chord = keys::shortcut_label(&shortcut);
+        assert_eq!(h.shell().get_toast_action_label(), "Retry");
+        assert_eq!(h.shell().get_toast_action_keys(), chord.as_str());
+        let toast = h.find("Couldn't download the update.").expect("the toast");
+        assert_eq!(
+            toast.accessible_description().as_deref(),
+            Some(format!("Failed. Retry, {chord}").as_str())
+        );
     }
 }

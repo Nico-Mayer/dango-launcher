@@ -12,7 +12,7 @@ mod tests;
 pub use effect::{ActionRequest, BusyStage, Effect, Origin};
 pub use input::{Chord, Context, Event, Input, Intent, ResultItem, TemplateInspection};
 pub use snapshot::Snapshot;
-pub use state::{Launcher, ToastStyle};
+pub use state::{Launcher, ToastAction, ToastStyle};
 
 /// The most items a list or grid shows, root search included.
 pub const ITEM_LIMIT: usize = 50;

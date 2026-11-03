@@ -2363,3 +2363,88 @@ fn an_action_answering_back_leaves_the_view() {
         "a later render from the left view is dropped"
     );
 }
+
+fn retry_request() -> ActionRequest {
+    ActionRequest {
+        origin: Origin::Root,
+        extension_id: "dango.updates".into(),
+        item_id: "update".into(),
+        action_id: "install".into(),
+        values: None,
+        query: None,
+    }
+}
+
+fn retry_toast(h: &mut Harness) {
+    h.launcher.toast = Some(super::state::HeldToast {
+        id: 9_000,
+        style: ToastStyle::Failure,
+        text: "Couldn't download the update. Check your connection and try again.".into(),
+        action: Some(ToastAction {
+            title: "Retry".into(),
+            shortcut: Shortcut {
+                key: "r".into(),
+                modifiers: vec![Modifier::Cmd],
+            },
+            request: retry_request(),
+        }),
+    });
+}
+
+#[test]
+fn a_toast_chord_runs_its_action_once_and_clears_it() {
+    let mut h = Harness::root(3);
+    retry_toast(&mut h);
+    let effects = h.command("r");
+    assert_eq!(effects, vec![Effect::RunAction(retry_request())]);
+    assert!(h.failure().is_none());
+    let again = h.command("r");
+    assert!(!again.iter().any(
+        |effect| matches!(effect, Effect::RunAction(request) if request.action_id == "install")
+    ));
+}
+
+#[test]
+fn another_key_clears_a_toast_without_running_its_action() {
+    let mut h = Harness::root(3);
+    retry_toast(&mut h);
+    let effects = h.press("ArrowDown");
+    assert!(h.failure().is_none());
+    assert!(!effects
+        .iter()
+        .any(|effect| matches!(effect, Effect::RunAction(_))));
+}
+
+#[test]
+fn a_toast_chord_beats_an_item_action_with_the_same_chord() {
+    let mut h = Harness::new();
+    let mut item = result(1);
+    item.actions.push(Action {
+        id: "reveal".into(),
+        title: "Show in Explorer".into(),
+        shortcut: Some(Shortcut {
+            key: "r".into(),
+            modifiers: vec![Modifier::Cmd],
+        }),
+        ..Default::default()
+    });
+    h.results("", vec![item]);
+    retry_toast(&mut h);
+    assert!(h
+        .snapshot()
+        .bindings
+        .iter()
+        .any(|binding| binding.chord == Chord::command("r")));
+    let effects = h.command("r");
+    assert_eq!(effects, vec![Effect::RunAction(retry_request())]);
+}
+
+#[test]
+fn the_panel_keeps_a_toast_chord_from_running() {
+    let mut h = Harness::root(3);
+    h.command("k");
+    retry_toast(&mut h);
+    assert!(h.launcher.toast_action().is_none());
+    let effects = h.command("r");
+    assert!(!effects.contains(&Effect::RunAction(retry_request())));
+}

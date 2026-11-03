@@ -10,13 +10,13 @@
 
 ## 2. Toast actions
 
-- [ ] 2.1 In `src/ui/`, give `Toast` and `HeldToast` an optional `ToastAction { title, shortcut, request: ActionRequest }`. While a toast with an action shows and the panel is closed, add its chord to `bindings`. In `Launcher::intent`, check that chord before `clear_failure`: a match emits `Effect::RunAction`, clears the toast, and the key does nothing else. Verify with reducer tests in `src/ui/tests.rs`:
+- [x] 2.1 In `src/ui/`, give `Toast` and `HeldToast` an optional `ToastAction { title, shortcut, request: ActionRequest }`. While a toast with an action shows and the panel is closed, add its chord to `bindings`. In `Launcher::intent`, check that chord before `clear_failure`: a match emits `Effect::RunAction`, clears the toast, and the key does nothing else. Verify with reducer tests in `src/ui/tests.rs`:
   - the chord runs the action once and clears the toast;
   - another key clears the failure toast without running it;
   - the chord does nothing once the toast is gone;
   - a toast chord beats a root item's action with the same chord (Ctrl+R);
   - with the panel open, the chord is not bound.
-- [ ] 2.2 In `ui/shell/action-bar.slint`, draw the toast action's label and `Kbd` after the toast text, with the label and chord in the toast's accessible description. Extend the `Shell` global and `render/shell.rs`. Verify with a UI test: a failure toast with "Retry" shows "Retry" and the platform's chord label, and its description names them.
+- [x] 2.2 In `ui/shell/action-bar.slint`, draw the toast action's label and `Kbd` after the toast text, with the label and chord in the toast's accessible description. Extend the `Shell` global and `render/shell.rs`. Verify with a UI test: a failure toast with "Retry" shows "Retry" and the platform's chord label, and its description names them.
 
 ## 3. Task registry
 

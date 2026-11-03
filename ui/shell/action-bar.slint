@@ -57,7 +57,28 @@ export component ActionBar inherits Rectangle {
                 overflow: elide;
                 accessible-role: AccessibleRole.text;
                 accessible-label: self.text;
-                accessible-description: Shell.toast-shown && Shell.toast-style == ToastStyle.failure ? "Failed" : "";
+                accessible-description: !Shell.toast-shown ? ""
+                    : (Shell.toast-style == ToastStyle.failure ? "Failed" : "")
+                    + (Shell.toast-style == ToastStyle.failure && Shell.toast-action-label != "" ? ". " : "")
+                    + (Shell.toast-action-label != "" ? Shell.toast-action-label + ", " + Shell.toast-action-keys : "");
+            }
+            if Shell.toast-shown && Shell.toast-action-label != "": HorizontalLayout {
+                horizontal-stretch: 0;
+                spacing: Theme.gap;
+                Text {
+                    text: Shell.toast-action-label;
+                    color: Theme.foreground;
+                    font-size: Theme.text-small;
+                    vertical-alignment: center;
+                    accessible-role: none;
+                }
+                VerticalLayout {
+                    alignment: center;
+                    Kbd {
+                        keys: Shell.toast-action-keys;
+                        accessible-role: none;
+                    }
+                }
             }
         }
 

@@ -3,7 +3,9 @@ use crate::protocol::{
 };
 
 use super::input::{Chord, Context, ResultItem};
-use super::state::{Entry, Launcher, Mode, PushedView, ToastStyle, ViewError, FILTER_PREFIX};
+use super::state::{
+    Entry, Launcher, Mode, PushedView, ToastAction, ToastStyle, ViewError, FILTER_PREFIX,
+};
 
 macro_rules! snapshot_types {
     ($($item:item)*) => {
@@ -180,6 +182,7 @@ snapshot_types! {
     pub struct Toast {
         pub style: ToastStyle,
         pub text: String,
+        pub action: Option<ToastAction>,
     }
 
     pub struct Hud {
@@ -316,6 +319,12 @@ impl Launcher {
             };
             bindings.push(plain("Tab"));
             bindings.push(anywhere(shift_tab));
+        }
+        if let Some(action) = self.toast_action() {
+            let chord = Chord::from(&action.shortcut);
+            if !bindings.iter().any(|taken| taken.chord == chord) {
+                bindings.push(anywhere(chord));
+            }
         }
         if !matches!(mode, Mode::Error | Mode::Panel) {
             let shortcuts = actions.iter().filter_map(|a| a.shortcut.as_ref());
@@ -506,11 +515,13 @@ impl Launcher {
             return Some(Toast {
                 style: toast.style,
                 text: toast.text.clone(),
+                action: toast.action.clone(),
             });
         }
         self.busy_marks_shown().map(|text| Toast {
             style: ToastStyle::Busy,
             text: text.to_string(),
+            action: None,
         })
     }
 

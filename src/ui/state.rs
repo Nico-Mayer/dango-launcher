@@ -60,6 +60,15 @@ pub(super) struct HeldToast {
     pub(super) id: u64,
     pub(super) style: ToastStyle,
     pub(super) text: String,
+    pub(super) action: Option<ToastAction>,
+}
+
+/// One action a toast offers, run by its chord while the toast shows.
+#[derive(Clone, Debug, PartialEq)]
+pub struct ToastAction {
+    pub title: String,
+    pub shortcut: Shortcut,
+    pub request: ActionRequest,
 }
 
 /// The loading bar and busy toast wait a moment before they appear and, once
@@ -203,6 +212,16 @@ impl Launcher {
     }
 
     fn intent(&mut self, intent: Intent, fx: &mut Vec<Effect>) {
+        if let Intent::Key { chord } = &intent {
+            if let Some(action) = self
+                .toast_action()
+                .filter(|action| Chord::from(&action.shortcut) == *chord)
+            {
+                fx.push(Effect::RunAction(action.request.clone()));
+                self.toast = None;
+                return;
+            }
+        }
         if matches!(
             intent,
             Intent::QueryChanged { .. }
@@ -511,7 +530,17 @@ impl Launcher {
             id,
             style: ToastStyle::Failure,
             text,
+            action: None,
         });
+    }
+
+    /// The toast's action, while the toast shows and the panel does not own
+    /// the keyboard.
+    pub(super) fn toast_action(&self) -> Option<&ToastAction> {
+        if self.panel.is_some() {
+            return None;
+        }
+        self.toast.as_ref().and_then(|toast| toast.action.as_ref())
     }
 
     /// A failure stays until the next key press or click.
@@ -531,6 +560,7 @@ impl Launcher {
             id,
             style: ToastStyle::Success,
             text,
+            action: None,
         });
         fx.push(Effect::ExpireToast {
             id,
@@ -542,7 +572,12 @@ impl Launcher {
     /// launcher is still on screen starts its time at the hide.
     fn show_hud(&mut self, style: ToastStyle, text: String, fx: &mut Vec<Effect>) {
         let id = self.next_revision();
-        self.hud = Some(HeldToast { id, style, text });
+        self.hud = Some(HeldToast {
+            id,
+            style,
+            text,
+            action: None,
+        });
         if !self.visible {
             fx.push(Effect::ExpireToast { id, style });
         }
