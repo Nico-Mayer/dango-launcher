@@ -243,7 +243,7 @@ Per-command settings, keyed by command id.
 
 | Setting | Type | Default | Values | Description |
 | --- | --- | --- | --- | --- |
-| `excluded-applications` | string |  |  | Applications where Dango must never send the copy chord to read a selection, comma separated and matched ignoring case. For editors that bind Ctrl+C to something of their own. Dango says it cannot read the selection there instead. |
+| `excluded-applications` | array |  |  | Applications where Dango must never send the copy chord to read a selection, matched ignoring case. For editors that bind Ctrl+C to something of their own. Dango says it cannot read the selection there instead. |
 
 ## Provider settings
 

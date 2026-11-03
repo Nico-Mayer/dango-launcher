@@ -503,7 +503,7 @@ mod tests {
     const FULL: &str = r#"
         version = 1
         hyperkey = { enabled = true, shift = false, tap = "escape" }
-        selection = { excluded-applications = "Zed" }
+        selection = { excluded-applications = ["Zed"] }
         quicklinks = { favicons = false }
         window-management = { commands = { left-half = { alias = "lh", hotkey = "hyper+left" } } }
         system = { commands = { open-config = { hotkey = "hyper+comma" } } }
