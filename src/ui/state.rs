@@ -1081,8 +1081,8 @@ impl Launcher {
         }
     }
 
-    /// Root results in the order they are drawn: pinned, then suggestions,
-    /// then everything else.
+    /// Root results in the order they are drawn: the answer, pinned, then
+    /// suggestions, then everything else.
     pub(super) fn root_order(&self) -> impl Iterator<Item = &ResultItem> {
         let answer = self.results.iter().filter(|item| item.answer);
         let rows = || self.results.iter().filter(|item| !item.answer);

@@ -137,9 +137,11 @@ impl Renderer {
                 ViewBody::Progress(body) => progress::write(ui, body),
             },
         }
-        if !matches!(snapshot.screen, Screen::Root(_)) {
-            answer::write(ui, None, &self.icons);
-        }
+        let root = match &snapshot.screen {
+            Screen::Root(root) => Some(root),
+            _ => None,
+        };
+        answer::write(ui, root, &self.icons);
         if !typing(&snapshot.screen) {
             self.query = None;
         }

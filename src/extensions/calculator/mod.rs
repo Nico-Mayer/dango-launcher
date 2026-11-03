@@ -22,6 +22,10 @@ const DEADLINE: Duration = Duration::from_millis(100);
 
 const APPROX: &str = "approx. ";
 
+/// Root selection goes by id, and a game's id can be "730" just as an answer
+/// can, so the answer's id carries a prefix no other result uses.
+const ID_PREFIX: &str = "answer:";
+
 pub(crate) fn manifest() -> Manifest {
     Manifest {
         manifest_version: 1,
@@ -63,6 +67,7 @@ impl Extension for CalculatorExtension {
         action_id: &str,
         _values: &FormValues,
     ) -> ActionOutcome {
+        let item_id = item_id.strip_prefix(ID_PREFIX).unwrap_or(item_id);
         match action_id {
             ACTION_COPY => ActionOutcome::CopyToClipboard(item_id.to_string()),
             ACTION_PASTE => {
@@ -118,7 +123,7 @@ fn worth_asking(query: &str) -> bool {
     let comma_in_number = chars
         .windows(3)
         .any(|window| window[0].is_ascii_digit() && window[1] == ',' && window[2].is_ascii_digit());
-    if comma_in_number {
+    if comma_in_number || looks_like_date(query) {
         return false;
     }
     let operator = query.contains(['+', '-', '*', '/', '^', '%']);
@@ -127,6 +132,18 @@ fn worth_asking(query: &str) -> bool {
         .iter()
         .any(|word| lower.contains(word));
     operator || conversion
+}
+
+/// "2024-11-04" or "4/11/2024": three numbers joined by the same "-" or "/"
+/// are a date, not a sum to work out.
+fn looks_like_date(query: &str) -> bool {
+    ['-', '/'].iter().any(|separator| {
+        let parts: Vec<&str> = query.split(*separator).collect();
+        parts.len() == 3
+            && parts
+                .iter()
+                .all(|part| !part.is_empty() && part.chars().all(|c| c.is_ascii_digit()))
+    })
 }
 
 struct Deadline(Instant);
@@ -152,7 +169,7 @@ impl RootProvider for AnswerProvider {
         };
         vec![Candidate {
             extension_id: EXTENSION_ID.into(),
-            id: found.plain,
+            id: format!("{ID_PREFIX}{}", found.plain),
             title: found.shown,
             status: None,
             icon: None,
@@ -199,7 +216,22 @@ mod tests {
 
     #[test]
     fn names_and_commas_get_no_answer() {
-        for query in ["firefox", "pi", "4k", "2fa", "1h", "1,5*2", "2048", ""] {
+        for query in [
+            "firefox",
+            "pi",
+            "4k",
+            "2fa",
+            "1h",
+            "1,5*2",
+            "2048",
+            "",
+            "-5",
+            "c++",
+            "dango-ui",
+            "9^9^9",
+            "2024-11-04",
+            "4/11/2024",
+        ] {
             assert_eq!(shown(query), None, "{query}");
         }
     }
@@ -208,7 +240,7 @@ mod tests {
     fn copy_puts_the_answer_on_the_clipboard() {
         let calculator = CalculatorExtension::new(None);
         assert_eq!(
-            calculator.perform_action("4", ACTION_COPY, &FormValues::new()),
+            calculator.perform_action("answer:4", ACTION_COPY, &FormValues::new()),
             ActionOutcome::CopyToClipboard("4".into())
         );
     }
@@ -231,7 +263,7 @@ mod tests {
     async fn the_provider_answers_with_one_copyable_result() {
         let items = AnswerProvider.items("2+2".into()).await;
         assert_eq!(items.len(), 1);
-        assert_eq!(items[0].id, "4");
+        assert_eq!(items[0].id, "answer:4");
         assert_eq!(items[0].source, Source::Answer);
         assert_eq!(items[0].actions[0].title, "Copy answer");
         assert_eq!(items[0].actions[1].title, "Paste answer");

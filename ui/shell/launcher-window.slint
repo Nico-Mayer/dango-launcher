@@ -79,9 +79,9 @@ export component LauncherWindow inherits Window {
                 y: 0;
             }
 
-            property <length> answer-room: Shell.screen == ScreenKind.root && AnswerData.shown ? Theme.answer-height : 0;
+            property <length> answer-room: AnswerData.shown ? Theme.answer-height : 0;
 
-            if Shell.screen == ScreenKind.root && AnswerData.shown: InlineAnswer {
+            if AnswerData.shown: InlineAnswer {
                 y: parent.body-top;
             }
 
