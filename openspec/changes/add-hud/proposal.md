@@ -13,12 +13,12 @@ left it for its own change.
 ## What Changes
 
 - A HUD: a small pill window with a dot and one line of text, shown briefly at
-  the bottom of the active screen while the launcher is hidden. It never takes
-  focus and ignores the mouse.
+  the bottom of the screen under the mouse pointer while the launcher is
+  hidden. It never takes focus and ignores the mouse.
 - The HUD only reports outcomes the user cannot see otherwise:
   - a failure that happens while the launcher is hidden (a no-view command run
     from its hotkey, an action that hid the launcher and then failed, an
-    application hotkey whose application is missing)
+    application hotkey whose application is missing or fails to open)
   - a copy that closes the launcher, as "Copied to clipboard"
 - Outcomes the user can already see, such as a moved window or an opened app,
   show nothing.
@@ -64,8 +64,8 @@ so each gets its own hand check.
   keeps an unseen failure for the next activation.
 - `view-protocol`: "No-view commands report their outcome" sends a failure to
   the HUD when the launcher is hidden.
-- `command-hotkeys`: a missing application on a hotkey press is reported in
-  the HUD and the log instead of the tray status line.
+- `command-hotkeys`: a missing application or a failed launch on a hotkey
+  press is reported in the HUD and the log instead of the tray status line.
 
 ## Impact
 
@@ -76,6 +76,7 @@ so each gets its own hand check.
   and the recording fake.
 - `ui/`: a new HUD window component exported from `app.slint`, built from the
   existing `Dot` atom and `Theme`.
-- `src/platform/windows` and `src/platform/macos`: native setup for a
-  non-activating, click-through, topmost window, behind a narrow trait.
+- `src/platform/windows` and `src/platform/macos`: placement and the native
+  setup winit does not cover (tool window style, non-activating `NSPanel`),
+  behind a narrow trait.
 - No change to the extension manifest or the view protocol's wire format.

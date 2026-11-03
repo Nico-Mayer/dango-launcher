@@ -104,18 +104,19 @@ key press or a click.
 ### Requirement: The HUD sits at the bottom of the active screen
 
 The HUD SHALL show centred horizontally near the bottom of the work area of the
-display that holds the focused window, above the taskbar or the Dock. It SHALL
-show over every other window, including fullscreen applications.
+display under the mouse pointer, the display the launcher would open on, above
+the taskbar or the Dock. It SHALL show over every other window, including
+fullscreen applications.
 
 #### Scenario: Placement on Windows
 
-- **WHEN** the HUD shows on Windows with the focused window on a second monitor
+- **WHEN** the HUD shows on Windows with the mouse pointer on a second monitor
 - **THEN** it is centred near the bottom of that monitor's work area, above the
   taskbar
 
 #### Scenario: Placement on macOS
 
-- **WHEN** the HUD shows on macOS with the focused window on a second display
+- **WHEN** the HUD shows on macOS with the mouse pointer on a second display
 - **THEN** it is centred near the bottom of that display's visible frame, above
   the Dock
 

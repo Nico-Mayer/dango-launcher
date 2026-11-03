@@ -67,3 +67,9 @@ first-wins conflict handling as command bindings.
 
 - **WHEN** an application's hotkey is written as a per-platform table
 - **THEN** each platform registers its own chord and ignores the other's
+
+#### Scenario: The application fails to open
+
+- **WHEN** the user presses an application's chord and the launch fails
+- **THEN** the HUD shows the launch's failure sentence
+- **AND** the log names the entry and the tray status line is unchanged
