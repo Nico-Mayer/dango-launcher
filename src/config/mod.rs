@@ -90,6 +90,12 @@ pub struct Config {
     pub extensions: BTreeMap<String, Table>,
 }
 
+/// Whether an extension id names a built-in, which is configured in its own
+/// table even when the same id also appears under `extensions`.
+fn is_built_in(extension_id: &str) -> bool {
+    table_name(extension_id).is_some_and(|name| BUILT_IN_TABLES.contains(&name))
+}
+
 /// The table names of the built-in extensions, each also its id after `dango.`.
 pub const BUILT_IN_TABLES: [&str; 10] = [
     "ai",
@@ -352,7 +358,12 @@ impl Config {
         let mut tables: Vec<(String, &dyn ExtensionTable)> = BUILT_IN_TABLES
             .iter()
             .map(|name| format!("dango.{name}"))
-            .chain(self.extensions.keys().cloned())
+            .chain(
+                self.extensions
+                    .keys()
+                    .filter(|id| !is_built_in(id))
+                    .cloned(),
+            )
             .filter_map(|id| self.table(&id).map(|table| (id, table)))
             .collect();
         tables.sort_by(|a, b| a.0.cmp(&b.0));
@@ -538,9 +549,13 @@ mod tests {
 
     #[test]
     fn a_built_in_under_extensions_is_not_its_table() {
-        let config =
-            Config::parse(r#"extensions = { "dango.clipboard" = { enabled = false } }"#).unwrap();
+        let config = Config::parse(
+            r#"extensions = { "dango.clipboard" = { enabled = false, commands = { history = { hotkey = "ctrl+alt+h" } } } }"#,
+        )
+        .unwrap();
         assert_eq!(config.enabled("dango.clipboard"), None);
+        let ids: Vec<String> = config.tables().into_iter().map(|(id, _)| id).collect();
+        assert_eq!(ids.len(), BUILT_IN_TABLES.len(), "no id twice: {ids:?}");
     }
 
     #[test]
