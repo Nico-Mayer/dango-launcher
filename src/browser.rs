@@ -1,4 +1,4 @@
-//! The browsers a quicklink can name. The id is what `quicklinks.json` stores,
+//! The browsers a quicklink can name. The id is what `quicklinks.toml` stores,
 //! the same on both platforms, so one file works on either machine.
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

@@ -606,9 +606,9 @@ mod harness {
                 std::env::var("HOME").unwrap_or_default()
             )
         });
-        std::fs::read_to_string(format!("{path}/config.json"))
+        std::fs::read_to_string(format!("{path}/config.toml"))
             .ok()
-            .and_then(|text| serde_json::from_str::<serde_json::Value>(&text).ok())
+            .and_then(|text| text.parse::<toml::Table>().ok())
             .and_then(|config| {
                 config
                     .get("hyperkey")
