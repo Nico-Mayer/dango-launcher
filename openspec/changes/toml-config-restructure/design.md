@@ -35,6 +35,9 @@ See proposal.md for why. Current shape, in `src/config/`:
 
 - A settings model for extensions that are not built in. `extensions` gets
   the shared table shape and nothing more.
+- Write-back from a settings panel: deferred until a panel exists. Every
+  setting keeps one stable path and the schema describes it, so a later panel
+  can edit single keys in place with `toml_edit`, keeping comments and order.
 - Deny unknown keys at runtime. Forward compatibility stays (see the
   configuration spec); the schema is where unknown keys are flagged.
 
