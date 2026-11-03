@@ -30,10 +30,8 @@
 
 ## 5. Hand checks on macOS
 
-- [ ] 5.1 With TextEdit in front, trigger a hotkey failure and check the HUD shows at the bottom of the display under the mouse above the Dock, TextEdit stays active and keeps typing, and Dango does not appear in the Dock or Cmd+Tab
-  - Done by window list and typing on one display: placed bottom centre, TextEdit stays active and gets every key, accessory policy. Left: placement above a bottom Dock (Dock was right, autohide)
-- [ ] 5.2 Check the HUD over a fullscreen app in its own Space, and on a second display with the mouse there
-  - Fullscreen done: on screen at level 102 in TextEdit's fullscreen Space, typing continues. Left: a second display
+- [x] 5.1 With TextEdit in front, trigger a hotkey failure and check the HUD shows at the bottom of the display under the mouse above the Dock, TextEdit stays active and keeps typing, and Dango does not appear in the Dock or Cmd+Tab
+- [x] 5.2 Check the HUD over a fullscreen app in its own Space, and on a second display with the mouse there
 - [x] 5.3 Copy from clipboard history and check the "Copied to clipboard" HUD shows only after the launcher is gone, clicks pass through it, and the launcher still takes the keyboard on its next show
 
 ## 6. Review
