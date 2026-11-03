@@ -16,7 +16,7 @@ use crate::extension::{self, EnabledStore, ExtensionHost, HostResolver};
 use crate::extensions::ai::{AgentClient, AuthFile, Clients, GenAiClient};
 use crate::extensions::applications::{AppIndex, ApplicationsExtension};
 use crate::extensions::clipboard::{
-    ClipboardExtension, ClipboardSource, History, PreferencePolicy, Watcher,
+    ClipboardExtension, ClipboardSource, ConfigPolicy, History, Watcher,
 };
 use crate::extensions::games::{GameList, GamesExtension, SteamSource};
 use crate::extensions::permissions::PermissionsExtension;
@@ -203,11 +203,7 @@ fn build_services(
     let history = match (&store, &clipboard) {
         (Some(store), Some(clipboard)) => {
             let history = Arc::new(History::new(store.clone(), cache_dir().join("clipboard")));
-            let policy = Arc::new(PreferencePolicy(extension::Preferences::new(
-                extensions::clipboard::EXTENSION_ID,
-                extensions::clipboard::preference_declarations(),
-                file_config.clone(),
-            )));
+            let policy = Arc::new(ConfigPolicy(file_config.shared()));
             let watcher = Arc::new(Watcher::new(
                 clipboard.clone(),
                 attribution,
@@ -249,15 +245,10 @@ fn build_services(
     };
 
     if let Some((history, watcher)) = history {
-        let preferences = extension::Preferences::new(
-            extensions::clipboard::EXTENSION_ID,
-            extensions::clipboard::preference_declarations(),
-            file_config.clone(),
-        );
         let extension = Arc::new(ClipboardExtension::new(
             history,
             watcher,
-            preferences,
+            file_config.shared(),
             exchange.clone(),
             icons.clone(),
         ));
@@ -414,11 +405,7 @@ fn register_snippets(
     // skip: one list, read fresh each keystroke.
     let excluded: snippets::ExcludedApps = {
         use extensions::clipboard::Policy;
-        let policy = PreferencePolicy(extension::Preferences::new(
-            extensions::clipboard::EXTENSION_ID,
-            extensions::clipboard::preference_declarations(),
-            file_config.clone(),
-        ));
+        let policy = ConfigPolicy(file_config.shared());
         Arc::new(move || policy.excluded_applications())
     };
     let records_dir = config::config_dir();
@@ -457,13 +444,13 @@ fn register_snippets(
             excluded.clone(),
         );
         if let Some(source) = favicon_source.clone() {
-            let preferences = extension::Preferences::new(
-                snippets::extension_id(kind),
-                snippets::preference_declarations(kind),
-                file_config.clone(),
-            );
-            let wanted: snippets::FaviconsEnabled =
-                Arc::new(move || preferences.boolean(snippets::PREF_FAVICONS).unwrap_or(true));
+            let config = file_config.shared();
+            let wanted: snippets::FaviconsEnabled = match kind {
+                snippets::Kind::Quicklink => {
+                    Arc::new(move || config.read().unwrap().quicklinks.favicons)
+                }
+                snippets::Kind::Snippet => Arc::new(|| true),
+            };
             extension = extension.with_favicons(favicons.clone(), source, wanted);
         }
         register(host, &format!("{kind:?}"), Arc::new(extension));

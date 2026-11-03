@@ -1,16 +1,11 @@
 pub mod manifest;
-pub mod preferences;
 pub mod registry;
 
 use std::collections::HashMap;
 use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::sync::{Arc, Mutex};
 
-pub use manifest::{
-    CommandDecl, InvocationMode, Manifest, ManifestError, PreferenceDecl, PreferenceKind,
-    NAMED_ICON,
-};
-pub use preferences::{PreferenceStore, Preferences};
+pub use manifest::{CommandDecl, InvocationMode, Manifest, ManifestError, NAMED_ICON};
 pub use registry::{Collision, Host, RegisteredCommand, Registry};
 
 pub type ActivationResult = Result<(), Box<dyn std::error::Error + Send + Sync>>;
@@ -419,7 +414,6 @@ mod tests {
                         keywords: vec![],
                         alias: None,
                     }],
-                    preferences: vec![],
                     root_items: false,
                     services: false,
                 },
@@ -551,7 +545,6 @@ mod tests {
                 name: "svc".into(),
                 icon: None,
                 commands: vec![],
-                preferences: vec![],
                 root_items: false,
                 services: true,
             },
@@ -625,7 +618,6 @@ mod tests {
                 name: self.0.into(),
                 icon: None,
                 commands: vec![],
-                preferences: vec![],
                 root_items: true,
                 services: false,
             }))
@@ -750,7 +742,6 @@ mod tests {
                 name: "Clipboard".into(),
                 icon: None,
                 commands: vec![],
-                preferences: vec![],
                 root_items: false,
                 services: true,
             },
@@ -812,7 +803,6 @@ mod tests {
                     name: "clip".into(),
                     icon: None,
                     commands: vec![command("history"), command("clear")],
-                    preferences: vec![],
                     root_items: false,
                     services: true,
                 },

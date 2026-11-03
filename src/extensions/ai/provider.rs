@@ -290,11 +290,4 @@ mod tests {
         assert!(!shown.contains("sk-secret"), "{shown}");
         assert!(shown.contains("<redacted>"), "{shown}");
     }
-
-    #[test]
-    fn a_thinking_level_parses_and_an_unknown_one_does_not() {
-        assert_eq!(Thinking::parse("high"), Some(Thinking::High));
-        assert_eq!(Thinking::parse("off"), Some(Thinking::Off));
-        assert_eq!(Thinking::parse("deep"), None);
-    }
 }

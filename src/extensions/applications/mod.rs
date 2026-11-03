@@ -29,7 +29,6 @@ pub(crate) fn manifest() -> Manifest {
         name: "Applications".into(),
         icon: None,
         commands: vec![],
-        preferences: vec![],
         root_items: true,
         services: true,
     }

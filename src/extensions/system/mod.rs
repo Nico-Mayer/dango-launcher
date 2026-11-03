@@ -157,7 +157,6 @@ pub(crate) fn manifest() -> Manifest {
                 ],
             ),
         ],
-        preferences: vec![],
         root_items: false,
         services: false,
     }

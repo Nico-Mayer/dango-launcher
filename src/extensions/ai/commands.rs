@@ -7,14 +7,12 @@
 
 use std::collections::BTreeMap;
 
-use crate::config::{CommandSettings, Config, ProviderSettings};
+use crate::config::{AiCommandSettings, Config, ProviderSettings};
 use crate::templates::Template;
 
 use super::provider::{Request, Thinking};
 
 pub const EXTENSION_ID: &str = "dango.ai";
-pub const PREF_PROVIDER: &str = "provider";
-pub const PREF_THINKING: &str = "thinking";
 
 pub use crate::config::Output;
 
@@ -97,11 +95,7 @@ pub struct Built {
 }
 
 pub fn build(config: &Config) -> Built {
-    let settings = config
-        .extensions
-        .get(EXTENSION_ID)
-        .map(|extension| extension.commands.clone())
-        .unwrap_or_default();
+    let settings = &config.ai.commands;
 
     let mut problems = Vec::new();
     let mut commands = Vec::new();
@@ -130,7 +124,7 @@ pub fn build(config: &Config) -> Built {
         }
     }
 
-    for (id, overrides) in &settings {
+    for (id, overrides) in settings {
         if used.contains(&id.as_str()) || overrides.enabled == Some(false) {
             continue;
         }
@@ -146,7 +140,7 @@ pub fn build(config: &Config) -> Built {
 fn merge(
     id: &str,
     shipped: Option<&Shipped>,
-    overrides: &CommandSettings,
+    overrides: &AiCommandSettings,
 ) -> Result<AiCommand, String> {
     let title = overrides
         .title
@@ -168,27 +162,14 @@ fn merge(
     Template::parse(&prompt)
         .map_err(|error| format!("{EXTENSION_ID}: the command '{id}': {error}"))?;
 
-    let thinking = match overrides.thinking.as_deref() {
-        None => None,
-        Some(text) => Some(Thinking::parse(text).ok_or_else(|| {
-            format!("{EXTENSION_ID}: the command '{id}' has an unknown thinking level '{text}'")
-        })?),
-    };
-    let output = match overrides.output.as_deref() {
-        None => Output::default(),
-        Some(text) => Output::parse(text).ok_or_else(|| {
-            format!("{EXTENSION_ID}: the command '{id}' has an unknown output '{text}'")
-        })?,
-    };
-
     Ok(AiCommand {
         id: id.into(),
         title,
         prompt,
         provider: overrides.provider.clone(),
         model: overrides.model.clone(),
-        thinking,
-        output,
+        thinking: overrides.thinking,
+        output: overrides.output.unwrap_or_default(),
     })
 }
 
@@ -216,17 +197,10 @@ pub enum NotReady {
 
 impl Providers {
     pub fn from_config(config: &Config) -> Self {
-        let Some(extension) = config.extensions.get(EXTENSION_ID) else {
-            return Self::default();
-        };
-        let default_thinking = config
-            .preference(EXTENSION_ID, PREF_THINKING)
-            .and_then(|text| Thinking::parse(&text))
-            .unwrap_or_default();
         Self {
-            entries: extension.providers.clone(),
-            default_provider: config.preference(EXTENSION_ID, PREF_PROVIDER),
-            default_thinking,
+            entries: config.ai.providers.clone(),
+            default_provider: config.ai.provider.clone(),
+            default_thinking: config.ai.thinking,
         }
     }
 
@@ -333,7 +307,7 @@ mod tests {
     fn a_shipped_command_can_be_overridden_in_place() {
         let built = build(&config(
             r#"
-                [extensions."dango.ai".commands.improve-writing]
+                [ai.commands.improve-writing]
                 provider = "local"
                 model = "qwen3:8b"
                 thinking = "low"
@@ -359,7 +333,7 @@ mod tests {
     fn a_rewritten_prompt_replaces_the_shipped_one() {
         let built = build(&config(
             r#"
-                [extensions."dango.ai"]
+                [ai]
                 commands = { summarize = { prompt = "One sentence only.\n\n{{ selection }}" } }
             "#,
         ));
@@ -372,9 +346,7 @@ mod tests {
     #[test]
     fn a_shipped_command_can_be_turned_off() {
         let built = build(&config(
-            r#"
-                extensions = { "dango.ai" = { commands = { make-longer = { enabled = false } } } }
-            "#,
+            r#"ai = { commands = { make-longer = { enabled = false } } }"#,
         ));
         assert!(find(&built, "make-longer").is_none());
         assert_eq!(built.commands.len(), SHIPPED.len() - 1, "others survived");
@@ -385,7 +357,7 @@ mod tests {
     fn a_title_and_a_prompt_add_a_command_of_the_users_own() {
         let built = build(&config(
             r#"
-                [extensions."dango.ai".commands]
+                [ai.commands]
                 review-rust = { title = "Review Rust", prompt = "Review.\n\n{{ selection }}" }
             "#,
         ));
@@ -399,7 +371,7 @@ mod tests {
     fn an_entry_that_is_neither_is_reported_and_skipped() {
         let built = build(&config(
             r#"
-                [extensions."dango.ai".commands]
+                [ai.commands]
                 half-written = { title = "Half Written" }
                 review-rust = { title = "Review Rust", prompt = "Review.\n\n{{ selection }}" }
             "#,
@@ -414,29 +386,43 @@ mod tests {
     }
 
     #[test]
-    fn an_unknown_thinking_level_or_output_is_reported_and_skipped() {
+    fn an_unknown_thinking_level_or_output_is_a_config_error() {
+        let error = Config::parse(r#"ai = { commands = { summarize = { thinking = "max" } } }"#)
+            .unwrap_err();
+        assert!(error.to_string().contains("max"), "{error}");
+        let error =
+            Config::parse(r#"ai = { commands = { explain = { output = "speak" } } }"#).unwrap_err();
+        assert!(error.to_string().contains("speak"), "{error}");
+        let error = Config::parse(r#"ai = { thinking = "deep" }"#).unwrap_err();
+        assert!(error.to_string().contains("deep"), "{error}");
+    }
+
+    #[test]
+    fn a_multi_line_prompt_is_read_as_written() {
         let built = build(&config(
             r#"
-                [extensions."dango.ai"]
-                commands = { summarize = { thinking = "max" }, explain = { output = "speak" } }
+                [ai.commands.commit-message]
+                title = "Write Commit Message"
+                prompt = """
+Write a commit message.
+
+{{ selection }}"""
             "#,
         ));
-        assert!(find(&built, "summarize").is_none());
-        assert!(find(&built, "explain").is_none());
-        assert_eq!(built.commands.len(), SHIPPED.len() - 2, "others survived");
-        assert_eq!(built.problems.len(), 2);
-        assert!(built.problems.iter().any(|problem| problem.contains("max")));
-        assert!(built
-            .problems
-            .iter()
-            .any(|problem| problem.contains("speak")));
+        let command = find(&built, "commit-message").unwrap();
+        assert_eq!(
+            command.prompt,
+            "Write a commit message.
+
+{{ selection }}"
+        );
     }
 
     #[test]
     fn a_prompt_that_cannot_be_parsed_is_reported_and_skipped() {
         let built = build(&config(
             r#"
-                [extensions."dango.ai".commands]
+                [ai.commands]
                 explain = { prompt = "Explain {{ selection" }
                 broken = { title = "Broken", prompt = "unclosed {{ name" }
             "#,
@@ -458,9 +444,7 @@ mod tests {
     #[test]
     fn an_entry_with_only_a_hotkey_keeps_the_shipped_command() {
         let built = build(&config(
-            r#"
-                extensions = { "dango.ai" = { commands = { explain = { hotkey = "hyper+e" } } } }
-            "#,
+            r#"ai = { commands = { explain = { hotkey = "hyper+e" } } }"#,
         ));
         assert!(find(&built, "explain").is_some());
         assert!(built.problems.is_empty());
@@ -483,16 +467,17 @@ mod tests {
     }
 
     const TWO_PROVIDERS: &str = r#"
-        [extensions."dango.ai"]
-        preferences = { provider = "anthropic", thinking = "medium" }
+        [ai]
+        provider = "anthropic"
+        thinking = "medium"
 
-        [extensions."dango.ai".providers]
+        [ai.providers]
         anthropic = { kind = "anthropic", model = "claude-sonnet-5" }
 
-        [extensions."dango.ai".providers.local]
+        [ai.providers.local]
         kind = "ollama"
-        baseUrl = "http://localhost:11434"
         model = "qwen3:8b"
+        base-url = "http://localhost:11434"
     "#;
 
     #[test]
@@ -502,14 +487,6 @@ mod tests {
         assert_eq!(request.provider, "anthropic");
         assert_eq!(request.model.as_deref(), Some("claude-sonnet-5"));
         assert_eq!(request.thinking, Thinking::Medium);
-    }
-
-    #[test]
-    fn a_thinking_level_dango_does_not_have_reads_as_the_default() {
-        let text = TWO_PROVIDERS.replace("thinking = \"medium\"", "thinking = \"deep\"");
-        let providers = Providers::from_config(&config(&text));
-        let request = providers.resolve(&command(None, None, None)).unwrap();
-        assert_eq!(request.thinking, Thinking::Off);
     }
 
     #[test]
@@ -547,8 +524,7 @@ mod tests {
     fn the_only_provider_is_the_default_without_saying_so() {
         let providers = Providers::from_config(&config(
             r#"
-                [extensions]
-                "dango.ai" = { providers = { local = { kind = "ollama", model = "qwen3:8b" } } }
+                ai = { providers = { local = { kind = "ollama", model = "qwen3:8b" } } }
             "#,
         ));
         let request = providers.resolve(&command(None, None, None)).unwrap();
@@ -571,7 +547,7 @@ mod tests {
     fn several_providers_and_no_default_asks_for_a_default() {
         let providers = Providers::from_config(&config(
             r#"
-                [extensions."dango.ai".providers]
+                [ai.providers]
                 anthropic = { kind = "anthropic", model = "claude-sonnet-5" }
                 local = { kind = "ollama", model = "qwen3:8b" }
             "#,
@@ -584,7 +560,7 @@ mod tests {
     fn a_command_naming_its_provider_needs_no_default() {
         let providers = Providers::from_config(&config(
             r#"
-                [extensions."dango.ai".providers]
+                [ai.providers]
                 anthropic = { kind = "anthropic", model = "claude-sonnet-5" }
                 local = { kind = "ollama", model = "qwen3:8b" }
             "#,
@@ -607,9 +583,7 @@ mod tests {
     #[test]
     fn a_provider_with_no_model_anywhere_says_so() {
         let providers = Providers::from_config(&config(
-            r#"
-                extensions = { "dango.ai" = { providers = { local = { kind = "ollama" } } } }
-            "#,
+            r#"ai = { providers = { local = { kind = "ollama" } } }"#,
         ));
         let error = providers.resolve(&command(None, None, None)).unwrap_err();
         assert!(
@@ -626,7 +600,7 @@ mod tests {
     fn an_agent_program_with_no_model_uses_its_own_default() {
         let providers = Providers::from_config(&config(
             r#"
-                [extensions."dango.ai"]
+                [ai]
                 providers = { claude = { kind = "claude", path = "C:/tools/claude.exe" } }
             "#,
         ));

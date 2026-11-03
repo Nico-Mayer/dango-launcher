@@ -13,17 +13,21 @@ use std::collections::BTreeMap;
 use global_hotkey::hotkey::Modifiers;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
 
 pub mod hotkey;
 mod location;
 pub mod schema;
 mod store;
+mod tables;
 pub mod watch;
 
 pub use hotkey::{Hotkey, HotkeyError, ParsedHotkey, PerPlatform};
 pub use location::{auth_path, config_dir, config_path, SCHEMA_REF};
 pub use store::FileConfig;
+pub use tables::{
+    table_name, AiCommandSettings, AiTable, ApplicationsTable, ClipboardTable, CommandBinding,
+    ExtensionTable, PrimaryAction, QuicklinksTable, Table,
+};
 
 #[derive(Debug, thiserror::Error)]
 pub enum ConfigError {
@@ -35,6 +39,7 @@ pub enum ConfigError {
 
 /// The whole configuration.
 #[derive(Debug, Clone, Default, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
 pub struct Config {
     /// The config schema version. Leave it at 1.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -42,9 +47,6 @@ pub struct Config {
     /// Settings of the launcher itself.
     #[serde(default, skip_serializing_if = "Launcher::is_empty")]
     pub launcher: Launcher,
-    /// Per-extension settings, keyed by extension id.
-    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
-    pub extensions: BTreeMap<String, Extension>,
     /// CapsLock, remapped to act as the hyper modifier system-wide.
     /// Present means on; leave it out to turn it off. On macOS it uses F18,
     /// so a hotkey with `f18` does not work while it is on.
@@ -53,7 +55,55 @@ pub struct Config {
     /// How Dango reads the text you have selected.
     #[serde(default, skip_serializing_if = "Selection::is_empty")]
     pub selection: Selection,
+    /// Settings for the AI extension.
+    #[serde(default)]
+    pub ai: AiTable,
+    /// Settings for the Applications extension.
+    #[serde(default)]
+    pub applications: ApplicationsTable,
+    /// Settings for the Clipboard History extension.
+    #[serde(default)]
+    pub clipboard: ClipboardTable,
+    /// Settings for the Games extension.
+    #[serde(default)]
+    pub games: Table,
+    /// Settings for the Permissions extension.
+    #[serde(default)]
+    pub permissions: Table,
+    /// Settings for the Quicklinks extension.
+    #[serde(default)]
+    pub quicklinks: QuicklinksTable,
+    /// Settings for the Snippets extension.
+    #[serde(default)]
+    pub snippets: Table,
+    /// Settings for the System extension.
+    #[serde(default)]
+    pub system: Table,
+    /// Settings for the Updates extension.
+    #[serde(default)]
+    pub updates: Table,
+    /// Settings for the Window Management extension.
+    #[serde(default)]
+    pub window_management: Table,
+    /// Extensions that are not built in, keyed by extension id. Holds only
+    /// what Dango itself reads for them: enabled state, aliases, and hotkeys.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub extensions: BTreeMap<String, Table>,
 }
+
+/// The table names of the built-in extensions, each also its id after `dango.`.
+pub const BUILT_IN_TABLES: [&str; 10] = [
+    "ai",
+    "applications",
+    "clipboard",
+    "games",
+    "permissions",
+    "quicklinks",
+    "snippets",
+    "system",
+    "updates",
+    "window-management",
+];
 
 /// CapsLock, remapped to act as the hyper modifier system-wide. While it is
 /// held, Ctrl+Alt+Shift+Super are in effect, so a chord like `hyper+left`
@@ -154,31 +204,10 @@ impl Launcher {
     }
 }
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize, JsonSchema)]
-pub struct Extension {
-    /// Whether the extension runs. Absent means enabled.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub enabled: Option<bool>,
-    /// The extension's preference values, overriding its defaults.
-    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
-    pub preferences: BTreeMap<String, Value>,
-    /// Per-command settings, keyed by command id.
-    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
-    pub commands: BTreeMap<String, CommandSettings>,
-    /// Applications bound to global hotkeys, keyed by the name Dango shows for
-    /// the application in root search.
-    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
-    pub apps: BTreeMap<String, AppSettings>,
-    /// Model services, keyed by the name commands refer to them by. That name
-    /// is also the key its API key is filed under in auth.json.
-    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
-    pub providers: BTreeMap<String, ProviderSettings>,
-}
-
 /// One model service. The key it is stored under is the name a command uses to
 /// refer to it, and the name its key in `auth.json` is filed under.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
+#[serde(rename_all = "kebab-case")]
 pub struct ProviderSettings {
     pub kind: ProviderKind,
     /// Where the service lives. Anthropic needs none; an OpenAI-compatible
@@ -228,21 +257,6 @@ pub enum Thinking {
     High,
 }
 
-impl Thinking {
-    /// The levels as they are written in the config file, lowest first.
-    pub const NAMES: [&'static str; 4] = ["off", "low", "medium", "high"];
-
-    pub fn parse(text: &str) -> Option<Self> {
-        match text {
-            "off" => Some(Thinking::Off),
-            "low" => Some(Thinking::Low),
-            "medium" => Some(Thinking::Medium),
-            "high" => Some(Thinking::High),
-            _ => None,
-        }
-    }
-}
-
 /// What becomes of an AI command's answer once it is complete.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "lowercase")]
@@ -252,17 +266,6 @@ pub enum Output {
     View,
     Paste,
     Copy,
-}
-
-impl Output {
-    pub fn parse(text: &str) -> Option<Self> {
-        match text {
-            "view" => Some(Output::View),
-            "paste" => Some(Output::Paste),
-            "copy" => Some(Output::Copy),
-            _ => None,
-        }
-    }
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, JsonSchema)]
@@ -311,31 +314,6 @@ pub struct CommandSettings {
     /// command the extension ships.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub enabled: Option<bool>,
-    /// The title root search shows. Needed for a command the file defines
-    /// from nothing.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub title: Option<String>,
-    /// What the model is asked, as a template. Placeholders: {{ selection }},
-    /// {{ clipboard }}, and any other name, which the launcher asks for.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub prompt: Option<String>,
-    /// The provider this command uses, by its name under providers. Absent
-    /// falls back to the extension's default provider.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub provider: Option<String>,
-    /// The model this command uses. Absent falls back to the provider's model.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub model: Option<String>,
-    /// How hard the model thinks before answering. Absent falls back to the
-    /// extension's default level.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[schemars(with = "Option<Thinking>")]
-    pub thinking: Option<String>,
-    /// What becomes of the answer: shown in the launcher, pasted into the
-    /// previous app, or copied. Default view.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[schemars(with = "Option<Output>")]
-    pub output: Option<String>,
 }
 
 impl Config {
@@ -354,29 +332,50 @@ impl Config {
         }
     }
 
+    /// The table an extension is configured under: its own top-level table
+    /// for a built-in, its entry under `extensions` otherwise.
+    pub fn table(&self, extension_id: &str) -> Option<&dyn ExtensionTable> {
+        let built_in: Option<&dyn ExtensionTable> = match table_name(extension_id) {
+            Some("ai") => Some(&self.ai),
+            Some("applications") => Some(&self.applications),
+            Some("clipboard") => Some(&self.clipboard),
+            Some("games") => Some(&self.games),
+            Some("permissions") => Some(&self.permissions),
+            Some("quicklinks") => Some(&self.quicklinks),
+            Some("snippets") => Some(&self.snippets),
+            Some("system") => Some(&self.system),
+            Some("updates") => Some(&self.updates),
+            Some("window-management") => Some(&self.window_management),
+            _ => None,
+        };
+        built_in.or_else(|| {
+            self.extensions
+                .get(extension_id)
+                .map(|table| table as &dyn ExtensionTable)
+        })
+    }
+
+    /// Every table with its extension id, in id order, so walking them is
+    /// deterministic.
+    pub fn tables(&self) -> Vec<(String, &dyn ExtensionTable)> {
+        let mut tables: Vec<(String, &dyn ExtensionTable)> = BUILT_IN_TABLES
+            .iter()
+            .map(|name| format!("dango.{name}"))
+            .chain(self.extensions.keys().cloned())
+            .filter_map(|id| self.table(&id).map(|table| (id, table)))
+            .collect();
+        tables.sort_by(|a, b| a.0.cmp(&b.0));
+        tables
+    }
+
     /// The enabled state the file declares for an extension, if any.
     pub fn enabled(&self, extension_id: &str) -> Option<bool> {
-        self.extensions.get(extension_id).and_then(|e| e.enabled)
+        self.table(extension_id)?.enabled()
     }
 
     /// The enabled state the file declares for one command, if any.
     pub fn command_enabled(&self, extension_id: &str, command_id: &str) -> Option<bool> {
-        self.extensions
-            .get(extension_id)?
-            .commands
-            .get(command_id)?
-            .enabled
-    }
-
-    /// A preference value the file sets, as the string the reader expects.
-    /// Typed JSON is rendered to the string form: a number to its digits, a
-    /// boolean to `true`/`false`, a string to itself.
-    pub fn preference(&self, extension_id: &str, key: &str) -> Option<String> {
-        let value = self.extensions.get(extension_id)?.preferences.get(key)?;
-        Some(match value {
-            Value::String(text) => text.clone(),
-            other => other.to_string(),
-        })
+        self.table(extension_id)?.command(command_id)?.enabled
     }
 
     /// The modifier set the hyperkey emits, and therefore what a `hyper` chord
@@ -394,12 +393,10 @@ impl Config {
 
     /// A command alias the file sets.
     pub fn alias(&self, extension_id: &str, command_id: &str) -> Option<String> {
-        self.extensions
-            .get(extension_id)?
-            .commands
-            .get(command_id)?
+        self.table(extension_id)?
+            .command(command_id)?
             .alias
-            .clone()
+            .map(str::to_string)
     }
 }
 
@@ -412,20 +409,16 @@ mod tests {
         let text = r#"
             version = 1
             launcher = { hotkey = "alt+space" }
-
-            [extensions."dango.clipboard"]
-            enabled = false
-            preferences = { max_entries = 200 }
-
-            [extensions."dango.window-management".commands.left-half]
-            alias = "lh"
+            clipboard = { enabled = false, entries = 200 }
+            window-management = { commands = { left-half = { alias = "lh" } } }
         "#;
         let config = Config::parse(text).unwrap();
         assert_eq!(config.version, Some(1));
         assert_eq!(config.enabled("dango.clipboard"), Some(false));
+        assert_eq!(config.clipboard.entries, 200);
         assert_eq!(
-            config.preference("dango.clipboard", "max_entries"),
-            Some("200".to_string())
+            config.clipboard.total_megabytes, 256,
+            "unset keeps its default"
         );
         assert_eq!(
             config.alias("dango.window-management", "left-half"),
@@ -438,18 +431,11 @@ mod tests {
         let text = r#"
             version = 1
             somethingFuturistic = { on = true }
+            extensions = { "dango.future" = { enabled = true, somethingNew = 42 } }
 
-            [extensions."dango.future"]
-            enabled = true
-            somethingNew = 42
-
-            [extensions."dango.ai".providers.local]
-            kind = "ollama"
-            keepAlive = "10m"
-
-            [extensions."dango.ai".commands.make-longer]
-            enabled = false
-            later = [1, 2]
+            [ai]
+            providers = { local = { kind = "ollama", keepAlive = "10m" } }
+            commands = { make-longer = { enabled = false, later = [1, 2] } }
         "#;
         let config = Config::parse(text).unwrap();
         assert_eq!(config.enabled("dango.future"), Some(true));
@@ -502,8 +488,53 @@ mod tests {
         let config = Config::parse("").unwrap();
         assert_eq!(config.version, None);
         assert_eq!(config.enabled("anything"), None);
-        assert_eq!(config.preference("anything", "key"), None);
+        assert!(config.table("anything").is_none());
         assert!(config.launcher.hotkey.is_none());
+    }
+
+    #[test]
+    fn a_built_in_is_read_from_its_own_table() {
+        let config = Config::parse(
+            r#"
+            [clipboard]
+            enabled = false
+            commands.history = { alias = "ch", enabled = false }
+
+            [extensions."author.x"]
+            enabled = false
+            commands.go = { alias = "g" }
+        "#,
+        )
+        .unwrap();
+        assert_eq!(config.enabled("dango.clipboard"), Some(false));
+        assert_eq!(
+            config.command_enabled("dango.clipboard", "history"),
+            Some(false)
+        );
+        assert_eq!(
+            config.alias("dango.clipboard", "history").as_deref(),
+            Some("ch")
+        );
+        assert_eq!(config.enabled("author.x"), Some(false));
+        assert_eq!(config.alias("author.x", "go").as_deref(), Some("g"));
+        assert_eq!(config.enabled("dango.games"), None);
+        let ids: Vec<String> = config.tables().into_iter().map(|(id, _)| id).collect();
+        assert_eq!(ids.len(), BUILT_IN_TABLES.len() + 1);
+        assert!(ids.windows(2).all(|pair| pair[0] < pair[1]), "{ids:?}");
+    }
+
+    #[test]
+    fn favicons_are_on_unless_turned_off() {
+        assert!(Config::default().quicklinks.favicons);
+        let config = Config::parse("quicklinks = { favicons = false }").unwrap();
+        assert!(!config.quicklinks.favicons);
+    }
+
+    #[test]
+    fn a_built_in_under_extensions_is_not_its_table() {
+        let config =
+            Config::parse(r#"extensions = { "dango.clipboard" = { enabled = false } }"#).unwrap();
+        assert_eq!(config.enabled("dango.clipboard"), None);
     }
 
     #[test]
@@ -541,14 +572,17 @@ launcher = { not toml",
     #[test]
     fn application_bindings_parse_in_both_shapes() {
         let text = r#"
-            [extensions."dango.applications".apps]
+            [applications.hotkeys]
             Safari = { hotkey = "hyper+b" }
-            terminal = { name = { macos = "Terminal", windows = "Windows Terminal" }, hotkey = "hyper+t" }
             elsewhere = { name = { windows = "Only There" }, hotkey = "hyper+e" }
             renamed = { name = "Visual Studio Code", hotkey = "hyper+c" }
+
+            [applications.hotkeys.terminal]
+            name = { macos = "Terminal", windows = "Windows Terminal" }
+            hotkey = "hyper+t"
         "#;
         let config = Config::parse(text).unwrap();
-        let apps = &config.extensions["dango.applications"].apps;
+        let apps = &config.applications.hotkeys;
         assert_eq!(apps["Safari"].name_for_platform("Safari"), Some("Safari"));
         assert_eq!(
             apps["renamed"].name_for_platform("renamed"),
@@ -599,20 +633,17 @@ launcher = { not toml",
 
     #[test]
     fn an_unrecognised_provider_kind_is_a_config_error() {
-        let error = Config::parse(
-            r#"[extensions."dango.ai".providers.future]
-            kind = "mistral""#,
-        )
-        .unwrap_err();
+        let error =
+            Config::parse(r#"ai = { providers = { future = { kind = "mistral" } } }"#).unwrap_err();
         assert!(error.to_string().contains("mistral"), "{error}");
     }
 
     #[test]
     fn a_program_is_not_a_provider_kind() {
         let error = Config::parse(
-            r#"[extensions."dango.ai".providers.claude]
-            kind = "cli"
-            command = "claude""#,
+            r#"
+                ai = { providers = { claude = { kind = "cli", command = "claude" } } }
+            "#,
         )
         .unwrap_err();
         assert!(error.to_string().contains("cli"), "{error}");
@@ -620,24 +651,21 @@ launcher = { not toml",
 
     #[test]
     fn codex_is_not_a_provider_kind() {
-        let error = Config::parse(
-            r#"[extensions."dango.ai".providers.codex]
-            kind = "codex""#,
-        )
-        .unwrap_err();
+        let error =
+            Config::parse(r#"ai = { providers = { codex = { kind = "codex" } } }"#).unwrap_err();
         assert!(error.to_string().contains("codex"), "{error}");
     }
 
     #[test]
     fn an_agent_provider_round_trips_with_its_path() {
         let text = r#"
-            [extensions."dango.ai".providers]
+            [ai.providers]
             claude = { kind = "claude", model = "sonnet", path = "C:/tools/claude.exe" }
             pi = { kind = "pi" }
         "#;
         let config = Config::parse(text).unwrap();
         let again = Config::parse(&toml::to_string(&config).unwrap()).unwrap();
-        let providers = &again.extensions["dango.ai"].providers;
+        let providers = &again.ai.providers;
 
         let claude = &providers["claude"];
         assert_eq!(claude.kind, ProviderKind::Claude);

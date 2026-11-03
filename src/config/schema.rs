@@ -8,16 +8,14 @@ use std::path::Path;
 use serde_json::{json, Map, Value};
 
 use super::hotkey::{stands_alone, KEY_TOKENS, MODIFIER_TOKENS};
-use super::Config;
-use crate::extension::{Manifest, PreferenceDecl, PreferenceKind};
+use super::{table_name, Config};
+use crate::extension::Manifest;
 
 pub const FILE_NAME: &str = "config.schema.json";
 
+/// The one extension whose commands the file may also define, so its
+/// `commands` stays open to ids it does not ship.
 const AI_ID: &str = "dango.ai";
-const APPLICATIONS_ID: &str = "dango.applications";
-/// Command settings only the AI extension reads; every other extension's
-/// commands reject them.
-const AI_ONLY: &[&str] = &["title", "prompt", "provider", "model", "thinking", "output"];
 
 pub fn generate(manifests: &[Manifest]) -> Value {
     let mut schema = schemars::schema_for!(Config).to_value();
@@ -26,10 +24,8 @@ pub fn generate(manifests: &[Manifest]) -> Value {
     describe_root(&mut schema);
     constrain_hotkeys(&mut schema);
     constrain_hyperkey(&mut schema);
-    split_command_settings(&mut schema);
-    let extensions = extensions(manifests, &schema["$defs"]["Extension"]);
-    schema["properties"]["extensions"] = extensions;
-    defs(&mut schema).remove("Extension");
+    inline_tables(&mut schema, manifests);
+    drop_unused_defs(&mut schema);
     tidy(&mut schema);
     schema
 }
@@ -197,106 +193,45 @@ fn constrain_hyperkey(schema: &mut Value) {
     hyperkey["tap"]["enum"] = json!(key_names());
 }
 
-/// One shape for every extension's commands and a wider one for the AI
-/// extension, whose commands are also defined in the file.
-fn split_command_settings(schema: &mut Value) {
-    let defs = defs(schema);
-    let full = defs["CommandSettings"].clone();
-    defs.insert("AiCommandSettings".into(), full);
-    let generic = defs["CommandSettings"]["properties"]
-        .as_object_mut()
-        .expect("command settings has properties");
-    for key in AI_ONLY {
-        generic.remove(*key);
-    }
-}
-
-fn extensions(manifests: &[Manifest], base: &Value) -> Value {
-    let mut properties = Map::new();
+/// Each built-in table is written out in place, so its `commands` can name
+/// the ids that extension ships. The AI table also accepts ids it does not
+/// ship, because the file defines new AI commands there.
+fn inline_tables(schema: &mut Value, manifests: &[Manifest]) {
     for manifest in manifests {
-        let mut entry = base.clone();
-        entry["description"] = json!(format!("Settings for the {} extension.", manifest.name));
-        let fields = entry["properties"]
-            .as_object_mut()
-            .expect("extension has properties");
-        let described =
-            |fields: &Map<String, Value>, name: &str| fields[name]["description"].clone();
-        let preferences = preferences(&manifest.preferences, described(fields, "preferences"));
-        let commands = commands(manifest, described(fields, "commands"));
-        fields.insert("preferences".into(), preferences);
-        fields.insert("commands".into(), commands);
-        if manifest.id != APPLICATIONS_ID {
-            fields.remove("apps");
+        let Some(name) = table_name(&manifest.id) else {
+            continue;
+        };
+        let property = schema["properties"][name].clone();
+        let mut table = resolve(schema, &property).0.clone();
+        table["description"] = property["description"].clone();
+        let commands = &mut table["properties"]["commands"];
+        let item = commands["additionalProperties"].clone();
+        let mut properties = Map::new();
+        for command in &manifest.commands {
+            properties.insert(
+                command.id.clone(),
+                json!({
+                    "$ref": item["$ref"],
+                    "description": format!("Settings for the {} command.", command.id)
+                }),
+            );
         }
+        commands["properties"] = Value::Object(properties);
         if manifest.id != AI_ID {
-            fields.remove("providers");
+            commands["additionalProperties"] = json!(false);
         }
-        properties.insert(manifest.id.clone(), entry);
-    }
-    json!({
-        "type": "object",
-        "description": "Per-extension settings, keyed by extension id.",
-        "additionalProperties": false,
-        "properties": properties
-    })
-}
-
-fn preferences(declarations: &[PreferenceDecl], description: Value) -> Value {
-    let mut properties = Map::new();
-    for decl in declarations {
-        let mut property = json!({
-            "type": kind_name(decl.kind),
-            "description": decl.description
-        });
-        if let Some(default) = &decl.default {
-            property["default"] = default.clone();
-        }
-        if !decl.values.is_empty() {
-            property["enum"] = json!(decl.values);
-        }
-        properties.insert(decl.key.clone(), property);
-    }
-    json!({
-        "type": "object",
-        "description": description,
-        "additionalProperties": false,
-        "properties": properties
-    })
-}
-
-fn kind_name(kind: PreferenceKind) -> &'static str {
-    match kind {
-        PreferenceKind::String => "string",
-        PreferenceKind::Number => "number",
-        PreferenceKind::Boolean => "boolean",
+        schema["properties"][name] = table;
     }
 }
 
-/// Commands are named by id, not title: a title can differ per platform, and
-/// the reference generated from this must not.
-fn commands(manifest: &Manifest, description: Value) -> Value {
-    let item = if manifest.id == AI_ID {
-        "#/$defs/AiCommandSettings"
-    } else {
-        "#/$defs/CommandSettings"
-    };
-    let mut properties = Map::new();
-    for command in &manifest.commands {
-        properties.insert(
-            command.id.clone(),
-            json!({
-                "$ref": item,
-                "description": format!("Settings for the {} command.", command.id)
-            }),
-        );
+fn drop_unused_defs(schema: &mut Value) {
+    let names: Vec<String> = defs(schema).keys().cloned().collect();
+    for name in names {
+        let reference = format!("\"#/$defs/{name}\"");
+        if !schema.to_string().contains(&reference) {
+            defs(schema).remove(&name);
+        }
     }
-    let open = manifest.id == AI_ID;
-    json!({
-        "type": "object",
-        "description": description,
-        "additionalProperties": if open { json!({ "$ref": item }) } else { json!(false) },
-        "properties": properties
-    })
 }
 
 /// The settings reference as Markdown: one table per object, every property
@@ -371,7 +306,11 @@ impl Reference<'_> {
                 self.out,
                 "| `{name}` | {} | {} | {} | {} |",
                 type_name(schema, property),
-                default_of(resolved),
+                default_of(if property.get("default").is_some() {
+                    property
+                } else {
+                    resolved
+                }),
                 values_of(resolved),
                 description
             );
@@ -490,6 +429,7 @@ fn type_name(schema: &Value, property: &Value) -> String {
 
 fn def_title(name: &str) -> String {
     match name {
+        "Table" => "Extension table",
         "CommandSettings" => "Command settings",
         "AiCommandSettings" => "AI command settings",
         "AppSettings" => "Application settings",
@@ -512,8 +452,13 @@ fn anchor(title: &str) -> String {
 
 fn default_of(node: &Value) -> String {
     match &node["default"] {
-        Value::Null => String::new(),
+        Value::Null | Value::Object(_) => String::new(),
         Value::String(text) => format!("`{text}`"),
+        Value::Array(items) => items
+            .iter()
+            .map(|item| format!("`{}`", item.as_str().unwrap_or_default()))
+            .collect::<Vec<_>>()
+            .join(", "),
         other => format!("`{other}`"),
     }
 }
@@ -559,49 +504,46 @@ mod tests {
         version = 1
         hyperkey = { shift = false, tap = "escape" }
         selection = { excluded-applications = "Zed" }
+        quicklinks = { favicons = false }
+        window-management = { commands = { left-half = { alias = "lh", hotkey = "hyper+left" } } }
+        system = { commands = { open-config = { hotkey = "hyper+comma" } } }
 
         [launcher]
         hotkey = { macos = "cmd+space", windows = "ctrl+space" }
         autostart = true
         reset-after = 90
 
-        [extensions]
-        "dango.quicklinks" = { preferences = { favicons = false } }
-        "dango.window-management" = { commands = { left-half = { alias = "lh", hotkey = "hyper+left" } } }
-        "dango.system" = { commands = { open-config = { hotkey = "hyper+comma" } } }
-
-        [extensions."dango.clipboard"]
+        [clipboard]
         enabled = true
-
-        [extensions."dango.clipboard".preferences]
         entries = 200
-        excluded-applications = "1Password"
+        excluded-applications = ["1Password"]
         primary-action = "copy"
 
-        [extensions."dango.applications".apps]
+        [applications.hotkeys]
         Safari = { hotkey = "hyper+b" }
 
-        [extensions."dango.applications".apps.editor]
+        [applications.hotkeys.editor]
         name = { macos = "TextEdit", windows = "Notepad" }
         hotkey = "hyper+e"
 
-        [extensions."dango.ai"]
-        preferences = { provider = "anthropic", thinking = "low" }
+        [ai]
+        provider = "anthropic"
+        thinking = "low"
 
-        [extensions."dango.ai".providers]
+        [ai.providers]
         anthropic = { kind = "anthropic", model = "claude-sonnet-5" }
-        local = { kind = "ollama", baseUrl = "http://localhost:11434" }
+        local = { kind = "ollama", base-url = "http://localhost:11434" }
 
-        [extensions."dango.ai".commands]
+        [ai.commands]
         make-longer = { enabled = false }
 
-        [extensions."dango.ai".commands.improve-writing]
+        [ai.commands.improve-writing]
         provider = "anthropic"
         thinking = "low"
         output = "paste"
         hotkey = "hyper+i"
 
-        [extensions."dango.ai".commands.review-rust]
+        [ai.commands.review-rust]
         title = "Review Rust"
         prompt = "Review {{ selection }}"
         alias = "rr"
@@ -630,96 +572,69 @@ mod tests {
     #[test]
     fn a_misspelt_key_is_rejected() {
         assert!(!accepts(r#"launcher = { hotkeys = "alt+space" }"#));
-        assert!(!accepts(
-            r#"extensions = { "dango.clipboard" = { preferences = { entry = 1 } } }"#
-        ));
+        assert!(!accepts(r#"clipboard = { entry = 1 }"#));
     }
 
     #[test]
-    fn an_extension_dango_does_not_ship_is_rejected() {
+    fn an_unknown_top_level_table_is_rejected() {
+        assert!(!accepts(r#"clipbaord = { entries = 1 }"#));
+        assert!(accepts(
+            r#"extensions = { "author.x" = { enabled = false, commands = { go = { alias = "g" } } } }"#
+        ));
         assert!(!accepts(
-            r#"extensions = { "dango.future" = { enabled = true } }"#
+            r#"extensions = { "author.x" = { colour = "red" } }"#
         ));
     }
 
     #[test]
     fn user_named_entries_are_accepted_and_checked() {
         assert!(accepts(
-            r#"
-                extensions = { "dango.applications" = { apps = { Mine = { hotkey = "hyper+m" } } } }
-            "#
+            r#"applications = { hotkeys = { Mine = { hotkey = "hyper+m" } } }"#
         ));
         assert!(!accepts(
-            r#"
-                extensions = { "dango.applications" = { apps = { Mine = { hotkeys = "hyper+m" } } } }
-            "#
+            r#"applications = { hotkeys = { Mine = { hotkeys = "hyper+m" } } }"#
         ));
         assert!(accepts(
-            r#"
-                extensions = { "dango.ai" = { providers = { mine = { kind = "ollama" } } } }
-            "#
+            r#"ai = { providers = { mine = { kind = "ollama" } } }"#
         ));
         assert!(accepts(
-            r#"
-                extensions = { "dango.ai" = { commands = { mine = { title = "T", prompt = "p" } } } }
-            "#
+            r#"ai = { commands = { mine = { title = "T", prompt = "p" } } }"#
         ));
         assert!(!accepts(
-            r#"
-                extensions = { "dango.ai" = { commands = { mine = { prompts = "p" } } } }
-            "#
+            r#"ai = { commands = { mine = { prompts = "p" } } }"#
         ));
     }
 
     #[test]
     fn an_ai_only_setting_is_rejected_for_another_extension() {
         assert!(!accepts(
-            r#"
-                [extensions]
-                "dango.window-management" = { commands = { left-half = { prompt = "p" } } }
-            "#
+            r#"window-management = { commands = { left-half = { prompt = "p" } } }"#
         ));
         assert!(!accepts(
-            r#"
-                extensions = { "dango.system" = { commands = { lock = { output = "copy" } } } }
-            "#
+            r#"system = { commands = { lock = { output = "copy" } } }"#
         ));
     }
 
     #[test]
     fn a_command_dango_does_not_ship_is_rejected_outside_ai() {
         assert!(!accepts(
-            r#"
-                extensions = { "dango.system" = { commands = { reboot = { alias = "r" } } } }
-            "#
+            r#"system = { commands = { reboot = { alias = "r" } } }"#
         ));
     }
 
     #[test]
     fn enumerated_values_are_checked() {
         assert!(!accepts(
-            r#"
-                extensions = { "dango.ai" = { providers = { x = { kind = "mistral" } } } }
-            "#
+            r#"ai = { providers = { x = { kind = "mistral" } } }"#
         ));
         assert!(!accepts(
-            r#"
-                extensions = { "dango.ai" = { commands = { x = { thinking = "deep" } } } }
-            "#
+            r#"ai = { commands = { x = { thinking = "deep" } } }"#
         ));
         assert!(!accepts(
-            r#"
-                extensions = { "dango.ai" = { commands = { x = { output = "speak" } } } }
-            "#
+            r#"ai = { commands = { x = { output = "speak" } } }"#
         ));
-        assert!(!accepts(
-            r#"extensions = { "dango.ai" = { preferences = { thinking = "deep" } } }"#
-        ));
-        assert!(!accepts(
-            r#"
-                extensions = { "dango.clipboard" = { preferences = { primary-action = "speak" } } }
-            "#
-        ));
+        assert!(!accepts(r#"ai = { thinking = "deep" }"#));
+        assert!(!accepts(r#"clipboard = { primary-action = "speak" }"#));
         assert!(!accepts(r#"hyperkey = { key = "capslock" }"#));
         assert!(!accepts(r#"hyperkey = { tap = "lft" }"#));
     }
@@ -769,58 +684,51 @@ mod tests {
     }
 
     #[test]
-    fn every_built_in_preference_and_command_is_named() {
+    fn every_built_in_table_and_command_is_named() {
         let schema = schema();
-        let extensions = &schema["properties"]["extensions"]["properties"];
-        let manifests = builtin_manifests();
-        assert_eq!(extensions.as_object().unwrap().len(), manifests.len());
-        for manifest in &manifests {
-            let entry = &extensions[&manifest.id];
-            for decl in &manifest.preferences {
-                let property = &entry["properties"]["preferences"]["properties"][&decl.key];
-                assert_eq!(property["type"], kind_name(decl.kind), "{}", decl.key);
-                assert_eq!(property["description"], decl.description, "{}", decl.key);
-                match &decl.default {
-                    Some(Value::Number(number)) => {
-                        assert_eq!(
-                            property["default"].as_f64(),
-                            number.as_f64(),
-                            "{}",
-                            decl.key
-                        )
-                    }
-                    other => {
-                        assert_eq!(&property["default"], other.as_ref().unwrap_or(&Value::Null))
-                    }
-                }
-                if decl.values.is_empty() {
-                    assert!(property.get("enum").is_none());
-                } else {
-                    assert_eq!(property["enum"], json!(decl.values));
-                }
-            }
+        let properties = &schema["properties"];
+        for manifest in builtin_manifests() {
+            let name = table_name(&manifest.id).unwrap();
+            let table = &properties[name];
+            assert!(table.is_object(), "{name}");
             for command in &manifest.commands {
                 assert!(
-                    entry["properties"]["commands"]["properties"]
+                    table["properties"]["commands"]["properties"]
                         .get(&command.id)
                         .is_some(),
-                    "{}.{}",
-                    manifest.id,
+                    "{name}.{}",
                     command.id
                 );
             }
         }
-        let ai = extensions[AI_ID]["properties"]["commands"]["properties"]
+        let ai = properties["ai"]["properties"]["commands"]["properties"]
             .as_object()
             .unwrap();
         assert_eq!(ai.len(), 9, "the nine shipped AI commands");
-        assert!(extensions[AI_ID]["properties"].get("providers").is_some());
-        assert!(extensions[APPLICATIONS_ID]["properties"]
-            .get("apps")
+        assert!(properties["ai"]["properties"].get("providers").is_some());
+        assert!(properties["applications"]["properties"]
+            .get("hotkeys")
             .is_some());
-        assert!(extensions["dango.system"]["properties"]
-            .get("apps")
-            .is_none());
+        assert!(properties["system"]["properties"].get("hotkeys").is_none());
+    }
+
+    #[test]
+    fn a_setting_carries_its_type_default_and_values() {
+        let schema = schema();
+        let clipboard = &schema["properties"]["clipboard"]["properties"];
+        assert_eq!(clipboard["entries"]["type"], "integer");
+        assert_eq!(clipboard["entries"]["default"], 500);
+        assert_eq!(clipboard["excluded-applications"]["type"], "array");
+        assert_eq!(
+            clipboard["excluded-applications"]["description"],
+            "Applications whose copies are never recorded, matched ignoring case."
+        );
+        let action = resolve(&schema, &clipboard["primary-action"]).0;
+        assert_eq!(action["enum"], json!(["paste", "copy"]));
+        assert_eq!(
+            schema["properties"]["quicklinks"]["properties"]["favicons"]["default"],
+            true
+        );
     }
 
     #[test]
@@ -881,7 +789,8 @@ mod tests {
         let text = reference(&schema());
         assert!(text.starts_with("# Dango configuration\n"));
         assert!(text.contains("| `primary-action` | string | `paste` | `paste`, `copy` |"));
-        assert!(text.contains("## `extensions.dango.clipboard.preferences`"));
+        assert!(text.contains("## `clipboard`"));
+        assert!(!text.contains("preferences"));
         assert!(text.contains("## Command settings"));
         assert!(text.contains("## AI command settings"));
         assert!(text.contains("## Hotkey"));

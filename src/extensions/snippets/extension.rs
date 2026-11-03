@@ -11,8 +11,8 @@ use async_trait::async_trait;
 
 use crate::browser::Browser;
 use crate::extension::{
-    ActionOutcome, CommandDecl, Extension, FormValues, InvocationMode, Manifest, PreferenceDecl,
-    PreferenceKind, Service, NAMED_ICON,
+    ActionOutcome, CommandDecl, Extension, FormValues, InvocationMode, Manifest, Service,
+    NAMED_ICON,
 };
 use crate::invocation::{Command, InvocationContext};
 use crate::protocol::{
@@ -60,10 +60,6 @@ const FIELD_BROWSER: &str = "browser";
 /// Prefix for the fields an argument form asks about, so an argument called
 /// "name" cannot collide with the snippet's own name field.
 const ARGUMENT_PREFIX: &str = "arg:";
-
-/// Whether a quicklink wears the icon of the site it opens. Off stops Dango
-/// asking those sites for anything.
-pub const PREF_FAVICONS: &str = "favicons";
 
 pub struct SnippetsExtension {
     manifest: Manifest,
@@ -641,29 +637,11 @@ pub(crate) fn manifest(kind: Kind) -> Manifest {
                 alias: None,
             },
         ],
-        preferences: match kind {
-            Kind::Quicklink => vec![PreferenceDecl {
-                key: PREF_FAVICONS.into(),
-                kind: PreferenceKind::Boolean,
-                default: Some(true.into()),
-                description:
-                    "Show each quicklink with its site's icon. Off stops Dango fetching from those sites."
-                        .into(),
-                values: vec![],
-            }],
-            Kind::Snippet => vec![],
-        },
         root_items: true,
         // Both kinds run one: keyword expansion for snippets, favicon fetching
         // for quicklinks.
         services: true,
     }
-}
-
-/// What the host needs to read this extension's preferences, without handing it
-/// the manifest.
-pub fn preference_declarations(kind: Kind) -> Vec<PreferenceDecl> {
-    manifest(kind).preferences
 }
 
 #[cfg(test)]
@@ -1437,24 +1415,6 @@ mod tests {
 
     fn provider(extension: &SnippetsExtension) -> Arc<dyn crate::search::RootProvider> {
         extension.root_provider().expect("quicklinks provide items")
-    }
-
-    #[test]
-    fn only_quicklinks_declare_the_favicon_preference() {
-        let quicklinks = manifest(Kind::Quicklink);
-        let keys: Vec<_> = quicklinks
-            .preferences
-            .iter()
-            .map(|preference| preference.key.as_str())
-            .collect();
-        assert_eq!(keys, [PREF_FAVICONS]);
-        assert_eq!(
-            quicklinks.preferences[0].default,
-            Some(serde_json::Value::Bool(true)),
-            "favicons are on unless the user turns them off"
-        );
-        assert!(manifest(Kind::Snippet).preferences.is_empty());
-        assert!(quicklinks.validate().is_ok());
     }
 
     #[test]

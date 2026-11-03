@@ -22,7 +22,6 @@ pub(crate) fn manifest() -> Manifest {
         name: "Permissions".into(),
         icon: None,
         commands: vec![],
-        preferences: vec![],
         root_items: true,
         services: false,
     }

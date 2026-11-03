@@ -6,43 +6,37 @@ Every setting in config.toml. Generated from the code; do not edit by hand.
 
 | Setting | Type | Default | Values | Description |
 | --- | --- | --- | --- | --- |
-| `extensions` | object |  |  | Per-extension settings, keyed by extension id. |
+| `ai` | object |  |  | Settings for the AI extension. |
+| `applications` | object |  |  | Settings for the Applications extension. |
+| `clipboard` | object |  |  | Settings for the Clipboard History extension. |
+| `extensions` | map of [Extension table](#extension-table) |  |  | Extensions that are not built in, keyed by extension id. Holds only what Dango itself reads for them: enabled state, aliases, and hotkeys. |
+| `games` | object |  |  | Settings for the Games extension. |
 | `hyperkey` | [Hyperkey](#hyperkey) |  |  | CapsLock, remapped to act as the hyper modifier system-wide. Present means on; leave it out to turn it off. On macOS it uses F18, so a hotkey with `f18` does not work while it is on. |
 | `launcher` | [Launcher](#launcher) |  |  | Settings of the launcher itself. |
+| `permissions` | object |  |  | Settings for the Permissions extension. |
+| `quicklinks` | object |  |  | Settings for the Quicklinks extension. |
 | `selection` | [Selection](#selection) |  |  | How Dango reads the text you have selected. |
+| `snippets` | object |  |  | Settings for the Snippets extension. |
+| `system` | object |  |  | Settings for the System extension. |
+| `updates` | object |  |  | Settings for the Updates extension. |
 | `version` | integer |  |  | The config schema version. Leave it at 1. |
+| `window-management` | object |  |  | Settings for the Window Management extension. |
 
-## `extensions`
-
-Per-extension settings, keyed by extension id.
-
-| Setting | Type | Default | Values | Description |
-| --- | --- | --- | --- | --- |
-| `dango.ai` | object |  |  | Settings for the AI extension. |
-| `dango.applications` | object |  |  | Settings for the Applications extension. |
-| `dango.clipboard` | object |  |  | Settings for the Clipboard History extension. |
-| `dango.games` | object |  |  | Settings for the Games extension. |
-| `dango.permissions` | object |  |  | Settings for the Permissions extension. |
-| `dango.quicklinks` | object |  |  | Settings for the Quicklinks extension. |
-| `dango.snippets` | object |  |  | Settings for the Snippets extension. |
-| `dango.system` | object |  |  | Settings for the System extension. |
-| `dango.updates` | object |  |  | Settings for the Updates extension. |
-| `dango.window-management` | object |  |  | Settings for the Window Management extension. |
-
-## `extensions.dango.ai`
+## `ai`
 
 Settings for the AI extension.
 
 | Setting | Type | Default | Values | Description |
 | --- | --- | --- | --- | --- |
-| `commands` | map of [AI command settings](#ai-command-settings) |  |  | Per-command settings, keyed by command id. |
+| `commands` | map of [AI command settings](#ai-command-settings) |  |  | Per-command settings, keyed by command id. A command id the extension does not ship defines a new command. |
 | `enabled` | boolean |  |  | Whether the extension runs. Absent means enabled. |
-| `preferences` | object |  |  | The extension's preference values, overriding its defaults. |
+| `provider` | string |  |  | The provider a command uses when it names none. |
 | `providers` | map of [Provider settings](#provider-settings) |  |  | Model services, keyed by the name commands refer to them by. That name is also the key its API key is filed under in auth.json. |
+| `thinking` | string | `off` | `off`, `low`, `medium`, `high` | How hard the model thinks when a command does not say. |
 
-## `extensions.dango.ai.commands`
+## `ai.commands`
 
-Per-command settings, keyed by command id.
+Per-command settings, keyed by command id. A command id the extension does not ship defines a new command.
 
 | Setting | Type | Default | Values | Description |
 | --- | --- | --- | --- | --- |
@@ -56,25 +50,16 @@ Per-command settings, keyed by command id.
 | `summarize` | [AI command settings](#ai-command-settings) |  |  | Settings for the summarize command. |
 | `translate` | [AI command settings](#ai-command-settings) |  |  | Settings for the translate command. |
 
-## `extensions.dango.ai.preferences`
-
-The extension's preference values, overriding its defaults.
-
-| Setting | Type | Default | Values | Description |
-| --- | --- | --- | --- | --- |
-| `provider` | string |  |  | The provider a command uses when it names none. |
-| `thinking` | string | `off` | `off`, `low`, `medium`, `high` | How hard the model thinks when a command does not say. |
-
-## `extensions.dango.applications`
+## `applications`
 
 Settings for the Applications extension.
 
 | Setting | Type | Default | Values | Description |
 | --- | --- | --- | --- | --- |
-| `apps` | map of [Application settings](#application-settings) |  |  | Applications bound to global hotkeys, keyed by the name Dango shows for the application in root search. |
 | `enabled` | boolean |  |  | Whether the extension runs. Absent means enabled. |
+| `hotkeys` | map of [Application settings](#application-settings) |  |  | Applications bound to global hotkeys, keyed by the name Dango shows for the application in root search. |
 
-## `extensions.dango.clipboard`
+## `clipboard`
 
 Settings for the Clipboard History extension.
 
@@ -82,9 +67,13 @@ Settings for the Clipboard History extension.
 | --- | --- | --- | --- | --- |
 | `commands` | object |  |  | Per-command settings, keyed by command id. |
 | `enabled` | boolean |  |  | Whether the extension runs. Absent means enabled. |
-| `preferences` | object |  |  | The extension's preference values, overriding its defaults. |
+| `entries` | integer | `500` |  | How many entries the history keeps. |
+| `entry-megabytes` | integer | `16` |  | The largest single entry kept, in megabytes. |
+| `excluded-applications` | array | `1Password`, `Bitwarden`, `Dashlane`, `Enpass`, `KeePassXC`, `Keeper`, `LastPass`, `NordPass`, `Proton Pass`, `Secrets`, `Strongbox` |  | Applications whose copies are never recorded, matched ignoring case. |
+| `primary-action` | string | `paste` | `paste`, `copy` | What Enter does to an entry: paste it into the previous app, or only copy it. |
+| `total-megabytes` | integer | `256` |  | The most the whole history may use, in megabytes. |
 
-## `extensions.dango.clipboard.commands`
+## `clipboard.commands`
 
 Per-command settings, keyed by command id.
 
@@ -92,19 +81,7 @@ Per-command settings, keyed by command id.
 | --- | --- | --- | --- | --- |
 | `history` | [Command settings](#command-settings) |  |  | Settings for the history command. |
 
-## `extensions.dango.clipboard.preferences`
-
-The extension's preference values, overriding its defaults.
-
-| Setting | Type | Default | Values | Description |
-| --- | --- | --- | --- | --- |
-| `entries` | number | `500` |  | How many entries the history keeps. |
-| `entry-megabytes` | number | `16` |  | The largest single entry kept, in megabytes. |
-| `excluded-applications` | string | `1Password, Bitwarden, Dashlane, Enpass, KeePassXC, Keeper, LastPass, NordPass, Proton Pass, Secrets, Strongbox` |  | Applications whose copies are never recorded, comma separated. |
-| `primary-action` | string | `paste` | `paste`, `copy` | What Enter does to an entry: paste it into the previous app, or only copy it. |
-| `total-megabytes` | number | `256` |  | The most the whole history may use, in megabytes. |
-
-## `extensions.dango.games`
+## `games`
 
 Settings for the Games extension.
 
@@ -113,7 +90,7 @@ Settings for the Games extension.
 | `commands` | object |  |  | Per-command settings, keyed by command id. |
 | `enabled` | boolean |  |  | Whether the extension runs. Absent means enabled. |
 
-## `extensions.dango.games.commands`
+## `games.commands`
 
 Per-command settings, keyed by command id.
 
@@ -121,7 +98,7 @@ Per-command settings, keyed by command id.
 | --- | --- | --- | --- | --- |
 | `search` | [Command settings](#command-settings) |  |  | Settings for the search command. |
 
-## `extensions.dango.permissions`
+## `permissions`
 
 Settings for the Permissions extension.
 
@@ -129,7 +106,7 @@ Settings for the Permissions extension.
 | --- | --- | --- | --- | --- |
 | `enabled` | boolean |  |  | Whether the extension runs. Absent means enabled. |
 
-## `extensions.dango.quicklinks`
+## `quicklinks`
 
 Settings for the Quicklinks extension.
 
@@ -137,9 +114,9 @@ Settings for the Quicklinks extension.
 | --- | --- | --- | --- | --- |
 | `commands` | object |  |  | Per-command settings, keyed by command id. |
 | `enabled` | boolean |  |  | Whether the extension runs. Absent means enabled. |
-| `preferences` | object |  |  | The extension's preference values, overriding its defaults. |
+| `favicons` | boolean | `true` |  | Show each quicklink with its site's icon. Off stops Dango fetching from those sites. |
 
-## `extensions.dango.quicklinks.commands`
+## `quicklinks.commands`
 
 Per-command settings, keyed by command id.
 
@@ -148,15 +125,7 @@ Per-command settings, keyed by command id.
 | `create` | [Command settings](#command-settings) |  |  | Settings for the create command. |
 | `search` | [Command settings](#command-settings) |  |  | Settings for the search command. |
 
-## `extensions.dango.quicklinks.preferences`
-
-The extension's preference values, overriding its defaults.
-
-| Setting | Type | Default | Values | Description |
-| --- | --- | --- | --- | --- |
-| `favicons` | boolean | `true` |  | Show each quicklink with its site's icon. Off stops Dango fetching from those sites. |
-
-## `extensions.dango.snippets`
+## `snippets`
 
 Settings for the Snippets extension.
 
@@ -165,7 +134,7 @@ Settings for the Snippets extension.
 | `commands` | object |  |  | Per-command settings, keyed by command id. |
 | `enabled` | boolean |  |  | Whether the extension runs. Absent means enabled. |
 
-## `extensions.dango.snippets.commands`
+## `snippets.commands`
 
 Per-command settings, keyed by command id.
 
@@ -174,7 +143,7 @@ Per-command settings, keyed by command id.
 | `create` | [Command settings](#command-settings) |  |  | Settings for the create command. |
 | `search` | [Command settings](#command-settings) |  |  | Settings for the search command. |
 
-## `extensions.dango.system`
+## `system`
 
 Settings for the System extension.
 
@@ -183,7 +152,7 @@ Settings for the System extension.
 | `commands` | object |  |  | Per-command settings, keyed by command id. |
 | `enabled` | boolean |  |  | Whether the extension runs. Absent means enabled. |
 
-## `extensions.dango.system.commands`
+## `system.commands`
 
 Per-command settings, keyed by command id.
 
@@ -195,7 +164,7 @@ Per-command settings, keyed by command id.
 | `quit-application` | [Command settings](#command-settings) |  |  | Settings for the quit-application command. |
 | `sleep` | [Command settings](#command-settings) |  |  | Settings for the sleep command. |
 
-## `extensions.dango.updates`
+## `updates`
 
 Settings for the Updates extension.
 
@@ -204,7 +173,7 @@ Settings for the Updates extension.
 | `commands` | object |  |  | Per-command settings, keyed by command id. |
 | `enabled` | boolean |  |  | Whether the extension runs. Absent means enabled. |
 
-## `extensions.dango.updates.commands`
+## `updates.commands`
 
 Per-command settings, keyed by command id.
 
@@ -212,7 +181,7 @@ Per-command settings, keyed by command id.
 | --- | --- | --- | --- | --- |
 | `check` | [Command settings](#command-settings) |  |  | Settings for the check command. |
 
-## `extensions.dango.window-management`
+## `window-management`
 
 Settings for the Window Management extension.
 
@@ -221,7 +190,7 @@ Settings for the Window Management extension.
 | `commands` | object |  |  | Per-command settings, keyed by command id. |
 | `enabled` | boolean |  |  | Whether the extension runs. Absent means enabled. |
 
-## `extensions.dango.window-management.commands`
+## `window-management.commands`
 
 Per-command settings, keyed by command id.
 
@@ -246,6 +215,13 @@ Per-command settings, keyed by command id.
 | `top-half` | [Command settings](#command-settings) |  |  | Settings for the top-half command. |
 | `top-left-quarter` | [Command settings](#command-settings) |  |  | Settings for the top-left-quarter command. |
 | `top-right-quarter` | [Command settings](#command-settings) |  |  | Settings for the top-right-quarter command. |
+
+## Extension table
+
+| Setting | Type | Default | Values | Description |
+| --- | --- | --- | --- | --- |
+| `commands` | map of [Command settings](#command-settings) |  |  | Per-command settings, keyed by command id. |
+| `enabled` | boolean |  |  | Whether the extension runs. Absent means enabled. |
 
 ## Hyperkey
 
@@ -272,7 +248,7 @@ Per-command settings, keyed by command id.
 
 | Setting | Type | Default | Values | Description |
 | --- | --- | --- | --- | --- |
-| `baseUrl` | string |  |  | Where the service lives. Anthropic needs none; an OpenAI-compatible endpoint always does; Ollama defaults to the local one. |
+| `base-url` | string |  |  | Where the service lives. Anthropic needs none; an OpenAI-compatible endpoint always does; Ollama defaults to the local one. |
 | `kind` | string |  | `anthropic`, `openai`, `ollama`, `claude`, `pi` | The protocol a provider speaks. `openai` covers any OpenAI-compatible endpoint, such as OpenRouter, LM Studio, or vLLM. `claude` and `pi` run that CLI with the sign-in it already has. |
 | `model` | string |  |  | The model used by a command that names this provider but no model. Optional for `claude` and `pi`, which then use their own default. |
 | `path` | string |  |  | Absolute path to the program, for `claude` and `pi`. Without it Dango looks on PATH and in the usual install folders. |
@@ -283,7 +259,7 @@ Per-command settings, keyed by command id.
 | --- | --- | --- | --- | --- |
 | `alias` | string |  |  | A short alias that matches this command in root search. |
 | `enabled` | boolean |  |  | Whether the command is offered. Absent means yes; false removes a command the extension ships. |
-| `hotkey` | [Hotkey](#hotkey) |  |  | A global hotkey that runs this command from anywhere. A no-view command runs without showing the launcher; a view command shows its view. |
+| `hotkey` | [Hotkey](#hotkey) |  |  | A global hotkey that runs this command from anywhere. The command shows its view. |
 | `model` | string |  |  | The model this command uses. Absent falls back to the provider's model. |
 | `output` | [Output](#output) |  |  | What becomes of the answer: shown in the launcher, pasted into the previous app, or copied. Default view. |
 | `prompt` | string |  |  | What the model is asked, as a template. Placeholders: {{ selection }}, {{ clipboard }}, and any other name, which the launcher asks for. |

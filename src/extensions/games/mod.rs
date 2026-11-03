@@ -54,7 +54,6 @@ pub(crate) fn manifest() -> Manifest {
                 .collect(),
             alias: None,
         }],
-        preferences: vec![],
         root_items: true,
         services: true,
     }

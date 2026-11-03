@@ -1,13 +1,15 @@
 //! The extension proper: the manifest, the command that opens the history, and
-//! the policy that turns preferences into the bounds and exclusions the watcher
-//! asks for on every change.
+//! the policy that turns the `[clipboard]` settings into the bounds and
+//! exclusions the watcher asks for on every change.
 
 use std::path::Path;
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 
+use crate::config::Config;
+pub use crate::config::PrimaryAction;
 use crate::extension::{
-    ActionOutcome, CommandDecl, Extension, FormValues, InvocationMode, Manifest, PreferenceDecl,
-    PreferenceKind, Preferences, Service, NAMED_ICON,
+    ActionOutcome, CommandDecl, Extension, FormValues, InvocationMode, Manifest, Service,
+    NAMED_ICON,
 };
 use crate::icon_cache::{IconCache, IconRgba, ICON_SIZE};
 use crate::invocation::{Command, InvocationContext};
@@ -21,7 +23,6 @@ use time::OffsetDateTime;
 use super::history::{Bounds, Entry, History, Kind, LISTED_CHARS};
 use super::metadata;
 use super::watcher::{Policy, WatchService, Watcher};
-use super::DEFAULT_EXCLUDED_APPLICATIONS;
 
 pub const EXTENSION_ID: &str = "dango.clipboard";
 pub const COMMAND_HISTORY: &str = "history";
@@ -30,13 +31,7 @@ pub const ACTION_INSERT: &str = "insert";
 pub const ACTION_RESTORE: &str = "restore";
 pub const ACTION_REMOVE: &str = "remove";
 
-pub const PREF_ENTRIES: &str = "entries";
-pub const PREF_ENTRY_MEGABYTES: &str = "entry-megabytes";
-pub const PREF_TOTAL_MEGABYTES: &str = "total-megabytes";
-pub const PREF_EXCLUDED: &str = "excluded-applications";
-pub const PREF_PRIMARY_ACTION: &str = "primary-action";
-
-const MEGABYTE: f64 = 1024.0 * 1024.0;
+const MEGABYTE: usize = 1024 * 1024;
 
 /// How much of a text entry is worth showing on one line.
 const PREVIEW_CHARS: usize = 120;
@@ -45,7 +40,7 @@ pub struct ClipboardExtension {
     manifest: Manifest,
     history: Arc<History>,
     watcher: Arc<Watcher>,
-    preferences: Arc<Preferences>,
+    config: Arc<RwLock<Config>>,
     text: Option<Arc<dyn TextTarget>>,
     icons: Arc<IconCache>,
     render_icon: fn(&str) -> Option<IconRgba>,
@@ -55,7 +50,7 @@ impl ClipboardExtension {
     pub fn new(
         history: Arc<History>,
         watcher: Arc<Watcher>,
-        preferences: Preferences,
+        config: Arc<RwLock<Config>>,
         text: Option<Arc<dyn TextTarget>>,
         icons: Arc<IconCache>,
     ) -> Self {
@@ -63,7 +58,7 @@ impl ClipboardExtension {
             manifest: manifest(),
             history,
             watcher,
-            preferences: Arc::new(preferences),
+            config,
             text,
             icons,
             render_icon: render_file_icon,
@@ -79,7 +74,7 @@ impl ClipboardExtension {
     }
 
     fn list(&self) -> ViewTree {
-        let primary = primary_action(&self.preferences);
+        let primary = primary_action(&self.config);
         match self.history.entries() {
             Ok(entries) => history_view(&entries, primary, local_now(), &self.icons),
             Err(error) => {
@@ -103,7 +98,7 @@ impl Extension for ClipboardExtension {
         match command_id {
             COMMAND_HISTORY => Some(Arc::new(HistoryCommand {
                 history: self.history.clone(),
-                preferences: self.preferences.clone(),
+                config: self.config.clone(),
                 icons: self.icons.clone(),
                 render_icon: self.render_icon,
             })),
@@ -144,14 +139,6 @@ impl Extension for ClipboardExtension {
     }
 }
 
-/// The preference declarations, for building a reader before the extension
-/// itself exists. Without these the reader has nothing to supply defaults from,
-/// so every value would read as absent and a hand-edited exclusion list would
-/// silently do nothing.
-pub fn preference_declarations() -> Vec<PreferenceDecl> {
-    manifest().preferences
-}
-
 pub(crate) fn manifest() -> Manifest {
     Manifest {
         manifest_version: 1,
@@ -169,112 +156,52 @@ pub(crate) fn manifest() -> Manifest {
                 .collect(),
             alias: None,
         }],
-        preferences: vec![
-            number(PREF_ENTRIES, 500.0, "How many entries the history keeps."),
-            number(
-                PREF_ENTRY_MEGABYTES,
-                16.0,
-                "The largest single entry kept, in megabytes.",
-            ),
-            number(
-                PREF_TOTAL_MEGABYTES,
-                256.0,
-                "The most the whole history may use, in megabytes.",
-            ),
-            PreferenceDecl {
-                key: PREF_EXCLUDED.into(),
-                kind: PreferenceKind::String,
-                default: Some(DEFAULT_EXCLUDED_APPLICATIONS.join(", ").into()),
-                description: "Applications whose copies are never recorded, comma separated."
-                    .into(),
-                values: vec![],
-            },
-            PreferenceDecl {
-                key: PREF_PRIMARY_ACTION.into(),
-                kind: PreferenceKind::String,
-                default: Some("paste".into()),
-                description:
-                    "What Enter does to an entry: paste it into the previous app, or only copy it."
-                        .into(),
-                values: vec!["paste".into(), "copy".into()],
-            },
-        ],
         root_items: false,
         services: true,
     }
 }
 
-fn number(key: &str, default: f64, description: &str) -> PreferenceDecl {
-    PreferenceDecl {
-        key: key.into(),
-        kind: PreferenceKind::Number,
-        default: Some(default.into()),
-        description: description.into(),
-        values: vec![],
-    }
-}
+/// Turns the `[clipboard]` settings into what the watcher asks for on every
+/// change, so editing a value takes effect without a restart.
+pub struct ConfigPolicy(pub Arc<RwLock<Config>>);
 
-/// Turns preferences into what the watcher asks for on every change, so editing
-/// a value takes effect without a restart.
-pub struct PreferencePolicy(pub Preferences);
-
-impl Policy for PreferencePolicy {
+impl Policy for ConfigPolicy {
     fn bounds(&self) -> Bounds {
         let fallback = Bounds::default();
+        let config = self.0.read().unwrap();
+        let settings = &config.clipboard;
         Bounds {
-            entries: self
-                .0
-                .count(PREF_ENTRIES)
-                .map(|value| value as usize)
-                .unwrap_or(fallback.entries),
-            entry_bytes: megabytes(&self.0, PREF_ENTRY_MEGABYTES, fallback.entry_bytes),
-            total_bytes: megabytes(&self.0, PREF_TOTAL_MEGABYTES, fallback.total_bytes),
+            entries: settings.entries as usize,
+            entry_bytes: megabytes(settings.entry_megabytes, fallback.entry_bytes),
+            total_bytes: megabytes(settings.total_megabytes, fallback.total_bytes),
         }
     }
 
     fn excluded_applications(&self) -> Vec<String> {
-        match self.0.string(PREF_EXCLUDED) {
-            Some(value) => value
-                .split(',')
-                .map(str::trim)
-                .filter(|name| !name.is_empty())
-                .map(str::to_string)
-                .collect(),
-            None => DEFAULT_EXCLUDED_APPLICATIONS
-                .iter()
-                .map(|name| (*name).to_string())
-                .collect(),
-        }
+        self.0
+            .read()
+            .unwrap()
+            .clipboard
+            .excluded_applications
+            .clone()
     }
 }
 
-fn megabytes(preferences: &Preferences, key: &str, fallback: usize) -> usize {
-    preferences
-        .number(key)
-        .filter(|value| *value > 0.0)
-        .map(|value| (value * MEGABYTE) as usize)
-        .unwrap_or(fallback)
-}
-
-/// What Enter does to an entry. Anything the preference says that is not
-/// `copy` is read as the default, in keeping with a bad value falling back
-/// rather than refusing to open the history.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum PrimaryAction {
-    Paste,
-    Copy,
-}
-
-fn primary_action(preferences: &Preferences) -> PrimaryAction {
-    match preferences.string(PREF_PRIMARY_ACTION) {
-        Some(value) if value.trim().eq_ignore_ascii_case("copy") => PrimaryAction::Copy,
-        _ => PrimaryAction::Paste,
+/// Zero megabytes would refuse every entry, so it reads as the default.
+fn megabytes(value: u32, fallback: usize) -> usize {
+    match value {
+        0 => fallback,
+        value => value as usize * MEGABYTE,
     }
+}
+
+fn primary_action(config: &RwLock<Config>) -> PrimaryAction {
+    config.read().unwrap().clipboard.primary_action
 }
 
 struct HistoryCommand {
     history: Arc<History>,
-    preferences: Arc<Preferences>,
+    config: Arc<RwLock<Config>>,
     icons: Arc<IconCache>,
     render_icon: fn(&str) -> Option<IconRgba>,
 }
@@ -284,7 +211,7 @@ impl Command for HistoryCommand {
     /// on a busy shell, then shows it again with them. The second view reads
     /// the history again, so an entry removed in between stays removed.
     fn invoke(&self, ctx: &InvocationContext) {
-        let primary = primary_action(&self.preferences);
+        let primary = primary_action(&self.config);
         let entries = match self.history.entries() {
             Ok(entries) => entries,
             Err(error) => return ctx.fail(error.to_string()),
@@ -518,25 +445,8 @@ fn preview(text: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::extension::PreferenceStore;
-    use crate::extensions::clipboard::{ClipboardSource, Content};
-    use std::collections::HashMap;
+    use crate::extensions::clipboard::{ClipboardSource, Content, DEFAULT_EXCLUDED_APPLICATIONS};
     use std::sync::Mutex;
-
-    #[derive(Default)]
-    struct MemoryPreferences(Mutex<HashMap<String, String>>);
-
-    impl MemoryPreferences {
-        fn set(&self, _extension_id: &str, key: &str, value: &str) {
-            self.0.lock().unwrap().insert(key.into(), value.into());
-        }
-    }
-
-    impl PreferenceStore for MemoryPreferences {
-        fn get(&self, _extension_id: &str, key: &str) -> Option<String> {
-            self.0.lock().unwrap().get(key).cloned()
-        }
-    }
 
     /// Records what was put back on the clipboard, which is all the extension's
     /// tests need from one.
@@ -575,12 +485,8 @@ mod tests {
         }
     }
 
-    fn policy(store: Arc<dyn PreferenceStore>) -> PreferencePolicy {
-        PreferencePolicy(Preferences::new(
-            EXTENSION_ID,
-            manifest().preferences,
-            store,
-        ))
+    fn shared(text: &str) -> Arc<RwLock<Config>> {
+        Arc::new(RwLock::new(Config::parse(text).unwrap()))
     }
 
     #[derive(Default)]
@@ -620,7 +526,7 @@ mod tests {
         extension: ClipboardExtension,
         history: Arc<History>,
         clipboard: Arc<StubClipboard>,
-        store: Arc<MemoryPreferences>,
+        config: Arc<RwLock<Config>>,
         target: Arc<FakeTarget>,
     }
 
@@ -631,12 +537,12 @@ mod tests {
             dir,
         ));
         let clipboard = Arc::new(StubClipboard::default());
-        let store = Arc::new(MemoryPreferences::default());
+        let config = shared("");
         let watcher = Arc::new(Watcher::new(
             clipboard.clone(),
             Arc::new(NoAttribution),
             history.clone(),
-            Arc::new(policy(store.clone())),
+            Arc::new(ConfigPolicy(config.clone())),
         ));
         watcher.start();
         let recorded = target.clone().unwrap_or_default();
@@ -645,13 +551,13 @@ mod tests {
             extension: ClipboardExtension::new(
                 history.clone(),
                 watcher,
-                Preferences::new(EXTENSION_ID, manifest().preferences, store.clone()),
+                config.clone(),
                 text,
                 IconCache::in_temp(),
             ),
             history,
             clipboard,
-            store,
+            config,
             target: recorded,
         }
     }
@@ -701,35 +607,18 @@ mod tests {
     }
 
     #[test]
-    fn the_declarations_handed_to_a_reader_are_the_manifests_own() {
-        let declared: Vec<_> = preference_declarations()
-            .into_iter()
-            .map(|d| d.key)
-            .collect();
-        assert_eq!(
-            declared,
-            [
-                PREF_ENTRIES,
-                PREF_ENTRY_MEGABYTES,
-                PREF_TOTAL_MEGABYTES,
-                PREF_EXCLUDED,
-                PREF_PRIMARY_ACTION
-            ],
-            "a reader built without these reads every value as absent"
-        );
-    }
-
-    #[test]
-    fn the_bounds_come_from_preferences() {
-        let store = Arc::new(MemoryPreferences::default());
-        let policy = policy(store.clone());
+    fn the_bounds_come_from_the_clipboard_table() {
+        let policy = ConfigPolicy(shared(""));
         let bounds = policy.bounds();
         assert_eq!(bounds.entries, 500);
         assert_eq!(bounds.entry_bytes, 16 * 1024 * 1024);
         assert_eq!(bounds.total_bytes, 256 * 1024 * 1024);
 
-        store.set(EXTENSION_ID, PREF_ENTRIES, "20");
-        store.set(EXTENSION_ID, PREF_TOTAL_MEGABYTES, "8");
+        let policy = ConfigPolicy(shared(
+            "[clipboard]
+entries = 20
+total-megabytes = 8",
+        ));
         let bounds = policy.bounds();
         assert_eq!(bounds.entries, 20);
         assert_eq!(bounds.total_bytes, 8 * 1024 * 1024);
@@ -737,22 +626,36 @@ mod tests {
 
     #[test]
     fn the_exclusion_list_defaults_to_the_known_managers() {
-        let policy = policy(Arc::new(MemoryPreferences::default()));
-        let excluded = policy.excluded_applications();
+        let excluded = ConfigPolicy(shared("")).excluded_applications();
         assert!(excluded.contains(&"Proton Pass".to_string()));
         assert_eq!(excluded.len(), DEFAULT_EXCLUDED_APPLICATIONS.len());
     }
 
     #[test]
-    fn the_exclusion_list_is_parsed_from_a_written_value() {
-        let store = Arc::new(MemoryPreferences::default());
-        let policy = policy(store.clone());
-        store.set(EXTENSION_ID, PREF_EXCLUDED, " Proton Pass ,, Notes ");
+    fn the_exclusion_list_is_read_as_a_list() {
+        let policy = ConfigPolicy(shared(
+            r#"clipboard = { excluded-applications = ["Proton Pass", "Notes"] }"#,
+        ));
         assert_eq!(
             policy.excluded_applications(),
-            ["Proton Pass".to_string(), "Notes".to_string()],
-            "blank entries and stray spacing are the normal shape of a hand-edited list"
+            ["Proton Pass".to_string(), "Notes".to_string()]
         );
+    }
+
+    #[test]
+    fn a_separated_string_is_not_an_exclusion_list() {
+        let error = Config::parse(r#"clipboard = { excluded-applications = "1Password, Notes" }"#)
+            .unwrap_err();
+        assert!(
+            error.to_string().contains("excluded-applications"),
+            "{error}"
+        );
+    }
+
+    #[test]
+    fn an_unknown_primary_action_is_a_config_error() {
+        let error = Config::parse(r#"clipboard = { primary-action = "drop" }"#).unwrap_err();
+        assert!(error.to_string().contains("drop"), "{error}");
     }
 
     #[test]
@@ -1142,18 +1045,11 @@ mod tests {
             [ACTION_INSERT, ACTION_RESTORE, ACTION_REMOVE]
         );
 
-        f.store.set(EXTENSION_ID, PREF_PRIMARY_ACTION, "copy");
+        f.config.write().unwrap().clipboard.primary_action = PrimaryAction::Copy;
         assert_eq!(
             action_ids(&f.extension),
             [ACTION_RESTORE, ACTION_INSERT, ACTION_REMOVE],
             "read on every list build, so a config edit applies next time"
-        );
-
-        f.store.set(EXTENSION_ID, PREF_PRIMARY_ACTION, "teleport");
-        assert_eq!(
-            action_ids(&f.extension),
-            [ACTION_INSERT, ACTION_RESTORE, ACTION_REMOVE],
-            "a value that is neither falls back to the default"
         );
     }
 
@@ -1161,7 +1057,7 @@ mod tests {
     fn the_command_builds_its_view_with_the_same_order() {
         let f = build(Some(Arc::new(FakeTarget::default())));
         record_text(&f.history, "hello");
-        f.store.set(EXTENSION_ID, PREF_PRIMARY_ACTION, "copy");
+        f.config.write().unwrap().clipboard.primary_action = PrimaryAction::Copy;
 
         let pushed = open_history(&f.extension);
         assert_eq!(list_of(&pushed[0]).items[0].actions[0].id, ACTION_RESTORE);

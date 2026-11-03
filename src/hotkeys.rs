@@ -54,25 +54,27 @@ pub fn bindings(config: &Config, launcher: HotKey) -> Bindings {
         conflicts: Vec::new(),
     };
 
-    for (extension_id, extension) in &config.extensions {
-        for (command_id, command) in &extension.commands {
+    for (extension_id, extension) in config.tables() {
+        for (command_id, command) in extension.commands() {
             if command.enabled == Some(false) {
                 continue;
             }
-            if let Some(hotkey) = &command.hotkey {
+            if let Some(hotkey) = command.hotkey {
                 table.claim(
                     Target::Command(format!("{extension_id}.{command_id}")),
                     hotkey,
                 );
             }
         }
-        for (key, app) in &extension.apps {
-            let Some(hotkey) = &app.hotkey else {
-                continue;
-            };
-            // An entry naming only the other platform is not for this machine.
-            if let Some(name) = app.name_for_platform(key) {
-                table.claim(Target::Application(name.to_string()), hotkey);
+        if extension_id == crate::extensions::applications::EXTENSION_ID {
+            for (key, app) in &config.applications.hotkeys {
+                let Some(hotkey) = &app.hotkey else {
+                    continue;
+                };
+                // An entry naming only the other platform is not for this machine.
+                if let Some(name) = app.name_for_platform(key) {
+                    table.claim(Target::Application(name.to_string()), hotkey);
+                }
             }
         }
     }
@@ -87,8 +89,8 @@ pub fn bindings(config: &Config, launcher: HotKey) -> Bindings {
 /// false`, one line each.
 pub fn disabled_with_hotkey(config: &Config) -> Vec<String> {
     let mut lines = Vec::new();
-    for (extension_id, extension) in &config.extensions {
-        for (command_id, command) in &extension.commands {
+    for (extension_id, extension) in config.tables() {
+        for (command_id, command) in extension.commands() {
             if command.hotkey.is_some() && command.enabled == Some(false) {
                 lines.push(format!(
                     "{extension_id}.{command_id}: has a hotkey but is disabled"
@@ -356,7 +358,7 @@ mod tests {
     fn a_clean_set_binds_every_command() {
         let c = config(
             r#"
-                [extensions."dango.window-management".commands]
+                [window-management.commands]
                 left-half = { hotkey = "ctrl+alt+left" }
                 right-half = { hotkey = "ctrl+alt+right" }
             "#,
@@ -408,7 +410,7 @@ mod tests {
     fn an_application_is_bound_by_its_shown_name() {
         let c = config(
             r#"
-                [extensions."dango.applications".apps]
+                [applications.hotkeys]
                 Safari = { hotkey = "ctrl+alt+b" }
                 code = { name = "Visual Studio Code", hotkey = "ctrl+alt+c" }
             "#,
@@ -429,9 +431,8 @@ mod tests {
     fn an_application_and_a_command_on_one_chord_are_reported_by_name() {
         let c = config(
             r#"
-                [extensions]
-                "dango.applications" = { apps = { Safari = { hotkey = "ctrl+alt+j" } } }
-                x = { commands = { alpha = { hotkey = "ctrl+alt+j" } } }
+                applications = { hotkeys = { Safari = { hotkey = "ctrl+alt+j" } } }
+                extensions = { x = { commands = { alpha = { hotkey = "ctrl+alt+j" } } } }
             "#,
         );
         let result = bindings(&c, launcher());
@@ -454,7 +455,7 @@ mod tests {
         let other = "macos";
         let c = config(&format!(
             r#"
-                [extensions."dango.applications".apps.elsewhere]
+                [applications.hotkeys.elsewhere]
                 name = {{ {other} = "Only There" }}
                 hotkey = "ctrl+alt+e"
             "#
@@ -585,7 +586,7 @@ mod tests {
     fn a_hotkey_on_a_disabled_command_is_named() {
         let c = config(
             r#"
-                [extensions."dango.ai".commands]
+                [ai.commands]
                 make-longer = { hotkey = "ctrl+alt+l", enabled = false }
                 summarize = { hotkey = "ctrl+alt+s" }
                 fix = { enabled = false }

@@ -317,7 +317,6 @@ pub(crate) fn manifest() -> Manifest {
                 &["display", "monitor", "screen", "next", "move"],
             ),
         ],
-        preferences: vec![],
         root_items: false,
         services: false,
     }

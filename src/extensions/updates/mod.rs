@@ -50,7 +50,6 @@ pub(crate) fn manifest() -> Manifest {
             keywords: vec!["update".into(), "upgrade".into(), "version".into()],
             alias: None,
         }],
-        preferences: vec![],
         root_items: true,
         services: true,
     }

@@ -15,7 +15,6 @@ pub struct Manifest {
     /// Either `icon:<name>` for a named icon or a path to an image file.
     pub icon: Option<String>,
     pub commands: Vec<CommandDecl>,
-    pub preferences: Vec<PreferenceDecl>,
     /// Whether the extension supplies the single per-keystroke root items
     /// provider. The provider itself is native code, not part of the manifest.
     pub root_items: bool,
@@ -41,25 +40,6 @@ pub enum InvocationMode {
     NoView,
 }
 
-#[derive(Clone, Debug, PartialEq)]
-pub struct PreferenceDecl {
-    pub key: String,
-    pub kind: PreferenceKind,
-    pub default: Option<serde_json::Value>,
-    /// One sentence for the user, shown wherever the preference is described.
-    pub description: String,
-    /// For a string preference that takes one of a fixed set, that set. Empty
-    /// means any string.
-    pub values: Vec<String>,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum PreferenceKind {
-    String,
-    Number,
-    Boolean,
-}
-
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
 pub enum ManifestError {
     #[error("manifest version {found} is newer than the supported {SUPPORTED_MANIFEST_VERSION}")]
@@ -68,8 +48,6 @@ pub enum ManifestError {
     NoContributions { id: String },
     #[error("extension '{id}' declares two commands with id '{command_id}'")]
     DuplicateCommand { id: String, command_id: String },
-    #[error("extension '{id}' declares preference '{key}' without a description")]
-    UndescribedPreference { id: String, key: String },
 }
 
 impl Manifest {
@@ -96,24 +74,11 @@ impl Manifest {
                 });
             }
         }
-        if let Some(preference) = self
-            .preferences
-            .iter()
-            .find(|p| p.description.trim().is_empty())
-        {
-            return Err(ManifestError::UndescribedPreference {
-                id: self.id.clone(),
-                key: preference.key.clone(),
-            });
-        }
         Ok(())
     }
 
     fn contributes_anything(&self) -> bool {
-        !self.commands.is_empty()
-            || self.root_items
-            || self.services
-            || !self.preferences.is_empty()
+        !self.commands.is_empty() || self.root_items || self.services
     }
 }
 
@@ -121,16 +86,6 @@ impl CommandDecl {
     /// Extension id joined to command id. Unique across the whole registry.
     pub fn qualified_id(&self, extension_id: &str) -> String {
         format!("{extension_id}.{}", self.id)
-    }
-}
-
-impl PreferenceDecl {
-    /// Whether a raw stored value is one this preference allows. Only a string
-    /// preference with a declared set can refuse one.
-    pub fn accepts(&self, raw: &str) -> bool {
-        self.kind != PreferenceKind::String
-            || self.values.is_empty()
-            || self.values.iter().any(|value| value == raw)
     }
 }
 
@@ -156,7 +111,6 @@ mod tests {
             name: "Test".into(),
             icon: None,
             commands,
-            preferences: vec![],
             root_items: false,
             services: false,
         }
@@ -204,41 +158,5 @@ mod tests {
     #[test]
     fn qualified_id_joins_extension_and_command() {
         assert_eq!(command("open").qualified_id("apps"), "apps.open");
-    }
-
-    fn preference() -> PreferenceDecl {
-        PreferenceDecl {
-            key: "token".into(),
-            kind: PreferenceKind::String,
-            default: None,
-            description: "A token.".into(),
-            values: vec![],
-        }
-    }
-
-    #[test]
-    fn a_preference_without_a_description_is_rejected() {
-        let mut m = manifest(1, vec![command("a")]);
-        let mut pref = preference();
-        pref.description = " ".into();
-        m.preferences.push(pref);
-        assert_eq!(
-            m.validate(),
-            Err(ManifestError::UndescribedPreference {
-                id: "test".into(),
-                key: "token".into()
-            })
-        );
-    }
-
-    #[test]
-    fn a_declared_set_decides_what_is_accepted() {
-        let mut pref = preference();
-        assert!(pref.accepts("anything"));
-        pref.values = vec!["paste".into(), "copy".into()];
-        assert!(pref.accepts("copy"));
-        assert!(!pref.accepts("speak"));
-        pref.kind = PreferenceKind::Number;
-        assert!(pref.accepts("speak"), "only strings have a set");
     }
 }

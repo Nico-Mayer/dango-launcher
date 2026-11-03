@@ -6,7 +6,7 @@ use std::sync::{Arc, Mutex, RwLock};
 
 use super::location::SCHEMA_REF;
 use super::Config;
-use crate::extension::{EnabledStore, PreferenceStore};
+use crate::extension::EnabledStore;
 
 /// Holds the loaded configuration and answers the store traits from it. The
 /// config is behind a lock so a live reload can swap it while the app reads.
@@ -64,12 +64,6 @@ impl FileConfig {
     }
 }
 
-impl PreferenceStore for FileConfig {
-    fn get(&self, extension_id: &str, key: &str) -> Option<String> {
-        self.config.read().unwrap().preference(extension_id, key)
-    }
-}
-
 impl EnabledStore for FileConfig {
     fn is_enabled(&self, extension_id: &str) -> bool {
         // Absent means enabled: a fresh install with no file runs everything.
@@ -95,19 +89,6 @@ mod tests {
 
     fn temp_path(name: &str) -> PathBuf {
         std::env::temp_dir().join(format!("dango-cfg-test-{name}-{}.toml", std::process::id()))
-    }
-
-    #[test]
-    fn reads_a_preference_and_falls_back() {
-        let text = r#"
-                extensions = { "dango.clipboard" = { preferences = { max_entries = 200 } } }
-            "#;
-        let store = FileConfig::new(temp_path("pref"), Config::parse(text).unwrap());
-        assert_eq!(
-            store.get("dango.clipboard", "max_entries"),
-            Some("200".to_string())
-        );
-        assert_eq!(store.get("dango.clipboard", "unset"), None);
     }
 
     #[test]

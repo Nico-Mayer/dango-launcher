@@ -465,7 +465,6 @@ fn two_commands() -> Arc<TwoCommands> {
         name: "X".into(),
         icon: None,
         commands: vec![command("keep"), command("drop")],
-        preferences: vec![],
         root_items: false,
         services: false,
     }))
