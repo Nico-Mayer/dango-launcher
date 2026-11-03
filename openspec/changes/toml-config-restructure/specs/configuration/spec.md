@@ -165,13 +165,12 @@ in this file, so it stays shareable.
 
 ### Requirement: The top level holds app tables and extension tables
 
-The top level of the file SHALL hold `version`, the app tables `launcher`,
-`hyperkey`, and `selection`, one table per built-in extension, and the
-reserved `extensions` table. App tables configure Dango itself rather than a
-command. `extensions` is kept for extensions that are not built in, and holds
-only what Dango itself reads for them: enabled state, aliases, and hotkeys. No
-built-in extension's table SHALL be named `version`, `launcher`, `hyperkey`,
-`selection`, or `extensions`.
+The top level of the file SHALL hold `version`, the app tables `launcher` and
+`hyperkey`, one table per built-in extension, and the reserved `extensions`
+table. App tables configure Dango itself rather than a command. `extensions`
+is kept for extensions that are not built in, and holds only what Dango itself
+reads for them: enabled state, aliases, and hotkeys. No built-in extension's
+table SHALL be named `version`, `launcher`, `hyperkey`, or `extensions`.
 
 #### Scenario: Every built-in has its own table
 
@@ -182,8 +181,8 @@ built-in extension's table SHALL be named `version`, `launcher`, `hyperkey`,
 #### Scenario: No extension takes a reserved name
 
 - **WHEN** the built-in extensions are registered
-- **THEN** none of their table names is `version`, `launcher`, `hyperkey`,
-  `selection`, or `extensions`
+- **THEN** none of their table names is `version`, `launcher`, `hyperkey`, or
+  `extensions`
 
 ### Requirement: Inside a table, two keys are reserved
 

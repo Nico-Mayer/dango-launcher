@@ -16,9 +16,9 @@
 
 - [x] 3.1 Add the per-kind argument builders for `claude` and `pi` from the design table (model, thinking); verify unit tests for each kind and each thinking level
 - [x] 3.3 Move each CLI's program name, fixed flags, model flag, effort flag and off level into one table entry per kind, and give `claude` `DISABLE_AUTOUPDATER=1` in its entry's environment; verify the `args` tests still pass and a test that the claude environment holds the variable and pi's is empty
-- [ ] 3.2 Check by hand, once per CLI with a throwaway prompt, that `claude -p --safe-mode --tools "" --output-format text --no-session-persistence` and `pi -p --no-tools --no-context-files --no-session` each read the prompt from stdin and answer with the existing sign-in; record the result in this task, and change the builder and design if a flag is refused
+- [x] 3.2 Check by hand, once per CLI with a throwaway prompt, that `claude -p --safe-mode --tools "" --output-format text --no-session-persistence` and `pi -p --no-tools --no-context-files --no-session` each read the prompt from stdin and answer with the existing sign-in; record the result in this task, and change the builder and design if a flag is refused
   - claude: confirmed. The full fixed flag set, with the prompt on stdin, from an empty folder, answered `pong` with exit 0.
-  - pi: no flag refused, and the prompt on stdin started a request. It failed because the `openai-codex` sign-in has expired ("Your session has ended"). The error goes to stderr with exit 1, which is what `ProgramFailed` expects. Deferred: the author has no subscription pi can sign in to, so whether it answers stays open until one is available. Without `--no-extensions`, pi prints warnings about the user's extension packages, so that flag matters.
+  - pi: no flag refused, and the prompt on stdin started a request. It failed because the `openai-codex` sign-in has expired ("Your session has ended"). The error goes to stderr with exit 1, which is what `ProgramFailed` expects. Moved to #34: the author has no subscription pi can sign in to. Without `--no-extensions`, pi prints warnings about the user's extension packages, so that flag matters.
 
 ## 4. Program lookup
 
@@ -57,7 +57,7 @@
   - Passed on the rerun: a test command asking for a 2000-word essay with thinking high. While it ran, Dango's children were claude.exe (twice), mise.exe and conhost.exe. The first check after Escape, within half a second, found none, and the launcher stayed open. The first, unclear run most likely happened while the launcher was held hidden.
 - [x] 7.4 With a hook, an MCP server, and a rule in the global CLAUDE.md set up in the author's Claude Code config, run a command; verify the hook did not run (its side effect is absent), no MCP server process started, the CLAUDE.md rule had no effect on the answer, no new session appears in `claude --resume`, and the sign-in still answered
   - Passed: test SessionStart hook, user-scope MCP server, and a CLAUDE.md rule ("end every reply with PINEAPPLE7"). A control run without `--safe-mode` left all three traces. The Dango run left none, and no session folder exists for the workspace. The test items were removed afterwards.
-- [ ] 7.5 Deferred (no subscription for pi). Run one command with a `pi` provider; verify it answers, ignores a rule in the global AGENTS.md, and leaves no session behind
+- [x] 7.5 Moved to #34 (no subscription for pi). Run one command with a `pi` provider; verify it answers, ignores a rule in the global AGENTS.md, and leaves no session behind
 
 ## 8. macOS hand checks
 

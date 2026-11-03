@@ -17,11 +17,21 @@ use enigo::{Direction, Enigo, Key, Keyboard as _, Settings};
 use objc2_app_kit::NSWorkspace;
 use objc2_application_services::{AXError, AXUIElement};
 use objc2_core_foundation::{CFRetained, CFString, CFType};
+use objc2_core_graphics::{CGEvent, CGEventFlags, CGEventSource, CGEventSourceStateID};
 
-use crate::text::{with_deadline, DirectSelection, Handoff, Keys, MainThread, Selected, TextError};
+use super::DANGO_INJECTED;
+
+use crate::text::{
+    with_deadline, DirectSelection, Handoff, Keys, Lend, MainThread, Selected, TextError,
+};
 
 const FOCUSED_ELEMENT: &str = "AXFocusedUIElement";
 const SELECTED_TEXT: &str = "AXSelectedText";
+const SELECTED_TEXT_RANGE: &str = "AXSelectedTextRange";
+
+const KEY_COMMAND: u16 = 55;
+/// `kVK_ANSI_C`. The C key sits in the same place on the US and German layouts.
+const KEY_C: u16 = 8;
 
 /// How long to wait for the target application to take the paste before the
 /// clipboard is put back. macOS offers no signal that a paste has been handled,
@@ -130,8 +140,26 @@ fn keystroke_failed() -> TextError {
 }
 
 impl Keys for MacKeys {
+    /// Posted to the frontmost application's process rather than through
+    /// enigo, which posts to the key window: the launcher panel stays key
+    /// during a read.
     fn copy(&self) -> Result<(), TextError> {
-        self.chord('c')
+        let pid = app_behind().ok_or_else(keystroke_failed)?;
+        let source =
+            CGEventSource::new(CGEventSourceStateID::Private).ok_or_else(keystroke_failed)?;
+        CGEventSource::set_user_data(Some(&source), DANGO_INJECTED);
+        for (keycode, down, flags) in [
+            (KEY_COMMAND, true, CGEventFlags::MaskCommand),
+            (KEY_C, true, CGEventFlags::MaskCommand),
+            (KEY_C, false, CGEventFlags::MaskCommand),
+            (KEY_COMMAND, false, CGEventFlags::empty()),
+        ] {
+            let event = CGEvent::new_keyboard_event(Some(&source), keycode, down)
+                .ok_or_else(keystroke_failed)?;
+            CGEvent::set_flags(Some(&event), flags);
+            CGEvent::post_to_pid(pid, Some(&event));
+        }
+        Ok(())
     }
 
     fn paste(&self) -> Result<(), TextError> {
@@ -162,9 +190,9 @@ impl Keys for MacKeys {
 }
 
 /// The launcher is a non-activating panel, so the application the user was in
-/// never stopped being the active one and there is nothing to restore. What has
-/// to be true is that the panel is off screen and no longer taking keys, which
-/// the caller has already asked for by the time this runs.
+/// never stopped being the active one and there is nothing to restore. Before a
+/// keystroke the panel has to be off screen and no longer taking keys, which
+/// the caller has already asked for by the time `yield_to_previous` runs.
 pub struct MacHandoff;
 
 impl Handoff for MacHandoff {
@@ -177,6 +205,12 @@ impl Handoff for MacHandoff {
         Ok(())
     }
 
+    /// The panel never took activation, so the application behind it is
+    /// already frontmost and the panel stays key.
+    fn lend_to_previous(&self) -> Lend {
+        Lend::nothing_to_give_back()
+    }
+
     fn settle_after_paste(&self) {
         std::thread::sleep(PASTE_SETTLE);
     }
@@ -185,50 +219,60 @@ impl Handoff for MacHandoff {
 /// The accessibility route: focused element, then selected text. Touches
 /// nothing, so it is tried before the clipboard round trip.
 ///
-/// The application's own element is asked first, and the system-wide one only
-/// as a fallback. The spike found Ghostty answering through the application
-/// element on every selection while the system-wide element returned
-/// `CannotComplete` every single time, which is the opposite of what the
-/// documentation's usual example suggests.
+/// Only the frontmost application's element is asked. The spike found Ghostty
+/// answering through it on every selection while the system-wide element
+/// returned `CannotComplete` every single time, which is the opposite of what
+/// the documentation's usual example suggests.
 pub struct MacSelection;
 
 impl DirectSelection for MacSelection {
-    /// Bounded by a thread rather than `AXUIElementSetMessagingTimeout`: set
-    /// on the system-wide fallback element, that timeout becomes the global
-    /// one, window management included.
     fn selected_text(&self) -> Selected {
-        let pid = frontmost_pid();
+        let pid = app_behind();
         with_deadline(move || read(pid))
     }
 }
 
-fn read(pid: Option<i32>) -> Selected {
-    pid.and_then(|pid| selected_text_from(unsafe { AXUIElement::new_application(pid) }))
-        .or_else(|| selected_text_from(unsafe { AXUIElement::new_system_wide() }))
-        .map_or(Selected::Unavailable, |text| {
-            if text.is_empty() {
-                Selected::Empty
-            } else {
-                Selected::Text(text)
-            }
-        })
+/// Never the system-wide element, not even for the focused application:
+/// while the panel is key, macOS answers it in-process on this thread, where
+/// accesskit panics on a `RefCell` the main thread holds and Dango aborts.
+fn read(pid: Option<libc::pid_t>) -> Selected {
+    pid.and_then(|pid| answer_from(unsafe { AXUIElement::new_application(pid) }))
+        .unwrap_or(Selected::Unavailable)
 }
 
-fn frontmost_pid() -> Option<i32> {
+/// `None` when Dango itself is frontmost, as after opening it from the Dock:
+/// reading or copying there would hand back the search query.
+fn app_behind() -> Option<libc::pid_t> {
     NSWorkspace::sharedWorkspace()
         .frontmostApplication()
         .map(|app| app.processIdentifier())
+        .filter(|&pid| pid != std::process::id() as libc::pid_t)
 }
 
-fn selected_text_from(root: CFRetained<AXUIElement>) -> Option<String> {
+fn answer_from(root: CFRetained<AXUIElement>) -> Option<Selected> {
     unsafe {
         let focused = copy_attribute(&root, FOCUSED_ELEMENT)
             .ok()
             .flatten()?
             .downcast::<AXUIElement>()
             .ok()?;
-        let selected = copy_attribute(&focused, SELECTED_TEXT).ok().flatten()?;
-        Some(selected.downcast::<CFString>().ok()?.to_string())
+        let text = copy_attribute(&focused, SELECTED_TEXT)
+            .ok()
+            .flatten()
+            .and_then(|value| value.downcast::<CFString>().ok())
+            .map(|text| text.to_string());
+        let has_range = matches!(copy_attribute(&focused, SELECTED_TEXT_RANGE), Ok(Some(_)));
+        answer(text, has_range)
+    }
+}
+
+/// GPUI apps answer `""` for an element with no text at all. That is not a
+/// real "nothing selected", so it goes to the copy fallback.
+fn answer(text: Option<String>, has_range: bool) -> Option<Selected> {
+    match text? {
+        text if !text.is_empty() => Some(Selected::Text(text)),
+        _ if has_range => Some(Selected::Empty),
+        _ => None,
     }
 }
 
@@ -247,5 +291,37 @@ unsafe fn copy_attribute(
         }
         AXError::NoValue | AXError::AttributeUnsupported => Ok(None),
         other => Err(other),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn answer_for(text: Option<&str>, has_range: bool) -> Option<Selected> {
+        answer(text.map(str::to_owned), has_range)
+    }
+
+    #[test]
+    fn selected_text_is_the_answer() {
+        assert_eq!(
+            answer_for(Some("hello"), true),
+            Some(Selected::Text("hello".into()))
+        );
+    }
+
+    #[test]
+    fn an_empty_answer_with_a_range_is_empty() {
+        assert_eq!(answer_for(Some(""), true), Some(Selected::Empty));
+    }
+
+    #[test]
+    fn an_empty_answer_without_a_range_is_no_answer() {
+        assert_eq!(answer_for(Some(""), false), None);
+    }
+
+    #[test]
+    fn an_element_without_selected_text_is_no_answer() {
+        assert_eq!(answer_for(None, true), None);
     }
 }

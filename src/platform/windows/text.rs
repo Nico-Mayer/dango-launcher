@@ -25,12 +25,12 @@ use windows_sys::Win32::System::Threading::{
     GetCurrentProcess, OpenProcess, OpenProcessToken, PROCESS_QUERY_LIMITED_INFORMATION,
 };
 use windows_sys::Win32::UI::WindowsAndMessaging::{
-    AllowSetForegroundWindow, GetForegroundWindow, GetWindowThreadProcessId, SendMessageTimeoutW,
-    SMTO_ABORTIFHUNG, WM_NULL,
+    AllowSetForegroundWindow, GetForegroundWindow, GetWindowThreadProcessId, IsWindowVisible,
+    SendMessageTimeoutW, SMTO_ABORTIFHUNG, WM_NULL,
 };
 
 use super::DANGO_INJECTED;
-use crate::text::{Handoff, Keys, TextError};
+use crate::text::{Handoff, Keys, Lend, TextError};
 
 const FOREGROUND_TIMEOUT: Duration = Duration::from_millis(400);
 const FOREGROUND_POLL: Duration = Duration::from_millis(10);
@@ -79,11 +79,11 @@ impl WindowsKeys {
         }
     }
 
-    fn chord(&self, letter: char) -> Result<(), TextError> {
+    fn chord(&self, key: Key) -> Result<(), TextError> {
         let mut enigo = self.enigo.lock().unwrap();
         let send = |enigo: &mut Enigo| -> Result<(), enigo::InputError> {
             enigo.key(Key::Control, Direction::Press)?;
-            let pressed = enigo.key(Key::Unicode(letter), Direction::Click);
+            let pressed = enigo.key(key, Direction::Click);
             std::thread::sleep(CHORD_HOLD);
             enigo.key(Key::Control, Direction::Release)?;
             pressed
@@ -98,12 +98,14 @@ fn keystroke_failed(error: enigo::InputError) -> TextError {
 }
 
 impl Keys for WindowsKeys {
+    /// Ctrl+C is SIGINT in terminals and a command in modal editors.
+    /// Ctrl+Insert means copy there too, and nothing else anywhere.
     fn copy(&self) -> Result<(), TextError> {
-        self.chord('c')
+        self.chord(Key::Insert)
     }
 
     fn paste(&self) -> Result<(), TextError> {
-        self.chord('v')
+        self.chord(Key::Unicode('v'))
     }
 
     fn caret_left(&self, times: usize) -> Result<(), TextError> {
@@ -166,6 +168,31 @@ impl Handoff for WindowsHandoff {
             }
             std::thread::sleep(FOREGROUND_POLL);
         }
+    }
+
+    /// Gives the foreground back only if Dango held it. Keyword expansion reads
+    /// with the launcher hidden, and activating a hidden window would take the
+    /// keyboard from the app the user is typing in.
+    fn lend_to_previous(&self) -> Lend {
+        let launcher = unsafe { GetForegroundWindow() } as isize;
+        if launcher == 0 || !super::is_own_window(launcher as HWND) {
+            return Lend::new(self.yield_to_previous(), || {});
+        }
+        super::LENDING.store(true, Ordering::SeqCst);
+        Lend::new(self.yield_to_previous(), move || unsafe {
+            let launcher = launcher as HWND;
+            // Hidden during the read: activating it would leave the keyboard
+            // in a window nobody can see.
+            if IsWindowVisible(launcher) == 0 {
+                super::LENDING.store(false, Ordering::SeqCst);
+                return;
+            }
+            super::force_foreground(launcher);
+            if GetForegroundWindow() != launcher {
+                eprintln!("[dango] the launcher didn't get the foreground back after a read");
+            }
+            super::LENDING.store(false, Ordering::SeqCst);
+        })
     }
 
     /// A window that answers a no-op message is back in its message loop, which

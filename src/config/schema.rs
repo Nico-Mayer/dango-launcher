@@ -503,7 +503,6 @@ mod tests {
     const FULL: &str = r#"
         version = 1
         hyperkey = { enabled = true, shift = false, tap = "escape" }
-        selection = { excluded-applications = ["Zed"] }
         quicklinks = { favicons = false }
         window-management = { commands = { left-half = { alias = "lh", hotkey = "hyper+left" } } }
         system = { commands = { open-config = { hotkey = "hyper+comma" } } }
@@ -712,8 +711,7 @@ mod tests {
         assert!(properties["system"]["properties"].get("hotkeys").is_none());
     }
 
-    const RESERVED_TOP_LEVEL: [&str; 5] =
-        ["version", "launcher", "hyperkey", "selection", "extensions"];
+    const RESERVED_TOP_LEVEL: [&str; 4] = ["version", "launcher", "hyperkey", "extensions"];
 
     fn reserved_table_names<'a>(ids: impl IntoIterator<Item = &'a str>) -> Vec<&'a str> {
         ids.into_iter()

@@ -129,9 +129,10 @@ is activated within the period. When the period ends with the launcher still
 hidden, the command SHALL be cancelled and its later output dropped. A
 deliberate hide SHALL cancel a running command at once.
 
-A command that hides the launcher on its own behalf, to paste or to read a
-selection, is neither kind of hide: the launcher SHALL reset its view state and
-SHALL NOT cancel the command, whose next view brings the launcher back.
+A command that hides the launcher on its own behalf, to paste, is neither kind
+of hide: the launcher SHALL reset its view state and SHALL NOT cancel the
+command, whose next view brings the launcher back. Reading a selection SHALL
+NOT hide the launcher at all (see `selection-and-paste`).
 
 A failure message the user has not seen SHALL be the one exception to a reset.
 An action that hides the launcher as part of its work can only report a failure
@@ -209,10 +210,14 @@ another action, or presses Escape.
 
 #### Scenario: A command hides the launcher for its own work
 
-- **WHEN** a command hides the launcher to paste or read a selection and then
-  produces a view
+- **WHEN** a command hides the launcher to paste and then produces a view
 - **THEN** the launcher comes back showing that view
 - **AND** the command was not cancelled by the hide
+
+#### Scenario: Reading a selection does not hide the launcher
+
+- **WHEN** a command reads the selection while the launcher is on screen
+- **THEN** the launcher stays on screen and keeps its view state
 
 #### Scenario: A failure from a dismissing action is shown afterwards
 

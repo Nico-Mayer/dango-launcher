@@ -21,8 +21,10 @@ only where the application cannot be asked.
 
 An application that answers but reports nothing selected SHALL be treated as an
 empty selection, not as a failure to read, and SHALL NOT fall through to the
-keystroke path. The direct request SHALL be bounded in time, so an application
-that does not answer cannot hold up the read.
+keystroke path. An answer from Dango's own window, or an empty answer from an
+element that exposes no selection at all, SHALL count as no answer. The direct
+request SHALL be bounded in time, so an application that does not answer
+cannot hold up the read.
 
 #### Scenario: Reading a selection on macOS
 
@@ -57,6 +59,20 @@ that does not answer cannot hold up the read.
 - **THEN** Dango falls back to reading it through the clipboard
 - **AND** the clipboard holds what it held before the read, once the read has
   finished
+
+#### Scenario: Dango's own search field is never the answer on macOS
+
+- **WHEN** the launcher is on screen on macOS, the application behind it
+  exposes nothing, and Dango reads the selection
+- **THEN** the empty search field of the launcher is not reported as an empty
+  selection
+- **AND** Dango falls back to reading it through the clipboard
+
+#### Scenario: An element that exposes no selection on macOS
+
+- **WHEN** the focused element of the frontmost application on macOS answers
+  with empty selected text but exposes no selected text range
+- **THEN** Dango falls back to reading it through the clipboard
 
 #### Scenario: Reading a selection is fast enough to act on
 
@@ -229,50 +245,6 @@ unavailable, reading the selection and inserting text SHALL still work.
 - **THEN** clipboard history is off
 - **AND** reading the selection and inserting text still work, through AI commands and snippets
 
-### Requirement: The keystroke fallback can be refused for an application
-
-The user SHALL be able to name applications where the clipboard fallback must
-not be attempted, because the copy chord does something else there. For a
-named application Dango SHALL report that it cannot read the selection, and
-SHALL send no keystroke.
-
-The applications SHALL be set by the config key
-`selection.excluded-applications`: application names, comma separated, matched
-ignoring case, the same way as the clipboard history's exclusion list. It SHALL
-be empty by default.
-
-#### Scenario: A named application is never sent the copy chord
-
-- **WHEN** the frontmost application is one the user named, and something reads
-  the selection
-- **THEN** no keystroke is sent to it
-- **AND** the failure says to copy the text first, as that application does not
-  share its selection
-
-#### Scenario: Names match ignoring case
-
-- **WHEN** `selection.excluded-applications` names "helix" and the frontmost
-  application is named "Helix"
-- **THEN** it is treated as a named application
-
-#### Scenario: A named application that does expose its selection still works
-
-- **WHEN** a named application exposes its selection directly
-- **THEN** the selection is read directly
-- **AND** the exclusion never comes into play
-
-#### Scenario: An application that is not named is unaffected
-
-- **WHEN** the frontmost application is not named and does not expose its
-  selection
-- **THEN** the clipboard fallback runs
-
-#### Scenario: The list is empty by default
-
-- **WHEN** `selection.excluded-applications` is not set
-- **THEN** every application that does not expose its selection gets the
-  clipboard fallback
-
 ### Requirement: Reading and inserting need Accessibility on macOS
 
 On macOS both reading the selection and inserting text require the Accessibility
@@ -296,3 +268,72 @@ than failing silently. Requesting the permission and noticing a grant are in
 - **WHEN** the user invokes something that reads the selection or inserts text on Windows
 - **THEN** it works with no permission step
 - **AND** no message about a permission is ever shown
+
+### Requirement: Reading the selection keeps the launcher on screen
+
+Reading the selection SHALL NOT hide the launcher, on either platform, whether
+the command was run from root search or from its own hotkey. When the read is
+done, keyboard input SHALL go to the launcher again, to the field that had it
+before. A failed read SHALL be shown in the launcher at once.
+
+#### Scenario: Reading on Windows
+
+- **WHEN** the launcher is on screen on Windows and the user runs a command
+  that reads the selection
+- **THEN** the launcher stays on screen during the read
+- **AND** once the read is done, typing goes to the launcher
+
+#### Scenario: Reading on macOS
+
+- **WHEN** the launcher is on screen on macOS and the user runs a command that
+  reads the selection
+- **THEN** the launcher stays on screen during the read
+- **AND** typing still goes to the launcher
+
+#### Scenario: The copy fallback on Windows
+
+- **WHEN** the application behind the launcher on Windows exposes nothing and
+  the selection is read through the clipboard
+- **THEN** the launcher stays on screen
+- **AND** the copy reaches the application behind it, not the launcher
+
+#### Scenario: The copy fallback on macOS
+
+- **WHEN** the application behind the launcher on macOS exposes nothing and
+  the selection is read through the clipboard
+- **THEN** the launcher stays on screen
+- **AND** the copy reaches the application behind it, not the launcher
+
+#### Scenario: A failed read is shown at once
+
+- **WHEN** a command reads the selection and nothing is selected
+- **THEN** the launcher is still on screen and shows "Select some text first"
+
+#### Scenario: Lending the foreground is not a focus loss on Windows
+
+- **WHEN** Dango gives the foreground to the previous window to read the
+  selection
+- **THEN** the launcher is not hidden as if the user had clicked away
+
+### Requirement: The copy fallback uses a chord that copies everywhere
+
+The keystroke Dango sends to read a selection through the clipboard SHALL be
+one that means copy in editors and terminals alike, and SHALL NOT interrupt a
+running program or run an editor command. On Windows it SHALL be Ctrl+Insert.
+On macOS it SHALL be Cmd+C.
+
+#### Scenario: The copy chord on Windows
+
+- **WHEN** Dango reads a selection through the clipboard on Windows
+- **THEN** it sends Ctrl+Insert and never Ctrl+C
+
+#### Scenario: An editor that copies on Ctrl+Insert
+
+- **WHEN** text is selected in Zed on Windows and an AI command that needs the
+  selection is run
+- **THEN** the selected text is sent with the command's prompt
+
+#### Scenario: The copy chord on macOS
+
+- **WHEN** Dango reads a selection through the clipboard on macOS
+- **THEN** it sends Cmd+C to the application behind the launcher

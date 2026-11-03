@@ -33,6 +33,7 @@ pub use window::WindowsWindowManager;
 pub(super) const DANGO_INJECTED: usize = 0x44_41_4E_47;
 
 use std::cell::RefCell;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use raw_window_handle::RawWindowHandle;
 use windows_sys::Win32::Foundation::{FALSE, HWND, POINT, RECT, TRUE};
@@ -174,6 +175,19 @@ thread_local! {
     static FOCUS_LOST: RefCell<Option<Box<dyn Fn()>>> = const { RefCell::new(None) };
 }
 
+/// Set while a selection read has lent the foreground to the previous window.
+pub(super) static LENDING: AtomicBool = AtomicBool::new(false);
+
+/// The event for a lend can be handled after the foreground came back, so the
+/// current foreground is checked too.
+pub(super) fn focus_lent() -> bool {
+    is_lent(LENDING.load(Ordering::SeqCst), foreground_is_dango())
+}
+
+fn is_lent(lending: bool, dango_in_front: bool) -> bool {
+    lending || dango_in_front
+}
+
 /// Out of context, so the callback runs on this thread's message loop, and
 /// skipping Dango's own process, so taking the foreground does not count.
 pub(super) fn watch_focus_loss(lost: Box<dyn Fn()>) {
@@ -203,6 +217,9 @@ unsafe extern "system" fn foreground_changed(
     _thread: u32,
     _time: u32,
 ) {
+    if focus_lent() {
+        return;
+    }
     FOCUS_LOST.with(|slot| {
         if let Some(lost) = slot.borrow().as_ref() {
             lost();
@@ -331,6 +348,12 @@ pub(super) fn foreground_app() -> Option<String> {
     }
 }
 
+pub(super) fn is_own_window(window: HWND) -> bool {
+    let mut pid = 0u32;
+    unsafe { GetWindowThreadProcessId(window, &mut pid) };
+    pid == std::process::id()
+}
+
 pub(super) fn foreground_is_dango() -> bool {
     use windows::Win32::UI::WindowsAndMessaging::{GetForegroundWindow, GetWindowThreadProcessId};
     unsafe {
@@ -349,28 +372,6 @@ pub(super) fn foreground_is_dango() -> bool {
 static LAST_FOREGROUND: std::sync::Mutex<Option<NamedForeground>> = std::sync::Mutex::new(None);
 
 type NamedForeground = ((isize, u32), Option<String>);
-
-/// The application the launcher is covering, named the same way as the
-/// foreground one. Asked before the launcher gets out of the way, so a question
-/// about that application can be answered while it is still on screen: with the
-/// launcher in front, `foreground_app` would answer "Dango".
-pub(super) fn covered_app() -> Option<String> {
-    use windows::Win32::Foundation::HWND as WindowsHwnd;
-    use windows::Win32::UI::WindowsAndMessaging::GetWindowThreadProcessId;
-    unsafe {
-        let previous = text::previous_foreground()?;
-        // Already the same pointer type; casting it is the lint the project
-        // context warns about.
-        let handle = WindowsHwnd(previous);
-        let mut pid = 0u32;
-        GetWindowThreadProcessId(handle, Some(&mut pid));
-        if pid == 0 {
-            return None;
-        }
-        apps::init_com();
-        system::identify(handle, pid).map(|identity| identity.name)
-    }
-}
 
 /// Records the current foreground as the previous-foreground the paste settle
 /// waits on. Keyword expansion inserts into the application already focused, so
@@ -416,5 +417,21 @@ pub(super) fn focused_field_is_secure() -> bool {
         let len = GetClassNameW(info.hwndFocus, class.as_mut_ptr(), class.len() as i32);
         let class = String::from_utf16_lossy(&class[..len.max(0) as usize]);
         class.eq_ignore_ascii_case("edit")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::is_lent;
+
+    #[test]
+    fn only_a_real_focus_loss_hides_the_launcher() {
+        assert!(!is_lent(false, false));
+        assert!(is_lent(true, false), "lent for a read");
+        assert!(
+            is_lent(false, true),
+            "late event after the foreground came back"
+        );
+        assert!(is_lent(true, true));
     }
 }

@@ -38,6 +38,30 @@ fn core_with_ai(
     extensions: Vec<Arc<dyn Extension>>,
     ai: Option<super::AiParts>,
 ) -> (Arc<Core>, Arc<RecordingShell>) {
+    core_with_parts(
+        config_json,
+        grab,
+        extensions,
+        ai,
+        Arc::new(RecordingShell::default()),
+    )
+}
+
+fn core_with_shell(
+    config_json: &str,
+    extensions: Vec<Arc<dyn Extension>>,
+    shell: Arc<RecordingShell>,
+) -> (Arc<Core>, Arc<RecordingShell>) {
+    core_with_parts(config_json, FakeGrab::default(), extensions, None, shell)
+}
+
+fn core_with_parts(
+    config_json: &str,
+    grab: FakeGrab,
+    extensions: Vec<Arc<dyn Extension>>,
+    ai: Option<super::AiParts>,
+    shell: Arc<RecordingShell>,
+) -> (Arc<Core>, Arc<RecordingShell>) {
     let config = Config::parse(config_json).unwrap();
     let (launcher, _) = hotkeys::launcher(&config);
     let config = Arc::new(FileConfig::new(
@@ -71,7 +95,6 @@ fn core_with_ai(
         hotkeys: Registry::new(Box::new(grab), launcher),
         hyperkey: Mutex::default(),
     };
-    let shell = Arc::new(RecordingShell::default());
     let core = Arc::new(Core::new(
         shell.clone(),
         Handle::current(),
@@ -333,6 +356,70 @@ impl Runner for NoRunner {
     }
 }
 
+struct NothingSelected;
+
+impl crate::text::TextTarget for NothingSelected {
+    fn insert(&self, _text: &str, _caret: Option<usize>) -> Result<(), crate::text::TextError> {
+        Ok(())
+    }
+    fn expand(
+        &self,
+        _backspaces: usize,
+        _text: &str,
+        _caret: Option<usize>,
+    ) -> Result<(), crate::text::TextError> {
+        Ok(())
+    }
+    fn paste_content(
+        &self,
+        _content: &crate::extensions::clipboard::Content,
+    ) -> Result<(), crate::text::TextError> {
+        Ok(())
+    }
+    fn selection(&self) -> Result<Option<String>, crate::text::TextError> {
+        Ok(None)
+    }
+    fn clipboard_text(&self) -> Option<String> {
+        None
+    }
+}
+
+#[tokio::test]
+async fn a_failed_selection_read_shows_in_the_launcher_at_once() {
+    let ai = super::AiParts {
+        keys: Arc::new(crate::extensions::ai::AuthFile::new(
+            std::env::temp_dir().join("dango-no-auth.json"),
+        )),
+        client: Arc::new(StopCounter::default()),
+        text: Some(Arc::new(NothingSelected)),
+        clipboard: None,
+        runner: Arc::new(NoRunner),
+    };
+    let config = r#"
+        ai = { providers = { local = { kind = "ollama", model = "qwen3:8b" } } }
+    "#;
+    let (extension, _) = ai.build(&Config::parse(config).unwrap());
+    let (core, shell) = core_with_ai(config, FakeGrab::default(), vec![extension], Some(ai));
+    core.toggle();
+    core.run_command("dango.ai.improve-writing").unwrap();
+    settle().await;
+
+    assert!(!shell
+        .calls()
+        .iter()
+        .any(|call| matches!(call, Call::Hide { .. })));
+    let ui = crate::slint_shell::render_headless(shell.last_snapshot());
+    assert!(
+        i_slint_backend_testing::ElementHandle::find_by_accessible_label(
+            &ui,
+            "Select some text first"
+        )
+        .next()
+        .is_some(),
+        "the failure is on screen"
+    );
+}
+
 #[tokio::test]
 async fn quitting_stops_running_agent_programs() {
     let client = Arc::new(StopCounter::default());
@@ -447,6 +534,57 @@ impl crate::extension::Extension for TwoCommands {
         }
         Some(Arc::new(Noop))
     }
+}
+
+/// Records whether the launcher had been shown when the command started.
+struct ShowsFirst {
+    manifest: crate::extension::Manifest,
+    shell: Arc<RecordingShell>,
+    shown_at_start: Arc<Mutex<Option<bool>>>,
+}
+
+impl crate::extension::Extension for ShowsFirst {
+    fn manifest(&self) -> &crate::extension::Manifest {
+        &self.manifest
+    }
+    fn command(&self, _command_id: &str) -> Option<Arc<dyn crate::invocation::Command>> {
+        struct Probe(Arc<RecordingShell>, Arc<Mutex<Option<bool>>>);
+        impl crate::invocation::Command for Probe {
+            fn invoke(&self, _ctx: &InvocationContext) {
+                *self.1.lock().unwrap() = Some(self.0.calls().contains(&Call::Show));
+            }
+        }
+        Some(Arc::new(Probe(
+            self.shell.clone(),
+            self.shown_at_start.clone(),
+        )))
+    }
+}
+
+/// A view command from its hotkey may read the selection, which lends the
+/// foreground and so needs the launcher shown first. The show is queued on
+/// the main thread, so the command has to be queued behind it.
+#[tokio::test]
+async fn a_view_command_hotkey_starts_the_command_after_the_show() {
+    let mut manifest = two_commands().0.clone();
+    manifest.commands.truncate(1);
+    let shell = Arc::new(RecordingShell::default());
+    let shown_at_start = Arc::new(Mutex::new(None));
+    let extension = Arc::new(ShowsFirst {
+        manifest,
+        shell: shell.clone(),
+        shown_at_start: shown_at_start.clone(),
+    });
+    let (core, _) = core_with_shell("", vec![extension], shell.clone());
+    shell.queue_main_thread();
+
+    core.dispatch_command("x.keep");
+    // Room for a command started too early to run before the queue drains.
+    std::thread::sleep(Duration::from_millis(50));
+    shell.run_main_thread();
+    std::thread::sleep(Duration::from_millis(50));
+
+    assert_eq!(*shown_at_start.lock().unwrap(), Some(true));
 }
 
 fn two_commands() -> Arc<TwoCommands> {

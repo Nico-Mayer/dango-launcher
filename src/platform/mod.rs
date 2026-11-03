@@ -49,14 +49,28 @@ pub const LAUNCHER_MAX_HEIGHT: f64 = 480.0;
 /// Calls `lost` on the main thread whenever another application takes the
 /// foreground. Main thread only, and once.
 ///
-/// winit never reports focus for the launcher on Windows: the window is the
-/// foreground and has the keyboard, yet `has_focus` stays false and no
-/// `Focused` event arrives. macOS relies on the toolkit's focus event.
+/// winit never reports focus gain for the launcher on Windows: the window is
+/// the foreground and has the keyboard, yet `has_focus` stays false. macOS
+/// relies on the toolkit's focus event.
 pub fn watch_focus_loss(lost: Box<dyn Fn()>) {
     #[cfg(target_os = "windows")]
     windows::watch_focus_loss(lost);
     #[cfg(target_os = "macos")]
     drop(lost);
+}
+
+/// Whether a focus loss is only a selection read lending the foreground to the
+/// window behind the launcher. winit still reports it as `Focused(false)` on
+/// Windows.
+pub fn focus_lent() -> bool {
+    #[cfg(target_os = "windows")]
+    {
+        windows::focus_lent()
+    }
+    #[cfg(target_os = "macos")]
+    {
+        false
+    }
 }
 
 /// Calls `reopened` when the user opens Dango again from Finder or the Dock.
@@ -391,7 +405,6 @@ pub fn text_exchange(
     own_writes: std::sync::Arc<dyn crate::text::OwnWrites>,
     launcher: std::sync::Arc<dyn crate::text::Launcher>,
     main: std::sync::Arc<dyn crate::text::MainThread>,
-    refuses: Option<crate::text::RefusesFallback>,
 ) -> Option<crate::text::TextExchange> {
     #[cfg(target_os = "macos")]
     {
@@ -403,7 +416,6 @@ pub fn text_exchange(
             Some(std::sync::Arc::new(macos::MacSelection)),
             own_writes,
             launcher,
-            refuses,
         ))
     }
     #[cfg(target_os = "windows")]
@@ -421,25 +433,7 @@ pub fn text_exchange(
             Some(std::sync::Arc::new(windows::WindowsSelection)),
             own_writes,
             launcher,
-            refuses,
         ))
-    }
-}
-
-/// The application the launcher is covering, for a question about the
-/// application the user came from rather than about Dango.
-///
-/// On Windows the launcher holds the foreground, so this is the window it
-/// replaced. On macOS the launcher is a panel that never took activation, so
-/// the frontmost application already is the one being asked about.
-pub fn covered_app() -> Option<String> {
-    #[cfg(target_os = "windows")]
-    {
-        windows::covered_app()
-    }
-    #[cfg(target_os = "macos")]
-    {
-        foreground_app()
     }
 }
 

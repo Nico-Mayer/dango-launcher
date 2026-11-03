@@ -128,7 +128,7 @@ was handed a `Preferences` reader, it is handed the shared
 `config.read().unwrap().clipboard.entries`. A reload swaps the config behind
 the lock, so reads stay live the way preference reads were.
 
-The clipboard's and selection's comma splitting goes; both read
+The clipboard's comma splitting goes; it reads
 `Vec<String>` and compare ignoring case.
 
 Manifest contract: the manifest loses `preferences`, and "contributes

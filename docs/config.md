@@ -15,7 +15,6 @@ Every setting in config.toml. Generated from the code; do not edit by hand.
 | `launcher` | [Launcher](#launcher) |  |  | Settings of the launcher itself. |
 | `permissions` | object |  |  | Settings for the Permissions extension. |
 | `quicklinks` | object |  |  | Settings for the Quicklinks extension. |
-| `selection` | [Selection](#selection) |  |  | How Dango reads the text you have selected. |
 | `snippets` | object |  |  | Settings for the Snippets extension. |
 | `system` | object |  |  | Settings for the System extension. |
 | `updates` | object |  |  | Settings for the Updates extension. |
@@ -238,12 +237,6 @@ Per-command settings, keyed by command id.
 | `autostart` | boolean |  |  | Start Dango when you log in, on the machine that reads this file. Default false. A development build ignores it. |
 | `hotkey` | [Hotkey](#hotkey) |  |  | The chord that summons the launcher. Default alt+space, which is Option+Space on macOS. |
 | `reset-after-seconds` | integer |  |  | Seconds the launcher keeps what you were doing after it is hidden by the hotkey or by losing focus. Pressing the hotkey again within this time continues where you left off. Default 60. 0 resets to root search at once. |
-
-## Selection
-
-| Setting | Type | Default | Values | Description |
-| --- | --- | --- | --- | --- |
-| `excluded-applications` | array |  |  | Applications where Dango must never send the copy chord to read a selection, matched ignoring case. For editors that bind Ctrl+C to something of their own. Dango says it cannot read the selection there instead. |
 
 ## Provider settings
 

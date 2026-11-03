@@ -22,7 +22,7 @@ taste.
   `extensions` table is reserved for extensions that are not built in.
 - **BREAKING**: an extension's settings sit directly in its table, typed. The
   `preferences` object is gone. Lists are TOML arrays, so `excluded-applications`
-  in `[clipboard]` and `[selection]` become arrays.
+  in `[clipboard]` becomes an array.
 - **BREAKING**: a value of the wrong type or outside its allowed values makes
   the file invalid, like a syntax error: Dango keeps the last good config and
   says where the problem is. Before, such a value quietly read as its default.
@@ -76,7 +76,6 @@ None.
 - `clipboard-history`: settings live in `[clipboard]`; `excluded-applications`
   is a list; an unknown `primary-action` invalidates the file.
 - `keyword-expansion`: path of the shared exclusion list.
-- `selection-and-paste`: `selection.excluded-applications` is a list.
 - `hyperkey`: turned on by `enabled = true`, not by the table being present.
 - `launcher-shell`: `launcher.reset-after` becomes `launcher.reset-after-seconds`.
 - `system-commands`: what Open Config File creates, and the example hotkey path.
