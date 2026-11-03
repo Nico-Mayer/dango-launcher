@@ -605,9 +605,15 @@ impl Core {
             // The launcher never showed to record the window the press acts on.
             platform::note_insertion_target();
         }
-        if let Err(error) = self.run_command(command_id) {
-            self.report_problem(&format!("{command_id}: {error}"));
-        }
+        // Queued behind the show: a command that reads the selection lends the
+        // foreground, which only works once the launcher holds it.
+        let core = self.clone();
+        let command_id = command_id.to_string();
+        self.on_main_thread(move || {
+            if let Err(error) = core.run_command(&command_id) {
+                core.report_problem(&format!("{command_id}: {error}"));
+            }
+        });
     }
 
     /// Launches an application from its hotkey: the same launch action Enter

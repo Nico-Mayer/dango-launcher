@@ -49,14 +49,28 @@ pub const LAUNCHER_MAX_HEIGHT: f64 = 480.0;
 /// Calls `lost` on the main thread whenever another application takes the
 /// foreground. Main thread only, and once.
 ///
-/// winit never reports focus for the launcher on Windows: the window is the
-/// foreground and has the keyboard, yet `has_focus` stays false and no
-/// `Focused` event arrives. macOS relies on the toolkit's focus event.
+/// winit never reports focus gain for the launcher on Windows: the window is
+/// the foreground and has the keyboard, yet `has_focus` stays false. macOS
+/// relies on the toolkit's focus event.
 pub fn watch_focus_loss(lost: Box<dyn Fn()>) {
     #[cfg(target_os = "windows")]
     windows::watch_focus_loss(lost);
     #[cfg(target_os = "macos")]
     drop(lost);
+}
+
+/// Whether a focus loss is only a selection read lending the foreground to the
+/// window behind the launcher. winit still reports it as `Focused(false)` on
+/// Windows.
+pub fn focus_lent() -> bool {
+    #[cfg(target_os = "windows")]
+    {
+        windows::focus_lent()
+    }
+    #[cfg(target_os = "macos")]
+    {
+        false
+    }
 }
 
 /// Calls `reopened` when the user opens Dango again from Finder or the Dock.

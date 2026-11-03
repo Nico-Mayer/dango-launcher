@@ -25,8 +25,8 @@ use windows_sys::Win32::System::Threading::{
     GetCurrentProcess, OpenProcess, OpenProcessToken, PROCESS_QUERY_LIMITED_INFORMATION,
 };
 use windows_sys::Win32::UI::WindowsAndMessaging::{
-    AllowSetForegroundWindow, GetForegroundWindow, GetWindowThreadProcessId, SendMessageTimeoutW,
-    SMTO_ABORTIFHUNG, WM_NULL,
+    AllowSetForegroundWindow, GetForegroundWindow, GetWindowThreadProcessId, IsWindowVisible,
+    SendMessageTimeoutW, SMTO_ABORTIFHUNG, WM_NULL,
 };
 
 use super::DANGO_INJECTED;
@@ -181,6 +181,12 @@ impl Handoff for WindowsHandoff {
         super::LENDING.store(true, Ordering::SeqCst);
         Lend::new(self.yield_to_previous(), move || unsafe {
             let launcher = launcher as HWND;
+            // Hidden during the read: activating it would leave the keyboard
+            // in a window nobody can see.
+            if IsWindowVisible(launcher) == 0 {
+                super::LENDING.store(false, Ordering::SeqCst);
+                return;
+            }
             super::force_foreground(launcher);
             if GetForegroundWindow() != launcher {
                 eprintln!("[dango] the launcher didn't get the foreground back after a read");

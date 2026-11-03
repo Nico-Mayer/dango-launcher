@@ -287,7 +287,9 @@ fn connect(
         // falls back to without OpenGL 2, has none.
         window.window().on_winit_window_event(move |_, event| {
             match event {
-                winit::event::WindowEvent::Focused(false) => core.hide_on_focus_loss(),
+                winit::event::WindowEvent::Focused(false) if !platform::focus_lent() => {
+                    core.hide_on_focus_loss()
+                }
                 winit::event::WindowEvent::RedrawRequested => {
                     if let Some(probe) = renderer.borrow_mut().painted() {
                         core.dispatch(Intent::Painted { probe });

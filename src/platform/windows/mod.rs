@@ -180,8 +180,12 @@ pub(super) static LENDING: AtomicBool = AtomicBool::new(false);
 
 /// The event for a lend can be handled after the foreground came back, so the
 /// current foreground is checked too.
-fn hides_on_foreground_change(lending: bool, dango_in_front: bool) -> bool {
-    !lending && !dango_in_front
+pub(super) fn focus_lent() -> bool {
+    is_lent(LENDING.load(Ordering::SeqCst), foreground_is_dango())
+}
+
+fn is_lent(lending: bool, dango_in_front: bool) -> bool {
+    lending || dango_in_front
 }
 
 /// Out of context, so the callback runs on this thread's message loop, and
@@ -213,7 +217,7 @@ unsafe extern "system" fn foreground_changed(
     _thread: u32,
     _time: u32,
 ) {
-    if !hides_on_foreground_change(LENDING.load(Ordering::SeqCst), foreground_is_dango()) {
+    if focus_lent() {
         return;
     }
     FOCUS_LOST.with(|slot| {
@@ -418,16 +422,16 @@ pub(super) fn focused_field_is_secure() -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::hides_on_foreground_change;
+    use super::is_lent;
 
     #[test]
     fn only_a_real_focus_loss_hides_the_launcher() {
-        assert!(hides_on_foreground_change(false, false));
-        assert!(!hides_on_foreground_change(true, false), "lent for a read");
+        assert!(!is_lent(false, false));
+        assert!(is_lent(true, false), "lent for a read");
         assert!(
-            !hides_on_foreground_change(false, true),
+            is_lent(false, true),
             "late event after the foreground came back"
         );
-        assert!(!hides_on_foreground_change(true, true));
+        assert!(is_lent(true, true));
     }
 }
