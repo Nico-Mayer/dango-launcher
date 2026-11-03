@@ -146,7 +146,9 @@ export component List inherits Rectangle {
     }
 
     if ListData.skeleton: Skeleton {
+        x: 0;
         y: Theme.list-padding;
+        width: ListData.detail-pane ? parent.width * 2 / 5 : parent.width;
         height: parent.height - 2 * Theme.list-padding;
     }
 

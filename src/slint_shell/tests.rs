@@ -1042,6 +1042,20 @@ mod list_view {
     }
 
     #[test]
+    fn the_skeleton_keeps_to_the_list_beside_a_detail_pane() {
+        let h = Harness::root(results(1));
+        h.view(ViewTree::new(View::List(ListView {
+            loading: true,
+            detail_pane: true,
+            ..Default::default()
+        })));
+        let skeleton = ElementHandle::find_by_element_type_name(&h.ui, "Skeleton")
+            .next()
+            .expect("the skeleton");
+        assert!(skeleton.size().width <= 720.0 * 2.0 / 5.0 + 0.5);
+    }
+
+    #[test]
     fn arriving_items_replace_the_skeleton() {
         let h = Harness::root(results(1));
         h.view(loading(Vec::new()));
