@@ -219,26 +219,26 @@ impl Handoff for MacHandoff {
 /// The accessibility route: focused element, then selected text. Touches
 /// nothing, so it is tried before the clipboard round trip.
 ///
-/// The application's own element is asked first, and the system-wide one only
-/// as a fallback. The spike found Ghostty answering through the application
-/// element on every selection while the system-wide element returned
-/// `CannotComplete` every single time, which is the opposite of what the
-/// documentation's usual example suggests.
+/// Only the frontmost application's element is asked. The spike found Ghostty
+/// answering through it on every selection while the system-wide element
+/// returned `CannotComplete` every single time, which is the opposite of what
+/// the documentation's usual example suggests.
 pub struct MacSelection;
 
 impl DirectSelection for MacSelection {
-    /// Bounded by a thread rather than `AXUIElementSetMessagingTimeout`: set
-    /// on the system-wide fallback element, that timeout becomes the global
-    /// one, window management included.
     fn selected_text(&self) -> Selected {
         let pid = frontmost_pid();
         with_deadline(move || read(pid))
     }
 }
 
-fn read(pid: Option<i32>) -> Selected {
-    pid.and_then(|pid| answer_from(unsafe { AXUIElement::new_application(pid) }))
-        .or_else(|| answer_from(unsafe { AXUIElement::new_system_wide() }))
+/// Never the system-wide element, not even for the focused application:
+/// while the panel is key, macOS answers it in-process on this thread, where
+/// accesskit panics on a `RefCell` the main thread holds and Dango aborts.
+fn read(frontmost: Option<i32>) -> Selected {
+    frontmost
+        .filter(|&pid| pid != std::process::id() as libc::pid_t)
+        .and_then(|pid| answer_from(unsafe { AXUIElement::new_application(pid) }))
         .unwrap_or(Selected::Unavailable)
 }
 
