@@ -31,7 +31,7 @@
 ## 5. Integration
 
 - [x] 5.1 Run `mise run check` and `cargo test`; verify both pass
-- [ ] 5.2 Convert the author's `snippets.json`, `quicklinks.json`, and `auth.json` to TOML by hand (keep readable ids, slug the UUID ones), change the first line of `config.toml` to `#:schema ./.schemas/config.schema.json`, and delete `config.schema.json` and the old JSON files; nothing committed; verify a debug build lists the same snippets and quicklinks through the `dango-ui` `snapshot` tool, and an AI command with a hosted provider runs
+- [x] 5.2 Convert the author's `snippets.json`, `quicklinks.json`, and `auth.json` to TOML by hand (keep readable ids, slug the UUID ones), change the first line of `config.toml` to `#:schema ./.schemas/config.schema.json`, and delete `config.schema.json` and the old JSON files; nothing committed; verify a debug build lists the same snippets and quicklinks through the `dango-ui` `snapshot` tool, and an AI command with a hosted provider runs
 
 ## 6. Review
 
