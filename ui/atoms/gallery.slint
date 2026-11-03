@@ -3,6 +3,7 @@ import { Kbd } from "kbd.slint";
 import { Tag, TagRole } from "tag.slint";
 import { Accessory, AccessoryKind } from "accessory.slint";
 import { Dot, ToastStyle } from "dot.slint";
+import { Progress, ProgressKind } from "progress.slint";
 
 /// Every atom on its own, for the UI tests.
 export component AtomGallery inherits Window {
@@ -25,6 +26,31 @@ export component AtomGallery inherits Window {
         Dot {
             style: ToastStyle.busy;
             label: "Busy";
+        }
+        Progress {
+            kind: ProgressKind.ring;
+            value: 0.42;
+            width: 16px;
+            height: 16px;
+            accessible-description: "Part done";
+        }
+        Progress {
+            kind: ProgressKind.ring;
+            value: 1;
+            width: 16px;
+            height: 16px;
+            accessible-description: "All done";
+        }
+        Progress {
+            kind: ProgressKind.ring;
+            width: 16px;
+            height: 16px;
+        }
+        Progress {
+            kind: ProgressKind.bar;
+            value: 0.62;
+            height: 4px;
+            accessible-description: "Bar";
         }
     }
 }

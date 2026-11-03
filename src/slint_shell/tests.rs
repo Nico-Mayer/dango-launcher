@@ -293,6 +293,55 @@ mod atoms {
         }
     }
 
+    fn gallery() -> AtomGallery {
+        i_slint_backend_testing::init_no_event_loop();
+        let gallery = AtomGallery::new().unwrap();
+        gallery.set_chord(keys::panel_label().into());
+        gallery.show().unwrap();
+        gallery
+    }
+
+    fn described(gallery: &AtomGallery, description: &str) -> ElementHandle {
+        let wanted = description.to_string();
+        i_slint_backend_testing::ElementQuery::from_root(gallery)
+            .match_descendants()
+            .match_predicate(move |element| {
+                element.accessible_description().as_deref() == Some(wanted.as_str())
+            })
+            .find_first()
+            .unwrap_or_else(|| panic!("{description} is drawn"))
+    }
+
+    #[test]
+    fn a_determinate_ring_reports_its_value() {
+        let gallery = gallery();
+        assert_eq!(
+            described(&gallery, "Part done")
+                .accessible_value()
+                .as_deref(),
+            Some("42")
+        );
+        assert_eq!(
+            described(&gallery, "All done")
+                .accessible_value()
+                .as_deref(),
+            Some("100")
+        );
+        assert_eq!(
+            described(&gallery, "Bar").accessible_value().as_deref(),
+            Some("62")
+        );
+    }
+
+    #[test]
+    fn an_indeterminate_ring_says_it_is_working() {
+        let gallery = gallery();
+        let ring = ElementHandle::find_by_accessible_label(&gallery, "Working")
+            .next()
+            .expect("the indeterminate ring");
+        assert_eq!(ring.accessible_value().as_deref(), Some(""));
+    }
+
     #[test]
     fn a_kbd_and_a_tag_are_announced_once() {
         i_slint_backend_testing::init_no_event_loop();
