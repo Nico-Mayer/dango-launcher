@@ -203,7 +203,7 @@ another action, or presses Escape.
 
 #### Scenario: A zero grace period resets at once
 
-- **WHEN** `launcher.reset-after` is 0 and the launcher is hidden by an
+- **WHEN** `launcher.reset-after-seconds` is 0 and the launcher is hidden by an
   interrupting hide
 - **THEN** the next activation presents the launcher as if it had just started
 - **AND** a command that was running is cancelled at the hide
@@ -286,7 +286,7 @@ of starting a second process.
 
 ### Requirement: The grace period is a config setting
 
-Dango SHALL read a whole number of seconds from `launcher.reset-after` in the
+Dango SHALL read a whole number of seconds from `launcher.reset-after-seconds` in the
 config file as the grace period for interrupting hides. When the setting is
 absent, the period SHALL be 60 seconds. Zero SHALL mean an interrupting hide
 resets at once. The schema SHALL reject a negative or fractional value. A
@@ -295,24 +295,24 @@ SHALL appear in the generated schema and in the settings reference.
 
 #### Scenario: Setting is absent
 
-- **WHEN** the config file does not mention `launcher.reset-after`
+- **WHEN** the config file does not mention `launcher.reset-after-seconds`
 - **THEN** an interrupting hide holds state for 60 seconds
 
 #### Scenario: Setting is changed while running
 
-- **WHEN** the user sets `launcher.reset-after` to 300 and saves the file while
+- **WHEN** the user sets `launcher.reset-after-seconds` to 300 and saves the file while
   Dango is running
 - **THEN** the next interrupting hide holds state for 300 seconds, with no restart
 
 #### Scenario: An invalid value is rejected by the schema
 
-- **WHEN** the user sets `launcher.reset-after` to -5 or to 1.5
+- **WHEN** the user sets `launcher.reset-after-seconds` to -5 or to 1.5
 - **THEN** editor validation against the schema reports the value as invalid
 
 #### Scenario: The setting is documented
 
 - **WHEN** the settings reference is generated
-- **THEN** it lists `launcher.reset-after` with its type, default, and description
+- **THEN** it lists `launcher.reset-after-seconds` with its type, default, and description
 
 ### Requirement: Activation feels immediate
 

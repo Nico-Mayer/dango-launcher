@@ -95,27 +95,32 @@ chord always matches what the key produces.
   that is not bound to a chord
 - **THEN** Shift is not applied to that letter
 
-### Requirement: The hyperkey is off unless configured
+### Requirement: The hyperkey is off unless enabled
 
-Dango SHALL treat the hyperkey as absent by default. Only when the configuration
-declares a hyperkey SHALL CapsLock be remapped; otherwise every key keeps its
-normal function. Declaring a hyperkey SHALL be all it takes: the configuration
-SHALL NOT name which key, and a key name left in the hyperkey block SHALL NOT
-change which key is remapped or stop the hyperkey from starting.
+Dango SHALL treat the hyperkey as off by default. Only when the `[hyperkey]`
+table sets `enabled = true` SHALL CapsLock be remapped; otherwise every key
+keeps its normal function. Turning it on SHALL be all it takes: the
+configuration SHALL NOT name which key, and a key name left in the table SHALL
+NOT change which key is remapped or stop the hyperkey from starting.
 
 #### Scenario: No hyperkey configured
 
-- **WHEN** the configuration has no hyperkey block
+- **WHEN** the configuration has no `[hyperkey]` table
 - **THEN** CapsLock and every other key behave normally
 
-#### Scenario: An empty hyperkey block turns it on
+#### Scenario: A table without enabled leaves it off
 
-- **WHEN** the configuration has a hyperkey block with no options
+- **WHEN** the `[hyperkey]` table sets options but not `enabled`
+- **THEN** CapsLock and every other key behave normally
+
+#### Scenario: Enabled with no options turns it on
+
+- **WHEN** the `[hyperkey]` table sets only `enabled = true`
 - **THEN** CapsLock acts as the hyper modifier, with Shift included and no tap key
 
 #### Scenario: A leftover key name is ignored
 
-- **WHEN** the hyperkey block still names a key, such as `capslock` or `f13`
+- **WHEN** the `[hyperkey]` table sets `enabled = true` and still names a key, such as `capslock` or `f13`
 - **THEN** CapsLock acts as the hyper modifier
 - **AND** the config schema marks the key name as not allowed
 
@@ -160,12 +165,12 @@ tap key).
 
 #### Scenario: Enabling live
 
-- **WHEN** the user adds a hyperkey to the file while Dango is running
+- **WHEN** the user sets `enabled = true` in `[hyperkey]` while Dango is running
 - **THEN** CapsLock acts as the hyper modifier without a restart
 
 #### Scenario: Disabling live
 
-- **WHEN** the user removes the hyperkey from the file
+- **WHEN** the user sets `enabled = false` in `[hyperkey]`, or removes the table
 - **THEN** CapsLock returns to its normal function
 
 #### Scenario: Changing an option live

@@ -11,15 +11,15 @@ collide rather than letting one quietly lose.
 ### Requirement: A command can be bound to a global hotkey
 
 A command MAY declare a global hotkey in the configuration file at
-`extensions.<id>.commands.<id>.hotkey`, written in the same grammar as the
-launcher hotkey. Dango SHALL register the hotkey of each bound command that is
+`<table>.commands.<id>.hotkey`, where `<table>` is the extension's table, written
+in the same grammar as the launcher hotkey. Dango SHALL register the hotkey of each bound command that is
 enabled, so that pressing it invokes that command regardless of which
 application has focus. A disabled command's hotkey SHALL NOT be registered,
 and Dango SHALL write one line to its log for each disabled command that has a
 hotkey, naming the command.
 
 A command or application hotkey MAY be one chord for both platforms or an
-object with `macos` and `windows` chords. With the object, each platform SHALL
+table with `macos` and `windows` chords. With the table, each platform SHALL
 register its own chord and ignore the other's. A platform with no value SHALL
 register no chord for that binding and SHALL surface it as a refused hotkey.
 
@@ -44,19 +44,19 @@ file changes, without a restart.
 
 #### Scenario: A disabled command keeps no hotkey
 
-- **WHEN** a command has a hotkey in the config and `"enabled": false`
+- **WHEN** a command has a hotkey in the config and `enabled = false`
 - **THEN** its chord is not registered and pressing it does not invoke the command
 - **AND** the log notes that the command has a hotkey but is disabled
 
 #### Scenario: A per-platform command chord
 
-- **WHEN** a command's hotkey is written as an object with `macos` and
+- **WHEN** a command's hotkey is written as a table with `macos` and
   `windows` chords
 - **THEN** each platform registers its own chord and ignores the other's
 
 #### Scenario: A chord for the other platform only
 
-- **WHEN** a hotkey object has a value only for the other platform
+- **WHEN** a per-platform hotkey has a value only for the other platform
 - **THEN** no chord is registered for that binding on this platform
 - **AND** it is surfaced through the tray status line and the log as a refused
   hotkey, naming the command or application
@@ -159,7 +159,7 @@ one and SHALL NOT be expected to report a conflict the platform does not raise.
 ### Requirement: An application can be bound to a global hotkey
 
 An installed application MAY be bound to a global hotkey in the configuration
-file at `extensions.dango.applications.apps.<name>.hotkey`, in the same grammar
+file at `applications.hotkeys.<name>.hotkey`, in the same grammar
 as every other hotkey. Dango SHALL register each bound chord so that pressing
 it launches that application, or brings it to the front when it is already
 running, regardless of which application has focus, and without the launcher
@@ -217,7 +217,7 @@ first-wins conflict handling as command bindings.
 
 #### Scenario: A per-platform chord
 
-- **WHEN** an application's hotkey is written as a per-platform object
+- **WHEN** an application's hotkey is written as a per-platform table
 - **THEN** each platform registers its own chord and ignores the other's
 
 ### Requirement: A refused command or application hotkey is surfaced

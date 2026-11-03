@@ -32,11 +32,13 @@ support, and SHALL continue running without it.
 - **WHEN** two extensions declare the same identifier
 - **THEN** the conflict is reported and only one is registered
 
-### Requirement: Four contribution types
+### Requirement: Three contribution types
 
-An extension SHALL be able to contribute any combination of four things:
-`commands`, a single `rootItems` provider, `services`, and `preferences`. An
-extension contributing none of them SHALL be rejected as malformed.
+An extension SHALL be able to contribute any combination of three things:
+`commands`, a single `rootItems` provider, and `services`. An extension
+contributing none of them SHALL be rejected as malformed. Settings are not a
+contribution: a built-in extension's settings are its table in the
+configuration file, described in `openspec/specs/configuration`.
 
 #### Scenario: Extension contributes only commands
 
@@ -50,7 +52,7 @@ extension contributing none of them SHALL be rejected as malformed.
 
 #### Scenario: Extension contributes nothing
 
-- **WHEN** an extension declares no commands, no root items provider, no services, and no preferences
+- **WHEN** an extension declares no commands, no root items provider, and no services
 - **THEN** it is rejected as malformed and is not loaded
 
 ### Requirement: Command declaration
@@ -144,9 +146,10 @@ requirement "A command can be disabled on its own" defines.
 ### Requirement: Built-ins are extensions
 
 Built-in features SHALL be declared as extensions using the same manifest,
-contribution types, preference schema, and enable and disable lifecycle as any
-other extension. They SHALL differ only in that they execute as native code with
-full operating system access.
+contribution types, and enable and disable lifecycle as any other extension.
+They SHALL differ only in that they execute as native code with full operating
+system access, and in that their settings are typed tables of the
+configuration file.
 
 #### Scenario: A built-in can be disabled
 
@@ -175,46 +178,16 @@ prevent other extensions from working or stop the launcher from opening.
 - **THEN** the failure is shown to the user
 - **AND** the launcher remains usable
 
-### Requirement: Extension preferences
-
-An extension SHALL be able to declare preferences at extension level, each
-with a type, an optional default value, a description written for the user,
-and, for a string preference that takes one of a fixed set of values, that
-set. Dango SHALL supply the declared default when no value has been set, and
-SHALL use the description and values wherever it describes the preference to
-the user, including the config schema and the settings reference.
-
-#### Scenario: Default is supplied
-
-- **WHEN** a preference has never been set by the user
-- **THEN** reading it returns the declared default
-
-#### Scenario: No value and no default
-
-- **WHEN** a preference declares no default and the user has set no value
-- **THEN** reading it returns no value and the extension decides what to do
-
-#### Scenario: Every built-in preference is described
-
-- **WHEN** a built-in extension's manifest is validated
-- **THEN** every preference it declares has a non-empty description
-
-#### Scenario: A fixed set of values is declared once
-
-- **WHEN** a string preference accepts only certain values, such as the clipboard's primary action
-- **THEN** the declaration lists them
-- **AND** reading a stored value outside the set returns the default
-
 ### Requirement: A command can be disabled on its own
 
-A command whose entry in the configuration file at
-`extensions.<id>.commands.<id>` sets `enabled` to false SHALL be disabled, for
-every extension, built-in or not. A disabled command SHALL NOT appear in root
-search and SHALL NOT be invocable. What happens to its hotkey is in
-command-hotkeys. The extension's other commands, its root items, and its
-services SHALL be unaffected. An absent `enabled` SHALL mean enabled. A change
-to a command's `enabled` value SHALL apply when the file is reloaded, without a
-restart.
+A command whose entry in the configuration file at `<table>.commands.<id>`
+sets `enabled` to false SHALL be disabled, for every extension, built-in or
+not. `<table>` is the built-in's own table, or `extensions.<id>` for one that
+is not built in. A disabled command SHALL NOT appear in root search and SHALL
+NOT be invocable. What happens to its hotkey is in command-hotkeys. The
+extension's other commands, its root items, and its services SHALL be
+unaffected. An absent `enabled` SHALL mean enabled. A change to a command's
+`enabled` value SHALL apply when the file is reloaded, without a restart.
 
 #### Scenario: A disabled command leaves root search
 
@@ -235,6 +208,6 @@ restart.
 
 #### Scenario: Turning a command back on without restart
 
-- **WHEN** the user removes `enabled: false` from a command, or sets it to true, while Dango is running
+- **WHEN** the user removes `enabled = false` from a command, or sets it to true, while Dango is running
 - **THEN** the command appears in root search and its hotkey works again
 - **AND** the application was not restarted

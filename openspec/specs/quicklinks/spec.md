@@ -297,7 +297,7 @@ keystroke or every start.
 ### Requirement: Favicon fetching can be turned off
 
 The user SHALL be able to stop Dango making requests to the sites their
-quicklinks point at, through the `dango.quicklinks` preference `favicons`, a
+quicklinks point at, through the setting `quicklinks.favicons`, a
 boolean that defaults to `true`.
 
 #### Scenario: Turning it off

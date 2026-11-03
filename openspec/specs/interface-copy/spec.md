@@ -295,7 +295,7 @@ line SHALL say whether the config file loaded.
 One thing SHALL have one name everywhere it appears. The established names are:
 "snippet", "quicklink", "clipboard history", "entry" for one item of the
 history, "keyword" for a snippet's expansion trigger, "hotkey" for a global
-chord, "config file" for `config.json`, "the launcher" for Dango's window, and
+chord, "config file" for `config.toml`, "the launcher" for Dango's window, and
 "the previous app" for the application the user was in before summoning
 Dango. A platform component SHALL be called what the platform calls it.
 

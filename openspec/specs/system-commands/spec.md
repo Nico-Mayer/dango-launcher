@@ -153,14 +153,13 @@ prompt about unsaved work.
 Open config file SHALL be a no-view command, titled `Open Config File`, that
 opens the config file the configuration spec names, honouring
 `$DANGO_CONFIG_DIR`, with the application the operating system associates with
-`.json` files. Dango SHALL NOT choose, bundle, or configure an editor. The
+`.toml` files. Dango SHALL NOT choose, bundle, or configure an editor. The
 command SHALL be found by the words a user reaches for when looking for
 settings, including "config", "settings", "preferences", "keybinds", and
 "hotkeys".
 
-When no config file exists, the command SHALL create one containing the
-`$schema` key pointing at the schema beside it and the schema version, before
-opening it, and the creation SHALL NOT be treated as an external edit to react
+When no config file exists, the command SHALL create one whose first line is
+the `#:schema` comment pointing at the schema beside it, before opening it, and the creation SHALL NOT be treated as an external edit to react
 to. An existing file SHALL be opened as it is, with no change to its content.
 
 #### Scenario: Found by a settings word
@@ -171,25 +170,25 @@ to. An existing file SHALL be opened as it is, with no change to its content.
 #### Scenario: The file opens on macOS
 
 - **WHEN** open config file is invoked on macOS and the config file exists
-- **THEN** the file opens in the application macOS associates with `.json` files
+- **THEN** the file opens in the application macOS associates with `.toml` files
 - **AND** the launcher hides
 
 #### Scenario: The file opens on Windows
 
 - **WHEN** open config file is invoked on Windows and the config file exists
-- **THEN** the file opens in the application Windows associates with `.json` files
+- **THEN** the file opens in the application Windows associates with `.toml` files
 - **AND** the launcher hides
 
 #### Scenario: Windows has no association for the file type
 
-- **WHEN** open config file is invoked on Windows and no application is associated with `.json` files
+- **WHEN** open config file is invoked on Windows and no application is associated with `.toml` files
 - **THEN** the Windows chooser for picking an application appears, as it does for any such file
 - **AND** the launcher hides, because the request reached the operating system
 
 #### Scenario: No config file exists yet
 
 - **WHEN** open config file is invoked and there is no config file
-- **THEN** a config file containing `"$schema": "./config.schema.json"` and the schema version is created in the config directory
+- **THEN** a `config.toml` whose first line is `#:schema ./config.schema.json` is created in the config directory
 - **AND** that file is opened
 - **AND** the config status does not report a reload, because the write was Dango's own
 
@@ -220,5 +219,5 @@ to. An existing file SHALL be opened as it is, with no change to its content.
 
 #### Scenario: Bound to a hotkey
 
-- **WHEN** the command has a hotkey under `extensions.dango.system.commands.open-config.hotkey` and the user presses that chord while another application is focused
+- **WHEN** the command has a hotkey under `system.commands.open-config.hotkey` and the user presses that chord while another application is focused
 - **THEN** the config file opens without the launcher appearing

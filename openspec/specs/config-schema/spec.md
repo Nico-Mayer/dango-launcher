@@ -12,14 +12,15 @@ documentation cannot drift from behaviour.
 ### Requirement: The schema is generated from the code
 
 Dango SHALL produce a JSON Schema for the config file from its own definition
-of the file: the typed settings, every built-in extension's id, its preference
-keys with their type, default, allowed values, and description, and its
-shipped command ids. The schema SHALL NOT be maintained by hand anywhere.
+of the file: the typed settings of the app tables, every built-in extension's
+table with its settings' types, defaults, allowed values, and descriptions,
+and its shipped command ids. The schema SHALL NOT be maintained by hand
+anywhere.
 
 #### Scenario: A preference is known by key
 
-- **WHEN** a built-in extension declares a preference
-- **THEN** the schema names that key under that extension's `preferences`, with its type, its default, its description, and its allowed values when it has any
+- **WHEN** a built-in extension has a setting
+- **THEN** the schema names that key in that extension's table, with its type, its default, its description, and its allowed values when it has any
 
 #### Scenario: A shipped command is known by id
 
@@ -39,15 +40,22 @@ shipped command ids. The schema SHALL NOT be maintained by hand anywhere.
 
 ### Requirement: The schema is strict about known objects
 
-Every object the schema describes SHALL reject keys it does not name, except
-maps whose keys are the user's own names: applications bound to hotkeys, AI
-providers, and AI commands. The `extensions` map SHALL be closed to the
-built-in extension ids. Enumerated settings SHALL list their values.
+Every table the schema describes SHALL reject keys it does not name, except
+tables whose keys are the user's own names: applications bound to hotkeys, AI
+providers, AI commands, and the entries of the reserved `extensions` table.
+The top level SHALL be closed to `version`, the app tables, the built-in
+extension tables, and `extensions`. Enumerated settings SHALL list their
+values.
 
 #### Scenario: A misspelt key is rejected
 
-- **WHEN** a config contains `hotkeys` where `hotkey` is meant
+- **WHEN** a config contains `hotkeys` where `hotkey` is meant in `[launcher]`
 - **THEN** the schema reports the key as not allowed
+
+#### Scenario: An unknown top-level table is rejected
+
+- **WHEN** a config contains a `[clipbaord]` table
+- **THEN** the schema reports the table as not allowed
 
 #### Scenario: A user-named entry is accepted
 
@@ -56,8 +64,8 @@ built-in extension ids. Enumerated settings SHALL list their values.
 
 #### Scenario: A command setting that only one extension reads
 
-- **WHEN** a config gives a `prompt` to a command of an extension other than `dango.ai`
-- **THEN** the schema rejects the key for that extension
+- **WHEN** a config gives a `prompt` to a command in a table other than `[ai]`
+- **THEN** the schema rejects the key for that table
 
 #### Scenario: An enumerated value is checked
 
@@ -66,7 +74,7 @@ built-in extension ids. Enumerated settings SHALL list their values.
 
 #### Scenario: The runtime stays lenient
 
-- **WHEN** a config contains a key the schema rejects
+- **WHEN** a config contains a key the schema rejects as unknown
 - **THEN** Dango still loads the file, exactly as before
 
 ### Requirement: The schema is written beside the config file
@@ -105,17 +113,18 @@ NOT affect startup.
 
 ### Requirement: An editor can find the schema
 
-A config file Dango creates SHALL begin with a `$schema` key whose value is
-the relative path `./config.schema.json`.
+A config file Dango creates SHALL begin with the line
+`#:schema ./config.schema.json`, the comment TOML language servers read to
+find a schema. The file SHALL NOT need a key to point at the schema.
 
 #### Scenario: A created file points at the schema
 
 - **WHEN** Dango creates a config file
-- **THEN** its first key is `$schema` with the value `./config.schema.json`
+- **THEN** its first line is `#:schema ./config.schema.json`
 
 #### Scenario: The editor completes and checks the file
 
-- **WHEN** a config file with the `$schema` key is opened in an editor whose JSON language server honours `$schema`
+- **WHEN** a config file with that first line is opened in an editor whose TOML language server honours `#:schema`
 - **THEN** the editor offers the known keys and flags a key the schema rejects
 
 ### Requirement: The settings reference is generated and kept current

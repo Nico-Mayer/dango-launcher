@@ -119,8 +119,8 @@ needs. It SHALL keep them in memory only, and SHALL never write them anywhere.
 
 Dango SHALL hold nothing and expand nothing in contexts the user has excluded,
 the system marks as sensitive, or that belong to Dango itself. The excluded
-applications are the clipboard extension's `excluded-applications` preference,
-at `extensions.dango.clipboard.preferences.excluded-applications`: one list
+applications are the clipboard extension's `excluded-applications` setting,
+at `clipboard.excluded-applications`: one list
 serves both clipboard history and keyword expansion.
 
 On Windows, a password field is recognised only when it is a classic Win32
@@ -145,12 +145,12 @@ expected to expand.
 
 #### Scenario: An excluded application
 
-- **WHEN** the user types in an application listed in the clipboard extension's `excluded-applications` preference
+- **WHEN** the user types in an application listed in the clipboard extension's `excluded-applications` setting
 - **THEN** nothing is held and nothing expands
 
 #### Scenario: The exclusion list is honoured without a restart
 
-- **WHEN** the user changes the `excluded-applications` preference
+- **WHEN** the user changes the `excluded-applications` setting
 - **THEN** the change takes effect on the next keystroke observed
 
 #### Scenario: Typing in the launcher on Windows

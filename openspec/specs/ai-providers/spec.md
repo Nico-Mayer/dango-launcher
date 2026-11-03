@@ -75,7 +75,7 @@ provider's name to its key. It SHALL be optional: with no file, only providers
 needing no key work.
 
 Dango SHALL only read this file; it SHALL NOT write keys into it. A key SHALL
-NOT be written into `config.json`, into the local database, into a log, or into
+NOT be written into `config.toml`, into the local database, into a log, or into
 any message shown on screen. Where the platform expresses file permissions,
 Dango SHALL keep the file readable only by its owner.
 

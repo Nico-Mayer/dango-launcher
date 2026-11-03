@@ -72,9 +72,9 @@ total size on disk. When either bound is reached, the oldest entries SHALL be
 discarded first. A single entry larger than a per-entry ceiling SHALL NOT be
 recorded.
 
-The bounds SHALL be set by extension preferences: `entries`, the number of
-entries, default 500; `entry-megabytes`, the per-entry ceiling, default 16;
-and `total-megabytes`, the total size, default 256.
+The bounds SHALL be set by whole-number settings in `[clipboard]`: `entries`,
+the number of entries, default 500; `entry-megabytes`, the per-entry ceiling,
+default 16; and `total-megabytes`, the total size, default 256.
 
 #### Scenario: Entry count is capped
 
@@ -94,7 +94,7 @@ and `total-megabytes`, the total size, default 256.
 
 #### Scenario: Defaults apply when nothing is set
 
-- **WHEN** the user has set none of the three preferences
+- **WHEN** the user has set none of the three settings
 - **THEN** the history keeps at most 500 entries, refuses an entry over 16
   megabytes, and stays within 256 megabytes
 
@@ -111,10 +111,11 @@ entry into the application the user was in, and a copy action, which places the
 entry on the clipboard. Both SHALL hide the launcher as they run. What the
 clipboard holds after a paste is in `openspec/specs/selection-and-paste`.
 
-Which of the two Enter runs SHALL be set by the extension preference
-`primary-action`, with the values `paste` and `copy`. The default SHALL be
+Which of the two Enter runs SHALL be set by the setting `primary-action` in
+`[clipboard]`, with the values `paste` and `copy`. The default SHALL be
 `paste`. The action Enter does not run SHALL be reachable from the action
-panel. A value that is neither SHALL behave as the default.
+panel. A value that is neither SHALL make the config file invalid, as
+described in `openspec/specs/configuration`.
 
 A file entry SHALL go back on the clipboard as files, holding those of its
 files that still exist.
@@ -194,8 +195,10 @@ files that still exist.
 
 #### Scenario: An unrecognised preference value
 
-- **WHEN** `primary-action` is set to a value other than `paste` or `copy`
-- **THEN** Enter pastes, as if the preference were not set
+- **WHEN** the user saves `primary-action` set to a value other than `paste`
+  or `copy` while Dango is running
+- **THEN** Enter keeps running the action from the last config that loaded
+- **AND** the config problem is surfaced
 
 #### Scenario: The launcher gets out of the way promptly
 
@@ -501,9 +504,9 @@ from an application the user has excluded, SHALL NOT be recorded. An excluded
 entry SHALL leave no trace: not in the database, not on disk, and not in memory
 beyond the check itself. This SHALL hold for text, images, and files alike.
 
-The excluded applications SHALL be set by the extension preference
-`excluded-applications`: application names, comma separated, matched ignoring
-case. Its default SHALL list mainstream password managers.
+The excluded applications SHALL be set by the setting `excluded-applications`
+in `[clipboard]`: a list of application names, matched ignoring case. Its
+default SHALL list mainstream password managers.
 
 Content Dango itself puts on the clipboard SHALL NOT be recorded either. That
 rule is in `openspec/specs/selection-and-paste`.
@@ -531,7 +534,7 @@ rule is in `openspec/specs/selection-and-paste`.
 
 #### Scenario: Exclusion matches names ignoring case
 
-- **WHEN** `excluded-applications` names "1password" and content is copied from
+- **WHEN** `excluded-applications` lists "1password" and content is copied from
   an application named "1Password"
 - **THEN** nothing is recorded
 
