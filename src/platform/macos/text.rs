@@ -144,7 +144,7 @@ impl Keys for MacKeys {
     /// enigo, which posts to the key window: the launcher panel stays key
     /// during a read.
     fn copy(&self) -> Result<(), TextError> {
-        let pid = frontmost_pid().ok_or_else(keystroke_failed)?;
+        let pid = app_behind().ok_or_else(keystroke_failed)?;
         let source =
             CGEventSource::new(CGEventSourceStateID::Private).ok_or_else(keystroke_failed)?;
         CGEventSource::set_user_data(Some(&source), DANGO_INJECTED);
@@ -227,7 +227,7 @@ pub struct MacSelection;
 
 impl DirectSelection for MacSelection {
     fn selected_text(&self) -> Selected {
-        let pid = frontmost_pid();
+        let pid = app_behind();
         with_deadline(move || read(pid))
     }
 }
@@ -235,17 +235,18 @@ impl DirectSelection for MacSelection {
 /// Never the system-wide element, not even for the focused application:
 /// while the panel is key, macOS answers it in-process on this thread, where
 /// accesskit panics on a `RefCell` the main thread holds and Dango aborts.
-fn read(frontmost: Option<i32>) -> Selected {
-    frontmost
-        .filter(|&pid| pid != std::process::id() as libc::pid_t)
-        .and_then(|pid| answer_from(unsafe { AXUIElement::new_application(pid) }))
+fn read(pid: Option<libc::pid_t>) -> Selected {
+    pid.and_then(|pid| answer_from(unsafe { AXUIElement::new_application(pid) }))
         .unwrap_or(Selected::Unavailable)
 }
 
-fn frontmost_pid() -> Option<i32> {
+/// `None` when Dango itself is frontmost, as after opening it from the Dock:
+/// reading or copying there would hand back the search query.
+fn app_behind() -> Option<libc::pid_t> {
     NSWorkspace::sharedWorkspace()
         .frontmostApplication()
         .map(|app| app.processIdentifier())
+        .filter(|&pid| pid != std::process::id() as libc::pid_t)
 }
 
 fn answer_from(root: CFRetained<AXUIElement>) -> Option<Selected> {
@@ -260,40 +261,18 @@ fn answer_from(root: CFRetained<AXUIElement>) -> Option<Selected> {
             .flatten()
             .and_then(|value| value.downcast::<CFString>().ok())
             .map(|text| text.to_string());
-        let answer = Answer {
-            own: element_pid(&focused) == Some(std::process::id() as libc::pid_t),
-            text,
-            has_range: matches!(copy_attribute(&focused, SELECTED_TEXT_RANGE), Ok(Some(_))),
-        };
-        answer.selected()
+        let has_range = matches!(copy_attribute(&focused, SELECTED_TEXT_RANGE), Ok(Some(_)));
+        answer(text, has_range)
     }
 }
 
-fn element_pid(element: &AXUIElement) -> Option<libc::pid_t> {
-    let mut pid: libc::pid_t = 0;
-    let status = unsafe { element.pid(NonNull::from(&mut pid)) };
-    (status == AXError::Success).then_some(pid)
-}
-
-struct Answer {
-    own: bool,
-    text: Option<String>,
-    has_range: bool,
-}
-
-impl Answer {
-    /// GPUI apps answer `""` for an element with no text at all, and the
-    /// panel's own search field answers `""` too. Neither is a real "nothing
-    /// selected", so both go to the copy fallback.
-    fn selected(self) -> Option<Selected> {
-        if self.own {
-            return None;
-        }
-        match self.text? {
-            text if !text.is_empty() => Some(Selected::Text(text)),
-            _ if self.has_range => Some(Selected::Empty),
-            _ => None,
-        }
+/// GPUI apps answer `""` for an element with no text at all. That is not a
+/// real "nothing selected", so it goes to the copy fallback.
+fn answer(text: Option<String>, has_range: bool) -> Option<Selected> {
+    match text? {
+        text if !text.is_empty() => Some(Selected::Text(text)),
+        _ if has_range => Some(Selected::Empty),
+        _ => None,
     }
 }
 
@@ -319,41 +298,30 @@ unsafe fn copy_attribute(
 mod tests {
     use super::*;
 
-    fn answer(own: bool, text: Option<&str>, has_range: bool) -> Option<Selected> {
-        Answer {
-            own,
-            text: text.map(str::to_owned),
-            has_range,
-        }
-        .selected()
+    fn answer_for(text: Option<&str>, has_range: bool) -> Option<Selected> {
+        answer(text.map(str::to_owned), has_range)
     }
 
     #[test]
     fn selected_text_is_the_answer() {
         assert_eq!(
-            answer(false, Some("hello"), true),
+            answer_for(Some("hello"), true),
             Some(Selected::Text("hello".into()))
         );
     }
 
     #[test]
     fn an_empty_answer_with_a_range_is_empty() {
-        assert_eq!(answer(false, Some(""), true), Some(Selected::Empty));
+        assert_eq!(answer_for(Some(""), true), Some(Selected::Empty));
     }
 
     #[test]
     fn an_empty_answer_without_a_range_is_no_answer() {
-        assert_eq!(answer(false, Some(""), false), None);
-    }
-
-    #[test]
-    fn dangos_own_element_is_no_answer() {
-        assert_eq!(answer(true, Some(""), true), None);
-        assert_eq!(answer(true, Some("query"), true), None);
+        assert_eq!(answer_for(Some(""), false), None);
     }
 
     #[test]
     fn an_element_without_selected_text_is_no_answer() {
-        assert_eq!(answer(false, None, true), None);
+        assert_eq!(answer_for(None, true), None);
     }
 }

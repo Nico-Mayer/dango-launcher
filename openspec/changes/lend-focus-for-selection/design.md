@@ -114,7 +114,8 @@ Mac hand check: TextEdit, Firefox and Zed all handle it. Fallback not needed.
   or focused application) in-process on the reader thread, and accesskit
   panics on a `RefCell` the main thread holds, aborting Dango (found in the
   Mac hand check);
-- skips any focused element whose pid is Dango's own (`AXUIElementGetPid`);
+- asks nothing, and copies nothing, when Dango itself is the frontmost
+  application (opened from the Dock), so the search field is never the answer;
 - treats `""` as Empty only if the element also has `AXSelectedTextRange`;
   otherwise Unavailable.
 
