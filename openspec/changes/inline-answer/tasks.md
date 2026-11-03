@@ -2,7 +2,7 @@
 
 ## 1. The calculator as a root provider
 
-- [ ] 1.1 Add `fend-core = "1.5.9"` to `Cargo.toml`. Add `src/extensions/calculator/` with `CalculatorExtension`:
+- [x] 1.1 Add `fend-core = "1.5.9"` to `Cargo.toml`. Add `src/extensions/calculator/` with `CalculatorExtension`:
   - a manifest named "Calculator" with `root_items: true`, listed in `builtin_manifests()`;
   - the gate from design.md (an operator or " to ", " in ", " as "; no comma between digits);
   - `fend_core::evaluate_preview_with_interrupt` with a 100 ms deadline, run on `spawn_blocking`;

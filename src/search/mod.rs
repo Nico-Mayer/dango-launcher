@@ -17,6 +17,8 @@ use tokio::time::timeout;
 pub enum Source {
     Command,
     RootItem,
+    /// The calculator's answer to the query: first, never ranked or filtered.
+    Answer,
 }
 
 #[derive(Clone, Debug)]

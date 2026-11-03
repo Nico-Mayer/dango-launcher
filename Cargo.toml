@@ -33,6 +33,7 @@ slint-build = "=1.18.1"
 winresource = "0.1"
 
 [dependencies]
+fend-core = "1.5.9"
 global-hotkey = "0.8"
 auto-launch = "0.6"
 open = "5"

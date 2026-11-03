@@ -1322,6 +1322,7 @@ dependencies = [
  "email_address",
  "enigo",
  "favicon-picker",
+ "fend-core",
  "futures",
  "genai",
  "global-hotkey",
@@ -1916,6 +1917,12 @@ dependencies = [
  "wasm-bindgen",
  "web-sys",
 ]
+
+[[package]]
+name = "fend-core"
+version = "1.5.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7bf10938a7681e32b5b7d82ada720a04837f120e671c1e653309053e92c9e1e2"
 
 [[package]]
 name = "field-offset"
