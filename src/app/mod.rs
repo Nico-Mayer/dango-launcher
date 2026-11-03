@@ -762,7 +762,7 @@ impl Core {
         let config = match result {
             Ok(config) => config,
             Err(error) => {
-                crate::log::append(&format!("config reload failed: {error}"));
+                crate::log::append(&error.to_string());
                 self.set_config_status(true);
                 return;
             }

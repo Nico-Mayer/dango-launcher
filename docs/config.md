@@ -1,8 +1,12 @@
 # Dango configuration
 
-Every setting in config.toml. Generated from the code; do not edit by hand.
+Every file in the config directory and every setting in it. Generated from the code; do not edit by hand.
 
-## Top level
+## config.toml
+
+Every setting is optional; anything left out uses its built-in default. Dango keeps keys it does not know, but this schema flags them.
+
+### Top level
 
 | Setting | Type | Default | Values | Description |
 | --- | --- | --- | --- | --- |
@@ -21,7 +25,7 @@ Every setting in config.toml. Generated from the code; do not edit by hand.
 | `version` | integer |  |  | The config schema version. Leave it at 1. |
 | `window-management` | object |  |  | Settings for the Window Management extension. |
 
-## `ai`
+### `ai`
 
 Settings for the AI extension.
 
@@ -33,7 +37,7 @@ Settings for the AI extension.
 | `providers` | map of [Provider settings](#provider-settings) |  |  | Model services, keyed by the name commands refer to them by. That name is also the key its API key is filed under in auth.json. |
 | `thinking` | string | `off` | `off`, `low`, `medium`, `high` | How hard the model thinks when a command does not say. |
 
-## `ai.commands`
+### `ai.commands`
 
 Per-command settings, keyed by command id. A command id the extension does not ship defines a new command.
 
@@ -49,7 +53,7 @@ Per-command settings, keyed by command id. A command id the extension does not s
 | `summarize` | [AI command settings](#ai-command-settings) |  |  | Settings for the summarize command. |
 | `translate` | [AI command settings](#ai-command-settings) |  |  | Settings for the translate command. |
 
-## `applications`
+### `applications`
 
 Settings for the Applications extension.
 
@@ -58,7 +62,7 @@ Settings for the Applications extension.
 | `enabled` | boolean |  |  | Whether the extension runs. Absent means enabled. |
 | `hotkeys` | map of [Application settings](#application-settings) |  |  | Applications bound to global hotkeys, keyed by the name Dango shows for the application in root search. |
 
-## `clipboard`
+### `clipboard`
 
 Settings for the Clipboard History extension.
 
@@ -72,7 +76,7 @@ Settings for the Clipboard History extension.
 | `primary-action` | string | `paste` | `paste`, `copy` | What Enter does to an entry: paste it into the previous app, or only copy it. |
 | `total-megabytes` | integer | `256` |  | The most the whole history may use, in megabytes. |
 
-## `clipboard.commands`
+### `clipboard.commands`
 
 Per-command settings, keyed by command id.
 
@@ -80,7 +84,7 @@ Per-command settings, keyed by command id.
 | --- | --- | --- | --- | --- |
 | `history` | [Command settings](#command-settings) |  |  | Settings for the history command. |
 
-## `games`
+### `games`
 
 Settings for the Games extension.
 
@@ -89,7 +93,7 @@ Settings for the Games extension.
 | `commands` | object |  |  | Per-command settings, keyed by command id. |
 | `enabled` | boolean |  |  | Whether the extension runs. Absent means enabled. |
 
-## `games.commands`
+### `games.commands`
 
 Per-command settings, keyed by command id.
 
@@ -97,7 +101,7 @@ Per-command settings, keyed by command id.
 | --- | --- | --- | --- | --- |
 | `search` | [Command settings](#command-settings) |  |  | Settings for the search command. |
 
-## `permissions`
+### `permissions`
 
 Settings for the Permissions extension.
 
@@ -105,7 +109,7 @@ Settings for the Permissions extension.
 | --- | --- | --- | --- | --- |
 | `enabled` | boolean |  |  | Whether the extension runs. Absent means enabled. |
 
-## `quicklinks`
+### `quicklinks`
 
 Settings for the Quicklinks extension.
 
@@ -115,7 +119,7 @@ Settings for the Quicklinks extension.
 | `enabled` | boolean |  |  | Whether the extension runs. Absent means enabled. |
 | `favicons` | boolean | `true` |  | Show each quicklink with its site's icon. Off stops Dango fetching from those sites. |
 
-## `quicklinks.commands`
+### `quicklinks.commands`
 
 Per-command settings, keyed by command id.
 
@@ -124,7 +128,7 @@ Per-command settings, keyed by command id.
 | `create` | [Command settings](#command-settings) |  |  | Settings for the create command. |
 | `search` | [Command settings](#command-settings) |  |  | Settings for the search command. |
 
-## `snippets`
+### `snippets`
 
 Settings for the Snippets extension.
 
@@ -133,7 +137,7 @@ Settings for the Snippets extension.
 | `commands` | object |  |  | Per-command settings, keyed by command id. |
 | `enabled` | boolean |  |  | Whether the extension runs. Absent means enabled. |
 
-## `snippets.commands`
+### `snippets.commands`
 
 Per-command settings, keyed by command id.
 
@@ -142,7 +146,7 @@ Per-command settings, keyed by command id.
 | `create` | [Command settings](#command-settings) |  |  | Settings for the create command. |
 | `search` | [Command settings](#command-settings) |  |  | Settings for the search command. |
 
-## `system`
+### `system`
 
 Settings for the System extension.
 
@@ -151,7 +155,7 @@ Settings for the System extension.
 | `commands` | object |  |  | Per-command settings, keyed by command id. |
 | `enabled` | boolean |  |  | Whether the extension runs. Absent means enabled. |
 
-## `system.commands`
+### `system.commands`
 
 Per-command settings, keyed by command id.
 
@@ -163,7 +167,7 @@ Per-command settings, keyed by command id.
 | `quit-application` | [Command settings](#command-settings) |  |  | Settings for the quit-application command. |
 | `sleep` | [Command settings](#command-settings) |  |  | Settings for the sleep command. |
 
-## `updates`
+### `updates`
 
 Settings for the Updates extension.
 
@@ -172,7 +176,7 @@ Settings for the Updates extension.
 | `commands` | object |  |  | Per-command settings, keyed by command id. |
 | `enabled` | boolean |  |  | Whether the extension runs. Absent means enabled. |
 
-## `updates.commands`
+### `updates.commands`
 
 Per-command settings, keyed by command id.
 
@@ -180,7 +184,7 @@ Per-command settings, keyed by command id.
 | --- | --- | --- | --- | --- |
 | `check` | [Command settings](#command-settings) |  |  | Settings for the check command. |
 
-## `window-management`
+### `window-management`
 
 Settings for the Window Management extension.
 
@@ -189,7 +193,7 @@ Settings for the Window Management extension.
 | `commands` | object |  |  | Per-command settings, keyed by command id. |
 | `enabled` | boolean |  |  | Whether the extension runs. Absent means enabled. |
 
-## `window-management.commands`
+### `window-management.commands`
 
 Per-command settings, keyed by command id.
 
@@ -215,14 +219,14 @@ Per-command settings, keyed by command id.
 | `top-left-quarter` | [Command settings](#command-settings) |  |  | Settings for the top-left-quarter command. |
 | `top-right-quarter` | [Command settings](#command-settings) |  |  | Settings for the top-right-quarter command. |
 
-## Extension table
+### Extension table
 
 | Setting | Type | Default | Values | Description |
 | --- | --- | --- | --- | --- |
 | `commands` | map of [Command settings](#command-settings) |  |  | Per-command settings, keyed by command id. |
 | `enabled` | boolean |  |  | Whether the extension runs. Absent means enabled. |
 
-## Hyperkey
+### Hyperkey
 
 | Setting | Type | Default | Values | Description |
 | --- | --- | --- | --- | --- |
@@ -230,7 +234,7 @@ Per-command settings, keyed by command id.
 | `shift` | boolean |  |  | Whether Shift is part of the combination. Default true; false emits Ctrl+Alt+Super, which leaves typed characters unshifted. |
 | `tap` | string |  | `space`, `enter`, `return`, `tab`, `escape`, `esc`, `backspace`, `delete` and 78 more | A key to send on a quick, solitary tap of the hyperkey, such as `escape`. A hold, or a press with another key, still acts as the modifier. Leave it out for no tap action. |
 
-## Launcher
+### Launcher
 
 | Setting | Type | Default | Values | Description |
 | --- | --- | --- | --- | --- |
@@ -238,7 +242,7 @@ Per-command settings, keyed by command id.
 | `hotkey` | [Hotkey](#hotkey) |  |  | The chord that summons the launcher. Default alt+space, which is Option+Space on macOS. |
 | `reset-after-seconds` | integer |  |  | Seconds the launcher keeps what you were doing after it is hidden by the hotkey or by losing focus. Pressing the hotkey again within this time continues where you left off. Default 60. 0 resets to root search at once. |
 
-## Provider settings
+### Provider settings
 
 | Setting | Type | Default | Values | Description |
 | --- | --- | --- | --- | --- |
@@ -247,7 +251,7 @@ Per-command settings, keyed by command id.
 | `model` | string |  |  | The model used by a command that names this provider but no model. Optional for `claude` and `pi`, which then use their own default. |
 | `path` | string |  |  | Absolute path to the program, for `claude` and `pi`. Without it Dango looks on PATH and in the usual install folders. |
 
-## AI command settings
+### AI command settings
 
 | Setting | Type | Default | Values | Description |
 | --- | --- | --- | --- | --- |
@@ -261,14 +265,14 @@ Per-command settings, keyed by command id.
 | `thinking` | string |  | `off`, `low`, `medium`, `high` | How hard the model thinks before answering. Absent falls back to the extension's default level. |
 | `title` | string |  |  | The title root search shows. Needed for a command the file defines from nothing. |
 
-## Application settings
+### Application settings
 
 | Setting | Type | Default | Values | Description |
 | --- | --- | --- | --- | --- |
 | `hotkey` | [Hotkey](#hotkey) |  |  | The chord that opens the application, or brings it to the front. |
 | `name` | [Application name](#application-name) |  |  | The application's shown name when it differs from the key, either one string or one per platform. A side with no value means the entry is skipped on that platform. |
 
-## Command settings
+### Command settings
 
 | Setting | Type | Default | Values | Description |
 | --- | --- | --- | --- | --- |
@@ -276,7 +280,7 @@ Per-command settings, keyed by command id.
 | `enabled` | boolean |  |  | Whether the command is offered. Absent means yes; false removes a command the extension ships. |
 | `hotkey` | [Hotkey](#hotkey) |  |  | A global hotkey that runs this command from anywhere. A no-view command runs without showing the launcher; a view command shows its view. |
 
-## Hotkey
+### Hotkey
 
 A hotkey: one chord that works on both platforms, such as `mod+shift+k` where `mod` is Cmd on macOS and Ctrl on Windows, or a chord per platform. The key is a physical position, so a non-US layout does not move it.
 
@@ -287,7 +291,7 @@ A chord is one or more modifiers joined with `+`, then one key, all lowercase. A
 
 Or an object with a `macos` and a `windows` chord; a missing side means no binding there.
 
-## Application name
+### Application name
 
 An application's shown name: one string for both platforms, or one per platform, the same two shapes a hotkey may take.
 
@@ -296,7 +300,7 @@ One of:
 - string
 - [Per-platform value](#per-platform-value)
 
-## Per-platform value
+### Per-platform value
 
 | Setting | Type | Default | Values | Description |
 | --- | --- | --- | --- | --- |

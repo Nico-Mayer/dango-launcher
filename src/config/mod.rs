@@ -14,6 +14,7 @@ use global_hotkey::hotkey::Modifiers;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
+mod files;
 pub mod hotkey;
 mod location;
 pub mod schema;
@@ -21,8 +22,9 @@ mod store;
 mod tables;
 pub mod watch;
 
+pub use files::{write_user_file, UserFile};
 pub use hotkey::{Hotkey, HotkeyError, ParsedHotkey, PerPlatform};
-pub use location::{auth_path, config_dir, config_path, SCHEMA_REF};
+pub use location::{auth_path, config_dir};
 pub use store::FileConfig;
 pub use tables::{
     table_name, AiCommandSettings, AiTable, ApplicationsTable, ClipboardTable, CommandBinding,
@@ -31,9 +33,9 @@ pub use tables::{
 
 #[derive(Debug, thiserror::Error)]
 pub enum ConfigError {
-    #[error("the configuration file is not valid: {0}")]
+    #[error("config.toml: {0}")]
     Parse(String),
-    #[error("the configuration file could not be read: {0}")]
+    #[error("config.toml could not be read: {0}")]
     Read(String),
 }
 
@@ -540,6 +542,7 @@ launcher = { not toml",
         )
         .unwrap_err();
         assert!(matches!(error, ConfigError::Parse(_)));
+        assert!(error.to_string().starts_with("config.toml: "), "{error}");
         assert!(error.to_string().contains("line 2"), "{error}");
     }
 

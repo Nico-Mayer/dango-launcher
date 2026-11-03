@@ -4,7 +4,7 @@
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex, RwLock};
 
-use super::location::SCHEMA_REF;
+use super::files::{write_user_file, UserFile};
 use super::Config;
 use crate::extension::EnabledStore;
 
@@ -48,19 +48,10 @@ impl FileConfig {
     /// that exists is left alone, whatever it contains.
     pub fn ensure_file(&self) -> Result<PathBuf, String> {
         if !self.path.exists() {
-            let text = format!("#:schema {SCHEMA_REF}\n");
-            self.write(&text)
+            write_user_file(&self.path, &UserFile::Config.header(), &self.own_write)
                 .map_err(|error| format!("{}: {error}", self.path.display()))?;
         }
         Ok(self.path.clone())
-    }
-
-    fn write(&self, text: &str) -> std::io::Result<()> {
-        *self.own_write.lock().unwrap() = Some(text.to_string());
-        if let Some(parent) = self.path.parent() {
-            std::fs::create_dir_all(parent)?;
-        }
-        std::fs::write(&self.path, text)
     }
 }
 
@@ -137,7 +128,7 @@ mod tests {
         let store = FileConfig::new(path.clone(), Config::default());
         assert_eq!(store.ensure_file().unwrap(), path);
         let on_disk = std::fs::read_to_string(&path).unwrap();
-        assert_eq!(on_disk, "#:schema ./config.schema.json\n");
+        assert_eq!(on_disk, "#:schema ./.schemas/config.schema.json\n");
         assert!(Config::parse(&on_disk).is_ok());
         assert_eq!(
             store.own_write.lock().unwrap().as_deref(),

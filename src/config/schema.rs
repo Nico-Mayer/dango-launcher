@@ -1,4 +1,4 @@
-//! The JSON Schema for the config file, generated from the structs that read
+//! The JSON Schema for each user file, generated from the structs that read
 //! it and from the built-in manifests, so an editor's completions and the
 //! settings reference cannot drift from what the code accepts.
 
@@ -7,17 +7,25 @@ use std::path::Path;
 
 use serde_json::{json, Map, Value};
 
+use super::files::UserFile;
 use super::hotkey::{stands_alone, KEY_TOKENS, MODIFIER_TOKENS};
 use super::{table_name, Config};
 use crate::extension::Manifest;
-
-pub const FILE_NAME: &str = "config.schema.json";
 
 /// The one extension whose commands the file may also define, so its
 /// `commands` stays open to ids it does not ship.
 const AI_ID: &str = "dango.ai";
 
-pub fn generate(manifests: &[Manifest]) -> Value {
+pub fn generate(file: UserFile, manifests: &[Manifest]) -> Value {
+    let mut schema = match file {
+        UserFile::Config => config_schema(manifests),
+    };
+    drop_unused_defs(&mut schema);
+    tidy(&mut schema);
+    schema
+}
+
+fn config_schema(manifests: &[Manifest]) -> Value {
     let mut schema = schemars::schema_for!(Config).to_value();
     strip_null(&mut schema);
     close_objects(&mut schema);
@@ -25,8 +33,6 @@ pub fn generate(manifests: &[Manifest]) -> Value {
     constrain_hotkeys(&mut schema);
     constrain_hyperkey(&mut schema);
     inline_tables(&mut schema, manifests);
-    drop_unused_defs(&mut schema);
-    tidy(&mut schema);
     schema
 }
 
@@ -36,15 +42,25 @@ pub fn render(schema: &Value) -> String {
     text
 }
 
-/// Writes the schema into `dir` unless the copy there already matches.
-/// Returns whether a write happened.
-pub fn write(dir: &Path, manifests: &[Manifest]) -> Result<bool, String> {
-    let path = dir.join(FILE_NAME);
-    let text = render(&generate(manifests));
+/// Writes every user file's schema under `dir`, returning one message per
+/// schema that could not be written.
+pub fn write_all(dir: &Path, manifests: &[Manifest]) -> Vec<String> {
+    UserFile::ALL
+        .into_iter()
+        .filter_map(|file| write(dir, file, manifests).err())
+        .collect()
+}
+
+/// Writes one schema unless the copy there already matches. Returns whether a
+/// write happened.
+pub fn write(dir: &Path, file: UserFile, manifests: &[Manifest]) -> Result<bool, String> {
+    let path = file.schema_path_in(dir);
+    let text = render(&generate(file, manifests));
     if std::fs::read_to_string(&path).ok().as_deref() == Some(text.as_str()) {
         return Ok(false);
     }
-    std::fs::create_dir_all(dir)
+    path.parent()
+        .map_or(Ok(()), std::fs::create_dir_all)
         .and_then(|_| std::fs::write(&path, &text))
         .map_err(|error| format!("{}: {error}", path.display()))?;
     Ok(true)
@@ -234,29 +250,36 @@ fn drop_unused_defs(schema: &mut Value) {
     }
 }
 
-/// The settings reference as Markdown: one table per object, every property
-/// with its type, default, allowed values, and description. Shared shapes
-/// from `$defs` are rendered once and linked to.
-pub fn reference(schema: &Value) -> String {
+/// The settings reference as Markdown: a part per user file, one table per
+/// object, every property with its type, default, allowed values, and
+/// description. Shared shapes from `$defs` are rendered once and linked to.
+pub fn reference(manifests: &[Manifest]) -> String {
     let mut out = String::from(
-        "# Dango configuration\n\nEvery setting in config.toml. Generated from the code; \
-         do not edit by hand.\n",
+        "# Dango configuration\n\nEvery file in the config directory and every setting in it. \
+         Generated from the code; do not edit by hand.\n",
     );
-    let mut writer = Reference {
-        schema,
-        out: &mut out,
-        pending: Vec::new(),
-        rendered: Vec::new(),
-    };
-    writer.section("Top level", "", schema);
-    while let Some(name) = writer.pending.first().cloned() {
-        writer.pending.remove(0);
-        writer.rendered.push(name.clone());
-        let def = schema["$defs"][&name].clone();
-        if name == "Hotkey" {
-            writer.hotkey_section(&def_title(&name), &def);
-        } else {
-            writer.section(&def_title(&name), "", &def);
+    for file in UserFile::ALL {
+        let schema = generate(file, manifests);
+        let _ = writeln!(out, "\n## {}\n", file.file_name());
+        if let Some(description) = schema["description"].as_str() {
+            let _ = writeln!(out, "{description}");
+        }
+        let mut writer = Reference {
+            schema: &schema,
+            out: &mut out,
+            pending: Vec::new(),
+            rendered: Vec::new(),
+        };
+        writer.section("Top level", "", &schema);
+        while let Some(name) = writer.pending.first().cloned() {
+            writer.pending.remove(0);
+            writer.rendered.push(name.clone());
+            let def = schema["$defs"][&name].clone();
+            if name == "Hotkey" {
+                writer.hotkey_section(&def_title(&name), &def);
+            } else {
+                writer.section(&def_title(&name), "", &def);
+            }
         }
     }
     out
@@ -278,7 +301,7 @@ impl Reference<'_> {
         let Some(properties) = node["properties"].as_object() else {
             return;
         };
-        let _ = writeln!(self.out, "\n## {title}\n");
+        let _ = writeln!(self.out, "\n### {title}\n");
         if let Some(description) = node["description"].as_str().filter(|_| !path.is_empty()) {
             let _ = writeln!(self.out, "{description}\n");
         }
@@ -343,7 +366,7 @@ impl Reference<'_> {
     /// A value that takes one of several shapes, such as a name that is one
     /// string or one per platform.
     fn shapes_section(&mut self, title: &str, node: &Value, branches: &[Value]) {
-        let _ = writeln!(self.out, "\n## {title}\n");
+        let _ = writeln!(self.out, "\n### {title}\n");
         if let Some(description) = node["description"].as_str() {
             let _ = writeln!(self.out, "{description}\n");
         }
@@ -358,7 +381,7 @@ impl Reference<'_> {
     }
 
     fn hotkey_section(&mut self, title: &str, node: &Value) {
-        let _ = writeln!(self.out, "\n## {title}\n");
+        let _ = writeln!(self.out, "\n### {title}\n");
         if let Some(description) = node["description"].as_str() {
             let _ = writeln!(self.out, "{description}\n");
         }
@@ -485,7 +508,7 @@ mod tests {
     use crate::extensions::builtin_manifests;
 
     fn schema() -> Value {
-        generate(&builtin_manifests())
+        generate(UserFile::Config, &builtin_manifests())
     }
 
     fn validator() -> jsonschema::Validator {
@@ -769,43 +792,49 @@ mod tests {
     fn writing_creates_replaces_and_leaves_an_identical_file_alone() {
         let dir = std::env::temp_dir().join(format!("dango-schema-{}", uuid::Uuid::new_v4()));
         let manifests = builtin_manifests();
-        let path = dir.join(FILE_NAME);
 
-        assert_eq!(write(&dir, &manifests), Ok(true));
-        assert_eq!(
-            std::fs::read_to_string(&path).unwrap(),
-            render(&generate(&manifests))
-        );
-        let modified = std::fs::metadata(&path).unwrap().modified().unwrap();
+        assert!(write_all(&dir, &manifests).is_empty());
+        for file in UserFile::ALL {
+            let path = dir.join(".schemas").join(file.schema_file_name());
+            assert_eq!(
+                std::fs::read_to_string(&path).unwrap(),
+                render(&generate(file, &manifests))
+            );
+            let modified = std::fs::metadata(&path).unwrap().modified().unwrap();
 
-        assert_eq!(write(&dir, &manifests), Ok(false));
-        assert_eq!(
-            std::fs::metadata(&path).unwrap().modified().unwrap(),
-            modified
-        );
+            assert_eq!(write(&dir, file, &manifests), Ok(false));
+            assert_eq!(
+                std::fs::metadata(&path).unwrap().modified().unwrap(),
+                modified
+            );
 
-        std::fs::write(&path, "{}").unwrap();
-        assert_eq!(write(&dir, &manifests), Ok(true));
-        assert_ne!(std::fs::read_to_string(&path).unwrap(), "{}");
+            std::fs::write(&path, "{}").unwrap();
+            assert_eq!(write(&dir, file, &manifests), Ok(true));
+            assert_ne!(std::fs::read_to_string(&path).unwrap(), "{}");
+        }
+        assert!(!dir.join("config.schema.json").exists());
 
         let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]
-    fn a_directory_that_cannot_be_written_names_the_path() {
+    fn a_directory_that_cannot_be_written_names_each_schema() {
         let dir = std::env::temp_dir().join(format!("dango-schema-{}", uuid::Uuid::new_v4()));
         std::fs::create_dir_all(&dir).unwrap();
         let blocker = dir.join("blocker");
         std::fs::write(&blocker, "").unwrap();
-        let error = write(&blocker, &builtin_manifests()).unwrap_err();
-        assert!(error.contains(FILE_NAME), "{error}");
+        let errors = write_all(&blocker, &builtin_manifests());
+        assert_eq!(errors.len(), UserFile::ALL.len());
+        for (file, error) in UserFile::ALL.into_iter().zip(&errors) {
+            assert!(error.contains(&file.schema_file_name()), "{error}");
+        }
         let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]
     fn the_settings_reference_is_current() {
         let path = Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/docs/config.md"));
-        let expected = reference(&schema());
+        let expected = reference(&builtin_manifests());
         if std::env::var_os("DANGO_UPDATE_DOCS").is_some() {
             std::fs::write(path, &expected).expect("write docs/config.md");
         }
@@ -820,14 +849,17 @@ mod tests {
 
     #[test]
     fn the_reference_lists_every_property_once_per_shape() {
-        let text = reference(&schema());
+        let text = reference(&builtin_manifests());
         assert!(text.starts_with("# Dango configuration\n"));
+        for file in UserFile::ALL {
+            assert!(text.contains(&format!("\n## {}\n", file.file_name())));
+        }
         assert!(text.contains("| `primary-action` | string | `paste` | `paste`, `copy` |"));
-        assert!(text.contains("## `clipboard`"));
+        assert!(text.contains("### `clipboard`"));
         assert!(!text.contains("preferences"));
-        assert!(text.contains("## Command settings"));
-        assert!(text.contains("## AI command settings"));
-        assert!(text.contains("## Hotkey"));
-        assert_eq!(text.matches("## Command settings").count(), 1);
+        assert!(text.contains("### Command settings"));
+        assert!(text.contains("### AI command settings"));
+        assert!(text.contains("### Hotkey"));
+        assert_eq!(text.matches("### Command settings").count(), 1);
     }
 }

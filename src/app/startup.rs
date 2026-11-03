@@ -58,11 +58,11 @@ pub fn data_dir() -> Option<PathBuf> {
 /// Builds the core and starts everything that runs beside it. Main thread
 /// only: the hotkeys and the clipboard's activation observer register there.
 pub fn start(startup: Startup) -> Arc<Core> {
-    let config_path = config::config_path();
+    let config_path = config::UserFile::Config.path();
     let (initial_config, config_error) = match config::Config::load(&config_path) {
         Ok(config) => (config, None),
         Err(error) => {
-            crate::log::append(&format!("config file error, using defaults: {error}"));
+            crate::log::append(&format!("{error}, using the built-in defaults"));
             (config::Config::default(), Some(error.to_string()))
         }
     };
@@ -107,7 +107,7 @@ pub fn start(startup: Startup) -> Arc<Core> {
 fn watch_config(core: &Arc<Core>) {
     let weak = Arc::downgrade(core);
     let started = config::watch::watch(
-        config::config_path(),
+        config::UserFile::Config.path(),
         core.config.own_write(),
         move |text| {
             let Some(core) = weak.upgrade() else {
@@ -288,13 +288,9 @@ fn build_services(
     )));
     register(&mut host, "window-management", window_management);
 
-    if let Err(error) =
-        config::schema::write(&config::config_dir(), &extensions::builtin_manifests())
+    for error in config::schema::write_all(&config::config_dir(), &extensions::builtin_manifests())
     {
-        crate::log::append(&format!(
-            "config: could not write {}: {error}",
-            config::schema::FILE_NAME
-        ));
+        crate::log::append(&format!("could not write a schema: {error}"));
     }
 
     let ai = AiParts {
