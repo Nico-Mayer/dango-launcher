@@ -126,8 +126,9 @@ progress view" means the top view is a progress view whose owner is the task's
   `Running` task while its progress view is not on top. The busy-mark timing
   applies as is.
 - `ViewScreen.busy`, which drives the SearchBar bar, is computed at snapshot
-  time as `marks shown && (working || top view loading)`, so a task never draws
-  a loading bar.
+  time: marks shown, unless they show a task (no `working`, top view not
+  loading, a running task). So a task never draws a loading bar, and a bar
+  that lingers its 400 ms after loading ends stays.
 - The busy toast for a task source carries the task's Cancel as a toast action.
 
 **Results:**

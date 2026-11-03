@@ -5,6 +5,7 @@ mod startup;
 #[cfg(test)]
 mod tests;
 
+use crate::tasks::Tasks;
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, Weak};
@@ -74,6 +75,17 @@ pub struct Services {
     pub clipboard: Option<Arc<dyn ClipboardSource>>,
     pub hotkeys: Registry,
     pub hyperkey: Mutex<HyperkeySlot>,
+    pub tasks: Arc<Tasks>,
+}
+
+/// The registry, telling the launcher about every report as views are told:
+/// straight into the state machine, from whichever thread reports.
+pub(crate) fn tasks_for(core: Weak<Core>) -> Arc<Tasks> {
+    Tasks::new(move |state| {
+        if let Some(core) = core.upgrade() {
+            core.apply(ui::Input::Event(ui::Event::Task(Box::new(state))));
+        }
+    })
 }
 
 /// The running hyperkey and the settings it was started from, so a reload that

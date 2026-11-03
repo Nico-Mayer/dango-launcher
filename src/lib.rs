@@ -17,6 +17,7 @@ pub mod search;
 pub mod shell;
 mod slint_shell;
 pub mod store;
+pub mod tasks;
 pub mod templates;
 pub mod text;
 pub mod ui;

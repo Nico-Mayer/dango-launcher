@@ -385,6 +385,7 @@ fn build_services(
         clipboard: clipboard.map(|clipboard| clipboard as Arc<dyn ClipboardSource>),
         hotkeys,
         hyperkey,
+        tasks: super::tasks_for(core.clone()),
     }
 }
 

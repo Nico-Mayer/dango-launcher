@@ -2448,3 +2448,157 @@ fn the_panel_keeps_a_toast_chord_from_running() {
     let effects = h.command("r");
     assert!(!effects.contains(&Effect::RunAction(retry_request())));
 }
+
+fn task(id: u64, status: crate::tasks::TaskStatus) -> crate::tasks::TaskState {
+    crate::tasks::TaskState {
+        id,
+        owner: "dango.updates".into(),
+        title: "Dango 0.5.0".into(),
+        line: format!("Downloading Dango 0.5.{id} · 42%"),
+        status,
+        progress: Some(0.42),
+        steps: Vec::new(),
+        subtitle: String::new(),
+        detail: String::new(),
+        cancel: Some("cancel".into()),
+        retry: Some("install".into()),
+        item_id: "update".into(),
+    }
+}
+
+fn report(h: &mut Harness, state: crate::tasks::TaskState) {
+    h.event(Event::Task(Box::new(state)));
+}
+
+fn running_task() -> crate::tasks::TaskStatus {
+    crate::tasks::TaskStatus::Running
+}
+
+fn failed_task() -> crate::tasks::TaskStatus {
+    crate::tasks::TaskStatus::Failed {
+        sentence: "Couldn't download the update. Check your connection and try again.".into(),
+    }
+}
+
+fn ready_task() -> crate::tasks::TaskStatus {
+    crate::tasks::TaskStatus::NeedsInput {
+        sentence: "Dango 0.5.0 is ready to restart".into(),
+    }
+}
+
+#[test]
+fn a_running_task_shows_in_the_busy_toast_at_root() {
+    let mut h = Harness::root(3);
+    report(&mut h, task(1, running_task()));
+    assert_eq!(h.status(), "", "the busy-mark delay applies");
+    h.wake_busy();
+    assert_eq!(h.status(), "Downloading Dango 0.5.1 · 42%");
+}
+
+#[test]
+fn the_oldest_running_task_leads_the_busy_toast() {
+    let mut h = Harness::root(3);
+    report(&mut h, task(1, running_task()));
+    report(&mut h, task(2, running_task()));
+    h.wake_busy();
+    assert_eq!(h.status(), "Downloading Dango 0.5.1 · 42%");
+}
+
+#[test]
+fn a_task_waiting_for_input_shows_no_busy_toast() {
+    let mut h = Harness::root(3);
+    report(&mut h, task(1, running_task()));
+    report(&mut h, task(1, ready_task()));
+    h.wake_busy();
+    assert_eq!(h.status(), "");
+}
+
+#[test]
+fn the_cancel_chord_runs_the_owner_s_cancel_action() {
+    let mut h = Harness::root(3);
+    report(&mut h, task(1, running_task()));
+    h.wake_busy();
+    let toast = h.snapshot().toast.unwrap();
+    assert_eq!(toast.action.as_ref().unwrap().title, "Cancel");
+    let effects = h.command(".");
+    let Some(Effect::RunAction(request)) = effects.first() else {
+        panic!("expected the cancel action, got {effects:?}");
+    };
+    assert_eq!(
+        (request.extension_id.as_str(), request.action_id.as_str()),
+        ("dango.updates", "cancel")
+    );
+}
+
+#[test]
+fn a_running_task_draws_no_loading_bar_in_another_view() {
+    let mut h = Harness::view(done_tree());
+    report(&mut h, task(1, running_task()));
+    h.wake_busy();
+    assert_eq!(h.status(), "Downloading Dango 0.5.1 · 42%");
+    let Screen::View(view) = h.snapshot().screen else {
+        panic!("expected a view");
+    };
+    assert!(!view.busy);
+}
+
+#[test]
+fn a_task_failing_while_hidden_shows_in_the_hud_and_on_the_next_open() {
+    let mut h = Harness::root(3);
+    report(&mut h, task(1, running_task()));
+    h.event(Event::Hidden);
+    report(&mut h, task(1, failed_task()));
+    assert!(hud_text(&h).is_some_and(|text| text.starts_with("Couldn't download")));
+    h.event(Event::Activated {
+        held: false,
+        probe: None,
+    });
+    let toast = h.snapshot().toast.unwrap();
+    assert_eq!(toast.style, ToastStyle::Failure);
+    assert_eq!(toast.action.unwrap().title, "Retry");
+}
+
+#[test]
+fn a_task_ready_while_hidden_shows_a_success_toast_on_the_next_open() {
+    let mut h = Harness::root(3);
+    report(&mut h, task(1, running_task()));
+    h.event(Event::Hidden);
+    report(&mut h, task(1, ready_task()));
+    assert!(hud_text(&h).is_none());
+    h.event(Event::Activated {
+        held: false,
+        probe: None,
+    });
+    assert_eq!(
+        h.toast(ToastStyle::Success).as_deref(),
+        Some("Dango 0.5.0 is ready to restart")
+    );
+}
+
+#[test]
+fn reopening_onto_the_task_s_own_view_shows_no_result_toast() {
+    let mut h = Harness::view(progress_tree());
+    let own = |status| crate::tasks::TaskState {
+        owner: "fixture".into(),
+        ..task(1, status)
+    };
+    report(&mut h, own(running_task()));
+    h.event(Event::Hidden);
+    report(&mut h, own(failed_task()));
+    h.event(Event::Activated {
+        held: true,
+        probe: None,
+    });
+    assert!(h.failure().is_none());
+}
+
+#[test]
+fn a_task_ready_while_at_root_shows_a_toast_at_once() {
+    let mut h = Harness::root(3);
+    report(&mut h, task(1, running_task()));
+    report(&mut h, task(1, ready_task()));
+    assert_eq!(
+        h.toast(ToastStyle::Success).as_deref(),
+        Some("Dango 0.5.0 is ready to restart")
+    );
+}

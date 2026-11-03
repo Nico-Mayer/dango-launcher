@@ -9,6 +9,7 @@ use crate::protocol::{
 use super::effect::{ActionRequest, BusyStage, Effect, Origin};
 use super::input::{Chord, Context, Event, Input, Intent, ResultItem, TemplateInspection};
 use crate::ranking::fuzzy;
+use crate::tasks::{TaskState, TaskStatus};
 
 /// All interaction state of the launcher. A pure reducer: input goes in,
 /// effects for the shell come out, and `snapshot` says what to draw.
@@ -47,6 +48,10 @@ pub struct Launcher {
     pub(super) view_error: Option<ViewError>,
     pub(super) toast: Option<HeldToast>,
     pub(super) busy_marks: BusyMarks,
+    /// The last report of every task that has not ended.
+    pub(super) tasks: Vec<TaskState>,
+    /// A task's result that came while the launcher was hidden.
+    pending_result: Option<TaskState>,
     /// What the launcher reports while it is off screen. Set while it is still
     /// visible, it waits for the hide.
     pub(super) hud: Option<HeldToast>,
@@ -314,6 +319,11 @@ impl Launcher {
                 if held {
                     fx.push(Effect::Search(self.query.clone()));
                 }
+                if let Some(result) = self.pending_result.take() {
+                    if !self.shows_progress_of(&result.owner) {
+                        self.show_task_result(result, fx);
+                    }
+                }
             }
             Event::Reset => self.reset(fx),
             Event::Hidden => {
@@ -335,6 +345,7 @@ impl Launcher {
                 }
             }
             Event::BusyMarksWoke { id } => self.busy_marks_woke(id, fx),
+            Event::Task(state) => self.task_changed(*state, fx),
             Event::ToastExpired { id } => {
                 if self.toast.as_ref().is_some_and(|toast| toast.id == id) {
                     self.toast = None;
@@ -371,10 +382,100 @@ impl Launcher {
         if let Some(title) = &self.working {
             return Some(format!("Running {title}…"));
         }
+        if self.top_loading() {
+            return Some("Loading…".to_string());
+        }
+        self.busy_task().map(|task| task.line.clone())
+    }
+
+    pub(super) fn top_loading(&self) -> bool {
         self.stack
             .last()
-            .filter(|view| is_loading(&view.tree.view))
-            .map(|_| "Loading…".to_string())
+            .is_some_and(|view| is_loading(&view.tree.view))
+    }
+
+    /// The oldest running task the user can't see in its own view.
+    fn busy_task(&self) -> Option<&TaskState> {
+        self.tasks
+            .iter()
+            .find(|task| task.status == TaskStatus::Running && !self.shows_progress_of(&task.owner))
+    }
+
+    /// Whether the view on top is a progress view the task's owner pushed.
+    fn shows_progress_of(&self, owner: &str) -> bool {
+        matches!(
+            self.stack.last().map(|view| &view.tree.view),
+            Some(View::Progress(_))
+        ) && self.owner.as_deref() == Some(owner)
+    }
+
+    fn task_changed(&mut self, state: TaskState, fx: &mut Vec<Effect>) {
+        let known = self.tasks.iter().position(|task| task.id == state.id);
+        let was = known.map(|index| self.tasks[index].status.clone());
+        match known {
+            Some(index) if state.status.ended() => {
+                self.tasks.remove(index);
+            }
+            Some(index) => self.tasks[index] = state.clone(),
+            None if !state.status.ended() => self.tasks.push(state.clone()),
+            None => {}
+        }
+        let arrived = match &state.status {
+            TaskStatus::NeedsInput { .. } => !matches!(was, Some(TaskStatus::NeedsInput { .. })),
+            TaskStatus::Done { .. } | TaskStatus::Failed { .. } => true,
+            TaskStatus::Running | TaskStatus::Cancelled => false,
+        };
+        if !arrived {
+            return;
+        }
+        if !self.visible {
+            if let TaskStatus::Failed { sentence } = &state.status {
+                self.show_hud(ToastStyle::Failure, sentence.clone(), fx);
+            }
+            self.pending_result = Some(state);
+        } else if !self.shows_progress_of(&state.owner) {
+            self.show_task_result(state, fx);
+        }
+    }
+
+    fn show_task_result(&mut self, state: TaskState, fx: &mut Vec<Effect>) {
+        match &state.status {
+            TaskStatus::NeedsInput { sentence } | TaskStatus::Done { sentence } => {
+                self.show_success(sentence.clone(), fx);
+            }
+            TaskStatus::Failed { sentence } => {
+                let id = self.next_revision();
+                self.toast = Some(HeldToast {
+                    id,
+                    style: ToastStyle::Failure,
+                    text: sentence.clone(),
+                    action: state
+                        .retry
+                        .as_deref()
+                        .map(|retry| task_action(&state, "Retry", "r", retry)),
+                });
+            }
+            TaskStatus::Running | TaskStatus::Cancelled => {}
+        }
+    }
+
+    /// Whether the busy marks are there for a task rather than for a command
+    /// or a loading view, which also draw the SearchBar's bar.
+    pub(super) fn busy_shows_task(&self) -> bool {
+        self.busy_marks_shown().is_some()
+            && self.working.is_none()
+            && !self.top_loading()
+            && self.busy_task().is_some()
+    }
+
+    /// The running task's Cancel, while the busy toast is showing that task.
+    fn busy_cancel(&self) -> Option<ToastAction> {
+        if !self.busy_shows_task() {
+            return None;
+        }
+        let task = self.busy_task()?;
+        let cancel = task.cancel.as_deref()?;
+        Some(task_action(task, "Cancel", ".", cancel))
     }
 
     fn settle_busy_marks(&mut self, fx: &mut Vec<Effect>) {
@@ -536,11 +637,18 @@ impl Launcher {
 
     /// The toast's action, while the toast shows and the panel does not own
     /// the keyboard.
-    pub(super) fn toast_action(&self) -> Option<&ToastAction> {
+    pub(super) fn toast_action(&self) -> Option<ToastAction> {
         if self.panel.is_some() {
             return None;
         }
-        self.toast.as_ref().and_then(|toast| toast.action.as_ref())
+        match &self.toast {
+            Some(toast) => toast.action.clone(),
+            None => self.busy_cancel(),
+        }
+    }
+
+    pub(super) fn busy_toast_action(&self) -> Option<ToastAction> {
+        self.busy_cancel()
     }
 
     /// A failure stays until the next key press or click.
@@ -1366,5 +1474,25 @@ fn is_loading(view: &View) -> bool {
         View::Grid(grid) => grid.loading,
         View::Detail(detail) => detail.loading,
         View::Form(_) | View::Progress(_) => false,
+    }
+}
+
+/// An action of a task's owner, offered on a toast with the platform's
+/// command key.
+fn task_action(task: &TaskState, title: &str, key: &str, action_id: &str) -> ToastAction {
+    ToastAction {
+        title: title.into(),
+        shortcut: Shortcut {
+            key: key.into(),
+            modifiers: vec![Modifier::Cmd],
+        },
+        request: ActionRequest {
+            origin: Origin::Root,
+            extension_id: task.owner.clone(),
+            item_id: task.item_id.clone(),
+            action_id: action_id.into(),
+            values: None,
+            query: None,
+        },
     }
 }

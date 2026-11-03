@@ -132,6 +132,8 @@ pub enum Event {
     BusyMarksWoke {
         id: u64,
     },
+    /// A background task reported a change.
+    Task(Box<crate::tasks::TaskState>),
 }
 
 #[derive(Clone, Debug, PartialEq)]

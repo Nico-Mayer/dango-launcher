@@ -497,7 +497,7 @@ impl Launcher {
             }),
         };
         ViewScreen {
-            busy: self.busy_marks_shown().is_some(),
+            busy: self.busy_marks_shown().is_some() && !self.busy_shows_task(),
             body,
         }
     }
@@ -521,7 +521,7 @@ impl Launcher {
         self.busy_marks_shown().map(|text| Toast {
             style: ToastStyle::Busy,
             text: text.to_string(),
-            action: None,
+            action: self.busy_toast_action(),
         })
     }
 

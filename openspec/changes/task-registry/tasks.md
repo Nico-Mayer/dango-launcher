@@ -20,7 +20,7 @@
 
 ## 3. Task registry
 
-- [ ] 3.1 Add `src/tasks.rs` with `Tasks`, `TaskHandle`, `TaskState`, `TaskStatus`, and `progress_view(&TaskState, actions)`, as design.md describes:
+- [x] 3.1 Add `src/tasks.rs` with `Tasks`, `TaskHandle`, `TaskState`, `TaskStatus`, and `progress_view(&TaskState, actions)`, as design.md describes:
   - an oldest-first `Vec`;
   - a `Weak<Core>` set once;
   - reports applied as `Event::Task` outside the lock;
@@ -28,7 +28,7 @@
   - `Done`, `Failed`, and `Cancelled` dropped after their report, `NeedsInput` kept.
 
   Put `Tasks` in `Services` and link it to Core where `ViewRunner` gets its `Weak<Core>`. Verify with unit tests in `src/tasks.rs` (cancel flips the receiver; ended tasks leave; `NeedsInput` stays; `progress_view` maps steps and value) and an app test in `src/app/tests.rs` (a report reaches the reducer's snapshot).
-- [ ] 3.2 In the reducer:
+- [x] 3.2 In the reducer:
   - Keep the last `TaskState` per id.
   - Make the oldest `Running` task the third busy source while its owner's progress view is not on top, with its Cancel as a toast action.
   - Compute `ViewScreen.busy` as `marks shown && (working || top view loading)`.

@@ -109,14 +109,19 @@ fn core_with_applications(
         clipboard: None,
         hotkeys: Registry::new(Box::new(grab), launcher),
         hyperkey: Mutex::default(),
+        tasks: crate::tasks::Tasks::new(|_| {}),
     };
-    let core = Arc::new(Core::new(
-        shell.clone(),
-        Handle::current(),
-        config,
-        TrayStatus::default(),
-        services,
-    ));
+    let core = Arc::new_cyclic(|weak| {
+        let mut services = services;
+        services.tasks = super::tasks_for(weak.clone());
+        Core::new(
+            shell.clone(),
+            Handle::current(),
+            config,
+            TrayStatus::default(),
+            services,
+        )
+    });
     (core, shell)
 }
 
@@ -938,4 +943,18 @@ async fn a_view_done_before_the_delay_never_shows_busy_marks() {
         tokio::time::sleep(Duration::from_millis(50)).await;
         assert!(!busy(&shell));
     }
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_task_report_reaches_the_launcher() {
+    let (core, shell) = core("");
+    core.toggle();
+    let task = core
+        .services
+        .tasks
+        .start("dango.updates", "update", "Dango 0.5.0");
+    task.report(|state| state.line = "Downloading Dango 0.5.0 · 42%".into());
+    tokio::time::sleep(Duration::from_millis(200)).await;
+    let toast = shell.last_snapshot().toast.expect("the task's busy toast");
+    assert_eq!(toast.text, "Downloading Dango 0.5.0 · 42%");
 }
