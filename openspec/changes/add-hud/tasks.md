@@ -13,7 +13,7 @@
 - [x] 2.2 Add the HUD writer in `src/slint_shell/render/` and a UI test in `src/slint_shell/tests.rs` that a failure HUD and a success HUD show their text, dot style, and accessible label, and that the longest failure string is not elided at the HUD's max width
 - [x] 2.3 Add `platform::HudWindow` (`attach`, `place`, `did_show`), create `HudWindow` at startup with `with_active(false)` through a `with_winit_window_attributes_hook` gated by a flag set around its creation, call `set_cursor_hittest(false)` after each show, and let `SlintShell` place and `show()` it when `snapshot.hud` appears or changes id and `hide()` it when it goes; verify `cargo test` with a unit test of the show and hide decision and a UI test that the shell shows, rewrites, and hides the HUD window
 - [x] 2.4 Implement `HudWindow` on Windows in `platform/windows` per design D4 (monitor under the cursor, physical-pixel placement above `rcWork`'s bottom with `SWP_NOACTIVATE`, `WS_EX_TOOLWINDOW` applied again after each show); verify `cargo clippy --all-targets -- -D warnings` on Windows
-- [ ] 2.5 Implement `HudWindow` on macOS in `platform/macos` per design D4 (reclass to plain `NSPanel`, not `DangoPanel`; non-activating mask, level above the launcher, collection behaviour, `visibleFrame` of the screen under the mouse); verify symbol names against the vendored `objc2-app-kit` source and a macOS compile in CI
+- [x] 2.5 Implement `HudWindow` on macOS in `platform/macos` per design D4 (reclass to plain `NSPanel`, not `DangoPanel`; non-activating mask, level above the launcher, collection behaviour, `visibleFrame` of the screen under the mouse); verify symbol names against the vendored `objc2-app-kit` source and a macOS compile in CI
 
 ## 3. Failures go to the HUD while hidden
 
