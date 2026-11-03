@@ -274,6 +274,11 @@ fn build_services(
     ));
     register(&mut host, "permissions", permissions);
 
+    let calculator = Arc::new(extensions::calculator::CalculatorExtension::new(
+        exchange.clone(),
+    ));
+    register(&mut host, "calculator", calculator);
+
     // Registered after permissions, so a permission warning leads the update item.
     let updates = Arc::new(UpdatesExtension::new(
         startup.updates.clone(),

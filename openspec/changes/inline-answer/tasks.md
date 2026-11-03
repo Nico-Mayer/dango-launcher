@@ -16,7 +16,7 @@
   - `copy` answers `CopyToClipboard`;
   - `paste` without a text exchange fails with "Dango can't reach other apps right now";
   - the manifest validates.
-- [ ] 1.2 Register the extension in `src/app/startup.rs` with the text exchange. Make the ranker in `src/ranking/` pass `Source::Answer` through first and unranked. In `run_action` (`src/app/mod.rs`), skip `record_use` for `dango.calculator`. Verify with:
+- [x] 1.2 Register the extension in `src/app/startup.rs` with the text exchange. Make the ranker in `src/ranking/` pass `Source::Answer` through first and unranked. In `run_action` (`src/app/mod.rs`), skip `record_use` for `dango.calculator`. Verify with:
   - a ranking test: an answer candidate comes first, above a pinned item;
   - an app test: an action on `dango.calculator` that answers `Done` records no frecency;
   - `cargo test`.

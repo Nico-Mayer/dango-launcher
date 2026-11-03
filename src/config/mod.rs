@@ -59,6 +59,9 @@ pub struct Config {
     /// Settings for the Applications extension.
     #[serde(default)]
     pub applications: ApplicationsTable,
+    /// Settings for the Calculator extension.
+    #[serde(default)]
+    pub calculator: Table,
     /// Settings for the Clipboard History extension.
     #[serde(default)]
     pub clipboard: ClipboardTable,
@@ -96,9 +99,10 @@ fn is_built_in(extension_id: &str) -> bool {
 }
 
 /// The table names of the built-in extensions, each also its id after `dango.`.
-pub const BUILT_IN_TABLES: [&str; 10] = [
+pub const BUILT_IN_TABLES: [&str; 11] = [
     "ai",
     "applications",
+    "calculator",
     "clipboard",
     "games",
     "permissions",
@@ -305,6 +309,7 @@ impl Config {
         let built_in: Option<&dyn ExtensionTable> = match table_name(extension_id) {
             Some("ai") => Some(&self.ai),
             Some("applications") => Some(&self.applications),
+            Some("calculator") => Some(&self.calculator),
             Some("clipboard") => Some(&self.clipboard),
             Some("games") => Some(&self.games),
             Some("permissions") => Some(&self.permissions),

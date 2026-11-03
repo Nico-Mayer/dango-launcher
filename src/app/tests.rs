@@ -958,3 +958,20 @@ async fn a_task_report_reaches_the_launcher() {
     let toast = shell.last_snapshot().toast.expect("the task's busy toast");
     assert_eq!(toast.text, "Downloading Dango 0.5.0 · 42%");
 }
+
+#[tokio::test]
+async fn an_answer_is_never_learned() {
+    let (core, _) = core("");
+    core.record_use(
+        crate::extensions::calculator::EXTENSION_ID,
+        "4",
+        Some("2+2"),
+    );
+    let now = crate::ranking::now_millis();
+    assert_eq!(
+        core.services
+            .frecency
+            .score(crate::extensions::calculator::EXTENSION_ID, "4", now),
+        0.0
+    );
+}

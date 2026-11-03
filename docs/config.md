@@ -12,6 +12,7 @@ Every setting is optional; anything left out uses its built-in default. Dango ke
 | --- | --- | --- | --- | --- |
 | `ai` | object |  |  | Settings for the AI extension. |
 | `applications` | object |  |  | Settings for the Applications extension. |
+| `calculator` | object |  |  | Settings for the Calculator extension. |
 | `clipboard` | object |  |  | Settings for the Clipboard History extension. |
 | `extensions` | map of [Extension table](#extension-table) |  |  | Extensions that are not built in, keyed by extension id. Holds only what Dango itself reads for them: enabled state, aliases, and hotkeys. |
 | `games` | object |  |  | Settings for the Games extension. |
@@ -61,6 +62,14 @@ Settings for the Applications extension.
 | --- | --- | --- | --- | --- |
 | `enabled` | boolean |  |  | Whether the extension runs. Absent means enabled. |
 | `hotkeys` | map of [Application settings](#application-settings) |  |  | Applications bound to global hotkeys, keyed by the name Dango shows for the application in root search. |
+
+### `calculator`
+
+Settings for the Calculator extension.
+
+| Setting | Type | Default | Values | Description |
+| --- | --- | --- | --- | --- |
+| `enabled` | boolean |  |  | Whether the extension runs. Absent means enabled. |
 
 ### `clipboard`
 
