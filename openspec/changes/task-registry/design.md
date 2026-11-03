@@ -188,12 +188,13 @@ Install update --> tasks.start("dango.updates", "Dango 0.5.0")
 - **No `on_finished` API.** Verifying takes milliseconds, so a separate
   "Verify signature" working state would barely show. The error kind already
   tells the two failures apart.
-- **The update is kept together with its bytes.** `PackagerSource.found` is
-  overwritten by the 6-hourly check, so a ready 0.5.0 could otherwise install
-  a newer `Update`. Scheduled checks are also skipped while a task runs or
-  waits ready.
+- **No check runs while a download runs or waits ready.** `PackagerSource.found`
+  is overwritten by every check, so a ready 0.5.0 could otherwise install a
+  newer `Update`. `Inner::check` answers the version it already has while a
+  task exists, which covers the 6-hourly check and "Check for Updates" alike,
+  and needs no change to the source's API.
 - **`installing` and `shown` go.** `Inner` holds `task: Option<TaskHandle>` and
-  `ready: Option<(Update, Vec<u8>)>`.
+  `ready: Option<Vec<u8>>`.
 - **Cancel can't stop the blocking download thread:** the updater has no
   abort. The thread finishes its transfer, and its bytes are dropped.
 - **"Check for Updates"** offers "Install update", from the same
