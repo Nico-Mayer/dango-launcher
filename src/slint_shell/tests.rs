@@ -397,6 +397,18 @@ mod search_bar {
         assert!(!h.shell().get_typing());
         assert!(h.find("Fixture Command").is_some());
     }
+
+    #[test]
+    fn the_title_starts_right_after_the_back_control() {
+        let h = Harness::root(results(3));
+        h.view(form_tree());
+        let back = h.find("Go back").expect("the back control");
+        let title = ElementHandle::find_by_accessible_label(&h.ui, "Fixture Command")
+            .min_by(|a, b| a.absolute_position().y.total_cmp(&b.absolute_position().y))
+            .expect("the title");
+        let gap = title.absolute_position().x - (back.absolute_position().x + back.size().width);
+        assert_eq!(gap, 12.0);
+    }
 }
 
 mod action_bar {

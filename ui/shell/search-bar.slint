@@ -51,41 +51,62 @@ export component SearchBar inherits Rectangle {
             }
         }
 
+        // The query and the title share one slot: a hidden element keeps its
+        // place in a layout, so separate slots would split the width.
         Rectangle {
-            visible: Shell.typing;
             horizontal-stretch: 1;
-            accessible-role: text-input;
-            accessible-label: Search.placeholder;
-            accessible-placeholder-text: Search.placeholder;
-            accessible-value: input.text;
-            accessible-action-set-value(value) => {
-                input.text = value;
-                Intents.query-edited(value);
-            }
-            Text {
-                x: 0;
+
+            Rectangle {
                 width: parent.width;
-                text: input.text == "" && input.preedit-text == "" ? Search.placeholder : "";
-                color: Theme.muted;
-                font-size: Theme.text-large;
-                vertical-alignment: center;
-                overflow: elide;
-                accessible-role: none;
+                height: parent.height;
+                visible: Shell.typing;
+                accessible-role: text-input;
+                accessible-label: Search.placeholder;
+                accessible-placeholder-text: Search.placeholder;
+                accessible-value: input.text;
+                accessible-action-set-value(value) => {
+                    input.text = value;
+                    Intents.query-edited(value);
+                }
+                Text {
+                    x: 0;
+                    width: parent.width;
+                    text: input.text == "" && input.preedit-text == "" ? Search.placeholder : "";
+                    color: Theme.muted;
+                    font-size: Theme.text-large;
+                    vertical-alignment: center;
+                    overflow: elide;
+                    accessible-role: none;
+                }
+                input := TextInput {
+                    x: 0;
+                    width: parent.width;
+                    height: parent.height;
+                    single-line: true;
+                    color: Theme.text;
+                    selection-background-color: Theme.selection;
+                    selection-foreground-color: Theme.text;
+                    font-size: Theme.text-large;
+                    vertical-alignment: center;
+                    accessible-role: none;
+                    edited => {
+                        Intents.query-edited(self.text);
+                    }
+                }
             }
-            input := TextInput {
+
+            if !Shell.typing: Text {
                 x: 0;
                 width: parent.width;
                 height: parent.height;
-                single-line: true;
+                text: Shell.title;
                 color: Theme.text;
-                selection-background-color: Theme.selection;
-                selection-foreground-color: Theme.text;
                 font-size: Theme.text-large;
+                font-weight: 500;
                 vertical-alignment: center;
-                accessible-role: none;
-                edited => {
-                    Intents.query-edited(self.text);
-                }
+                overflow: elide;
+                accessible-role: AccessibleRole.text;
+                accessible-label: Shell.title;
             }
         }
 
@@ -172,18 +193,6 @@ export component SearchBar inherits Rectangle {
                     }
                 }
             }
-        }
-
-        if !Shell.typing: Text {
-            horizontal-stretch: 1;
-            text: Shell.title;
-            color: Theme.text;
-            font-size: Theme.text-large;
-            font-weight: 500;
-            vertical-alignment: center;
-            overflow: elide;
-            accessible-role: AccessibleRole.text;
-            accessible-label: Shell.title;
         }
     }
 
