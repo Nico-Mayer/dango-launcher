@@ -523,7 +523,7 @@ mod toast {
         for message in [
             "Set up this command's provider in your config file",
             "Couldn't verify the update, so it wasn't installed",
-            "Copy the text first, as Visual Studio Code doesn't share its selection",
+            "One keyword can't be the start of another, so choose a different keyword",
         ] {
             h.event(Event::Failed(message.into()));
             assert!(h.shell().get_panel_hint());
