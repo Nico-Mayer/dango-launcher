@@ -256,6 +256,7 @@ impl Launcher {
                 self.show_failure(message, fx);
                 self.working = None;
             }
+            Event::HotkeyFailed(message) => self.show_failure(message, fx),
             Event::TemplateInspected {
                 field,
                 source,

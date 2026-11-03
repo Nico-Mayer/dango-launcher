@@ -686,7 +686,7 @@ impl Core {
     /// it is hidden, and the log keeps the detail.
     fn report_failure(self: &Arc<Self>, detail: &str, message: String) {
         crate::log::append(detail);
-        self.apply(ui::Input::Event(ui::Event::Failed(message)));
+        self.apply(ui::Input::Event(ui::Event::HotkeyFailed(message)));
     }
 
     /// A file edit that went wrong, or a hotkey binding Dango could not honour,

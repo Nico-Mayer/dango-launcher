@@ -1833,6 +1833,24 @@ fn a_running_command_shows_a_busy_toast_until_it_fails_or_resets() {
 }
 
 #[test]
+fn a_hotkey_failure_while_held_keeps_the_running_status() {
+    let mut h = Harness::root(18);
+    let mut command = result(1);
+    command.title = "Clipboard History".into();
+    command.actions.clear();
+    h.results("", vec![command]);
+    h.press("Enter");
+    h.event(Event::Hidden);
+    h.event(Event::HotkeyFailed("Can't open Zed".into()));
+    assert_eq!(hud_text(&h).as_deref(), Some("Can't open Zed"));
+    h.event(Event::Activated {
+        held: true,
+        probe: None,
+    });
+    assert_eq!(h.status(), "Running Clipboard History…");
+}
+
+#[test]
 fn a_view_arriving_ends_the_running_status() {
     let mut h = Harness::new();
     let mut command = result(1);

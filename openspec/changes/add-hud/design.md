@@ -95,7 +95,9 @@ it, a new `Event::Hidden` clears it. `Core::settle_hide` sends
 `Snapshot` gains `hud: Option<Hud { style, text }>`. `ToastStyle` is reused;
 `Busy` never reaches the HUD.
 
-Hotkey paths join the same route through `Event::Failed`:
+Hotkey paths join the same route through a new `Event::HotkeyFailed`. It
+shows the failure like `Event::Failed` but leaves a command still running
+from the launcher alone, so a held launcher keeps its busy toast:
 
 - a `run_command` error from `dispatch_command`
 - a missing application, with "Can't open {name} because it isn't installed"
