@@ -13,8 +13,8 @@ roles (`working`, `blocked`, `done`, `idle`) these parts use.
 ## What Changes
 
 - **New atoms** in `ui/atoms/`:
-  - **Progress:** a bar, a ring, or a spinner. Each is determinate (a value
-    from 0 to 1) or indeterminate.
+  - **Progress:** a bar or a ring, determinate (a value from 0 to 1) or
+    indeterminate. A spinner is a small indeterminate ring.
   - **Status dot:** working, needs input, done, failed, or queued, each in its
     status role.
   - **Skeleton rows:** grey placeholder rows for a list that has nothing yet.
@@ -24,14 +24,16 @@ roles (`working`, `blocked`, `done`, `idle`) these parts use.
   still dot. Success and failure dots stay still.
 - **The SearchBar's loading bar** becomes the progress bar atom,
   indeterminate. It looks the same as today.
-- **Loading marks stop blinking.** The loading bar and the busy toast appear
-  only after the view has been loading for about 150 ms. Once shown, they
-  stay at least about 400 ms.
-- **A list that is loading with no items shows skeleton rows** in place of a
-  blank body.
+- **Busy marks stop blinking.** The loading bar and the busy toast, both
+  "Running X…" and "Loading…", appear only after Dango has been busy for
+  about 150 ms. Once shown, they stay at least about 400 ms. A command that
+  shows a loading view keeps one toast from start to end, with no gap.
+- **A list that is loading and declares no items shows skeleton rows** in
+  place of a blank body.
 - **View protocol:** list items can declare two new accessory kinds, a
-  `progress` ring and a `status` dot. The change is additive: every tree that
-  is valid today stays valid, and the protocol stays at version 2.
+  `progress` ring and a `status` dot. A progress value outside 0 to 1 is
+  clamped. The change is additive: every tree that is valid today stays
+  valid, and the protocol stays at version 2.
 
 ## Non-goals
 
@@ -60,21 +62,24 @@ None.
   - The "Nothing animates" requirement is removed.
   - The busy toast shows a spinner.
   - The small parts include progress marks, status dots, and skeleton rows.
-  - The loading bar honours the minimum display time.
+  - Busy marks (loading bar and busy toast) wait about 150 ms and stay at
+    least about 400 ms.
 - `view-protocol`:
   - Accessories gain the `progress` and `status` kinds.
-  - Loading marks wait before they appear and stay a minimum time.
+  - Loading marks follow the busy-mark timing.
   - An empty list that is loading shows skeleton rows.
 
 ## Impact
 
 - `ui/atoms/`: new `progress.slint`, `skeleton.slint`. `dot.slint` takes a
-  status in place of the toast style. `accessory.slint` and `gallery.slint`
+  status in place of the toast style, and `ToastStyle` moves to
+  `ui/globals.slint`. `accessory.slint` and `gallery.slint`
   gain the new kinds.
 - `ui/shell/search-bar.slint`, `action-bar.slint`, `hud.slint`, and
   `ui/views/list.slint`.
 - `src/protocol.rs`: two new `Accessory` variants.
-- `src/ui/`: loading-mark timing in the reducer (new effect and event).
+- `src/ui/`: busy-mark timing in the reducer (new effect and event).
+  `RootScreen.busy` is removed.
   `src/app/` schedules the timer, as it does for toast expiry.
 - `src/slint_shell/render/`: maps the new accessories and the skeleton.
 - Tests in `src/ui/tests.rs` and `src/slint_shell/tests.rs`.

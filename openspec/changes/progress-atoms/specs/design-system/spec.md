@@ -4,13 +4,13 @@
 
 ### Requirement: Progress marks are honest
 
-A progress mark SHALL be a bar, a ring, or a spinner. A bar or ring SHALL be
-determinate, filled to its value from 0 to 1, only when the total is known.
-Otherwise it SHALL be indeterminate and move without claiming an amount. A
-spinner SHALL always be indeterminate. Each mark SHALL be drawn in the working
-role, except the SearchBar's loading bar, which keeps the accent role. Each
-SHALL tell assistive technology that it is busy and, when determinate, its
-value.
+A progress mark SHALL be a bar or a ring, filled in the working role on a track
+in the raised role. It SHALL be determinate, filled to its value from 0 to 1,
+only when the total is known. Otherwise it SHALL be indeterminate and move
+without claiming an amount. A spinner is a small indeterminate ring. The
+SearchBar's loading bar is the one exception to these colours (see its
+requirement). A mark SHALL tell assistive technology that it is busy and, when
+determinate, its value in percent.
 
 #### Scenario: A determinate ring
 
@@ -18,18 +18,24 @@ value.
 - **THEN** the ring is filled to 42 percent and does not move
 - **AND** assistive technology is told the value 42 percent
 
+#### Scenario: A full ring
+
+- **WHEN** an item declares a progress ring at 1
+- **THEN** the ring is drawn as a full circle
+
 #### Scenario: An indeterminate ring
 
 - **WHEN** an item declares a progress ring with no value
-- **THEN** the ring moves without showing an amount
+- **THEN** the ring turns without showing an amount
 
 ### Requirement: Status dots name a state
 
 A status dot SHALL show one of five states, each in its own role: working in
 the working role, needs input in the blocked role, done in the done role,
 failed in the danger role, and queued in the idle role. A status dot SHALL NOT
-move. Assistive technology SHALL be told the state as "Working", "Needs input",
-"Done", "Failed", or "Queued".
+move. A status dot shown as an item's accessory SHALL tell assistive
+technology its state as "Working", "Needs input", "Done", "Failed", or
+"Queued".
 
 #### Scenario: A failed item
 
@@ -39,21 +45,70 @@ move. Assistive technology SHALL be told the state as "Working", "Needs input",
 
 ### Requirement: A cold list shows skeleton rows
 
-A list that is loading and has no items yet SHALL show skeleton rows in its
-body: rows of the normal row height with a muted shape where the icon and
-title would be, enough to fill the space the list may take. Skeleton rows
-SHALL NOT be selectable, SHALL NOT be read out one by one to assistive
-technology, and SHALL be replaced by the items in the same frame they arrive.
+A list whose view is loading and declares no items SHALL show skeleton rows in
+its body: rows of the normal row height, with a shape in the raised role where
+the icon and title would be, as many as fit the launcher at its maximum height.
+Skeleton rows SHALL NOT be selectable, SHALL NOT be read out one by one to
+assistive technology, and SHALL be replaced by the items in the same frame they
+arrive. A list whose items are all filtered out by the query SHALL NOT show
+skeleton rows.
 
 #### Scenario: Opening a slow list
 
 - **WHEN** a command shows a list marked loading with no items
-- **THEN** the body shows skeleton rows and no empty state
+- **THEN** the launcher takes its maximum height and the body shows skeleton
+  rows and no empty state
 
 #### Scenario: Items arrive
 
 - **WHEN** the first items of that list arrive
 - **THEN** the skeleton rows are gone and the items are shown in the same frame
+
+#### Scenario: A refreshing list filtered to nothing
+
+- **WHEN** a list marked loading has items and the query matches none of them
+- **THEN** no skeleton rows are shown
+
+### Requirement: Busy marks do not blink
+
+The busy marks, the SearchBar's loading bar and the busy toast, SHALL appear
+only once Dango has been busy for about 150 milliseconds. Dango is busy while a
+command invoked from root search has not finished or shown a view, or while
+the top view is marked loading. Once shown, the marks SHALL stay for at least
+about 400 milliseconds, even if the work ends sooner. While Dango stays busy,
+replacing the view SHALL NOT restart the marks. Leaving the view or a reset
+SHALL remove them at once.
+
+#### Scenario: A fast command
+
+- **WHEN** a command invoked from root search finishes within about 150
+  milliseconds
+- **THEN** no busy toast is shown
+
+#### Scenario: A slow command shows a view that loads
+
+- **WHEN** a command takes a second to show a view marked loading, and the
+  view loads for another second
+- **THEN** the busy toast appears after a short moment reading "Running"
+  followed by the command's title, then reads "Loading…" without disappearing
+  in between
+
+#### Scenario: Busy marks stay a moment
+
+- **WHEN** the busy marks have just appeared and the work then ends
+- **THEN** the marks stay until they have been shown for about 400
+  milliseconds, and are then removed
+
+#### Scenario: A streamed view keeps its marks steady
+
+- **WHEN** a command replaces a view marked loading many times a second
+- **THEN** the busy marks stay shown and the loading bar's sweep continues
+  without restarting
+
+#### Scenario: Leaving clears at once
+
+- **WHEN** the user leaves a view while its busy marks are shown
+- **THEN** the marks are gone in the same frame
 
 ## MODIFIED Requirements
 
@@ -61,13 +116,12 @@ technology, and SHALL be replaced by the items in the same frame they arrive.
 
 The SearchBar SHALL hold the query for a list or grid, with a placeholder the
 view sets. When a view has been pushed, it SHALL show a back control before
-the query; activating it SHALL go back one view, as Escape does. While the
-view's loading marks are shown (see view-protocol), it SHALL show an
-indeterminate progress bar along its bottom edge: a thin bar in which a short
-segment in the accent role sweeps from one end to the other, again and again,
-at a steady pace. When the view declares a filter dropdown, the SearchBar SHALL
-show it at its right end. For a detail or form view, the SearchBar SHALL show
-the command's title in place of the query.
+the query; activating it SHALL go back one view, as Escape does. While the busy
+marks are shown, it SHALL show an indeterminate progress bar along its bottom
+edge: a thin bar in which a short segment in the accent role sweeps from one
+end to the other, again and again, at a steady pace. When the view declares a
+filter dropdown, the SearchBar SHALL show it at its right end. For a detail or
+form view, the SearchBar SHALL show the command's title in place of the query.
 
 #### Scenario: Root shows no back control
 
@@ -86,13 +140,13 @@ the command's title in place of the query.
 
 #### Scenario: A loading view
 
-- **WHEN** the view's loading marks are shown
+- **WHEN** the busy marks are shown for a view marked loading
 - **THEN** the loading bar is shown under the SearchBar with its segment
   sweeping along it
 
 #### Scenario: Loading ends
 
-- **WHEN** the view's loading marks are removed, or the user leaves the view
+- **WHEN** the busy marks are removed, or the user leaves the view
 - **THEN** the loading bar and its motion are gone in the same frame
 
 #### Scenario: A form shows its title
@@ -104,11 +158,12 @@ the command's title in place of the query.
 
 A toast SHALL replace the ActionBar's context while it shows. A toast has a
 style and one line of text. A busy toast SHALL show a spinner in the working
-role and stay while its work runs. A success toast SHALL show a dot in the done
-role and disappear after about two seconds. A failure toast SHALL show a dot in
-the danger role and stay until the next key press or click. The success and
-failure dots SHALL NOT move. Assistive technology SHALL be told the toast's
-text and whether it reports a failure. Showing a toast SHALL NOT take focus.
+role and stay while its work runs, following the busy-mark timing. A success
+toast SHALL show a dot in the done role and disappear after about two seconds.
+A failure toast SHALL show a dot in the danger role and stay until the next key
+press or click. The success and failure dots SHALL NOT move. Assistive
+technology SHALL be told the toast's text and whether it reports a failure.
+Showing a toast SHALL NOT take focus.
 
 #### Scenario: A success toast
 
@@ -124,7 +179,7 @@ text and whether it reports a failure. Showing a toast SHALL NOT take focus.
 
 #### Scenario: A busy toast
 
-- **WHEN** a view's loading marks are shown
+- **WHEN** the busy marks are shown
 - **THEN** the busy toast shows a spinner in the working role, turning while
   the work runs
 
@@ -145,8 +200,7 @@ The launcher SHALL build every surface from the same small parts:
   view protocol requires.
 - A tag is short text in its role's colour on a rounded, faint fill of the same
   role. Its role is accent, muted, or danger.
-- A progress mark is a bar, a 16 logical pixel ring, or a spinner.
-- A status dot is a small round mark in its state's role.
+- A progress ring as an accessory is 16 logical pixels.
 - An accessory is text, an icon, a tag, a key chord, a progress ring, or a
   status dot. A row shows at most three, right-aligned.
 
@@ -168,12 +222,6 @@ The launcher SHALL build every surface from the same small parts:
 - **THEN** "Link" is drawn in the accent colour on a faint accent fill, with no
   outline
 
-#### Scenario: Progress and status as accessories
-
-- **WHEN** an item declares a progress ring at 0.5 and the status queued
-- **THEN** its row shows a half-filled ring and a dot in the idle role on its
-  right
-
 ## REMOVED Requirements
 
 ### Requirement: Nothing animates
@@ -183,5 +231,7 @@ the rule saved next to nothing while idle. Motion is now allowed where it
 shows that something is busy: progress marks and the busy toast's spinner.
 **Migration**: None. The launcher still shows, moves its selection, opens the
 action panel, and replaces views without transitions, because no requirement
-asks for one. How fast the launcher appears stays in launcher-shell, and how a
-streamed view keeps its selection stays in view-protocol.
+asks for one. That a streamed view keeps its loading bar steady moves to
+"Busy marks do not blink". How fast the launcher appears stays in
+launcher-shell, and how a streamed view keeps its selection stays in
+view-protocol.

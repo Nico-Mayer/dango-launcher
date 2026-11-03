@@ -2,39 +2,44 @@
 
 ## Context
 
-Loading today, from command to screen:
+Busy state today, from reducer to screen:
 
 ```
-View{loading: true} --> reducer --> snapshot.busy --+--> Shell.loading (SearchBar sweep)
-                                                    +--> busy toast "Loading…" (still Dot)
+state.working (root invocation) --+--> toast "Running X…"  --+
+top view loading ----------------+--> toast "Loading…"     --+--> ActionBar (still Dot)
+                                  +--> ViewScreen.busy -------> Shell.loading (SearchBar sweep)
 ```
 
-The reducer in `src/ui/` decides everything, and the renderer only copies the
-snapshot into Slint globals. Timers already follow one pattern. The reducer
-returns an `Effect` asking to be woken after a delay, `src/app/` runs the
-timer, and it feeds an `Event` back with an id. Stale ids are ignored. Toast
-expiry works this way (`Effect` with `TOAST_LIFETIME`, then
-`Event::ToastExpired { id }`).
+`Snapshot::toast` (`src/ui/snapshot.rs`) picks "Running X…" while
+`self.working` is set, and otherwise "Loading…" while the top view is loading.
+The first render of an invoked command clears `working` (`state.rs`, in the
+tree handler), so the toast passes from one source to the other. `RootScreen.busy`
+mirrors `working`, but no renderer reads it.
 
-`ui/atoms/dot.slint` takes a `ToastStyle` and colours by it. The ActionBar and
-the HUD both use it. The SearchBar draws its sweep inline with
-`animation-tick()`.
+Timers follow one pattern. The reducer returns an `Effect` with an id, and
+`src/app/mod.rs` picks the duration, sleeps, and feeds an `Event` back. Stale
+ids are ignored. Toast expiry works this way: `Effect::ExpireToast { id, style }`,
+then `Event::ToastExpired { id }`.
+
+`ui/atoms/dot.slint` takes a `ToastStyle`, and the ActionBar and the HUD both
+use it with an empty label. The SearchBar draws its sweep inline with
+`animation-tick()`, as element `SearchBar::sweep`.
 
 ## Goals / Non-Goals
 
 **Goals:**
 
-- One `Progress` atom (bar, ring, spinner), one status dot, one skeleton, all
-  taking colours from `Theme` status roles.
-- Loading-mark timing lives in the reducer, so it is tested without a window
-  or a clock.
+- One `Progress` atom (bar, ring), one status dot, and one skeleton, all
+  colours from `Theme`.
+- Busy-mark timing in the reducer, with one input, tested without a window or
+  a clock.
 - Extensions can declare progress and status accessories.
 
 **Non-Goals:**
 
 - Task registry, ProgressView, toast actions (task-registry change).
 - Skeletons for grid or detail.
-- Root-search loading marks.
+- Root-search result loading marks.
 
 ## Decisions
 
@@ -42,92 +47,141 @@ the HUD both use it. The SearchBar draws its sweep inline with
 
 | Part | Design part | File |
 |---|---|---|
-| `Progress` (`kind`: bar, ring, spinner; `value`: float, below 0 = indeterminate) | "Progress atom · bar · ring · spinner" | `ui/atoms/progress.slint` (new) |
-| `Dot` with `status`: working, blocked, done, failed, queued | status dots ("same herdr status tokens") | `ui/atoms/dot.slint` (reworked) |
-| `Skeleton` (rows) | "Skeleton · cold load" | `ui/atoms/skeleton.slint` (new) |
+| `Progress` (`kind`: bar, ring; `value`: float, below 0 = indeterminate; `size` for rings) | "Progress atom · bar · ring · spinner" | `ui/atoms/progress.slint` (new) |
+| `Dot` with `status`: working, needs-input, done, failed, queued | status dots ("same herdr status tokens") | `ui/atoms/dot.slint` (reworked) |
+| `Skeleton` | "Skeleton · cold load" | `ui/atoms/skeleton.slint` (new) |
+
+A spinner is not its own kind. It is a ring with no value at the size it is
+needed: 12 px in the busy toast, 16 px as an accessory.
 
 Slint 1.18's std-widgets have `Spinner` and `ProgressIndicator`. Both read
 `FluentPalette` colours (checked in the vendored
 `i-slint-compiler-1.18.1/widgets/fluent/spinner.slint` and
-`progressindicator.slint`) and expose no colour property. AGENTS.md already
-rules out std-widgets controls for that reason. We draw our own:
+`progressindicator.slint`) and expose no colour property. AGENTS.md rules out
+std-widgets controls for that reason, so we draw our own, following the
+design's colours:
 
-- **Bar:** a `Rectangle` track in `border`. Determinate fills a share of its
-  width in `working`. Indeterminate is today's sweep, moved here unchanged:
-  the segment stays `accent`, so the SearchBar looks as it does now.
-- **Ring:** 16 px, a `Path` arc in `working` over a `border` track.
-  Determinate draws the arc to `value`. Indeterminate draws a fixed quarter
-  arc rotated by `animation-tick()`.
-- **Spinner:** an indeterminate ring at icon size (the busy toast uses it at
-  the dot's place, 12 px).
+- **Track:** `raised` for both bar and ring.
+- **Fill:** `working`.
+- **Bar:** determinate fills a share of its width. Indeterminate sweeps a
+  segment, using today's sweep maths.
+- **Ring:** a `Path` arc. A full circle needs Slint's own workaround from
+  `widgets/common/spinner-base.slint`: clamp the sweep to `min(0.9999, value)`,
+  start the path with `MoveTo` and `LineTo` (femtovg does not fill a complete
+  circle otherwise), and draw no arc at 0. Indeterminate is a fixed quarter arc
+  turned with `transform-rotation` driven by `animation-tick()`
+  (`transform-rotation` exists on every element in 1.18). The software
+  renderer draws `Path`: its `path` feature is on through `std`.
 
-Indeterminate motion uses `animation-tick()`, as the sweep does. It runs only
-while the part is on screen, so an idle launcher redraws nothing.
+Indeterminate motion runs only while the part is on screen, so an idle
+launcher redraws nothing.
 
-### Dot takes a status, toast styles map to it
+**The SearchBar's loading bar keeps today's look**, a 2 px line in `border`
+with an `accent` segment, by choice. The design draws a 4 px bar in `working`
+for progress inside views, but the SearchBar line is the launcher's quiet
+loading signal and already matches the spec. It is a `Progress { kind: bar }`
+with colour overrides (`track`, `fill` properties defaulting to `raised` and
+`working`), so the SearchBar sets `border` and `accent`.
 
-`Dot` gets `in property <Status> status` (`working`, `blocked`, `done`,
-`failed`, `queued`), coloured by `working`, `blocked`, `done`, `danger`, and
-`idle`. Its accessible label is the state's word (see Copy). `ToastStyle`
-stays where toasts need it. The ActionBar shows `Progress { kind: spinner }`
-for busy, and `Dot` with `done` or `failed` otherwise. The HUD maps success to
-`done` and failure to `failed`. `dot.slint` no longer imports `ToastStyle`.
+Accessibility: `accessible-role: progress-indicator`. Determinate sets
+`accessible-value: round(value * 100)`, `accessible-value-minimum: 0`, and
+`accessible-value-maximum: 100`. Rounding keeps 0.42 as 42, not
+`42.000001`. Indeterminate sets the label "Working". The testing backend reads
+`accessible_value()` (already used in `src/slint_shell/tests.rs`).
 
-### Loading-mark timing in the reducer
+### Dot takes a status, and only accessory dots speak
 
-The snapshot's `busy` stops meaning "the view is loading". It means "the
-loading marks are shown". A small state machine sits beside the view stack:
+`Dot` gets `in property <Status> status`, with the enum named after the
+protocol (`working`, `needs-input`, `done`, `failed`, `queued`). It is coloured
+by the `working`, `blocked`, `done`, `danger`, and `idle` roles. It has an
+`in property <bool> announce`. Only the accessory sets it, and then the dot's
+accessible label is the state's word. Toast and HUD dots keep no label, as
+today. Their text and the existing "Failed" description already say it, so a
+second "Failed" or "Done" would be noise.
+
+The ActionBar shows a 12 px indeterminate `Progress { kind: ring }` for a busy
+toast, and a `Dot` with `done` or `failed` otherwise. The HUD maps success to
+`done` and failure to `failed`. `dot.slint` stops importing `ToastStyle`, which
+moves to `ui/globals.slint` next to the toast properties.
+
+### Busy-mark timing in the reducer
+
+**One input:** `busy_input = working.is_some() || top view loading`. Both
+toast texts and the SearchBar line follow the same marks, so passing from
+"Running X…" to "Loading…" never drops the toast.
+
+**State:**
 
 ```
-             view loading                   Due(id)
-  Hidden ------------------> Pending -------------------> Shown
-    ^                          |                          |    |
-    |      view not loading    |       Held(id) and not   |    | view not loading
-    +--------------------------+       loading            |    | before Held
-    +-----------------------------------------------------+    v
-    |                                                       Lingering
-    +------------------------- Held(id) ----------------------+
+             busy_input                Woke(id)
+  Hidden ----------------> Pending{id} ----------> Shown{id, held: false}
+    ^                         |                          |
+    |  not busy_input         |                          | Woke(id)
+    +-------------------------+                          v
+    |                                         Shown{id, held: true}
+    +--- not busy_input, held -------------------------+
 ```
 
-- Entering `Pending` emits `Effect::WakeLoadingMarks { id, after: delay }`.
-  `src/app/` answers with `Event::LoadingMarksDue { id }` after
-  `LOADING_MARK_DELAY` (150 ms).
-- Entering `Shown` emits a second wake for `LOADING_MARK_HOLD` (400 ms),
-  answered with `Event::LoadingMarksHeld { id }`.
-- `Shown` and `Lingering` are `busy` in the snapshot. `Hidden` and `Pending`
-  are not.
-- Leaving the view, a reset, or a new invocation goes straight to `Hidden` and
-  bumps the id, so late wakes are ignored. That matches the "abandoned"
-  scenario.
+- Marks show when `Shown && (busy_input || !held)`. When work ends before
+  `held`, the marks stay. The second wake then finds `!busy_input` and goes to
+  `Hidden`.
+- Every entry into `Pending` takes a new id. A stale wake from an earlier
+  Pending, or from an earlier view, never matches.
+- A view replacement while `busy_input` stays true keeps the state. So does a
+  streamed AI view: no reset, no new id, and the sweep's `animation-tick()`
+  keeps running.
+- A replacement that makes `busy_input` false: from `Pending` to `Hidden`;
+  from `Shown{held: true}` to `Hidden`; from `Shown{held: false}` it stays until
+  the wake.
+- `busy_input` true again while `Shown{held: false}` lingers: stay `Shown`.
+- Leaving the view, a reset, or the stack emptying: `Hidden` at once.
 
-The two durations are constants in `src/app/mod.rs`, next to
-`TOAST_LIFETIME`. The reducer only sees the events, so `src/ui/tests.rs` drives
-every path by sending `LoadingMarksDue` and `LoadingMarksHeld` by hand.
+**Effect and event**, mirroring toast expiry:
+`Effect::WakeBusyMarks { id, stage }`, with `stage` = `Delay` or `Hold`, and
+`Event::BusyMarksWoke { id }`. The reducer knows from its state which stage a
+wake is for. `src/app/mod.rs` holds `BUSY_MARK_DELAY` (150 ms) and
+`BUSY_MARK_HOLD` (400 ms) and picks one by `stage`, next to `TOAST_LIFETIME`.
+
+The snapshot reads the marks, not the view flag:
+
+- `ViewScreen.busy` is true while marks show.
+- `Snapshot::toast` returns the busy toast only while marks show, with the
+  text chosen as today ("Running X…" while `working`, else "Loading…").
+- `RootScreen.busy` is deleted. Its one test moves to the toast.
 
 Alternatives rejected:
 
-- **Timing in Slint** (delay the `if Shell.loading` with a timer). That puts an
+- **Timing in Slint** (a timer around `if Shell.loading`). That puts an
   interaction rule in the renderer, against AGENTS.md, and can't be tested in
   the reducer.
 - **Debouncing in `src/app/`** before events reach the reducer. That hides
-  state from the reducer, which builds the busy toast and the empty-state
-  choice from the same flag.
+  state from the reducer, which builds the toast and the empty-state choice
+  from the same flag.
+- **Four states with `Lingering` and two events.** The `held` flag carries the
+  same information with one state and one event fewer.
+- **Delaying only "Loading…".** A root command would then show "Running X…" at
+  once, drop the toast for 150 ms on its first render, and show "Loading…".
+  That is a new blink on the most common path.
 
 ### Skeleton rows
 
-A list view marked loading with no items is the one case that today renders a
-blank body. The snapshot gives it a `skeleton` flag in place of the empty
-state. The renderer sets `ListData.skeleton` and the list draws `Skeleton` in
-its body. The skeleton is not gated by the 150 ms delay: it replaces a blank
-body, not content, so it has nothing to blink against.
+The trigger is the tree, not the filter: a list view marked loading whose
+declared items are empty. A refreshing list whose items are all filtered out
+by the query shows its usual filtered state, not a skeleton.
 
-Rows: `Theme.row-height` high, with an icon square and a title bar in
-`raised`, and no motion. The count is fixed so that the window takes its
-maximum height: `(MAX - SEARCH_BAR - ACTION_BAR - 2 * LIST_PADDING) / ROW`,
-rounded down, so 8 at today's sizes. `render/height.rs` counts the same
-number, per the fixed-height rule. The skeleton is one element with
-`accessible-role: none` children. The list reports busy through the existing
-"Loading…" toast.
+- The snapshot gives the list body a `skeleton` flag in place of the empty
+  state.
+- `render/height.rs` sends a skeleton list to the existing `_ => MAX` arm.
+  There is no row count in Rust.
+- `Skeleton` fills its height with as many `Theme.row-height` rows as fit:
+  `floor(height / row-height)`. Each row has an icon square and a title bar in
+  `raised`, with no motion. The children use `accessible-role: none`, and the
+  list reports busy through the toast.
+- `ListData.skeleton` is written by the list renderer on every snapshot. The
+  root path writes `ListData` too, so it sets `skeleton: false`.
+
+The skeleton is not gated by the 150 ms delay. It replaces a blank body, not
+content, so it has nothing to blink against.
 
 ### Protocol: two accessory kinds, version stays 2
 
@@ -137,20 +191,17 @@ Accessory::Status { status: Status }         // {"kind":"status","status":"needs
 enum Status { Working, NeedsInput, Done, Failed, Queued }
 ```
 
-The view-tree check that already refuses bad shortcuts also refuses a
-`value` outside 0 to 1, with the same "error in place of the view" path. The
-Slint side adds `progress` and `status` to `AccessoryKind`, and `value` and
-`status` fields to `AccessoryData`.
+An out-of-range value is clamped to 0 to 1 when rendered, with no refusal. A
+float rounding error such as 1.0000001 must not replace a view with an error.
+The user chose this.
 
 This extends the versioned view protocol. It stays at version 2 because the
 change is additive: every tree valid today is still valid. No third-party
-extensions exist yet, so the only readers are the built-ins. The
-task-registry change adds a view kind and decides there whether that needs
-version 3.
+extensions exist yet. The task-registry change adds a view kind and decides
+there whether that needs version 3.
 
-`Status` is a protocol name. "Needs input" is the user-facing word, and the
-herdr role behind it is `blocked`. The protocol uses `needsInput` so an
-extension author writes what they mean.
+"Needs input" is the user-facing word, `needsInput` the wire name, and
+`needs-input` the Slint enum value. The herdr role behind it is `blocked`.
 
 ### Copy
 
@@ -160,26 +211,25 @@ plain words, and matching the existing toast description "Failed".
 
 | Where | String |
 |---|---|
-| Status dot, working | "Working" |
-| Status dot, needs input | "Needs input" |
-| Status dot, done | "Done" |
-| Status dot, failed | "Failed" |
-| Status dot, queued | "Queued" |
+| Accessory status dot, working | "Working" |
+| Accessory status dot, needs input | "Needs input" |
+| Accessory status dot, done | "Done" |
+| Accessory status dot, failed | "Failed" |
+| Accessory status dot, queued | "Queued" |
 | Indeterminate ring or spinner | "Working" |
-| Determinate ring or bar | no label, `accessible-value` 0 to 100 |
+| Determinate ring or bar | no label, value 0 to 100 |
 
-The busy toast keeps "Loading…".
+"Running X…" and "Loading…" are unchanged. Only when they appear changes.
 
 ## Risks / Trade-offs
 
 - **Continuous redraws while busy.** `animation-tick()` repaints every frame
-  while a spinner or sweep is on screen. That already happens for the sweep
-  today. The spinner adds no cost beyond it, because both show together.
-- **The software renderer.** It draws `Path` arcs without the GPU. A 12 to
-  16 px arc is cheap, and the UI tests run on the testing backend, so a
-  rendering glitch would only show by eye.
-- **The 150 ms delay hides real short loads.** A load that ends within 150 ms
-  shows nothing. That is the point. Skeleton rows still cover a cold list.
+  while a spinner or sweep is on screen. That already happens for the sweep.
+  The spinner shows at the same time, so it adds no cost of its own.
+- **The software renderer.** It draws small `Path` arcs cheaply. A glitch would
+  only show by eye, because UI tests run on the testing backend.
+- **A slow command's toast now waits 150 ms.** A command that finishes within
+  that time shows no toast at all. This is the point of the rule.
 - **Flicker moves to the skeleton.** A list that loads in one frame shows one
   frame of skeleton in place of one frame of blank body. That is no worse
   than today.

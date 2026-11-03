@@ -6,10 +6,9 @@
 
 A list item SHALL be able to declare up to three accessories, each one of text,
 an icon, a tag with a role of accent, muted, or danger, a key chord, a progress
-ring with an optional value from 0 to 1, or a status of working, needs input,
-done, failed, or queued. A progress ring without a value SHALL be shown as
-indeterminate. Dango SHALL refuse a view tree in which a progress value lies
-outside 0 to 1, and SHALL show an error in place of the view. An item SHALL be
+ring with an optional value, or a status of working, needs input, done, failed,
+or queued. A progress ring without a value SHALL be shown as indeterminate. A
+value below 0 SHALL be shown as 0 and a value above 1 as 1. An item SHALL be
 able to declare keywords. When the launcher filters, a query SHALL match an
 item by its keywords as well as its title, and the keywords SHALL NOT be shown.
 
@@ -27,7 +26,7 @@ item by its keywords as well as its title, and the keywords SHALL NOT be shown.
 #### Scenario: A progress value out of range
 
 - **WHEN** an item declares a progress ring at 1.5
-- **THEN** Dango shows an error in place of the view
+- **THEN** the ring is shown full and the view is shown as usual
 
 #### Scenario: A keyword matches
 
@@ -42,17 +41,14 @@ when it has no content.
 
 Every list, grid, or detail view marked loading SHALL show the SearchBar's
 loading bar and a busy toast reading "Loading…", whether or not it already
-contains content. These loading marks SHALL appear only once the view has been
-loading for about 150 milliseconds, and once shown SHALL stay for at least
-about 400 milliseconds, even if loading ends sooner. Entering the loading state
-SHALL NOT itself clear, replace, dim into unreadability, or block interaction
-with content supplied by the command. The loading marks SHALL reflect the
-declared loading state, not infer completion from incoming text, and SHALL NOT
-claim a numerical progress value.
+contains content, following the busy-mark timing in design-system. Entering the
+loading state SHALL NOT itself clear, replace, dim into unreadability, or block
+interaction with content supplied by the command. The loading marks SHALL
+reflect the declared loading state, not infer completion from incoming text or
+elapsed time, and SHALL NOT claim a numerical progress value.
 
-A list marked loading with no items SHALL show skeleton rows (see
-design-system) from the moment it is shown, without waiting for the loading
-marks.
+A list marked loading that declares no items SHALL show skeleton rows (see
+design-system) from the moment it is shown.
 
 An empty state SHALL have a title and MAY have an icon, a one-line description,
 and actions. When an empty view is shown, Enter SHALL run its first action.
@@ -65,19 +61,6 @@ shown.
 - **WHEN** a command emits a view marked as loading and keeps it loading
 - **THEN** after a short moment the loading bar and the busy toast are shown
   without clearing any content already displayed
-
-#### Scenario: A fast load shows no loading marks
-
-- **WHEN** a command emits a view marked loading and replaces it with one not
-  marked loading within about 150 milliseconds
-- **THEN** neither the loading bar nor the busy toast is shown
-
-#### Scenario: Loading marks do not blink
-
-- **WHEN** the loading marks have just appeared and the command then emits a
-  view not marked loading
-- **THEN** the marks stay until they have been shown for about 400
-  milliseconds, and are then removed
 
 #### Scenario: Empty state is shown
 
@@ -112,15 +95,15 @@ shown.
 
 #### Scenario: Loading finishes
 
-- **WHEN** the command emits a replacement with loading set to false and the
-  loading marks have been shown for at least about 400 milliseconds
-- **THEN** its content remains visible and the loading marks are removed
+- **WHEN** the command emits a replacement with loading set to false
+- **THEN** its content remains visible and the loading marks are removed once
+  they have been shown for their minimum time
 - **AND** assistive technology is no longer told that the view is busy
 
 #### Scenario: Loading feedback is abandoned
 
 - **WHEN** the user leaves a loading view, or the launcher resets through a
   deliberate hide or the grace period running out (see launcher-shell)
-- **THEN** its loading marks are removed at once, without waiting for the
+- **THEN** its loading marks are removed at once, without waiting for their
   minimum time
 - **AND** a late update from an abandoned invocation does not restore them
