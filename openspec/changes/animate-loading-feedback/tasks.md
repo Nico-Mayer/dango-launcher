@@ -13,5 +13,5 @@
 
 ## 3. Wrap up
 
-- [ ] 3.1 Run `mise run check` and `cargo test`; both pass
-- [ ] 3.2 Run the `ponytail-review` skill in a fresh subagent on this change's commits, without the apply context; report findings to the author
+- [x] 3.1 Run `mise run check` and `cargo test`; both pass
+- [x] 3.2 Run the `ponytail-review` skill in a fresh subagent on this change's commits, without the apply context; report findings to the author
