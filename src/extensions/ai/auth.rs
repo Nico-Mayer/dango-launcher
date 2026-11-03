@@ -1,7 +1,7 @@
 //! Provider keys, read from `auth.json` in the config directory.
 //!
 //! Plain text, deliberately: one user with two machines, and a file that can be
-//! copied. It is its own file so `config.json` stays committable, and Dango only
+//! copied. It is its own file so `config.toml` stays committable, and Dango only
 //! ever reads it.
 //!
 //! Two rules hold everything here together. The file is read per request rather

@@ -94,7 +94,7 @@ mod tests {
     use super::*;
 
     fn temp_path(name: &str) -> PathBuf {
-        std::env::temp_dir().join(format!("dango-cfg-test-{name}-{}.json", std::process::id()))
+        std::env::temp_dir().join(format!("dango-cfg-test-{name}-{}.toml", std::process::id()))
     }
 
     #[test]
@@ -152,7 +152,7 @@ mod tests {
     #[test]
     fn ensure_file_creates_a_missing_file_with_the_version_only() {
         let dir = temp_dir("ensure-missing");
-        let path = dir.join("nested").join("config.json");
+        let path = dir.join("nested").join("config.toml");
         let store = FileConfig::new(path.clone(), Config::default());
         assert_eq!(store.ensure_file().unwrap(), path);
         let on_disk = std::fs::read_to_string(&path).unwrap();
@@ -170,7 +170,7 @@ mod tests {
     #[test]
     fn ensure_file_leaves_an_existing_file_alone() {
         let dir = temp_dir("ensure-existing");
-        let path = dir.join("config.json");
+        let path = dir.join("config.toml");
         std::fs::write(&path, "not json at all").unwrap();
         let store = FileConfig::new(path.clone(), Config::default());
         assert_eq!(store.ensure_file().unwrap(), path);
@@ -186,7 +186,7 @@ mod tests {
         // created under it on any platform.
         let blocker = dir.join("blocker");
         std::fs::write(&blocker, "").unwrap();
-        let path = blocker.join("config.json");
+        let path = blocker.join("config.toml");
         let store = FileConfig::new(path.clone(), Config::default());
         let error = store.ensure_file().unwrap_err();
         assert!(error.contains(&path.display().to_string()), "{error}");

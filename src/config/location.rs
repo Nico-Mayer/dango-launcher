@@ -5,7 +5,7 @@
 //! symlink and commit. `$DANGO_CONFIG_DIR` overrides it for anyone who keeps
 //! their dotfiles elsewhere.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 pub const CONFIG_DIR_ENV: &str = "DANGO_CONFIG_DIR";
 
@@ -16,7 +16,11 @@ pub fn config_dir() -> PathBuf {
 
 /// The config file itself.
 pub fn config_path() -> PathBuf {
-    config_dir().join("config.json")
+    config_file(&config_dir())
+}
+
+fn config_file(dir: &Path) -> PathBuf {
+    dir.join("config.toml")
 }
 
 /// How the config file refers to the schema Dango writes beside it, relative
@@ -45,6 +49,21 @@ mod tests {
     fn default_is_dot_config_dango() {
         let dir = resolve(None, PathBuf::from("/home/nico"));
         assert_eq!(dir, PathBuf::from("/home/nico/.config/dango"));
+    }
+
+    #[test]
+    fn an_old_json_file_alone_is_not_read() {
+        let dir = std::env::temp_dir().join(format!("dango-loc-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(
+            dir.join("config.json"),
+            r#"{ "launcher": { "autostart": true } }"#,
+        )
+        .unwrap();
+        let config = super::super::Config::load(&config_file(&dir)).unwrap();
+        assert!(config.launcher.autostart.is_none());
+        assert!(dir.join("config.json").exists());
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]

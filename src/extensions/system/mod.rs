@@ -347,7 +347,7 @@ pub mod tests {
     fn temp_config() -> Arc<FileConfig> {
         let dir = std::env::temp_dir().join(format!("dango-system-{}", uuid::Uuid::new_v4()));
         Arc::new(FileConfig::new(
-            dir.join("config.json"),
+            dir.join("config.toml"),
             crate::config::Config::default(),
         ))
     }
@@ -638,7 +638,7 @@ pub mod tests {
         let blocker = dir.join("blocker");
         std::fs::write(&blocker, "").unwrap();
         let config = Arc::new(FileConfig::new(
-            blocker.join("config.json"),
+            blocker.join("config.toml"),
             crate::config::Config::default(),
         ));
         let (opener, invoker) = setup_open_config(config, Arc::new(FakeOpener::default()));
