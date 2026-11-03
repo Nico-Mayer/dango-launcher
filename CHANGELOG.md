@@ -2,6 +2,22 @@
 
 All notable changes to Dango. Generated from commit history at release time.
 
+## [6.0.0] - 2026-11-03
+
+### Features
+
+- **config:** Move schemas into .schemas folder
+- **ai:** [**breaking**] Read provider keys from auth.toml
+- **snippets:** [**breaking**] Store snippets and quicklinks as TOML
+
+### Fixes
+
+- **snippets:** Keep field comments and unknown keys
+- **app:** Keep startup config error on its lines
+
+### Maintenance
+
+- Drop leftover JSON config file references
 ## [5.0.0] - 2026-11-03
 
 ### Features
