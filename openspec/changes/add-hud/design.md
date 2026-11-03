@@ -74,6 +74,11 @@ it, a new `Event::Hidden` clears it. `Core::settle_hide` sends
 
 - `show_failure` while hidden sets `hud` instead of `toast`. The failure is no
   longer kept across `reset`.
+- `Event::Hidden` moves a failure toast still showing to the HUD. A command
+  that pastes asks for the hide and goes on working, so its failure can land
+  just before the window is gone (`HideLauncher::dismiss` returns before the
+  main thread hides). The cost: a failure the user already saw, followed by a
+  click elsewhere, shows once more in the HUD.
 - `CopyToClipboard` emits `CopyText` and `Dismiss` and sets a pending success
   HUD "Copied to clipboard".
 - The snapshot exposes `hud` only while the reducer sees the launcher hidden.

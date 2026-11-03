@@ -804,3 +804,17 @@ async fn a_success_hud_goes_after_two_seconds() {
     tokio::time::sleep(Duration::from_millis(200)).await;
     assert_eq!(hud(&shell), None);
 }
+
+#[tokio::test(start_paused = true)]
+async fn a_failure_while_hidden_shows_in_the_hud_for_four_seconds() {
+    let (core, shell) = core("");
+    core.apply(crate::ui::Input::Event(crate::ui::Event::Failed(
+        "Nope".into(),
+    )));
+    tokio::time::sleep(Duration::from_millis(3900)).await;
+    assert_eq!(hud(&shell).as_deref(), Some("Nope"));
+    tokio::time::sleep(Duration::from_millis(200)).await;
+    assert_eq!(hud(&shell), None);
+    core.toggle();
+    assert!(shell.last_snapshot().toast.is_none());
+}

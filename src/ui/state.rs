@@ -253,7 +253,7 @@ impl Launcher {
                 self.action_finished(request, outcome, fx)
             }
             Event::Failed(message) => {
-                self.show_failure(message);
+                self.show_failure(message, fx);
                 self.working = None;
             }
             Event::TemplateInspected {
@@ -279,6 +279,15 @@ impl Launcher {
             Event::Reset => self.reset(fx),
             Event::Hidden => {
                 self.visible = false;
+                // A command that pastes asks for the hide and goes on working,
+                // so its failure can land just before the window is gone.
+                if let Some(toast) = self
+                    .toast
+                    .take_if(|toast| toast.style == ToastStyle::Failure)
+                {
+                    self.show_hud(ToastStyle::Failure, toast.text, fx);
+                    return;
+                }
                 if let Some(hud) = &self.hud {
                     fx.push(Effect::ExpireToast {
                         id: hud.id,
@@ -297,13 +306,6 @@ impl Launcher {
         }
     }
 
-    /// A failure deliberately survives this.
-    ///
-    /// An action that pastes hides the launcher before it does the work, so it
-    /// can only report a failure once the window is already gone, and whether
-    /// that report arrives before or after this reset is a race. The message is
-    /// carried to the next activation instead, and cleared as soon as the user
-    /// types, acts, or presses Escape.
     fn reset(&mut self, fx: &mut Vec<Effect>) {
         self.query.clear();
         self.query_revision = self.next_revision();
@@ -319,6 +321,7 @@ impl Launcher {
         self.panel = None;
         self.view_error = None;
         self.working = None;
+        self.toast = None;
         fx.push(Effect::Search(String::new()));
     }
 
@@ -399,7 +402,7 @@ impl Launcher {
                 }
             }
             (ActionOutcome::Toast(text), _) => self.show_success(text, fx),
-            (ActionOutcome::Failed(message), _) => self.show_failure(message),
+            (ActionOutcome::Failed(message), _) => self.show_failure(message, fx),
         }
     }
 
@@ -411,7 +414,13 @@ impl Launcher {
         true
     }
 
-    fn show_failure(&mut self, text: String) {
+    /// Off screen nobody would see a toast, and it would be stale by the next
+    /// activation, so the HUD says it instead.
+    fn show_failure(&mut self, text: String, fx: &mut Vec<Effect>) {
+        if !self.visible {
+            self.show_hud(ToastStyle::Failure, text, fx);
+            return;
+        }
         let id = self.next_revision();
         self.toast = Some(HeldToast {
             id,
