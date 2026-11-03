@@ -48,7 +48,7 @@
 
 ## 4. The update on a task
 
-- [ ] 4.1 Rewrite the install flow in `src/extensions/updates/mod.rs` on a task, as the design's flow shows:
+- [x] 4.1 Rewrite the install flow in `src/extensions/updates/mod.rs` on a task, as the design's flow shows:
   - steps "Download", "Verify signature", "Restart";
   - download progress throttled by `progress_step`;
   - on success, keep the `Update` and the bytes in `Inner::ready`, with the "Restart" step needing input and the detail "Ready to restart";
@@ -63,7 +63,7 @@
   - cancel reports `Cancelled` and installs nothing;
   - download and signature errors each report their sentence with Retry;
   - no scheduled check while ready.
-- [ ] 4.2 Make the update item and the "Check for Updates" result follow the state:
+- [x] 4.2 Make the update item and the "Check for Updates" result follow the state:
   - "Install update" when idle;
   - "Show progress" while running;
   - when ready: the title "Dango 0.5.0 is ready to restart" with "Restart now".

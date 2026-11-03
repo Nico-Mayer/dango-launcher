@@ -153,6 +153,7 @@ fn build_services(
     core: &Weak<Core>,
     notices: &mut Vec<String>,
 ) -> Services {
+    let tasks = super::tasks_for(core.clone());
     let store: Option<Arc<Store>> = match open_store() {
         Ok(Opened {
             store,
@@ -283,6 +284,7 @@ fn build_services(
             core: core.clone(),
             owner: updates::EXTENSION_ID,
         })),
+        tasks.clone(),
     ));
     register(&mut host, "updates", updates);
 
@@ -385,7 +387,7 @@ fn build_services(
         clipboard: clipboard.map(|clipboard| clipboard as Arc<dyn ClipboardSource>),
         hotkeys,
         hyperkey,
-        tasks: super::tasks_for(core.clone()),
+        tasks,
     }
 }
 

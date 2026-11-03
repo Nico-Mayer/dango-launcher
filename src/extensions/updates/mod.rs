@@ -16,8 +16,9 @@ use crate::extension::{
     Service, NAMED_ICON,
 };
 use crate::invocation::{Command, InvocationContext, Runner};
-use crate::protocol::{Action, DetailView, View, ViewTree};
+use crate::protocol::{Action, DetailView, Modifier, Shortcut, Status, View, ViewTree};
 use crate::search::{Candidate, RootProvider, Source};
+use crate::tasks::{self, TaskHandle, TaskState, TaskStatus, Tasks};
 
 pub use source::{production, UpdateError, UpdateSource};
 
@@ -25,6 +26,11 @@ pub const EXTENSION_ID: &str = "dango.updates";
 
 pub const COMMAND_CHECK: &str = "check";
 pub const ACTION_INSTALL: &str = "install";
+const ACTION_SHOW: &str = "show";
+const ACTION_CANCEL: &str = "cancel";
+const ACTION_BACKGROUND: &str = "background";
+const ACTION_RESTART: &str = "restart";
+const ACTION_LATER: &str = "later";
 
 const ITEM_ID: &str = "update";
 
@@ -35,6 +41,8 @@ const WAKE_EVERY: Duration = Duration::from_secs(10 * 60);
 const CHECKING: &str = "Checking for updates";
 const UP_TO_DATE: &str = "You have the latest version";
 const DEVELOPMENT: &str = "Updates are off in development builds.";
+const STEPS: [&str; 3] = ["Download", "Verify signature", "Restart"];
+const READY: &str = "Ready to restart";
 
 pub(crate) fn manifest() -> Manifest {
     Manifest {
@@ -67,12 +75,15 @@ struct Inner {
     enabled: bool,
     runtime: Handle,
     runner: Option<Arc<dyn Runner>>,
+    tasks: Arc<Tasks>,
     available: Mutex<Option<String>>,
-    installing: AtomicBool,
-    /// Where the install shows its progress. Replaced when the user starts the
-    /// install again while it runs, so reopening it finds the download.
+    /// The download in progress or waiting to restart.
+    task: Mutex<Option<TaskHandle>>,
+    /// A verified download, kept until "Restart now".
+    ready: Mutex<Option<Vec<u8>>>,
+    /// Where the task shows its progress. Replaced when the user opens it
+    /// again, so reopening it finds the download.
     view: Mutex<Option<Arc<InvocationContext>>>,
-    shown: Mutex<Option<ViewTree>>,
 }
 
 impl UpdatesExtension {
@@ -82,6 +93,7 @@ impl UpdatesExtension {
         enabled: bool,
         runtime: Handle,
         runner: Option<Arc<dyn Runner>>,
+        tasks: Arc<Tasks>,
     ) -> Self {
         Self {
             manifest: manifest(),
@@ -91,10 +103,11 @@ impl UpdatesExtension {
                 enabled,
                 runtime,
                 runner,
+                tasks,
                 available: Mutex::new(None),
-                installing: AtomicBool::new(false),
+                task: Mutex::new(None),
+                ready: Mutex::new(None),
                 view: Mutex::new(None),
-                shown: Mutex::new(None),
             }),
         }
     }
@@ -165,7 +178,10 @@ impl Extension for UpdatesExtension {
         _values: &FormValues,
     ) -> ActionOutcome {
         match action_id {
-            ACTION_INSTALL => self.inner.start_install(),
+            ACTION_INSTALL | ACTION_SHOW => self.inner.start_install(),
+            ACTION_CANCEL => self.inner.cancel(),
+            ACTION_BACKGROUND | ACTION_LATER => ActionOutcome::Back,
+            ACTION_RESTART => self.inner.restart(),
             _ => ActionOutcome::Failed("That action isn't available".into()),
         }
     }
@@ -176,7 +192,16 @@ impl Inner {
         self.available.lock().unwrap().clone()
     }
 
+    fn task_state(&self) -> Option<TaskState> {
+        self.task.lock().unwrap().as_ref()?.state()
+    }
+
+    /// A download that runs or waits keeps the version it found: a newer check
+    /// would change what "Restart now" installs.
     async fn check(&self) -> Result<Option<String>, UpdateError> {
+        if self.task_state().is_some() {
+            return Ok(self.available());
+        }
         let found = self.source.check().await?;
         self.available.lock().unwrap().clone_from(&found);
         Ok(found)
@@ -207,6 +232,7 @@ impl Inner {
         ctx.push_view(tree);
     }
 
+    /// Starts the download, or shows the one that runs or waits.
     fn start_install(self: &Arc<Self>) -> ActionOutcome {
         let Some(version) = self.available() else {
             return ActionOutcome::Failed("That action isn't available".into());
@@ -214,48 +240,145 @@ impl Inner {
         let Some(ctx) = self.runner.as_ref().and_then(|runner| runner.start()) else {
             return ActionOutcome::Failed("The update can't start right now".into());
         };
-        if let Some(tree) = self.shown.lock().unwrap().clone() {
-            ctx.push_view(tree);
-        }
         *self.view.lock().unwrap() = Some(ctx);
-        if !self.installing.swap(true, Ordering::SeqCst) {
-            let inner = self.clone();
-            self.runtime
-                .spawn(async move { inner.install(&version).await });
+        if let Some(state) = self.task_state() {
+            self.show(&state);
+            return ActionOutcome::Started;
         }
+        let task = self
+            .tasks
+            .start(EXTENSION_ID, ITEM_ID, &format!("Dango {version}"));
+        let state = task.report(|state| {
+            state.subtitle = format!("You have {}", self.current);
+            state.line = downloading_line(&version, None);
+            state.steps = tasks::steps(&STEPS, 0, Status::Working);
+            state.cancel = Some(ACTION_CANCEL.into());
+            state.retry = Some(ACTION_INSTALL.into());
+        });
+        if let Some(state) = state {
+            self.show(&state);
+        }
+        *self.task.lock().unwrap() = Some(task.clone());
+        let inner = self.clone();
+        self.runtime
+            .spawn(async move { inner.download(task, &version).await });
         ActionOutcome::Started
     }
 
     /// Runs to the end even when the launcher is dismissed: only what it shows
     /// is dropped then, not the download.
-    async fn install(&self, version: &str) {
-        self.show(detail(downloading_title(version), true, vec![]));
+    async fn download(&self, task: TaskHandle, version: &str) {
         let mut received = 0;
         let mut shown = 0;
-        let downloaded = self
-            .source
-            .download(&mut |chunk, total| {
-                received += chunk;
-                if received - shown >= progress_step(total) {
-                    shown = received;
-                    self.show(downloading(version, received, total));
+        let mut progress = |chunk: u64, total: Option<u64>| {
+            received += chunk;
+            if received - shown >= progress_step(total) {
+                shown = received;
+                let state = task.report(|state| {
+                    state.progress = total.map(|total| received as f32 / total.max(1) as f32);
+                    state.detail = bytes_line(received, total);
+                    state.line = downloading_line(version, state.progress);
+                });
+                if let Some(state) = state {
+                    self.show(&state);
                 }
-            })
-            .await;
-        let installed = downloaded.and_then(|bytes| self.source.install(&bytes));
-        if let Err(error) = installed {
-            crate::log::append(&format!("updates: {}", error.detail()));
-            self.show(detail(error.to_string(), false, vec![]));
+            }
+        };
+        let mut cancelled = task.cancelled();
+        let downloaded = tokio::select! {
+            downloaded = self.source.download(&mut progress) => downloaded,
+            _ = cancelled.wait_for(|cancelled| *cancelled) => {
+                task.report(|state| state.status = TaskStatus::Cancelled);
+                self.task.lock().unwrap().take();
+                return;
+            }
+        };
+        let state = match downloaded {
+            Ok(bytes) => {
+                *self.ready.lock().unwrap() = Some(bytes);
+                task.report(|state| {
+                    state.status = TaskStatus::NeedsInput {
+                        sentence: format!("Dango {version} is ready to restart"),
+                    };
+                    state.progress = Some(1.0);
+                    state.steps = tasks::steps(&STEPS, 2, Status::NeedsInput);
+                    state.detail = READY.into();
+                })
+            }
+            Err(error) => {
+                crate::log::append(&format!("updates: {}", error.detail()));
+                let failed = match error {
+                    UpdateError::Signature(_) => 1,
+                    _ => 0,
+                };
+                let state = task.report(|state| {
+                    state.status = TaskStatus::Failed {
+                        sentence: error.to_string(),
+                    };
+                    state.steps = tasks::steps(&STEPS, failed, Status::Failed);
+                    state.detail = error.to_string();
+                });
+                self.task.lock().unwrap().take();
+                state
+            }
+        };
+        if let Some(state) = state {
+            self.show(&state);
         }
-        self.installing.store(false, Ordering::SeqCst);
-        self.shown.lock().unwrap().take();
     }
 
-    fn show(&self, tree: ViewTree) {
-        *self.shown.lock().unwrap() = Some(tree.clone());
-        if let Some(ctx) = self.view.lock().unwrap().as_ref() {
-            ctx.push_view(tree);
+    fn cancel(&self) -> ActionOutcome {
+        if let Some(task) = self.task.lock().unwrap().as_ref() {
+            task.cancel();
         }
+        ActionOutcome::Back
+    }
+
+    fn restart(&self) -> ActionOutcome {
+        let Some(bytes) = self.ready.lock().unwrap().take() else {
+            return ActionOutcome::Failed("That action isn't available".into());
+        };
+        // On Windows this exits, and the installer starts Dango again.
+        match self.source.install(&bytes) {
+            Ok(()) => ActionOutcome::Done,
+            Err(error) => {
+                crate::log::append(&format!("updates: {}", error.detail()));
+                *self.ready.lock().unwrap() = Some(bytes);
+                ActionOutcome::Failed(error.to_string())
+            }
+        }
+    }
+
+    fn show(&self, state: &TaskState) {
+        if let Some(ctx) = self.view.lock().unwrap().as_ref() {
+            ctx.push_view(tasks::progress_view(state, actions_for(&state.status)));
+        }
+    }
+}
+
+fn actions_for(status: &TaskStatus) -> Vec<Action> {
+    let action = |id: &str, title: &str| Action {
+        id: id.into(),
+        title: title.into(),
+        ..Default::default()
+    };
+    match status {
+        TaskStatus::Running => vec![
+            action(ACTION_BACKGROUND, "Continue in background"),
+            Action {
+                shortcut: Some(Shortcut {
+                    key: ".".into(),
+                    modifiers: vec![Modifier::Cmd],
+                }),
+                ..action(ACTION_CANCEL, "Cancel")
+            },
+        ],
+        TaskStatus::NeedsInput { .. } => vec![
+            action(ACTION_RESTART, "Restart now"),
+            action(ACTION_LATER, "Install later"),
+        ],
+        TaskStatus::Failed { .. } => vec![action(ACTION_INSTALL, "Retry")],
+        TaskStatus::Done { .. } | TaskStatus::Cancelled => Vec::new(),
     }
 }
 
@@ -272,27 +395,25 @@ fn available_title(version: &str) -> String {
 fn install_action() -> Action {
     Action {
         id: ACTION_INSTALL.into(),
-        title: "Install and restart".into(),
+        title: "Install update".into(),
         shortcut: None,
         ..Default::default()
     }
 }
 
-fn downloading(version: &str, received: u64, total: Option<u64>) -> ViewTree {
+fn bytes_line(received: u64, total: Option<u64>) -> String {
     let size = |bytes| ByteSize::b(bytes).display().si().to_string();
-    let progress = match total {
+    match total {
         Some(total) => format!("{} of {}", size(received), size(total)),
         None => size(received),
-    };
-    detail(
-        format!("{}\n\n{progress}", downloading_title(version)),
-        true,
-        vec![],
-    )
+    }
 }
 
-fn downloading_title(version: &str) -> String {
-    format!("Downloading Dango {version}")
+fn downloading_line(version: &str, progress: Option<f32>) -> String {
+    match progress {
+        Some(share) => format!("Downloading Dango {version} · {}%", (share * 100.0).round()),
+        None => format!("Downloading Dango {version}"),
+    }
 }
 
 fn detail(markdown: String, loading: bool, actions: Vec<Action>) -> ViewTree {
@@ -312,16 +433,32 @@ impl RootProvider for UpdateProvider {
         let Some(version) = self.0.available() else {
             return vec![];
         };
+        let action = |id: &str, title: &str| Action {
+            id: id.into(),
+            title: title.into(),
+            ..Default::default()
+        };
+        let (title, primary) = match self.0.task_state().map(|state| state.status) {
+            Some(TaskStatus::NeedsInput { .. }) => (
+                format!("Dango {version} is ready to restart"),
+                action(ACTION_RESTART, "Restart now"),
+            ),
+            Some(TaskStatus::Running) => (
+                available_title(&version),
+                action(ACTION_SHOW, "Show progress"),
+            ),
+            _ => (available_title(&version), install_action()),
+        };
         vec![Candidate {
             extension_id: EXTENSION_ID.into(),
             id: ITEM_ID.into(),
-            title: available_title(&version),
+            title,
             status: Some(format!("You have {}", self.0.current)),
             icon: Some(format!("{NAMED_ICON}circle-arrow-down")),
             keywords: vec!["update".into(), "dango".into()],
             alias: None,
             source: Source::RootItem,
-            actions: vec![install_action()],
+            actions: vec![primary],
             match_positions: vec![],
             suggested: false,
             pinned: true,
@@ -369,6 +506,26 @@ mod tests {
         fn last(&self) -> DetailView {
             self.details().pop().expect("a view was shown")
         }
+
+        fn progress(&self) -> Vec<crate::protocol::ProgressView> {
+            self.0
+                .lock()
+                .unwrap()
+                .iter()
+                .filter_map(|tree| match &tree.view {
+                    View::Progress(progress) => Some(progress.clone()),
+                    _ => None,
+                })
+                .collect()
+        }
+
+        fn last_progress(&self) -> crate::protocol::ProgressView {
+            self.progress().pop().expect("a progress view was shown")
+        }
+    }
+
+    fn statuses(view: &crate::protocol::ProgressView) -> Vec<Status> {
+        view.steps.iter().map(|step| step.status).collect()
     }
 
     struct FixedRunner(Arc<Recorded>);
@@ -401,6 +558,7 @@ mod tests {
             enabled,
             Handle::current(),
             Some(Arc::new(FixedRunner(views.clone()))),
+            Tasks::new(|_| {}),
         );
         Fixture {
             extension,
@@ -425,15 +583,25 @@ mod tests {
             sink
         }
 
-        async fn install_to_the_end(&self) {
-            self.extension.inner.check().await.unwrap();
-            let outcome =
-                self.extension
-                    .perform_action(ITEM_ID, ACTION_INSTALL, &FormValues::new());
-            assert_eq!(outcome, ActionOutcome::Started);
-            while self.extension.inner.installing.load(Ordering::SeqCst) {
+        fn act(&self, action: &str) -> ActionOutcome {
+            self.extension
+                .perform_action(ITEM_ID, action, &FormValues::new())
+        }
+
+        fn status(&self) -> Option<TaskStatus> {
+            self.extension.inner.task_state().map(|state| state.status)
+        }
+
+        async fn settle(&self) {
+            while self.status() == Some(TaskStatus::Running) {
                 tokio::task::yield_now().await;
             }
+        }
+
+        async fn download_to_the_end(&self) {
+            self.extension.inner.check().await.unwrap();
+            assert_eq!(self.act(ACTION_INSTALL), ActionOutcome::Started);
+            self.settle().await;
         }
     }
 
@@ -456,7 +624,7 @@ mod tests {
         assert!(items[0].pinned);
         assert!(items[0].keywords.contains(&"update".to_string()));
         assert!(items[0].keywords.contains(&"dango".to_string()));
-        assert_eq!(items[0].actions[0].title, "Install and restart");
+        assert_eq!(items[0].actions[0].title, "Install update");
     }
 
     #[tokio::test]
@@ -534,7 +702,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn dismissing_the_launcher_does_not_stop_the_install() {
+    async fn dismissing_the_launcher_does_not_stop_the_download() {
         struct Dismissed;
         impl Sink for Dismissed {
             fn push_view(&self, _tree: ViewTree) {}
@@ -560,34 +728,101 @@ mod tests {
             true,
             Handle::current(),
             Some(Arc::new(DismissedRunner)),
+            Tasks::new(|_| {}),
         );
         extension.inner.check().await.unwrap();
         extension.inner.start_install();
-        while extension.inner.installing.load(Ordering::SeqCst) {
+        while extension
+            .inner
+            .task_state()
+            .is_some_and(|state| state.status == TaskStatus::Running)
+        {
             tokio::task::yield_now().await;
         }
-        assert_eq!(source.installed.lock().unwrap().len(), 1);
+        assert!(matches!(
+            extension.inner.task_state().map(|state| state.status),
+            Some(TaskStatus::NeedsInput { .. })
+        ));
+        assert!(source.installed.lock().unwrap().is_empty());
     }
 
     #[tokio::test]
-    async fn installing_shows_the_download_then_installs_it() {
+    async fn the_download_shows_its_steps_and_waits_to_restart() {
         let fixture = fixture(FakeSource {
             chunks: vec![10_000_000, 10_000_000],
             total: Some(20_000_000),
             ..FakeSource::finding("0.5.0")
         });
-        fixture.install_to_the_end().await;
+        fixture.download_to_the_end().await;
 
-        let views = fixture.views.details();
-        assert_eq!(views[0].markdown, "Downloading Dango 0.5.0");
-        assert!(views.iter().all(|view| view.loading));
+        let views = fixture.views.progress();
+        assert_eq!(views[0].title, "Dango 0.5.0");
+        assert_eq!(views[0].subtitle, "You have 0.4.0");
+        assert_eq!(
+            statuses(&views[0]),
+            [Status::Working, Status::Queued, Status::Queued]
+        );
         assert!(views
             .iter()
-            .any(|view| view.markdown.ends_with("10.0 MB of 20.0 MB")));
+            .any(|view| view.detail == "10.0 MB of 20.0 MB" && view.value == Some(0.5)));
+        let last = fixture.views.last_progress();
+        assert_eq!(
+            statuses(&last),
+            [Status::Done, Status::Done, Status::NeedsInput]
+        );
+        assert_eq!(last.detail, "Ready to restart");
+        assert_eq!(last.actions[0].title, "Restart now");
+        assert_eq!(last.actions[1].title, "Install later");
+        assert!(fixture.source.installed.lock().unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    async fn restart_now_installs_once() {
+        let fixture = fixture(FakeSource::finding("0.5.0"));
+        fixture.download_to_the_end().await;
+        assert_eq!(fixture.act(ACTION_RESTART), ActionOutcome::Done);
         assert_eq!(
             *fixture.source.installed.lock().unwrap(),
             [b"update".to_vec()]
         );
+        assert!(matches!(
+            fixture.act(ACTION_RESTART),
+            ActionOutcome::Failed(_)
+        ));
+        assert_eq!(fixture.source.installed.lock().unwrap().len(), 1);
+    }
+
+    #[tokio::test]
+    async fn no_check_runs_while_an_update_waits() {
+        let fixture = fixture(FakeSource::finding("0.5.0"));
+        fixture.download_to_the_end().await;
+        let checks = fixture.source.checks();
+        *fixture.source.found.lock().unwrap() = Some("0.5.1".into());
+        assert_eq!(
+            fixture.extension.inner.check().await.unwrap().as_deref(),
+            Some("0.5.0")
+        );
+        assert_eq!(fixture.source.checks(), checks);
+    }
+
+    #[tokio::test]
+    async fn cancelling_ends_the_task_and_installs_nothing() {
+        let gate = Arc::new(tokio::sync::Notify::new());
+        let fixture = fixture(FakeSource {
+            gate: Some(gate.clone()),
+            ..FakeSource::finding("0.5.0")
+        });
+        fixture.extension.inner.check().await.unwrap();
+        fixture.act(ACTION_INSTALL);
+        tokio::task::yield_now().await;
+        assert_eq!(fixture.act(ACTION_CANCEL), ActionOutcome::Back);
+        while fixture.status().is_some() {
+            tokio::task::yield_now().await;
+        }
+        gate.notify_waiters();
+        assert!(fixture.source.installed.lock().unwrap().is_empty());
+        assert!(fixture.extension.inner.ready.lock().unwrap().is_none());
+        assert_eq!(fixture.items().await[0].actions[0].title, "Install update");
     }
 
     #[tokio::test]
@@ -596,14 +831,18 @@ mod tests {
             download_error: Some(UpdateError::Signature("bad signature".into())),
             ..FakeSource::finding("0.5.0")
         });
-        fixture.install_to_the_end().await;
+        fixture.download_to_the_end().await;
 
-        let last = fixture.views.last();
+        let last = fixture.views.last_progress();
         assert_eq!(
-            last.markdown,
+            last.detail,
             "Couldn't verify the update, so it wasn't installed. Try again later."
         );
-        assert!(!last.loading);
+        assert_eq!(
+            statuses(&last),
+            [Status::Done, Status::Failed, Status::Queued]
+        );
+        assert_eq!(last.actions[0].title, "Retry");
         assert!(fixture.source.installed.lock().unwrap().is_empty());
     }
 
@@ -613,14 +852,47 @@ mod tests {
             download_error: Some(UpdateError::Download("reset by peer".into())),
             ..FakeSource::finding("0.5.0")
         });
-        fixture.install_to_the_end().await;
+        fixture.download_to_the_end().await;
 
+        let last = fixture.views.last_progress();
         assert_eq!(
-            fixture.views.last().markdown,
+            last.detail,
             "Couldn't download the update. Check your connection and try again."
         );
+        assert_eq!(statuses(&last)[0], Status::Failed);
         assert!(fixture.source.installed.lock().unwrap().is_empty());
         assert_eq!(fixture.items().await.len(), 1);
+        assert_eq!(fixture.items().await[0].actions[0].title, "Install update");
+    }
+
+    #[tokio::test]
+    async fn the_update_item_follows_the_download() {
+        let gate = Arc::new(tokio::sync::Notify::new());
+        let fixture = fixture(FakeSource {
+            gate: Some(gate.clone()),
+            ..FakeSource::finding("0.5.0")
+        });
+        fixture.extension.inner.check().await.unwrap();
+        fixture.act(ACTION_INSTALL);
+        let running = &fixture.items().await[0];
+        assert_eq!(running.title, "Dango 0.5.0 is available");
+        assert_eq!(running.actions[0].title, "Show progress");
+
+        assert_eq!(fixture.act(ACTION_SHOW), ActionOutcome::Started);
+        assert_eq!(
+            fixture.status(),
+            Some(TaskStatus::Running),
+            "no second task"
+        );
+
+        while fixture.status() == Some(TaskStatus::Running) {
+            gate.notify_waiters();
+            tokio::task::yield_now().await;
+        }
+        assert_eq!(fixture.act(ACTION_LATER), ActionOutcome::Back);
+        let ready = &fixture.items().await[0];
+        assert_eq!(ready.title, "Dango 0.5.0 is ready to restart");
+        assert_eq!(ready.actions[0].title, "Restart now");
     }
 
     #[tokio::test]
@@ -641,7 +913,7 @@ mod tests {
         assert!(views[0].loading);
         let last = views.last().unwrap();
         assert_eq!(last.markdown, "Dango 0.5.0 is available\n\nYou have 0.4.0");
-        assert_eq!(last.actions[0].title, "Install and restart");
+        assert_eq!(last.actions[0].title, "Install update");
         assert_eq!(fixture.items().await.len(), 1);
     }
 

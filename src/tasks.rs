@@ -118,14 +118,12 @@ impl TaskHandle {
         self.id
     }
 
-    /// Changes the task and tells the launcher. An ended task leaves the
-    /// registry, and later reports do nothing.
-    pub fn report(&self, change: impl FnOnce(&mut TaskState)) {
+    /// Changes the task, tells the launcher, and answers the new state. An
+    /// ended task leaves the registry, and later reports do nothing.
+    pub fn report(&self, change: impl FnOnce(&mut TaskState)) -> Option<TaskState> {
         let state = {
             let mut running = self.tasks.running.lock().unwrap();
-            let Some(index) = running.iter().position(|task| task.id == self.id) else {
-                return;
-            };
+            let index = running.iter().position(|task| task.id == self.id)?;
             change(&mut running[index]);
             let state = running[index].clone();
             if state.status.ended() {
@@ -133,7 +131,8 @@ impl TaskHandle {
             }
             state
         };
-        (self.tasks.notify)(state);
+        (self.tasks.notify)(state.clone());
+        Some(state)
     }
 
     pub fn state(&self) -> Option<TaskState> {
