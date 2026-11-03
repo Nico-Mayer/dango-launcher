@@ -20,7 +20,7 @@ use crate::protocol::{
 use crate::text::{TextError, TextTarget};
 use time::OffsetDateTime;
 
-use super::history::{Bounds, Entry, History, Kind, LISTED_CHARS};
+use super::history::{Bounds, Entry, History, Kind, LISTED_CHARS, MEGABYTE};
 use super::metadata;
 use super::watcher::{Policy, WatchService, Watcher};
 
@@ -30,8 +30,6 @@ pub const COMMAND_HISTORY: &str = "history";
 pub const ACTION_INSERT: &str = "insert";
 pub const ACTION_RESTORE: &str = "restore";
 pub const ACTION_REMOVE: &str = "remove";
-
-const MEGABYTE: usize = 1024 * 1024;
 
 /// How much of a text entry is worth showing on one line.
 const PREVIEW_CHARS: usize = 120;

@@ -8,18 +8,13 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use super::{AppSettings, CommandSettings, Hotkey, Output, ProviderSettings, Thinking};
-use crate::extensions::clipboard::DEFAULT_EXCLUDED_APPLICATIONS;
+use crate::extensions::clipboard::{Bounds, DEFAULT_EXCLUDED_APPLICATIONS, MEGABYTE};
 
 /// What Dango reads from any table, whatever else the extension keeps there.
 pub trait ExtensionTable {
     fn enabled(&self) -> Option<bool>;
     fn commands(&self) -> Vec<(&str, CommandBinding<'_>)>;
-
-    fn command(&self, id: &str) -> Option<CommandBinding<'_>> {
-        self.commands()
-            .into_iter()
-            .find_map(|(command_id, binding)| (command_id == id).then_some(binding))
-    }
+    fn command(&self, id: &str) -> Option<CommandBinding<'_>>;
 }
 
 /// The per-command keys every extension shares.
@@ -66,6 +61,10 @@ macro_rules! extension_table {
                     .iter()
                     .map(|(id, command)| (id.as_str(), command.binding()))
                     .collect()
+            }
+
+            fn command(&self, id: &str) -> Option<CommandBinding<'_>> {
+                self.commands.get(id).map(Binds::binding)
             }
         }
     )+};
@@ -114,12 +113,13 @@ pub struct ClipboardTable {
 
 impl Default for ClipboardTable {
     fn default() -> Self {
+        let bounds = Bounds::default();
         Self {
             enabled: None,
             commands: BTreeMap::new(),
-            entries: 500,
-            entry_megabytes: 16,
-            total_megabytes: 256,
+            entries: bounds.entries as u32,
+            entry_megabytes: (bounds.entry_bytes / MEGABYTE) as u32,
+            total_megabytes: (bounds.total_bytes / MEGABYTE) as u32,
             excluded_applications: DEFAULT_EXCLUDED_APPLICATIONS
                 .iter()
                 .map(|name| (*name).to_string())

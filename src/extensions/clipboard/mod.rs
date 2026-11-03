@@ -10,7 +10,7 @@ pub(crate) use extension::manifest;
 #[cfg(test)]
 pub(crate) use extension::{history_view, PrimaryAction};
 pub use extension::{ClipboardExtension, ConfigPolicy, EXTENSION_ID};
-pub use history::{Bounds, Content, Entry, History, HistoryError, Kind};
+pub use history::{Bounds, Content, Entry, History, HistoryError, Kind, MEGABYTE};
 pub use source::{Attribution, ClipboardSource, CrateClipboard, Snapshot};
 pub use watcher::{Policy, WatchService, Watcher};
 

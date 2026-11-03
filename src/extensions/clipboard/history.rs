@@ -138,12 +138,14 @@ pub struct Bounds {
     pub total_bytes: usize,
 }
 
+pub const MEGABYTE: usize = 1024 * 1024;
+
 impl Default for Bounds {
     fn default() -> Self {
         Self {
             entries: 500,
-            entry_bytes: 16 * 1024 * 1024,
-            total_bytes: 256 * 1024 * 1024,
+            entry_bytes: 16 * MEGABYTE,
+            total_bytes: 256 * MEGABYTE,
         }
     }
 }
