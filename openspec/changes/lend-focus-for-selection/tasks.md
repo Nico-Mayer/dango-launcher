@@ -31,7 +31,10 @@
 
 ## 5. Review
 
-- [ ] 5.1 Run the `ponytail-review` skill in a fresh subagent on the change's commits, without the apply context; record findings for the author
+- [x] 5.1 Run the `ponytail-review` skill in a fresh subagent on the change's commits, without the apply context; record findings for the author
+  - Must fix: on macOS the copy fallback now sends Cmd+C to Dango's own panel, since the read no longer hides it and 4.2 is open. Apps without AX selection fail until 4.2, or until the macOS lend hides the panel as a stopgap.
+  - Should fix: stale `MacHandoff` doc comment (with 4.2); no test pins the command hotkey run behind the show.
+  - Nice to have: inline `is_lent` and drop its test.
 
 ## Workflow follow-up
 
