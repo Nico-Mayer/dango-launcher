@@ -14,6 +14,8 @@ use std::path::{Path, PathBuf};
 
 use toml::{Table, Value};
 
+use crate::config::line_of;
+
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
 pub enum AuthError {
     #[error("auth.toml: line {line} isn't valid TOML")]
@@ -55,11 +57,6 @@ impl Keys for AuthFile {
             .filter(|key| !key.trim().is_empty())
             .map(str::to_string))
     }
-}
-
-fn line_of(text: &str, span: Option<std::ops::Range<usize>>) -> usize {
-    let start = span.map_or(0, |span| span.start.min(text.len()));
-    text[..start].matches('\n').count() + 1
 }
 
 fn read(path: &Path) -> Result<Option<String>, AuthError> {

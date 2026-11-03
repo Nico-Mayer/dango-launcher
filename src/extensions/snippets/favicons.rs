@@ -837,8 +837,8 @@ mod tests {
         let before = service.fingerprint();
         std::fs::write(
             records.path(),
-            r#"[{"id": "1", "name": "Docs", "url": "https://example.com/"},
-                {"id": "2", "name": "Other", "url": "https://other.example/"}]"#,
+            "docs = { name = \"Docs\", url = \"https://example.com/\" }\n\
+             other = { name = \"Other\", url = \"https://other.example/\" }\n",
         )
         .unwrap();
         assert_ne!(service.fingerprint(), before, "the file changed");

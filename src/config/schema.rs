@@ -10,7 +10,9 @@ use serde_json::{json, Map, Value};
 use super::files::UserFile;
 use super::hotkey::{stands_alone, KEY_TOKENS, MODIFIER_TOKENS};
 use super::{table_name, Config};
+use crate::browser::Browser;
 use crate::extension::Manifest;
+use crate::extensions::snippets::{QuicklinkEntry, SnippetEntry};
 
 /// The one extension whose commands the file may also define, so its
 /// `commands` stays open to ids it does not ship.
@@ -19,6 +21,23 @@ const AI_ID: &str = "dango.ai";
 pub fn generate(file: UserFile, manifests: &[Manifest]) -> Value {
     let mut schema = match file {
         UserFile::Config => config_schema(manifests),
+        UserFile::Snippets => records_schema(
+            schemars::schema_for!(SnippetEntry).to_value(),
+            "Dango snippets",
+            "Snippets, each a table keyed by its id. Dango adds, edits, and removes \
+             them from the launcher and keeps your comments and order.",
+        ),
+        UserFile::Quicklinks => {
+            let mut schema = records_schema(
+                schemars::schema_for!(QuicklinkEntry).to_value(),
+                "Dango quicklinks",
+                "Quicklinks, each a table keyed by its id. Dango adds, edits, and removes \
+                 them from the launcher and keeps your comments and order.",
+            );
+            let browsers: Vec<&str> = Browser::ALL.iter().map(|b| b.id()).collect();
+            schema["$defs"]["QuicklinkEntry"]["properties"]["browser"]["enum"] = json!(browsers);
+            schema
+        }
         UserFile::Auth => auth_schema(),
     };
     drop_unused_defs(&mut schema);
@@ -33,6 +52,33 @@ fn version_property() -> Value {
         "type": "integer",
         "minimum": 0,
         "description": "The file's schema version. Leave it at 1."
+    })
+}
+
+/// A file whose top level holds `version` and records keyed by id, each
+/// described by `entry`.
+fn records_schema(mut entry: Value, title: &str, description: &str) -> Value {
+    strip_null(&mut entry);
+    close_objects(&mut entry);
+    let name = entry["title"].as_str().unwrap_or("Entry").to_string();
+    let entry_description = entry["description"].clone();
+    if let Some(fields) = entry.as_object_mut() {
+        fields.remove("$schema");
+        fields.remove("title");
+    }
+    let mut defs = Map::new();
+    defs.insert(name.clone(), entry);
+    json!({
+        "$schema": DRAFT,
+        "$defs": defs,
+        "title": title,
+        "description": description,
+        "type": "object",
+        "properties": { "version": version_property() },
+        "additionalProperties": {
+            "$ref": format!("#/$defs/{name}"),
+            "description": entry_description
+        }
     })
 }
 
@@ -507,6 +553,8 @@ fn def_title(name: &str) -> String {
         "AppName" => "Application name",
         "ProviderSettings" => "Provider settings",
         "PerPlatform" => "Per-platform value",
+        "SnippetEntry" => "Snippet",
+        "QuicklinkEntry" => "Quicklink",
         other => other,
     }
     .to_string()
@@ -838,6 +886,34 @@ mod tests {
 
     fn validator_for(file: UserFile) -> jsonschema::Validator {
         jsonschema::validator_for(&generate(file, &builtin_manifests())).expect("compiles")
+    }
+
+    #[test]
+    fn a_record_under_any_id_is_checked_field_by_field() {
+        let snippets = validator_for(UserFile::Snippets);
+        assert!(snippets.is_valid(&instance(
+            "version = 1\n[any-id]\nname = \"N\"\ntemplate = \"t\"\nkeyword = \";k\""
+        )));
+        assert!(!snippets.is_valid(&instance("[a]\nname = \"N\"\ntemplte = \"t\"")));
+        assert!(!snippets.is_valid(&instance("[a]\nname = 3\ntemplate = \"t\"")));
+
+        let quicklinks = validator_for(UserFile::Quicklinks);
+        assert!(quicklinks.is_valid(&instance(
+            "[docs]\nname = \"Docs\"\nurl = \"https://example.com\"\nbrowser = \"firefox\""
+        )));
+        assert!(!quicklinks.is_valid(&instance(
+            "[docs]\nname = \"Docs\"\nurl = \"https://example.com\"\nbrowser = \"opera\""
+        )));
+    }
+
+    #[test]
+    fn a_record_field_carries_its_description() {
+        let schema = generate(UserFile::Snippets, &builtin_manifests());
+        let template = &schema["$defs"]["SnippetEntry"]["properties"]["template"];
+        assert_eq!(template["type"], "string");
+        assert!(template["description"]
+            .as_str()
+            .is_some_and(|text| text.starts_with("The text to insert.")));
     }
 
     #[test]

@@ -22,7 +22,7 @@ mod store;
 mod tables;
 pub mod watch;
 
-pub use files::{write_user_file, UserFile};
+pub use files::{line_of, write_user_file, UserFile};
 pub use hotkey::{Hotkey, HotkeyError, ParsedHotkey, PerPlatform};
 pub use location::config_dir;
 pub use store::FileConfig;

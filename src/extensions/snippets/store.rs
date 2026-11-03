@@ -2,27 +2,32 @@
 //!
 //! Both are a name plus a template the user wrote, both are created and edited
 //! from the launcher, and both should exist on either of the author's machines.
-//! So one store serves both, and both live as text files in the config
+//! So one store serves both, and both live as TOML files in the config
 //! directory rather than in the database, so they travel in the user's dotfiles.
 //!
-//! A file is an array of records, each `{ id, name, <body> }`, where the body
-//! key is `template` for a snippet and `url` for a quicklink so the file reads
-//! naturally. Records are held in memory and read from there on the search path;
-//! the file is the durable form. Unknown fields on a record are preserved, so a
-//! later feature adding, say, a keyword does not lose it.
+//! A file holds one table per record, keyed by its id, with `name` and a body
+//! key: `template` for a snippet, `url` for a quicklink. The store keeps the
+//! parsed document and edits only the table it changes, so the user's comments,
+//! order, and unknown keys survive Dango's writes. Records are read from memory
+//! on the search path; the file is the durable form.
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, RwLock};
 
-use serde_json::{Map, Value};
+use schemars::JsonSchema;
+use toml_edit::{value, DocumentMut, Item, Table, TableLike};
 
 use crate::browser::Browser;
+use crate::config::{line_of, write_user_file, UserFile};
 use crate::templates::{Template, TemplateError, Values};
 
 use super::favicons::site_of;
 use super::matcher::KeywordEntry;
+
+/// Reserved at the top level of a records file, so never a record id.
+const VERSION: &str = "version";
 
 #[derive(Debug, thiserror::Error)]
 pub enum RecordError {
@@ -36,8 +41,14 @@ pub enum RecordError {
     InvalidUrl,
     #[error("That no longer exists")]
     Gone,
-    #[error("The file isn't valid JSON: {0}")]
+    #[error("{0}")]
     Parse(String),
+    #[error("Line {line}: {field} must be text")]
+    NotText { line: usize, field: String },
+    #[error("Line {line}: {id} must be a table")]
+    NotATable { line: usize, id: String },
+    #[error("Couldn't read the file: {0}")]
+    Read(String),
     #[error("A snippet that asks for input can't have a keyword")]
     KeywordNeedsPlainSnippet,
     #[error("Another snippet already uses that keyword")]
@@ -65,6 +76,30 @@ pub struct Record {
     pub browser: Option<String>,
 }
 
+/// A snippet, keyed by its id.
+#[derive(JsonSchema)]
+pub struct SnippetEntry {
+    /// The title shown in the launcher.
+    pub name: String,
+    /// The text to insert. Placeholders such as `{{ date }}` are filled in
+    /// when the snippet is used.
+    pub template: String,
+    /// Typing this anywhere expands the snippet in place. Not allowed on a
+    /// snippet that asks for input.
+    pub keyword: Option<String>,
+}
+
+/// A quicklink, keyed by its id.
+#[derive(JsonSchema)]
+pub struct QuicklinkEntry {
+    /// The title shown in the launcher.
+    pub name: String,
+    /// The URL to open. `{{ query }}` asks for text and places it in the URL.
+    pub url: String,
+    /// The browser to open it in. Left out, the default browser opens it.
+    pub browser: Option<String>,
+}
+
 /// Which of the two kinds a store instance owns. They are identical in shape,
 /// differing only in the file they live in and what the body field is called.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -74,11 +109,15 @@ pub enum Kind {
 }
 
 impl Kind {
-    pub fn file_name(self) -> &'static str {
+    pub fn file(self) -> UserFile {
         match self {
-            Kind::Snippet => "snippets.json",
-            Kind::Quicklink => "quicklinks.json",
+            Kind::Snippet => UserFile::Snippets,
+            Kind::Quicklink => UserFile::Quicklinks,
         }
+    }
+
+    pub fn file_name(self) -> &'static str {
+        self.file().file_name()
     }
 
     fn body_field(self) -> &'static str {
@@ -94,13 +133,36 @@ impl Kind {
             Kind::Quicklink => "Enter a URL",
         }
     }
+
+    /// The id for a name that has no letters or digits to make one from.
+    fn fallback_id(self) -> &'static str {
+        match self {
+            Kind::Snippet => "snippet",
+            Kind::Quicklink => "quicklink",
+        }
+    }
+}
+
+/// The file as parsed: the document Dango edits, and its records.
+#[derive(Clone)]
+struct Loaded {
+    doc: DocumentMut,
+    records: Vec<Record>,
+}
+
+impl Loaded {
+    fn empty() -> Self {
+        Self {
+            doc: DocumentMut::new(),
+            records: Vec::new(),
+        }
+    }
 }
 
 pub struct Records {
     path: PathBuf,
     kind: Kind,
-    /// The live set, each a JSON object so unknown fields survive.
-    cache: RwLock<Vec<Map<String, Value>>>,
+    cache: RwLock<Loaded>,
     /// The last text the app wrote, so the file watcher ignores its own write.
     own_write: Arc<Mutex<Option<String>>>,
     /// The file failed to load, so the cache is not what the file holds and a
@@ -114,24 +176,24 @@ pub struct Records {
 impl Records {
     /// Opens the store for a kind under `config_dir`, loading its file. A missing
     /// file is an empty set. A malformed file is kept out of the cache and
-    /// reported by `new` returning the parse error, so the caller can surface it
-    /// while still running on an empty set.
+    /// reported by returning the error, so the caller can surface it while still
+    /// running on an empty set.
     pub fn open(config_dir: &Path, kind: Kind) -> (Arc<Self>, Option<RecordError>) {
-        let path = config_dir.join(kind.file_name());
-        let (records, error) = match load(&path) {
-            Ok(records) => (records, None),
-            Err(error) => (Vec::new(), Some(error)),
+        let path = kind.file().path_in(config_dir);
+        let (loaded, error) = match load(&path, kind) {
+            Ok(loaded) => (loaded, None),
+            Err(error) => (Loaded::empty(), Some(error)),
         };
         let store = Arc::new(Self {
             path,
             kind,
             broken: AtomicBool::new(error.is_some()),
-            cache: RwLock::new(Vec::new()),
+            cache: RwLock::new(Loaded::empty()),
             own_write: Arc::new(Mutex::new(None)),
             hosts: RwLock::new(HashMap::new()),
         });
-        store.set_hosts(&records);
-        *store.cache.write().unwrap() = records;
+        store.set_hosts(&loaded.records);
+        *store.cache.write().unwrap() = loaded;
         (store, error)
     }
 
@@ -150,24 +212,23 @@ impl Records {
     /// Reloads the cache from `text`, for the file watcher. On a parse failure
     /// the last good cache is kept and the error returned to be surfaced.
     pub fn reload(&self, text: &str) -> Result<(), RecordError> {
-        let records = parse(text).inspect_err(|_| self.broken.store(true, Ordering::SeqCst))?;
-        let records = with_ids(records);
-        self.set_hosts(&records);
-        *self.cache.write().unwrap() = records;
+        let loaded =
+            parse(text, self.kind).inspect_err(|_| self.broken.store(true, Ordering::SeqCst))?;
+        self.set_hosts(&loaded.records);
+        *self.cache.write().unwrap() = loaded;
         self.broken.store(false, Ordering::SeqCst);
         Ok(())
     }
 
-    fn set_hosts(&self, records: &[Map<String, Value>]) {
+    fn set_hosts(&self, records: &[Record]) {
         if self.kind != Kind::Quicklink {
             return;
         }
         let hosts = records
             .iter()
-            .filter_map(|record| self.project(record))
             .filter_map(|record| {
-                let (host, _) = site_of(&record)?;
-                Some((record.id, host))
+                let (host, _) = site_of(record)?;
+                Some((record.id.clone(), host))
             })
             .collect();
         *self.hosts.write().unwrap() = hosts;
@@ -221,9 +282,10 @@ impl Records {
         }
         let cache = self.cache.read().unwrap();
         let others: Vec<&str> = cache
+            .records
             .iter()
-            .filter(|record| record_id(record) != own_id)
-            .filter_map(|record| record.get("keyword").and_then(Value::as_str))
+            .filter(|record| Some(record.id.as_str()) != own_id)
+            .filter_map(|record| record.keyword.as_deref())
             .collect();
         if others.contains(&keyword) {
             return Err(RecordError::KeywordTaken(keyword.to_string()));
@@ -273,64 +335,64 @@ impl Records {
         self.writable()?;
         self.validate(name, body)?;
         let keyword = self.validate_keyword(keyword, body, id)?;
-        let existing = id.is_some();
-        let id = id.map_or_else(|| uuid::Uuid::new_v4().to_string(), str::to_string);
-        self.change(|cache| {
-            let record = if existing {
-                cache
-                    .iter_mut()
-                    .find(|r| record_id(r) == Some(&id))
-                    .ok_or(RecordError::Gone)?
-            } else {
-                cache.push(Map::new());
-                let record = cache.last_mut().unwrap();
-                record.insert("id".into(), Value::String(id.clone()));
-                record
+        let kind = self.kind;
+        let mut saved = id.map(str::to_string);
+        self.change(|doc| {
+            let id = match &saved {
+                Some(id) => id.clone(),
+                None => {
+                    let id = new_id(doc, name, kind);
+                    doc.insert(&id, Item::Table(Table::new()));
+                    saved = Some(id.clone());
+                    id
+                }
             };
-            record.insert("name".into(), Value::String(name.trim().to_string()));
-            record.insert(
-                self.kind.body_field().into(),
-                Value::String(body.to_string()),
-            );
-            set_or_remove(record, "keyword", keyword);
+            let table = record_table(doc, &id).ok_or(RecordError::Gone)?;
+            table.insert("name", value(name.trim()));
+            table.insert(kind.body_field(), value(body));
+            if kind == Kind::Snippet {
+                set_or_remove(table, "keyword", keyword);
+            }
             match browser.map(str::trim) {
                 None => {}
-                Some("") | Some(Browser::DEFAULT_ID) => set_or_remove(record, "browser", None),
-                Some(browser) => set_or_remove(record, "browser", Some(browser.to_string())),
+                Some("") | Some(Browser::DEFAULT_ID) => set_or_remove(table, "browser", None),
+                Some(browser) => set_or_remove(table, "browser", Some(browser.to_string())),
             }
             Ok(())
         })?;
-        Ok(id)
+        Ok(saved.unwrap_or_default())
     }
 
-    /// Removes the record's entry outright. There is no tombstone: git remembers
+    /// Removes the record's table outright. There is no tombstone: git remembers
     /// what was deleted, so a hard delete does not come back.
     pub fn remove(&self, id: &str) -> Result<(), RecordError> {
         self.writable()?;
-        self.change(|cache| {
-            let before = cache.len();
-            cache.retain(|r| record_id(r) != Some(id));
-            if cache.len() == before {
-                return Err(RecordError::Gone);
-            }
+        self.change(|doc| {
+            record_table(doc, id).ok_or(RecordError::Gone)?;
+            doc.remove(id);
             Ok(())
         })
     }
 
-    /// Applies `edit` to a copy of the set and keeps it only once the file
+    /// Applies `edit` to a copy of the document and keeps it only once the file
     /// holds it, so a failed write leaves the cache as the file has it.
     fn change(
         &self,
-        edit: impl FnOnce(&mut Vec<Map<String, Value>>) -> Result<(), RecordError>,
+        edit: impl FnOnce(&mut DocumentMut) -> Result<(), RecordError>,
     ) -> Result<(), RecordError> {
         let mut cache = self.cache.write().unwrap();
-        let mut next = cache.clone();
-        edit(&mut next)?;
-        if let Err(error) = self.persist(&next) {
+        let mut doc = cache.doc.clone();
+        edit(&mut doc)?;
+        let mut text = doc.to_string();
+        if !self.path.exists() {
+            text = format!("{}\n{text}", self.kind.file().header());
+        }
+        let next = parse(&text, self.kind)?;
+        if let Err(error) = write_user_file(&self.path, &text, &self.own_write) {
             crate::log::append(&format!("could not write {}: {error}", self.path.display()));
             return Err(RecordError::Write(self.kind.file_name()));
         }
-        self.set_hosts(&next);
+        self.set_hosts(&next.records);
         *cache = next;
         Ok(())
     }
@@ -338,29 +400,22 @@ impl Records {
     /// The snippets' keywords, read without copying or sorting the records,
     /// because the expansion worker asks on every keystroke.
     pub fn keywords(&self) -> Vec<KeywordEntry> {
-        if self.kind != Kind::Snippet {
-            return Vec::new();
-        }
         self.cache
             .read()
             .unwrap()
+            .records
             .iter()
             .filter_map(|record| {
-                record.get("name")?.as_str()?;
                 Some(KeywordEntry {
-                    id: record_id(record)?.to_string(),
-                    keyword: record.get("keyword")?.as_str()?.to_string(),
+                    id: record.id.clone(),
+                    keyword: record.keyword.clone()?,
                 })
             })
             .collect()
     }
 
     pub fn all(&self) -> Result<Vec<Record>, RecordError> {
-        let cache = self.cache.read().unwrap();
-        let mut records: Vec<Record> = cache
-            .iter()
-            .filter_map(|record| self.project(record))
-            .collect();
+        let mut records = self.cache.read().unwrap().records.clone();
         records.sort_by_key(|record| record.name.to_lowercase());
         Ok(records)
     }
@@ -368,125 +423,124 @@ impl Records {
     /// The records as the file has them now, for a caller that follows the file
     /// itself and must not read a set the watcher has not reloaded yet.
     pub fn on_disk(&self) -> Result<Vec<Record>, RecordError> {
-        Ok(load(&self.path)?
-            .iter()
-            .filter_map(|record| self.project(record))
-            .collect())
+        Ok(load(&self.path, self.kind)?.records)
     }
 
     pub fn get(&self, id: &str) -> Result<Record, RecordError> {
-        let cache = self.cache.read().unwrap();
-        cache
+        self.cache
+            .read()
+            .unwrap()
+            .records
             .iter()
-            .find(|r| record_id(r) == Some(id))
-            .and_then(|record| self.project(record))
+            .find(|record| record.id == id)
+            .cloned()
             .ok_or(RecordError::Gone)
     }
-
-    /// A stored object as a `Record`, or `None` if it has no name to show.
-    fn project(&self, record: &Map<String, Value>) -> Option<Record> {
-        let name = record.get("name")?.as_str()?.to_string();
-        let body = record
-            .get(self.kind.body_field())
-            .and_then(|v| v.as_str())
-            .unwrap_or_default()
-            .to_string();
-        let id = record_id(record)?.to_string();
-        let keyword = match self.kind {
-            Kind::Snippet => record
-                .get("keyword")
-                .and_then(Value::as_str)
-                .map(str::to_string),
-            Kind::Quicklink => None,
-        };
-        let browser = match self.kind {
-            Kind::Snippet => None,
-            Kind::Quicklink => record
-                .get("browser")
-                .and_then(Value::as_str)
-                .map(str::to_string),
-        };
-        Some(Record {
-            id,
-            name,
-            body,
-            keyword,
-            browser,
-        })
-    }
-
-    fn persist(&self, records: &[Map<String, Value>]) -> std::io::Result<()> {
-        let text = serde_json::to_string_pretty(records)?;
-        if let Some(parent) = self.path.parent() {
-            std::fs::create_dir_all(parent)?;
-        }
-        let temp = self
-            .path
-            .with_file_name(format!("{}.tmp", self.kind.file_name()));
-        std::fs::write(&temp, &text)?;
-        *self.own_write.lock().unwrap() = Some(text);
-        std::fs::rename(&temp, &self.path).inspect_err(|_| {
-            *self.own_write.lock().unwrap() = None;
-            let _ = std::fs::remove_file(&temp);
-        })
-    }
 }
 
-fn set_or_remove(record: &mut Map<String, Value>, key: &str, value: Option<String>) {
-    match value {
-        Some(value) => {
-            record.insert(key.into(), Value::String(value));
+/// An id made from the name, numbered when taken. Never `version`, which the
+/// file reserves.
+fn new_id(doc: &DocumentMut, name: &str, kind: Kind) -> String {
+    let base = Some(slug::slugify(name))
+        .filter(|slug| !slug.is_empty())
+        .unwrap_or_else(|| kind.fallback_id().to_string());
+    let mut id = base.clone();
+    let mut count = 1;
+    while id == VERSION || doc.contains_key(&id) {
+        count += 1;
+        id = format!("{base}-{count}");
+    }
+    id
+}
+
+fn record_table<'d>(doc: &'d mut DocumentMut, id: &str) -> Option<&'d mut dyn TableLike> {
+    if id == VERSION {
+        return None;
+    }
+    doc.get_mut(id)?.as_table_like_mut()
+}
+
+fn set_or_remove(table: &mut dyn TableLike, key: &str, text: Option<String>) {
+    match text {
+        Some(text) => {
+            table.insert(key, value(text));
         }
         None => {
-            record.remove(key);
+            table.remove(key);
         }
     }
 }
 
-fn record_id(record: &Map<String, Value>) -> Option<&str> {
-    record.get("id").and_then(|v| v.as_str())
-}
-
-/// Loads and parses a records file. A missing file is an empty set. Ids are
-/// filled in for any entry that lacks one.
-fn load(path: &Path) -> Result<Vec<Map<String, Value>>, RecordError> {
+/// Loads and parses a records file. A missing file is an empty set.
+fn load(path: &Path, kind: Kind) -> Result<Loaded, RecordError> {
     match std::fs::read_to_string(path) {
-        Ok(text) => Ok(with_ids(parse(&text)?)),
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(Vec::new()),
-        Err(error) => Err(RecordError::Parse(error.to_string())),
+        Ok(text) => parse(&text, kind),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(Loaded::empty()),
+        Err(error) => Err(RecordError::Read(error.to_string())),
     }
 }
 
-fn parse(text: &str) -> Result<Vec<Map<String, Value>>, RecordError> {
-    if text.trim().is_empty() {
-        return Ok(Vec::new());
-    }
-    serde_json::from_str(text).map_err(|error| RecordError::Parse(error.to_string()))
-}
-
-/// Assigns an id to any record that was hand-authored without one. The id is
-/// derived from the name, so it stays the same across loads until the next save
-/// writes it, and frecency and an open edit form keep pointing at the record.
-fn with_ids(mut records: Vec<Map<String, Value>>) -> Vec<Map<String, Value>> {
-    for index in 0..records.len() {
-        if record_id(&records[index]).is_some() {
+/// Parses a records file. A table without a name is not shown, and a field
+/// of the wrong type makes the file invalid with its line, as a wrong type
+/// does in the config file.
+fn parse(text: &str, kind: Kind) -> Result<Loaded, RecordError> {
+    let document =
+        toml_edit::Document::parse(text).map_err(|error| RecordError::Parse(error.to_string()))?;
+    let mut records = Vec::new();
+    for (id, item) in document.as_table().iter() {
+        if id == VERSION {
             continue;
         }
-        let name = records[index]
-            .get("name")
-            .and_then(Value::as_str)
-            .unwrap_or_default()
-            .trim()
-            .to_string();
-        let mut id = format!("name:{name}");
-        let mut count = 1;
-        while records.iter().any(|record| record_id(record) == Some(&id)) {
-            count += 1;
-            id = format!("name:{name}#{count}");
+        let Some(table) = item.as_table_like() else {
+            return Err(RecordError::NotATable {
+                line: line_of(text, item.span()),
+                id: id.to_string(),
+            });
+        };
+        if let Some(record) = project(text, kind, id, table)? {
+            records.push(record);
         }
-        records[index].insert("id".into(), Value::String(id));
     }
-    records
+    Ok(Loaded {
+        doc: document.into_mut(),
+        records,
+    })
+}
+
+fn project(
+    text: &str,
+    kind: Kind,
+    id: &str,
+    table: &dyn TableLike,
+) -> Result<Option<Record>, RecordError> {
+    let field = |field: &str| -> Result<Option<String>, RecordError> {
+        let Some(item) = table.get(field) else {
+            return Ok(None);
+        };
+        match item.as_str() {
+            Some(text) => Ok(Some(text.to_string())),
+            None => Err(RecordError::NotText {
+                line: line_of(text, item.span()),
+                field: field.to_string(),
+            }),
+        }
+    };
+    let Some(name) = field("name")? else {
+        return Ok(None);
+    };
+    Ok(Some(Record {
+        id: id.to_string(),
+        name,
+        body: field(kind.body_field())?.unwrap_or_default(),
+        keyword: match kind {
+            Kind::Snippet => field("keyword")?,
+            Kind::Quicklink => None,
+        },
+        browser: match kind {
+            Kind::Snippet => None,
+            Kind::Quicklink => field("browser")?,
+        },
+    }))
 }
 
 #[cfg(test)]
@@ -567,55 +621,150 @@ mod tests {
             .contains("Sign-off"));
         records.remove(&id).unwrap();
         assert_eq!(records.all().unwrap().len(), 0);
-        assert!(!records.path().with_extension("json.tmp").exists());
+        assert!(!records.path().with_extension("toml.tmp").exists());
+    }
+
+    fn dir_with(file: &str, text: &str) -> PathBuf {
+        let dir = std::env::temp_dir().join(format!("dango-records-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join(file), text).unwrap();
+        dir
     }
 
     #[test]
-    fn a_hand_added_entry_gains_an_id_and_is_preserved() {
-        let dir = std::env::temp_dir().join(format!("dango-records-{}", uuid::Uuid::new_v4()));
-        std::fs::create_dir_all(&dir).unwrap();
-        std::fs::write(
-            dir.join("snippets.json"),
-            r#"[{ "name": "Hand", "template": "typed by hand" }]"#,
-        )
-        .unwrap();
+    fn a_hand_added_record_is_read_under_its_key() {
+        let dir = dir_with(
+            "snippets.toml",
+            "[brb]\nname = \"Be right back\"\ntemplate = \"be right back\"\n",
+        );
         let records = Records::open(&dir, Kind::Snippet).0;
         let all = records.all().unwrap();
         assert_eq!(all.len(), 1);
-        assert!(!all[0].id.is_empty(), "an id was assigned");
-        assert_eq!(all[0].body, "typed by hand");
+        assert_eq!(all[0].id, "brb");
+        assert_eq!(all[0].body, "be right back");
     }
 
     #[test]
-    fn a_hand_added_entry_keeps_its_id_across_loads() {
-        let text = r#"[{ "name": "Hand", "template": "a" }, { "name": "Hand", "template": "b" }]"#;
+    fn an_inline_table_is_a_record_too() {
+        let records = records(Kind::Quicklink);
+        records
+            .reload("github = { name = \"GitHub\", url = \"https://github.com\" }\n")
+            .unwrap();
+        records
+            .update("github", "GitHub", "https://github.com/notifications", None)
+            .unwrap();
+        assert_eq!(
+            records.get("github").unwrap().body,
+            "https://github.com/notifications"
+        );
+    }
+
+    #[test]
+    fn version_is_not_a_record() {
         let records = records(Kind::Snippet);
-        records.reload(text).unwrap();
-        let first: Vec<_> = records.all().unwrap().into_iter().map(|r| r.id).collect();
-        records.reload(text).unwrap();
-        let second: Vec<_> = records.all().unwrap().into_iter().map(|r| r.id).collect();
-        assert_eq!(first, second);
-        assert_ne!(first[0], first[1], "same name, distinct ids");
+        records
+            .reload("version = 1\n\n[a]\nname = \"A\"\ntemplate = \"a\"\n")
+            .unwrap();
+        let ids: Vec<_> = records.all().unwrap().into_iter().map(|r| r.id).collect();
+        assert_eq!(ids, ["a"]);
+        assert!(matches!(records.remove(VERSION), Err(RecordError::Gone)));
+        let id = records.create("Version", "v", None).unwrap();
+        assert_eq!(id, "version-2");
     }
 
     #[test]
-    fn unknown_fields_on_a_record_are_preserved() {
-        let dir = std::env::temp_dir().join(format!("dango-records-{}", uuid::Uuid::new_v4()));
-        std::fs::create_dir_all(&dir).unwrap();
-        std::fs::write(
-            dir.join("snippets.json"),
-            r#"[{ "id": "a", "name": "Hand", "template": "t", "color": "blue" }]"#,
-        )
-        .unwrap();
-        let records = Records::open(&dir, Kind::Snippet).0;
-        // An edit that does not touch the unknown field keeps it.
-        records.update("a", "Hand", "t2", None).unwrap();
+    fn ids_are_made_from_the_name() {
+        let records = records(Kind::Snippet);
+        assert_eq!(records.create("Café menu", "x", None).unwrap(), "cafe-menu");
+        assert_eq!(
+            records.create("Café Menu", "y", None).unwrap(),
+            "cafe-menu-2"
+        );
+        assert_eq!(records.create("!!!", "z", None).unwrap(), "snippet");
+        assert_eq!(records.create("???", "w", None).unwrap(), "snippet-2");
+        let quicklinks = self::records(Kind::Quicklink);
+        assert_eq!(
+            quicklinks.create("…", "https://example.com", None).unwrap(),
+            "quicklink"
+        );
+    }
+
+    #[test]
+    fn a_rename_keeps_the_id() {
+        let records = records(Kind::Snippet);
+        let id = records.create("Signature", "Best", None).unwrap();
+        records.update(&id, "Work signature", "Best", None).unwrap();
+        assert_eq!(id, "signature");
+        assert_eq!(records.get("signature").unwrap().name, "Work signature");
+        let on_disk = std::fs::read_to_string(records.path()).unwrap();
+        assert!(on_disk.contains("[signature]"), "{on_disk}");
+    }
+
+    #[test]
+    fn a_created_file_points_at_its_schema() {
+        let records = records(Kind::Snippet);
+        records.create("Signature", "Best", None).unwrap();
         let on_disk = std::fs::read_to_string(records.path()).unwrap();
         assert!(
-            on_disk.contains("color"),
-            "unknown field dropped: {on_disk}"
+            on_disk.starts_with("#:schema ./.schemas/snippets.schema.json\n"),
+            "{on_disk}"
         );
-        assert!(on_disk.contains("blue"));
+        records.create("Second", "Two", None).unwrap();
+        let on_disk = std::fs::read_to_string(records.path()).unwrap();
+        assert_eq!(on_disk.matches("#:schema").count(), 1, "{on_disk}");
+    }
+
+    #[test]
+    fn a_multi_line_template_is_written_on_several_lines() {
+        let records = records(Kind::Snippet);
+        records.create("Signature", "Best,\nNico", None).unwrap();
+        let on_disk = std::fs::read_to_string(records.path()).unwrap();
+        assert!(
+            on_disk.contains("\"\"\"") && on_disk.contains("Best,\nNico"),
+            "{on_disk}"
+        );
+        assert_eq!(records.get("signature").unwrap().body, "Best,\nNico");
+    }
+
+    #[test]
+    fn comments_order_and_unknown_keys_survive_writes() {
+        let text = "#:schema ./.schemas/quicklinks.schema.json\n\n\
+            # Work\n[one]\nname = \"One\"\nurl = \"https://one.example\"\ncolor = \"blue\"\n\n\
+            [two]\nname = \"Two\" # the second\nurl = \"https://two.example\"\n\n\
+            [three]\nname = \"Three\"\nurl = \"https://three.example\"\n";
+        let dir = dir_with("quicklinks.toml", text);
+        let records = Records::open(&dir, Kind::Quicklink).0;
+
+        records
+            .update("two", "Two", "https://two.example/new", None)
+            .unwrap();
+        records
+            .create("Four", "https://four.example", None)
+            .unwrap();
+
+        let on_disk = std::fs::read_to_string(records.path()).unwrap();
+        assert!(on_disk.starts_with(
+            "#:schema ./.schemas/quicklinks.schema.json\n\n# Work\n[one]\nname = \"One\"\nurl = \"https://one.example\"\ncolor = \"blue\"\n"
+        ), "{on_disk}");
+        let order: Vec<usize> = ["[one]", "[two]", "[three]", "[four]"]
+            .iter()
+            .map(|header| on_disk.find(header).unwrap())
+            .collect();
+        assert!(order.windows(2).all(|pair| pair[0] < pair[1]), "{on_disk}");
+        assert!(on_disk.contains("https://two.example/new"), "{on_disk}");
+    }
+
+    #[test]
+    fn a_field_of_the_wrong_type_names_its_line() {
+        let records = records(Kind::Snippet);
+        records.create("Signature", "Best", None).unwrap();
+        let error = records
+            .reload("[a]\nname = \"A\"\ntemplate = \"a\"\n\n[b]\nname = 3\n")
+            .unwrap_err();
+        assert_eq!(error.to_string(), "Line 6: name must be text");
+        assert_eq!(records.all().unwrap().len(), 1, "last good kept");
+        let error = records.reload("a = \"loose\"\n").unwrap_err();
+        assert_eq!(error.to_string(), "Line 1: a must be a table");
     }
 
     #[test]
@@ -625,26 +774,25 @@ mod tests {
         let records = Records::open(&dir, Kind::Snippet).0;
         records.create("Signature", "Best", None).unwrap();
         // A bad edit lands; reload keeps the last good set.
-        let error = records.reload("{ not an array").unwrap_err();
+        let error = records.reload("[a\nname = 1").unwrap_err();
         assert!(matches!(error, RecordError::Parse(_)));
+        assert!(error.to_string().contains("line 1"), "{error}");
         assert_eq!(records.all().unwrap().len(), 1, "last good kept");
     }
 
     #[test]
     fn a_file_that_failed_to_load_is_not_overwritten() {
-        let dir = std::env::temp_dir().join(format!("dango-records-{}", uuid::Uuid::new_v4()));
-        std::fs::create_dir_all(&dir).unwrap();
-        let broken = r#"[{ "name": "Hand", "template": "t" },"#;
-        std::fs::write(dir.join("snippets.json"), broken).unwrap();
+        let broken = "[hand]\nname = \"Hand\"\ntemplate = \"t\n";
+        let dir = dir_with("snippets.toml", broken);
         let (records, error) = Records::open(&dir, Kind::Snippet);
         assert!(error.is_some());
 
         let refused = records.create("Signature", "Best", None).unwrap_err();
-        assert!(matches!(refused, RecordError::FileBroken("snippets.json")));
+        assert!(matches!(refused, RecordError::FileBroken("snippets.toml")));
         assert_eq!(std::fs::read_to_string(records.path()).unwrap(), broken);
 
         records
-            .reload(r#"[{ "name": "Hand", "template": "t" }]"#)
+            .reload("[hand]\nname = \"Hand\"\ntemplate = \"t\"\n")
             .unwrap();
         assert!(records.create("Signature", "Best", None).is_ok());
     }
@@ -658,7 +806,7 @@ mod tests {
         std::fs::create_dir(records.path()).unwrap();
 
         let error = records.create("Signature", "Best", None).unwrap_err();
-        assert!(matches!(error, RecordError::Write("snippets.json")));
+        assert!(matches!(error, RecordError::Write("snippets.toml")));
         assert!(records.all().unwrap().is_empty());
     }
 
@@ -732,7 +880,13 @@ mod tests {
         assert_eq!(quicklinks.all().unwrap().len(), 1);
         // The quicklink file uses "url" as its body key.
         let on_disk = std::fs::read_to_string(quicklinks.path()).unwrap();
-        assert!(on_disk.contains("\"url\""), "quicklink body key: {on_disk}");
+        assert!(
+            on_disk.contains(
+                "
+url = "
+            ),
+            "quicklink body key: {on_disk}"
+        );
     }
 
     #[test]
@@ -816,7 +970,7 @@ mod tests {
         let records = records(Kind::Quicklink);
         records
             .reload(&format!(
-                r#"[{{ "id": "a", "name": "Docs", "url": "{DOCS}", "browser": "safari" }}]"#
+                "[a]\nname = \"Docs\"\nurl = \"{DOCS}\"\nbrowser = \"safari\"\n"
             ))
             .unwrap();
 
@@ -970,7 +1124,7 @@ mod display_tests {
     #[test]
     fn a_message_carrying_detail_still_starts_with_a_sentence() {
         let errors = [
-            RecordError::Parse("expected value".into()),
+            RecordError::Parse("TOML parse error at line 1, column 1".into()),
             RecordError::Template(TemplateError::Parse("unexpected end".into())),
         ];
         for error in errors {

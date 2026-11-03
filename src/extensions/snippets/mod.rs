@@ -13,4 +13,4 @@ pub use extension::{
 pub use favicons::{FaviconCache, FaviconService, FaviconsEnabled, HttpFavicons};
 pub use matcher::{match_keyword, KeywordEntry};
 pub use service::ExcludedApps;
-pub use store::{Kind, Record, RecordError, Records};
+pub use store::{Kind, QuicklinkEntry, Record, RecordError, Records, SnippetEntry};

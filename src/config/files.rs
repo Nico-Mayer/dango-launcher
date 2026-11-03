@@ -12,18 +12,27 @@ const SCHEMA_DIR: &str = ".schemas";
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum UserFile {
     Config,
+    Snippets,
+    Quicklinks,
     /// Provider keys: beside the config but not in it, because the config is
     /// meant to be committed and this file is not.
     Auth,
 }
 
 impl UserFile {
-    pub const ALL: [UserFile; 2] = [UserFile::Config, UserFile::Auth];
+    pub const ALL: [UserFile; 4] = [
+        UserFile::Config,
+        UserFile::Snippets,
+        UserFile::Quicklinks,
+        UserFile::Auth,
+    ];
 
     /// The name without extension, shared by the file and its schema.
     pub fn name(self) -> &'static str {
         match self {
             UserFile::Config => "config",
+            UserFile::Snippets => "snippets",
+            UserFile::Quicklinks => "quicklinks",
             UserFile::Auth => "auth",
         }
     }
@@ -31,6 +40,8 @@ impl UserFile {
     pub fn file_name(self) -> &'static str {
         match self {
             UserFile::Config => "config.toml",
+            UserFile::Snippets => "snippets.toml",
+            UserFile::Quicklinks => "quicklinks.toml",
             UserFile::Auth => "auth.toml",
         }
     }
@@ -56,6 +67,17 @@ impl UserFile {
     pub fn header(self) -> String {
         format!("#:schema ./{SCHEMA_DIR}/{}\n", self.schema_file_name())
     }
+}
+
+/// The 1-based line a parse error's span starts on, for files whose error
+/// text must not quote the source.
+pub fn line_of(text: &str, span: Option<std::ops::Range<usize>>) -> usize {
+    let start = span.map_or(0, |span| span.start.min(text.len()));
+    text.as_bytes()[..start]
+        .iter()
+        .filter(|&&b| b == b'\n')
+        .count()
+        + 1
 }
 
 /// Writes `text` to `path` through a temp file and a rename, so a reader never

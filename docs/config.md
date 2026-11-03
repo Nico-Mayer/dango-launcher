@@ -307,6 +307,44 @@ One of:
 | `macos` | string |  |  | The value on macOS. |
 | `windows` | string |  |  | The value on Windows. |
 
+## snippets.toml
+
+Snippets, each a table keyed by its id. Dango adds, edits, and removes them from the launcher and keeps your comments and order.
+
+### Top level
+
+| Setting | Type | Default | Values | Description |
+| --- | --- | --- | --- | --- |
+| `version` | integer |  |  | The file's schema version. Leave it at 1. |
+| `<name>` | [Snippet](#snippet) |  |  | A snippet, keyed by its id. |
+
+### Snippet
+
+| Setting | Type | Default | Values | Description |
+| --- | --- | --- | --- | --- |
+| `keyword` | string |  |  | Typing this anywhere expands the snippet in place. Not allowed on a snippet that asks for input. |
+| `name` | string |  |  | The title shown in the launcher. |
+| `template` | string |  |  | The text to insert. Placeholders such as `{{ date }}` are filled in when the snippet is used. |
+
+## quicklinks.toml
+
+Quicklinks, each a table keyed by its id. Dango adds, edits, and removes them from the launcher and keeps your comments and order.
+
+### Top level
+
+| Setting | Type | Default | Values | Description |
+| --- | --- | --- | --- | --- |
+| `version` | integer |  |  | The file's schema version. Leave it at 1. |
+| `<name>` | [Quicklink](#quicklink) |  |  | A quicklink, keyed by its id. |
+
+### Quicklink
+
+| Setting | Type | Default | Values | Description |
+| --- | --- | --- | --- | --- |
+| `browser` | string |  | `chrome`, `edge`, `firefox`, `brave`, `safari` | The browser to open it in. Left out, the default browser opens it. |
+| `name` | string |  |  | The title shown in the launcher. |
+| `url` | string |  |  | The URL to open. `{{ query }}` asks for text and places it in the URL. |
+
 ## auth.toml
 
 API keys for hosted AI providers, keyed by the provider's name in config.toml. Dango only reads this file. Keep it out of git.
