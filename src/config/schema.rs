@@ -712,6 +712,42 @@ mod tests {
         assert!(properties["system"]["properties"].get("hotkeys").is_none());
     }
 
+    const RESERVED_TOP_LEVEL: [&str; 5] =
+        ["version", "launcher", "hyperkey", "selection", "extensions"];
+
+    fn reserved_table_names<'a>(ids: impl IntoIterator<Item = &'a str>) -> Vec<&'a str> {
+        ids.into_iter()
+            .filter_map(table_name)
+            .filter(|name| RESERVED_TOP_LEVEL.contains(name))
+            .collect()
+    }
+
+    #[test]
+    fn no_built_in_takes_a_reserved_table_name() {
+        let manifests = builtin_manifests();
+        assert!(reserved_table_names(manifests.iter().map(|m| m.id.as_str())).is_empty());
+        assert_eq!(reserved_table_names(["dango.launcher"]), ["launcher"]);
+        let mut names: Vec<&str> = manifests
+            .iter()
+            .filter_map(|manifest| table_name(&manifest.id))
+            .collect();
+        names.sort_unstable();
+        assert_eq!(names, crate::config::BUILT_IN_TABLES);
+    }
+
+    #[test]
+    fn enabled_and_commands_mean_the_same_in_every_table() {
+        let schema = schema();
+        for name in crate::config::BUILT_IN_TABLES {
+            let properties = &schema["properties"][name]["properties"];
+            assert_eq!(properties["enabled"]["type"], "boolean", "{name}");
+            if let Some(commands) = properties.get("commands") {
+                assert_eq!(commands["type"], "object", "{name}");
+                assert!(commands.get("properties").is_some(), "{name}");
+            }
+        }
+    }
+
     #[test]
     fn a_setting_carries_its_type_default_and_values() {
         let schema = schema();
