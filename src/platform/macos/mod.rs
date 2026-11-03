@@ -39,7 +39,7 @@ use objc2_app_kit::{
 use objc2_foundation::{MainThreadMarker, NSPoint};
 use raw_window_handle::RawWindowHandle;
 
-use super::{LauncherWindow, RunningApp, SystemControl, SystemError};
+use super::{HudWindow, LauncherWindow, RunningApp, SystemControl, SystemError};
 
 /// Whether the Accessibility permission has been granted. macOS gates every
 /// route into another application behind it: key synthesis, reading the
@@ -131,12 +131,17 @@ pub(super) fn focused_field_is_secure() -> bool {
 /// it.
 const NS_POPUP_MENU_WINDOW_LEVEL: isize = 101;
 
+/// Above the launcher, so a HUD shown as the launcher hides is never under it.
+const HUD_WINDOW_LEVEL: isize = NS_POPUP_MENU_WINDOW_LEVEL + 1;
+
 pub struct MacLauncherWindow;
 
 impl LauncherWindow for MacLauncherWindow {
     fn attach(&mut self, window: RawWindowHandle) {
         if let Some(ns_window) = ns_window(window) {
-            reclass_as_panel(&ns_window);
+            if let Some(class) = panel_class() {
+                reclass_as_panel(&ns_window, class);
+            }
 
             // Joining all spaces plus fullscreen-auxiliary lets the launcher
             // draw into another app's fullscreen space instead of making the
@@ -166,22 +171,7 @@ impl LauncherWindow for MacLauncherWindow {
     /// Centred on the display under the cursor, in AppKit's points, whose
     /// origin is the bottom-left of the primary display.
     fn position_on_active_display(&self, window: RawWindowHandle) {
-        let (Some(ns_window), Some(mtm)) = (ns_window(window), MainThreadMarker::new()) else {
-            return;
-        };
-        let cursor = NSEvent::mouseLocation();
-        let screens = NSScreen::screens(mtm);
-        let screen = (0..screens.count())
-            .map(|index| screens.objectAtIndex(index))
-            .find(|screen| {
-                let frame = screen.frame();
-                cursor.x >= frame.origin.x
-                    && cursor.x < frame.origin.x + frame.size.width
-                    && cursor.y >= frame.origin.y
-                    && cursor.y < frame.origin.y + frame.size.height
-            })
-            .or_else(|| NSScreen::mainScreen(mtm));
-        let Some(screen) = screen else {
+        let (Some(ns_window), Some(screen)) = (ns_window(window), screen_under_cursor()) else {
             return;
         };
         let area = screen.frame();
@@ -203,6 +193,63 @@ impl LauncherWindow for MacLauncherWindow {
         // A non-activating panel never takes application activation, so there
         // is nothing to hand back.
     }
+}
+
+pub struct MacHudWindow;
+
+impl HudWindow for MacHudWindow {
+    /// A plain NSPanel, not the launcher's class: that one can become key and
+    /// records it in `PANEL_IS_KEY`. A borderless NSPanel never becomes key.
+    fn attach(&mut self, window: RawWindowHandle) {
+        let (Some(ns_window), Some(class)) = (ns_window(window), AnyClass::get(c"NSPanel")) else {
+            return;
+        };
+        reclass_as_panel(&ns_window, class);
+        ns_window.setCollectionBehavior(
+            NSWindowCollectionBehavior::CanJoinAllSpaces
+                | NSWindowCollectionBehavior::FullScreenAuxiliary
+                | NSWindowCollectionBehavior::IgnoresCycle
+                | NSWindowCollectionBehavior::Stationary,
+        );
+        ns_window.setLevel(HUD_WINDOW_LEVEL);
+        ns_window.setHidesOnDeactivate(false);
+    }
+
+    /// In AppKit's points, whose origin is the bottom-left of the primary
+    /// display, so the margin is measured up from the visible frame's bottom.
+    fn place(&self, window: RawWindowHandle) {
+        let (Some(ns_window), Some(screen)) = (ns_window(window), screen_under_cursor()) else {
+            return;
+        };
+        let area = screen.visibleFrame();
+        let size = ns_window.frame().size;
+        let x = area.origin.x + (area.size.width - size.width) / 2.0;
+        let y = area.origin.y + super::HUD_MARGIN;
+        ns_window.setFrameOrigin(NSPoint::new(x, y));
+    }
+
+    /// The toolkit reapplies its own always-on-top level on show.
+    fn did_show(&self, window: RawWindowHandle) {
+        if let Some(ns_window) = ns_window(window) {
+            ns_window.setLevel(HUD_WINDOW_LEVEL);
+        }
+    }
+}
+
+fn screen_under_cursor() -> Option<Retained<NSScreen>> {
+    let mtm = MainThreadMarker::new()?;
+    let cursor = NSEvent::mouseLocation();
+    let screens = NSScreen::screens(mtm);
+    (0..screens.count())
+        .map(|index| screens.objectAtIndex(index))
+        .find(|screen| {
+            let frame = screen.frame();
+            cursor.x >= frame.origin.x
+                && cursor.x < frame.origin.x + frame.size.width
+                && cursor.y >= frame.origin.y
+                && cursor.y < frame.origin.y + frame.size.height
+        })
+        .or_else(|| NSScreen::mainScreen(mtm))
 }
 
 extern "C" fn can_become_key_window(_this: NonNull<AnyObject>, _cmd: Sel) -> Bool {
@@ -253,10 +300,7 @@ fn panel_class() -> Option<&'static AnyClass> {
     })
 }
 
-fn reclass_as_panel(ns_window: &NSWindow) {
-    let Some(class) = panel_class() else {
-        return;
-    };
+fn reclass_as_panel(ns_window: &NSWindow, class: &AnyClass) {
     let obj: *const NSWindow = ns_window;
     unsafe {
         objc2::ffi::object_setClass(obj as *mut AnyObject as *mut _, class as *const _ as *mut _);

@@ -802,6 +802,13 @@ mod list_view {
             tray: slint::Weak::default(),
             platform: std::sync::Arc::new(std::sync::Mutex::new(Box::new(NoPlatform))),
             attached: Default::default(),
+            hud: super::super::Hud {
+                window: slint::Weak::default(),
+                platform: std::sync::Arc::new(std::sync::Mutex::new(Box::new(
+                    super::hud::NoPlatform,
+                ))),
+                attached: Default::default(),
+            },
         };
         shell.hide(false);
         super::super::RENDERER.with(|slot| *slot.borrow_mut() = None);
@@ -1654,5 +1661,116 @@ mod tray {
             ["Pasting is off, see dango.log", "Config file loaded"]
         );
         assert!(!tray.get_grant_accessibility());
+    }
+}
+
+mod hud {
+    use super::super::generated::{HudWindow, ToastStyle as SlintToastStyle};
+    use super::super::render::hud;
+    use super::*;
+    use crate::ui::snapshot::Hud;
+    use crate::ui::ToastStyle;
+
+    fn shown(style: ToastStyle, text: &str) -> HudWindow {
+        i_slint_backend_testing::init_no_event_loop();
+        let ui = HudWindow::new().unwrap();
+        ui.show().unwrap();
+        hud::write(
+            &ui,
+            &Hud {
+                id: 1,
+                style,
+                text: text.into(),
+            },
+        );
+        ui
+    }
+
+    /// The testing backend has no native window, so the platform is never
+    /// reached.
+    pub(super) struct NoPlatform;
+
+    impl crate::platform::HudWindow for NoPlatform {
+        fn place(&self, _window: crate::platform::RawWindowHandle) {}
+    }
+
+    #[test]
+    fn the_shell_shows_a_new_hud_and_hides_a_gone_one() {
+        i_slint_backend_testing::init_no_event_loop();
+        let ui = HudWindow::new().unwrap();
+        let shell_hud = super::super::Hud {
+            window: ui.as_weak(),
+            platform: std::sync::Arc::new(std::sync::Mutex::new(Box::new(NoPlatform))),
+            attached: Default::default(),
+        };
+        let copied = Hud {
+            id: 7,
+            style: ToastStyle::Success,
+            text: "Copied to clipboard".into(),
+        };
+        shell_hud.update(Some(&copied));
+        assert!(ui.window().is_visible());
+        assert_eq!(ui.get_text(), "Copied to clipboard");
+        shell_hud.update(Some(&Hud {
+            id: 8,
+            style: ToastStyle::Failure,
+            text: "Nope".into(),
+        }));
+        assert_eq!(ui.get_text(), "Nope");
+        assert_eq!(ui.get_style(), SlintToastStyle::Failure);
+        shell_hud.update(None);
+        assert!(!ui.window().is_visible());
+        super::super::HUD_SHOWN.set(None);
+    }
+
+    fn label(ui: &HudWindow, text: &str) -> ElementHandle {
+        ElementHandle::find_by_accessible_label(ui, text)
+            .next()
+            .unwrap_or_else(|| panic!("no element labelled {text}"))
+    }
+
+    #[test]
+    fn a_failure_hud_says_it_failed() {
+        let ui = shown(
+            ToastStyle::Failure,
+            "Dango can't move administrator windows",
+        );
+        assert_eq!(ui.get_style(), SlintToastStyle::Failure);
+        let text = label(&ui, "Dango can't move administrator windows");
+        assert_eq!(text.accessible_description().as_deref(), Some("Failed"));
+    }
+
+    #[test]
+    fn a_success_hud_shows_its_text() {
+        let ui = shown(ToastStyle::Success, "Copied to clipboard");
+        assert_eq!(ui.get_style(), SlintToastStyle::Success);
+        let text = label(&ui, "Copied to clipboard");
+        assert_eq!(text.accessible_description().as_deref(), Some(""));
+    }
+
+    #[test]
+    fn the_longest_failures_fit_the_hud() {
+        let ui = shown(ToastStyle::Failure, "");
+        let write = |ui: &HudWindow, text: &str| {
+            hud::write(
+                ui,
+                &Hud {
+                    id: 1,
+                    style: ToastStyle::Failure,
+                    text: text.into(),
+                },
+            )
+        };
+        for message in [
+            "Set up this command's provider in your config file",
+            "Couldn't verify the update, so it wasn't installed",
+            "One keyword can't be the start of another, so choose a different keyword",
+            "Can't open Visual Studio Code because it isn't installed",
+        ] {
+            write(&ui, message);
+            assert!(!ui.get_cut(), "{message} is cut off");
+        }
+        write(&ui, &"Too long ".repeat(20));
+        assert!(ui.get_cut(), "the measure sees a cut");
     }
 }

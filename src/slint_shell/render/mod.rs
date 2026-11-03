@@ -8,6 +8,7 @@ mod empty;
 mod form;
 mod grid;
 mod height;
+pub mod hud;
 mod list;
 mod panel;
 mod shell;

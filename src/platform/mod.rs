@@ -46,6 +46,20 @@ pub trait LauncherWindow: Send {
 /// The launcher's tallest, in logical pixels.
 pub const LAUNCHER_MAX_HEIGHT: f64 = 480.0;
 
+/// The platform half of the HUD. The shell shows and hides it through Slint;
+/// this places it and does what winit cannot.
+pub trait HudWindow: Send {
+    /// Once, on the first show that has a native window.
+    fn attach(&mut self, _window: RawWindowHandle) {}
+    /// Centres the window near the bottom of the display under the pointer.
+    fn place(&self, window: RawWindowHandle);
+    /// After the shell has shown the window.
+    fn did_show(&self, _window: RawWindowHandle) {}
+}
+
+/// Between the HUD and the bottom of the work area, in logical pixels.
+pub const HUD_MARGIN: f64 = 48.0;
+
 /// Calls `lost` on the main thread whenever another application takes the
 /// foreground. Main thread only, and once.
 ///
@@ -167,6 +181,13 @@ pub fn launcher_window() -> Box<dyn LauncherWindow> {
     return Box::new(macos::MacLauncherWindow);
     #[cfg(target_os = "windows")]
     return Box::new(windows::WindowsLauncherWindow::default());
+}
+
+pub fn hud_window() -> Box<dyn HudWindow> {
+    #[cfg(target_os = "macos")]
+    return Box::new(macos::MacHudWindow);
+    #[cfg(target_os = "windows")]
+    return Box::new(windows::WindowsHudWindow);
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -646,9 +667,38 @@ pub fn launcher_origin(
     (x, y.max(area_y))
 }
 
+/// Horizontal centre, `margin` above the bottom of the display's work area,
+/// measured from the area's top edge.
+pub fn hud_origin(
+    area_x: f64,
+    area_y: f64,
+    area_width: f64,
+    area_height: f64,
+    window_width: f64,
+    window_height: f64,
+    margin: f64,
+) -> (f64, f64) {
+    let x = area_x + (area_width - window_width) / 2.0;
+    let y = area_y + area_height - margin - window_height;
+    (x, y.max(area_y))
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{crlf, launcher_origin, lf};
+    use super::{crlf, hud_origin, launcher_origin, lf};
+
+    #[test]
+    fn the_hud_sits_centred_above_the_bottom_edge() {
+        let (x, y) = hud_origin(1920.0, 0.0, 1280.0, 760.0, 560.0, 36.0, 48.0);
+        assert_eq!(x, 1920.0 + (1280.0 - 560.0) / 2.0);
+        assert_eq!(y, 760.0 - 48.0 - 36.0);
+    }
+
+    #[test]
+    fn the_hud_never_escapes_above_the_work_area() {
+        let (_, y) = hud_origin(0.0, 100.0, 800.0, 50.0, 560.0, 36.0, 48.0);
+        assert_eq!(y, 100.0);
+    }
 
     #[test]
     fn bare_line_feeds_become_crlf_and_existing_crlf_stays() {

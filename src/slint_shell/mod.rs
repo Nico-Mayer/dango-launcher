@@ -22,7 +22,7 @@ pub(crate) fn render_headless(snapshot: crate::ui::Snapshot) -> generated::Launc
     ui
 }
 
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
@@ -35,12 +35,18 @@ use crate::extensions::updates;
 use crate::platform::{self, LauncherWindow as PlatformWindow, Permission, RawWindowHandle};
 use crate::shell::{Shell, TrayCommand, TrayStatus};
 use crate::ui::{self, Intent};
-use generated::{LauncherWindow, Tray};
+use generated::{HudWindow, LauncherWindow, Tray};
+use render::hud::Change;
 use render::Renderer;
 
 thread_local! {
     /// Lives on the UI thread, as the component does.
     static RENDERER: RefCell<Option<Rc<RefCell<Renderer>>>> = const { RefCell::new(None) };
+    /// The id of the HUD on screen.
+    static HUD_SHOWN: Cell<Option<u64>> = const { Cell::new(None) };
+    /// Set while the HUD window is created, so the attributes hook can tell it
+    /// from the launcher: the hook runs before Slint gives a window its title.
+    static CREATING_HUD: Cell<bool> = const { Cell::new(false) };
 }
 
 type Platform = Arc<Mutex<Box<dyn PlatformWindow>>>;
@@ -50,6 +56,14 @@ struct SlintShell {
     tray: slint::Weak<Tray>,
     platform: Platform,
     attached: AtomicBool,
+    hud: Hud,
+}
+
+#[derive(Clone)]
+struct Hud {
+    window: slint::Weak<HudWindow>,
+    platform: Arc<Mutex<Box<dyn platform::HudWindow>>>,
+    attached: Arc<AtomicBool>,
 }
 
 impl SlintShell {
@@ -58,17 +72,63 @@ impl SlintShell {
             platform.attach(handle);
         }
     }
+}
 
-    fn handle(window: &LauncherWindow) -> Option<RawWindowHandle> {
-        use raw_window_handle::HasWindowHandle;
-        Some(
-            window
-                .window()
-                .window_handle()
-                .window_handle()
-                .ok()?
-                .as_raw(),
-        )
+fn handle(window: &slint::Window) -> Option<RawWindowHandle> {
+    use raw_window_handle::HasWindowHandle;
+    Some(window.window_handle().window_handle().ok()?.as_raw())
+}
+
+impl Hud {
+    fn update(&self, hud: Option<&ui::snapshot::Hud>) {
+        let Some(window) = self.window.upgrade() else {
+            return;
+        };
+        match (render::hud::change(HUD_SHOWN.get(), hud), hud) {
+            (Some(Change::Show), Some(hud)) => {
+                render::hud::write(&window, hud);
+                if self.show(&window) {
+                    HUD_SHOWN.set(Some(hud.id));
+                }
+            }
+            (Some(Change::Hide), _) => {
+                let _ = window.hide();
+                HUD_SHOWN.set(None);
+            }
+            _ => {}
+        }
+    }
+
+    fn show(&self, window: &HudWindow) -> bool {
+        let mut platform = self.platform.lock().unwrap();
+        // The native window may not exist before the first show.
+        let existing = handle(window.window());
+        if let Some(handle) = existing {
+            self.attach_once(platform.as_mut(), handle);
+            platform.place(handle);
+        }
+        if let Err(error) = window.show() {
+            eprintln!("[dango] could not show the HUD: {error}");
+            return false;
+        }
+        window.window().with_winit_window(|window| {
+            let _ = window.set_cursor_hittest(false);
+        });
+        let Some(handle) = handle(window.window()) else {
+            return true;
+        };
+        if existing.is_none() {
+            self.attach_once(platform.as_mut(), handle);
+            platform.place(handle);
+        }
+        platform.did_show(handle);
+        true
+    }
+
+    fn attach_once(&self, platform: &mut dyn platform::HudWindow, handle: RawWindowHandle) {
+        if !self.attached.swap(true, Ordering::Relaxed) {
+            platform.attach(handle);
+        }
     }
 }
 
@@ -76,8 +136,10 @@ impl Shell for SlintShell {
     fn publish(&self, snapshot: &ui::Snapshot) {
         let window = self.window.clone();
         let platform = self.platform.clone();
+        let hud = self.hud.clone();
         let snapshot = snapshot.clone();
         let _ = slint::invoke_from_event_loop(move || {
+            hud.update(snapshot.hud.as_ref());
             let Some(window) = window.upgrade() else {
                 return;
             };
@@ -98,7 +160,7 @@ impl Shell for SlintShell {
         let mut platform = self.platform.lock().unwrap();
         platform.will_show();
         // The native window may not exist before the first show.
-        let existing = Self::handle(&window);
+        let existing = handle(window.window());
         if let Some(handle) = existing {
             self.attach_once(platform.as_mut(), handle);
             platform.position_on_active_display(handle);
@@ -107,7 +169,7 @@ impl Shell for SlintShell {
             eprintln!("[dango] could not show the launcher: {error}");
             return;
         }
-        let Some(handle) = Self::handle(&window) else {
+        let Some(handle) = handle(window.window()) else {
             return;
         };
         if existing.is_none() {
@@ -158,7 +220,7 @@ fn set_launcher_height(window: &LauncherWindow, platform: &Platform, height: f32
         return;
     }
     let platform = platform.lock().unwrap();
-    let Some(handle) = SlintShell::handle(window) else {
+    let Some(handle) = handle(window.window()) else {
         return;
     };
     // Slint resizes the window itself when the component's height changes,
@@ -180,7 +242,15 @@ fn show_tray(component: &Tray, tray: &TrayStatus) {
 }
 
 fn select_backend() -> Result<(), slint::PlatformError> {
-    let selector = slint::BackendSelector::new().backend_name("winit".into());
+    let selector = slint::BackendSelector::new()
+        .backend_name("winit".into())
+        .with_winit_window_attributes_hook(|attributes| {
+            if CREATING_HUD.get() {
+                attributes.with_active(false)
+            } else {
+                attributes
+            }
+        });
     // An accessory app has no dock icon and never becomes the active app by
     // being shown, which is what lets the panel float over fullscreen spaces.
     #[cfg(target_os = "macos")]
@@ -212,6 +282,7 @@ pub fn run() {
 
     select_backend().expect("the winit backend");
     let window = LauncherWindow::new().expect("the launcher window");
+    let hud = create_hud();
     let tray = Tray::new().expect("the tray icon");
     tray.set_image(tray_icon());
     tray.set_hint("Dango".into());
@@ -224,6 +295,11 @@ pub fn run() {
         tray: tray.as_weak(),
         platform: Arc::new(Mutex::new(platform::launcher_window())),
         attached: AtomicBool::new(false),
+        hud: Hud {
+            window: hud.as_weak(),
+            platform: Arc::new(Mutex::new(platform::hud_window())),
+            attached: Arc::new(AtomicBool::new(false)),
+        },
     });
 
     // The hotkeys and the tray need the event loop running on this thread.
@@ -261,7 +337,18 @@ pub fn run() {
         eprintln!("[dango] the event loop stopped: {error}");
     }
     drop(window);
+    drop(hud);
     drop(tray);
+}
+
+/// Slint makes a window's adapter, and with it the winit attributes, on first
+/// use rather than in `new`, so the window is touched while the flag is set.
+fn create_hud() -> HudWindow {
+    CREATING_HUD.set(true);
+    let hud = HudWindow::new().expect("the HUD window");
+    let _ = hud.window().scale_factor();
+    CREATING_HUD.set(false);
+    hud
 }
 
 fn connect(

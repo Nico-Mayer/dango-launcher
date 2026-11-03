@@ -1,0 +1,53 @@
+import { Theme } from "../theme.slint";
+import { Dot, ToastStyle } from "../atoms/dot.slint";
+
+/// A toast on its own, for while the launcher is hidden. The window keeps one
+/// size so the shell can place it before Slint lays it out; the pill inside
+/// fits its text.
+export component HudWindow inherits Window {
+    in property <ToastStyle> style;
+    in property <string> text;
+    /// The text does not fit and is cut off.
+    out property <bool> cut: label.preferred-width > label.width;
+    no-frame: true;
+    always-on-top: true;
+    background: transparent;
+    title: "Dango";
+    width: Theme.hud-width;
+    height: Theme.hud-height;
+    default-font-size: Theme.text-body;
+    default-font-family: Theme.font;
+
+    pill := Rectangle {
+        width: min(parent.width, label.preferred-width + 2 * Theme.hud-padding + dot.width + Theme.gap);
+        height: parent.height;
+        background: Theme.raised;
+        border-radius: self.height / 2;
+        border-width: 1px;
+        border-color: Theme.border;
+
+        HorizontalLayout {
+            padding-left: Theme.hud-padding;
+            padding-right: Theme.hud-padding;
+            spacing: Theme.gap;
+
+            VerticalLayout {
+                alignment: center;
+                dot := Dot {
+                    style: root.style;
+                }
+            }
+
+            label := Text {
+                text: root.text;
+                color: root.style == ToastStyle.failure ? Theme.text : Theme.muted;
+                font-size: Theme.text-small;
+                vertical-alignment: center;
+                overflow: elide;
+                accessible-role: AccessibleRole.text;
+                accessible-label: self.text;
+                accessible-description: root.style == ToastStyle.failure ? "Failed" : "";
+            }
+        }
+    }
+}

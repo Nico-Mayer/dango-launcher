@@ -110,26 +110,31 @@ arrives before or after the hide) untested.
 Rejected: a separate `ExpireHud` effect and `HudExpired` event. They would
 copy the toast's timer one for one.
 
-### D3. Renderer writes a `Hud` global, the shell shows and hides the window
+### D3. The renderer writes the HUD window, the shell shows and hides it
 
-`src/slint_shell/render/` gets one more writer, `Hud` (`style`, `text`), in
-line with "one writer per global". When `snapshot.hud` changes from none to
-some, or its id changes, `SlintShell` places the window and calls Slint's
-`show()`; when it becomes none, it calls `hide()`. This runs where `publish`
-already reaches the main thread.
+`HudWindow` is its own component, like `Tray`, so its `style` and `text` are
+its own properties: a global would be a separate instance per component.
+`src/slint_shell/render/hud.rs` is their one writer and decides when the
+window comes and goes. When `snapshot.hud` changes from none to some, or its
+id changes, `SlintShell` places the window and calls Slint's `show()`; when
+it becomes none, it calls `hide()`. This runs where `publish` already reaches
+the main thread.
 
 `HudWindow` uses the existing `Dot` atom and `Theme` values: toast dot, toast
-text style, raised surface, the launcher's radius, and a max width equal to
-the ActionBar toast slot at the launcher's width. Its height is fixed, so the
-window size is set by counting, like rows. If `Theme` lacks a value the pill
-needs (pill padding), it is added there with dark and light values.
+text style, raised surface, and new `hud-width`, `hud-height`, and
+`hud-padding`. The window keeps one size, so the shell can place it before
+Slint lays it out; the pill inside is centred and fits its text up to the
+window's width, which is wider than the ActionBar's toast slot.
 
 ### D4. Slint shows and hides, platform code sets the window up
 
-A `with_window_attributes_hook` on the backend selector in
-`src/slint_shell/mod.rs`, matched on the HUD window's title, sets
-`with_active(false)` and `WindowLevel::AlwaysOnTop`. winit keeps both across
-shows. Once the window exists, `set_cursor_hittest(false)` through
+A `with_winit_window_attributes_hook` on the backend selector in
+`src/slint_shell/mod.rs` sets `with_active(false)`, which winit keeps for
+every show. The hook runs when Slint makes the window's adapter, before the
+component's title is set, so it cannot match on the title: a thread-local
+flag is set while the HUD window is created, and the window is touched then
+to make Slint create the adapter. `always-on-top` in the component gives the
+window level. After each show, `set_cursor_hittest(false)` through
 `WinitWindowAccessor` makes it click-through; winit sets and keeps the styles
 that needs.
 
@@ -138,8 +143,8 @@ The rest sits behind a narrow trait in `src/platform/mod.rs`, implemented in
 
 ```
 trait HudWindow {
-    fn attach(&mut self, window: RawWindowHandle);              // once
-    fn place(&self, window: RawWindowHandle, size: LogicalSize); // before show
+    fn attach(&mut self, window: RawWindowHandle); // once
+    fn place(&self, window: RawWindowHandle);      // before show
     fn did_show(&self, window: RawWindowHandle);
 }
 ```
@@ -203,6 +208,8 @@ No change to the extension manifest or the view protocol's wire format.
   uses the same rule, and the HUD is short-lived.
 - [A HUD over the bottom of a fullscreen video or game] → Accepted: it is
   short-lived and click-through.
-- [The attributes hook applies to every Slint window] → It matches on the HUD
-  window's title only; hand check 4.2 checks the launcher still takes the
-  keyboard.
+- [The attributes hook applies to every Slint window] → It acts only while
+  the flag is set around the HUD's creation; hand check 4.2 checks the
+  launcher still takes the keyboard.
+- [Slint applies other attributes on show and drops `active`] → Hand check
+  4.1 watches the foreground window while a HUD shows.
