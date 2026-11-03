@@ -14,12 +14,11 @@ without taking the app down.
 Dango SHALL read its configuration from a single TOML file named `config.toml`
 in a fixed directory, `~/.config/dango/` on both platforms, and SHALL honour a
 `$DANGO_CONFIG_DIR` environment override for that directory. The directory SHALL
-be created if it does not exist. A `config.json` in that directory SHALL NOT be
-read.
+be created if it does not exist. The file follows the contract in
+`config-files`.
 
 The file SHALL be optional: with no file present, Dango runs entirely on its
-built-in defaults. The schema Dango writes beside the file is not
-configuration and SHALL NOT count as the file being present.
+built-in defaults.
 
 #### Scenario: No file means defaults
 
@@ -122,12 +121,8 @@ with `enabled`, app tables included.
 
 ### Requirement: Keys and values follow one style
 
-Every key SHALL be lowercase kebab-case. A key whose value has a unit SHALL
-name the unit, as in `reset-after-seconds` or `entry-megabytes`. A count SHALL
-be a whole number. A setting holding several values SHALL be a TOML array, not
-a separated string. A value that differs per platform SHALL be written as one
-value or as a table with `macos` and `windows` keys. A path from an extension
-table to a value SHALL be at most three keys deep, as in
+The config file SHALL follow the key and value style in `config-files`. A path
+from an extension table to a value SHALL be at most three keys deep, as in
 `ai.commands.<id>.prompt`.
 
 #### Scenario: A list is an array
@@ -156,10 +151,9 @@ table to a value SHALL be at most three keys deep, as in
 
 ### Requirement: An absent key always means the default
 
-A key left out SHALL mean the setting's built-in default, for every setting.
-The file SHALL have no empty value or placeholder that means "default" or
-"off". `enabled` left out SHALL mean the table's default: on for an extension,
-off for the hyperkey.
+A key left out of the config file SHALL mean its default, as `config-files`
+sets for every file. `enabled` left out SHALL mean the table's default: on
+for an extension, off for the hyperkey.
 
 #### Scenario: An extension table without enabled
 
@@ -170,84 +164,3 @@ off for the hyperkey.
 
 - **WHEN** `[hyperkey]` sets `tap = "escape"` but not `enabled`
 - **THEN** the hyperkey is off
-
-### Requirement: Configuration is versioned and forward compatible
-
-The file MAY carry a top-level `version`. Keys the running version does not
-understand, including settings from a newer Dango and tables for extensions
-that are not installed, SHALL be preserved and ignored rather than treated as
-errors, so an older Dango and a newer one can share one file.
-
-#### Scenario: Unknown keys do not break loading
-
-- **WHEN** the file contains a key Dango does not recognise
-- **THEN** the rest of the configuration still loads and applies
-- **AND** the unknown key is left intact for whatever does understand it
-
-#### Scenario: The version may be left out
-
-- **WHEN** the file has no `version`
-- **THEN** it loads exactly as it would with one
-
-### Requirement: Edits apply live
-
-Dango SHALL watch the configuration file and re-apply it when it changes, without
-a restart: the launcher hotkey, enabled state, settings, and aliases SHALL
-reflect the new file. When Dango itself creates the file, that write SHALL NOT
-be treated as an external edit to react to.
-
-#### Scenario: Editing the file re-applies it
-
-- **WHEN** the user edits and saves `config.toml` while Dango is running
-- **THEN** the changed settings take effect without restarting Dango
-
-#### Scenario: The app's own write does not loop
-
-- **WHEN** Dango creates the file itself
-- **THEN** it does not re-apply its own write as though the user had edited it
-
-### Requirement: A bad file never takes the app down
-
-An unreadable or invalid configuration file SHALL NOT crash Dango or leave it
-unconfigured. A file is invalid when it is not valid TOML, or when a known
-setting has a value of the wrong type or outside the values it allows. Dango
-SHALL keep running on the last configuration that loaded cleanly, or on the
-built-in defaults if none has, and SHALL surface the problem, with the line it
-is on, where the user can find it rather than failing silently.
-
-#### Scenario: Invalid file keeps the last good configuration
-
-- **WHEN** the user saves a `config.toml` that does not parse
-- **THEN** Dango keeps running on the previously loaded configuration
-- **AND** the error is surfaced through the tray and written to a log
-
-#### Scenario: Invalid file at startup falls back to defaults
-
-- **WHEN** Dango starts and the existing `config.toml` does not parse
-- **THEN** Dango starts on its built-in defaults
-- **AND** the error is surfaced rather than the app refusing to start
-
-#### Scenario: A value of the wrong type makes the file invalid
-
-- **WHEN** the user saves a file with `entries = "many"` in `[clipboard]`
-- **THEN** Dango keeps running on the previously loaded configuration
-- **AND** the surfaced error names the setting and its line
-
-#### Scenario: A value outside the allowed ones makes the file invalid
-
-- **WHEN** the user saves a file with `primary-action = "drop"` in
-  `[clipboard]`
-- **THEN** Dango keeps running on the previously loaded configuration
-- **AND** the surfaced error names the setting and its line
-
-### Requirement: Dango writes the file only to create it
-
-Dango SHALL NOT change an existing configuration file. The only write SHALL be
-creating a missing file when the user opens it (see system-commands, "Open
-config file").
-
-#### Scenario: Settings are never written back
-
-- **WHEN** Dango runs with an existing `config.toml`, including one that does
-  not parse
-- **THEN** the file's content is the same as the user last saved it

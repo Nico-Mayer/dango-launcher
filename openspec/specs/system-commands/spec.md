@@ -159,7 +159,7 @@ settings, including "config", "settings", "preferences", "keybinds", and
 "hotkeys".
 
 When no config file exists, the command SHALL create one whose first line is
-the `#:schema` comment pointing at the schema beside it, before opening it, and the creation SHALL NOT be treated as an external edit to react
+the `#:schema` comment pointing at its schema in the `.schemas` folder, before opening it, and the creation SHALL NOT be treated as an external edit to react
 to. An existing file SHALL be opened as it is, with no change to its content.
 
 #### Scenario: Found by a settings word
@@ -188,7 +188,7 @@ to. An existing file SHALL be opened as it is, with no change to its content.
 #### Scenario: No config file exists yet
 
 - **WHEN** open config file is invoked and there is no config file
-- **THEN** a `config.toml` whose first line is `#:schema ./config.schema.json` is created in the config directory
+- **THEN** a `config.toml` whose first line is `#:schema ./.schemas/config.schema.json` is created in the config directory
 - **AND** that file is opened
 - **AND** the config status does not report a reload, because the write was Dango's own
 

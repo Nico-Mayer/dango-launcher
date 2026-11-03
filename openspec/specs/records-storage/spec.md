@@ -11,73 +11,74 @@ machines.
 
 ### Requirement: Authored records live as text in the config directory
 
-Snippets and quicklinks SHALL be stored as text files in the config directory,
-`snippets.json` and `quicklinks.json` under `~/.config/dango/`, honouring
-`$DANGO_CONFIG_DIR`. Each file SHALL be an array of records, and each record SHALL
-carry a name and a body (the template for a snippet, the URL for a quicklink) and
-a stable identifier.
+Snippets and quicklinks SHALL be stored in `snippets.toml` and
+`quicklinks.toml`, shared files under the contract in `config-files`. Each
+record SHALL be a table keyed by its id, holding `name` and its body,
+`template` for a snippet and `url` for a quicklink, and its optional fields:
+`keyword` for a snippet, `browser` for a quicklink.
 
 Machine-local data, the clipboard history and usage ranking, SHALL NOT be
 written to these files; it stays in the local database.
 
 #### Scenario: A created record is written to its file
 
-- **WHEN** the user creates a snippet
-- **THEN** it appears as an entry in `snippets.json`
+- **WHEN** the user creates a snippet named "Signature"
+- **THEN** `snippets.toml` holds a `[signature]` table with that name and its
+  template
 - **AND** the file is plain text that can be committed to git
+
+#### Scenario: A multi-line template stays readable
+
+- **WHEN** the user creates a snippet whose template has several lines
+- **THEN** the file holds the template on several lines, not with `\n` escapes
 
 #### Scenario: Machine-local data is not in the files
 
 - **WHEN** the clipboard history records an entry
-- **THEN** nothing is written to `snippets.json` or `quicklinks.json`
+- **THEN** nothing is written to `snippets.toml` or `quicklinks.toml`
 
 ### Requirement: The files are hand-editable
 
 A user SHALL be able to add, change, or remove a record by editing the file
-directly. A record MAY omit its identifier when hand-authored, and Dango SHALL
-assign one the next time it writes the file, without changing the record's meaning.
+directly, under an id of their choosing. A record created in the launcher
+SHALL get an id made from its name: lowercase kebab-case, letters folded to
+ASCII, never `version`, with a number appended when the id is taken. A record
+SHALL keep its id when renamed.
 
 #### Scenario: A hand-added record appears
 
-- **WHEN** the user adds a record to `snippets.json` by hand, without an id
-- **THEN** the snippet is available in the launcher
-- **AND** Dango gives it an id when it next writes the file
+- **WHEN** the user adds a `[brb]` table with a name and a template to
+  `snippets.toml` by hand
+- **THEN** the snippet is available in the launcher with id `brb`
 
-### Requirement: Edits apply live
+#### Scenario: An id is made from the name
 
-Dango SHALL watch the record files and reflect changes without a restart: a
-record added, changed, or removed in a file SHALL show up in the launcher on the
-next search, and Dango's own writes SHALL NOT be treated as external edits.
+- **WHEN** the user creates a snippet named "Café menu"
+- **THEN** it is stored under `[cafe-menu]`
 
-#### Scenario: Editing a record updates the launcher
+#### Scenario: A taken id gets a number
 
-- **WHEN** the user changes a snippet's body in `snippets.json` while Dango runs
-- **THEN** using that snippet inserts the new body, without a restart
+- **WHEN** a quicklink `github` exists and the user creates another quicklink
+  named "GitHub"
+- **THEN** the new one is stored under `[github-2]`
 
-#### Scenario: Deleting an entry removes the record
+#### Scenario: A rename keeps the id
 
-- **WHEN** the user removes a record's entry from the file
-- **THEN** that record no longer appears in the launcher
+- **WHEN** the user renames the snippet `signature` to "Work signature"
+- **THEN** it is still stored under `[signature]` with the new name
+
+#### Scenario: A name without letters or digits
+
+- **WHEN** the user creates a snippet named "!!!"
+- **THEN** it is stored under `[snippet]`, or `[snippet-2]` when that is taken
 
 ### Requirement: Removing a record removes its entry
 
-Removing a record through the launcher SHALL delete its entry from the file
+Removing a record through the launcher SHALL delete its table from the file
 rather than marking it deleted, and it SHALL stay gone across a restart.
 
 #### Scenario: Remove deletes the entry
 
 - **WHEN** the user removes a quicklink from the launcher
-- **THEN** its entry is gone from `quicklinks.json`
+- **THEN** its table is gone from `quicklinks.toml`
 - **AND** it does not return after a restart
-
-### Requirement: A bad records file is reported, not fatal
-
-An unreadable or invalid record file SHALL NOT crash Dango or discard the user's
-records. Dango SHALL keep the last set that loaded cleanly and surface the problem
-where the user can find it, the same way a bad config file is handled.
-
-#### Scenario: A malformed file keeps the last good records
-
-- **WHEN** the user saves a `snippets.json` that does not parse
-- **THEN** the snippets from the last good version are still available
-- **AND** the error is surfaced rather than the records being lost
