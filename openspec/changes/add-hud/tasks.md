@@ -23,10 +23,10 @@
 
 ## 4. Hand checks on Windows
 
-- [ ] 4.1 With an elevated window in front, press a window-management hotkey bound without hyper (the hyperkey hook sees no keys there), and check with `mise run shot` that the HUD shows the failure at the bottom of the monitor under the mouse, the elevated window keeps the foreground and typing, and the HUD is gone after about four seconds
+- [x] 4.1 With an elevated window in front, press a window-management hotkey bound without hyper (the hyperkey hook sees no keys there), and check with `mise run shot` that the HUD shows the failure at the bottom of the monitor under the mouse, the elevated window keeps the foreground and typing, and the HUD is gone after about four seconds
 - [x] 4.2 Copy from clipboard history in the launcher and check the "Copied to clipboard" HUD shows only after the launcher is gone, clicks pass through it, it is not in the taskbar or Alt+Tab, and the launcher still takes the keyboard on its next show
-- [ ] 4.3 Show two HUDs in a row with different text and check the second replaces the first; open the launcher over a HUD and check the HUD is gone
-- [ ] 4.4 Check the HUD over a fullscreen app, and on a second monitor with the mouse there
+- [x] 4.3 Show two HUDs in a row with different text and check the second replaces the first; open the launcher over a HUD and check the HUD is gone
+- [x] 4.4 Check the HUD over a fullscreen app, and on a second monitor with the mouse there
 
 ## 5. Hand checks on macOS
 
