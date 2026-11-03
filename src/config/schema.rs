@@ -19,10 +19,36 @@ const AI_ID: &str = "dango.ai";
 pub fn generate(file: UserFile, manifests: &[Manifest]) -> Value {
     let mut schema = match file {
         UserFile::Config => config_schema(manifests),
+        UserFile::Auth => auth_schema(),
     };
     drop_unused_defs(&mut schema);
     tidy(&mut schema);
     schema
+}
+
+const DRAFT: &str = "https://json-schema.org/draft/2020-12/schema";
+
+fn version_property() -> Value {
+    json!({
+        "type": "integer",
+        "minimum": 0,
+        "description": "The file's schema version. Leave it at 1."
+    })
+}
+
+fn auth_schema() -> Value {
+    json!({
+        "$schema": DRAFT,
+        "title": "Dango keys",
+        "description": "API keys for hosted AI providers, keyed by the provider's name in \
+            config.toml. Dango only reads this file. Keep it out of git.",
+        "type": "object",
+        "properties": { "version": version_property() },
+        "additionalProperties": {
+            "type": "string",
+            "description": "The provider's API key."
+        }
+    })
 }
 
 fn config_schema(manifests: &[Manifest]) -> Value {
@@ -241,7 +267,10 @@ fn inline_tables(schema: &mut Value, manifests: &[Manifest]) {
 }
 
 fn drop_unused_defs(schema: &mut Value) {
-    let names: Vec<String> = defs(schema).keys().cloned().collect();
+    let Some(defs_map) = schema.get("$defs").and_then(Value::as_object) else {
+        return;
+    };
+    let names: Vec<String> = defs_map.keys().cloned().collect();
     for name in names {
         let reference = format!("\"#/$defs/{name}\"");
         if !schema.to_string().contains(&reference) {
@@ -356,6 +385,25 @@ impl Reference<'_> {
                 } else if item.get("properties").is_some() {
                     children.push((format!("{child_path}.<name>"), item.clone()));
                 }
+            }
+        }
+        if let Some(item) = node
+            .get("additionalProperties")
+            .filter(|v| v.is_object())
+            .filter(|_| path.is_empty())
+        {
+            let (resolved, def) = resolve(schema, item);
+            let description = item["description"]
+                .as_str()
+                .or(resolved["description"].as_str())
+                .unwrap_or("");
+            let _ = writeln!(
+                self.out,
+                "| `<name>` | {} |  |  | {description} |",
+                type_name(schema, item)
+            );
+            if let Some(def) = def {
+                self.enqueue(def);
             }
         }
         for (child_path, child) in children {
@@ -786,6 +834,41 @@ mod tests {
             schema["properties"]["quicklinks"]["properties"]["favicons"]["default"],
             true
         );
+    }
+
+    fn validator_for(file: UserFile) -> jsonschema::Validator {
+        jsonschema::validator_for(&generate(file, &builtin_manifests())).expect("compiles")
+    }
+
+    #[test]
+    fn an_auth_key_must_be_text() {
+        let validator = validator_for(UserFile::Auth);
+        assert!(validator.is_valid(&instance("version = 1\nanthropic = \"sk-ant\"")));
+        assert!(!validator.is_valid(&instance("anthropic = 3")));
+    }
+
+    #[test]
+    fn every_schema_uses_kebab_case_keys() {
+        fn check(node: &Value, file: UserFile) {
+            match node {
+                Value::Object(map) => {
+                    if let Some(Value::Object(properties)) = map.get("properties") {
+                        for key in properties.keys() {
+                            let kebab = key
+                                .chars()
+                                .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-');
+                            assert!(kebab, "{file:?}: {key}");
+                        }
+                    }
+                    map.values().for_each(|child| check(child, file));
+                }
+                Value::Array(items) => items.iter().for_each(|child| check(child, file)),
+                _ => {}
+            }
+        }
+        for file in UserFile::ALL {
+            check(&generate(file, &builtin_manifests()), file);
+        }
     }
 
     #[test]

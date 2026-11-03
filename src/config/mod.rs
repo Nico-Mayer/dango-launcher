@@ -24,7 +24,7 @@ pub mod watch;
 
 pub use files::{write_user_file, UserFile};
 pub use hotkey::{Hotkey, HotkeyError, ParsedHotkey, PerPlatform};
-pub use location::{auth_path, config_dir};
+pub use location::config_dir;
 pub use store::FileConfig;
 pub use tables::{
     table_name, AiCommandSettings, AiTable, ApplicationsTable, ClipboardTable, CommandBinding,
@@ -172,7 +172,7 @@ impl Launcher {
 }
 
 /// One model service. The key it is stored under is the name a command uses to
-/// refer to it, and the name its key in `auth.json` is filed under.
+/// refer to it, and the name its key in `auth.toml` is filed under.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "kebab-case")]
 pub struct ProviderSettings {

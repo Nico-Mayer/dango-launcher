@@ -388,7 +388,7 @@ impl crate::text::TextTarget for NothingSelected {
 async fn a_failed_selection_read_shows_in_the_launcher_at_once() {
     let ai = super::AiParts {
         keys: Arc::new(crate::extensions::ai::AuthFile::new(
-            std::env::temp_dir().join("dango-no-auth.json"),
+            std::env::temp_dir().join("dango-no-auth.toml"),
         )),
         client: Arc::new(StopCounter::default()),
         text: Some(Arc::new(NothingSelected)),
@@ -425,7 +425,7 @@ async fn quitting_stops_running_agent_programs() {
     let client = Arc::new(StopCounter::default());
     let ai = super::AiParts {
         keys: Arc::new(crate::extensions::ai::AuthFile::new(
-            std::env::temp_dir().join("dango-no-auth.json"),
+            std::env::temp_dir().join("dango-no-auth.toml"),
         )),
         client: client.clone(),
         text: None,

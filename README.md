@@ -46,13 +46,15 @@ setting is optional and listed in `docs/config.md`. Run the Open Config File
 command from the launcher to open it in the app your system uses for `.toml`
 files. It creates the file if there is none yet.
 
-Dango writes `config.schema.json` beside the config file on every start. Put
-`#:schema ./config.schema.json` on the first line of yours and an editor with a
-TOML language server (Taplo, Tombi) will complete and check it. The schema file
-is generated, so keep it out of the git repository that holds your dotfiles.
+Dango writes a schema for each of its files into `.schemas/` in the config
+directory on every start. A file Dango creates starts with a line such as
+`#:schema ./.schemas/config.schema.json`, and an editor with a TOML language
+server (Taplo, Tombi) uses it to complete and check the file. Add the line by
+hand to a file you create yourself. The schemas are generated, so keep
+`.schemas/` out of the git repository that holds your dotfiles.
 
-API keys for the AI commands live beside it in `auth.json`, in plain text, one
-entry per provider. See `docs/auth.example.json`. **Keep `auth.json` out of
+API keys for the AI commands live beside it in `auth.toml`, in plain text, one
+entry per provider. See `docs/auth.example.toml`. **Keep `auth.toml` out of
 git.** The config file is meant to be committed and shared between machines;
 the key file is not.
 

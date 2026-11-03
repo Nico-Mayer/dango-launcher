@@ -1,4 +1,4 @@
-//! Provider keys, read from `auth.json` in the config directory.
+//! Provider keys, read from `auth.toml` in the config directory.
 //!
 //! Plain text, deliberately: one user with two machines, and a file that can be
 //! copied. It is its own file so `config.toml` stays committable, and Dango only
@@ -7,19 +7,18 @@
 //! Two rules hold everything here together. The file is read per request rather
 //! than cached, so a key added while Dango runs works immediately and none sits
 //! in memory between requests. And nothing derived from the file's contents ever
-//! reaches an error: the JSON is parsed to a value first and only position
-//! information from a syntax error is kept, because a serde error over a typed
-//! struct can quote the value it choked on.
+//! reaches an error: only the position of a syntax error is kept, because the
+//! `toml` error text quotes the line it choked on.
 
 use std::path::{Path, PathBuf};
 
-use serde_json::Value;
+use toml::{Table, Value};
 
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
 pub enum AuthError {
-    #[error("auth.json is not valid JSON, at line {line}")]
+    #[error("auth.toml: line {line} isn't valid TOML")]
     Parse { line: usize },
-    #[error("auth.json could not be read")]
+    #[error("auth.toml could not be read")]
     Read,
 }
 
@@ -45,14 +44,22 @@ impl Keys for AuthFile {
             return Ok(None);
         };
         restrict_to_owner(&self.path);
-        let value: Value =
-            serde_json::from_str(&text).map_err(|error| AuthError::Parse { line: error.line() })?;
-        Ok(value
+        let table: Table = text
+            .parse()
+            .map_err(|error: toml::de::Error| AuthError::Parse {
+                line: line_of(&text, error.span()),
+            })?;
+        Ok(table
             .get(provider)
             .and_then(Value::as_str)
             .filter(|key| !key.trim().is_empty())
             .map(str::to_string))
     }
+}
+
+fn line_of(text: &str, span: Option<std::ops::Range<usize>>) -> usize {
+    let start = span.map_or(0, |span| span.start.min(text.len()));
+    text[..start].matches('\n').count() + 1
 }
 
 fn read(path: &Path) -> Result<Option<String>, AuthError> {
@@ -87,7 +94,7 @@ mod tests {
     use super::*;
 
     fn write(dir: &Path, text: &str) -> PathBuf {
-        let path = dir.join("auth.json");
+        let path = dir.join("auth.toml");
         std::fs::write(&path, text).unwrap();
         path
     }
@@ -104,7 +111,7 @@ mod tests {
         let dir = temp_dir("read");
         let path = write(
             &dir,
-            r#"{ "anthropic": "sk-ant-test", "openrouter": "sk-or" }"#,
+            "version = 1\nanthropic = \"sk-ant-test\"\nopenrouter = \"sk-or\"\n",
         );
         let auth = AuthFile::new(path);
         assert_eq!(
@@ -113,34 +120,36 @@ mod tests {
         );
         assert_eq!(auth.key("openrouter").unwrap().as_deref(), Some("sk-or"));
         assert_eq!(auth.key("ollama").unwrap(), None);
+        assert_eq!(auth.key("version").unwrap(), None);
     }
 
     #[test]
     fn a_missing_file_is_no_keys_rather_than_an_error() {
         let dir = temp_dir("missing");
-        let auth = AuthFile::new(dir.join("auth.json"));
+        let auth = AuthFile::new(dir.join("auth.toml"));
         assert_eq!(auth.key("anthropic").unwrap(), None);
     }
 
     #[test]
     fn an_empty_key_counts_as_absent() {
         let dir = temp_dir("empty-value");
-        let path = write(&dir, r#"{ "anthropic": "  " }"#);
+        let path = write(&dir, r#"anthropic = "  ""#);
         assert_eq!(AuthFile::new(path).key("anthropic").unwrap(), None);
     }
 
     #[test]
     fn a_malformed_file_reports_where_not_what() {
         let dir = temp_dir("malformed");
-        let path = write(&dir, "{ \"anthropic\": \"sk-ant-secret\" ");
+        let path = write(&dir, "version = 1\nanthropic = \"sk-ant-secret\n");
         let error = AuthFile::new(path).key("anthropic").unwrap_err();
+        assert_eq!(error, AuthError::Parse { line: 2 });
         let message = error.to_string();
         assert!(
             !message.contains("sk-ant-secret"),
             "the key reached the error: {message}"
         );
         assert!(
-            message.contains("auth.json"),
+            message.contains("auth.toml"),
             "the file is not named: {message}"
         );
     }
@@ -148,10 +157,10 @@ mod tests {
     #[test]
     fn a_key_added_while_running_is_picked_up() {
         let dir = temp_dir("live");
-        let path = write(&dir, r#"{}"#);
+        let path = write(&dir, "");
         let auth = AuthFile::new(path.clone());
         assert_eq!(auth.key("anthropic").unwrap(), None);
-        std::fs::write(&path, r#"{ "anthropic": "sk-ant-new" }"#).unwrap();
+        std::fs::write(&path, r#"anthropic = "sk-ant-new""#).unwrap();
         assert_eq!(
             auth.key("anthropic").unwrap().as_deref(),
             Some("sk-ant-new")
@@ -164,7 +173,7 @@ mod tests {
         use std::os::unix::fs::PermissionsExt;
 
         let dir = temp_dir("permissions");
-        let path = write(&dir, r#"{ "anthropic": "sk-ant-test" }"#);
+        let path = write(&dir, r#"anthropic = "sk-ant-test""#);
         std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o644)).unwrap();
 
         let auth = AuthFile::new(path.clone());

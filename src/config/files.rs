@@ -12,21 +12,26 @@ const SCHEMA_DIR: &str = ".schemas";
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum UserFile {
     Config,
+    /// Provider keys: beside the config but not in it, because the config is
+    /// meant to be committed and this file is not.
+    Auth,
 }
 
 impl UserFile {
-    pub const ALL: [UserFile; 1] = [UserFile::Config];
+    pub const ALL: [UserFile; 2] = [UserFile::Config, UserFile::Auth];
 
     /// The name without extension, shared by the file and its schema.
     pub fn name(self) -> &'static str {
         match self {
             UserFile::Config => "config",
+            UserFile::Auth => "auth",
         }
     }
 
     pub fn file_name(self) -> &'static str {
         match self {
             UserFile::Config => "config.toml",
+            UserFile::Auth => "auth.toml",
         }
     }
 

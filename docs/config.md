@@ -34,7 +34,7 @@ Settings for the AI extension.
 | `commands` | map of [AI command settings](#ai-command-settings) |  |  | Per-command settings, keyed by command id. A command id the extension does not ship defines a new command. |
 | `enabled` | boolean |  |  | Whether the extension runs. Absent means enabled. |
 | `provider` | string |  |  | The provider a command uses when it names none. |
-| `providers` | map of [Provider settings](#provider-settings) |  |  | Model services, keyed by the name commands refer to them by. That name is also the key its API key is filed under in auth.json. |
+| `providers` | map of [Provider settings](#provider-settings) |  |  | Model services, keyed by the name commands refer to them by. That name is also the key its API key is filed under in auth.toml. |
 | `thinking` | string | `off` | `off`, `low`, `medium`, `high` | How hard the model thinks when a command does not say. |
 
 ### `ai.commands`
@@ -306,3 +306,14 @@ One of:
 | --- | --- | --- | --- | --- |
 | `macos` | string |  |  | The value on macOS. |
 | `windows` | string |  |  | The value on Windows. |
+
+## auth.toml
+
+API keys for hosted AI providers, keyed by the provider's name in config.toml. Dango only reads this file. Keep it out of git.
+
+### Top level
+
+| Setting | Type | Default | Values | Description |
+| --- | --- | --- | --- | --- |
+| `version` | integer |  |  | The file's schema version. Leave it at 1. |
+| `<name>` | string |  |  | The provider's API key. |

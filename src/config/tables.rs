@@ -173,7 +173,7 @@ pub struct AiTable {
     #[serde(skip_serializing_if = "BTreeMap::is_empty")]
     pub commands: BTreeMap<String, AiCommandSettings>,
     /// Model services, keyed by the name commands refer to them by. That name
-    /// is also the key its API key is filed under in auth.json.
+    /// is also the key its API key is filed under in auth.toml.
     #[serde(skip_serializing_if = "BTreeMap::is_empty")]
     pub providers: BTreeMap<String, ProviderSettings>,
     /// The provider a command uses when it names none.

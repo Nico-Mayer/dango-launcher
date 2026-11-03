@@ -73,9 +73,9 @@ fn is_loopback(base_url: &str) -> bool {
 /// it goes to the log.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum AiError {
-    #[error("{provider} needs a key. Add one to auth.json in your config folder.")]
+    #[error("{provider} needs a key. Add one to auth.toml in your config folder.")]
     MissingKey { provider: String },
-    #[error("{provider} didn't accept your key. Check it in auth.json.")]
+    #[error("{provider} didn't accept your key. Check it in auth.toml.")]
     KeyRejected { provider: String },
     #[error("{provider} doesn't have that model. Check the model name in your config file.")]
     UnknownModel { provider: String },
@@ -91,7 +91,7 @@ pub enum AiError {
     RateLimited { provider: String },
     #[error("The model didn't answer in time")]
     Timeout,
-    #[error("auth.json couldn't be read. Check the file in your config folder.")]
+    #[error("auth.toml couldn't be read. Check the file in your config folder.")]
     KeyFileUnreadable,
     #[error("Couldn't find {program}. Install it or set its path in your config file.")]
     ProgramMissing { program: String },

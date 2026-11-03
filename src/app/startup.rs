@@ -294,7 +294,7 @@ fn build_services(
     }
 
     let ai = AiParts {
-        keys: Arc::new(AuthFile::new(config::auth_path())),
+        keys: Arc::new(AuthFile::new(config::UserFile::Auth.path())),
         client: Arc::new(Clients::new(
             Arc::new(GenAiClient::new(startup.runtime.clone())),
             Arc::new(AgentClient::new(cache_dir().join("agent-workspace"))),

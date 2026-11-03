@@ -731,7 +731,7 @@ mod tests {
 
         assert_eq!(
             sink.failure().as_deref(),
-            Some("anthropic needs a key. Add one to auth.json in your config folder.")
+            Some("anthropic needs a key. Add one to auth.toml in your config folder.")
         );
         assert!(fixture.client.last_request().is_none());
     }
