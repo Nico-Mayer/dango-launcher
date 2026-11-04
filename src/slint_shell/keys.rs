@@ -41,6 +41,29 @@ pub fn shortcut_label(shortcut: &Shortcut) -> String {
     parts.join(platform::label(Label::ChordSeparator))
 }
 
+/// A global hotkey as the operating system reads it. Unlike an action
+/// shortcut, Control stays Control on macOS rather than becoming Cmd.
+pub fn hotkey_label(hotkey: &global_hotkey::hotkey::HotKey) -> String {
+    use global_hotkey::hotkey::Modifiers;
+    let mut parts: Vec<String> = [
+        (Modifiers::CONTROL, Label::ControlKey),
+        (Modifiers::ALT, Label::AltKey),
+        (Modifiers::SHIFT, Label::ShiftKey),
+        (Modifiers::SUPER, Label::SuperKey),
+    ]
+    .iter()
+    .filter(|(modifier, _)| hotkey.mods.contains(*modifier))
+    .map(|(_, label)| platform::label(*label).to_string())
+    .collect();
+    let code = format!("{:?}", hotkey.key);
+    let key = code
+        .strip_prefix("Key")
+        .or_else(|| code.strip_prefix("Digit"))
+        .unwrap_or(&code);
+    parts.push(key.to_string());
+    parts.join(platform::label(Label::ChordSeparator))
+}
+
 /// The modifiers held with a key. `control` and `meta` both count as the
 /// command key, as Ctrl on Windows and Cmd on macOS always have.
 #[derive(Clone, Copy, Debug, Default)]
@@ -99,6 +122,23 @@ fn name(text: &str) -> Option<String> {
 
 #[cfg(test)]
 mod tests {
+
+    fn ctrl_alt_v() -> global_hotkey::hotkey::HotKey {
+        use global_hotkey::hotkey::{Code, HotKey, Modifiers};
+        HotKey::new(Some(Modifiers::CONTROL | Modifiers::ALT), Code::KeyV)
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn a_hotkey_reads_with_the_mac_symbols() {
+        assert_eq!(hotkey_label(&ctrl_alt_v()), "⌃⌥V");
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn a_hotkey_reads_with_the_windows_names() {
+        assert_eq!(hotkey_label(&ctrl_alt_v()), "Ctrl+Alt+V");
+    }
     use super::*;
 
     #[test]

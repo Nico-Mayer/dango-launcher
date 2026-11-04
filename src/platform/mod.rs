@@ -514,8 +514,12 @@ pub enum Label {
     /// The default launcher hotkey.
     LauncherShortcut,
     CommandKey,
+    /// Control itself, which a global hotkey keeps apart from the command key.
+    ControlKey,
     AltKey,
     ShiftKey,
+    /// Cmd on macOS, the Windows key on Windows.
+    SuperKey,
     /// What joins the parts of a displayed chord.
     ChordSeparator,
 }
@@ -526,8 +530,10 @@ pub fn label(label: Label) -> &'static str {
         Label::EmptyTrash => ("Empty Trash", "Empty Recycle Bin"),
         Label::LauncherShortcut => ("Option+Space", "Alt+Space"),
         Label::CommandKey => ("⌘", "Ctrl"),
+        Label::ControlKey => ("⌃", "Ctrl"),
         Label::AltKey => ("⌥", "Alt"),
         Label::ShiftKey => ("⇧", "Shift"),
+        Label::SuperKey => ("⌘", "Win"),
         Label::ChordSeparator => ("", "+"),
     };
     if cfg!(target_os = "macos") {
