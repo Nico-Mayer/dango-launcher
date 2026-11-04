@@ -55,13 +55,38 @@ pub fn hotkey_label(hotkey: &global_hotkey::hotkey::HotKey) -> String {
     .filter(|(modifier, _)| hotkey.mods.contains(*modifier))
     .map(|(_, label)| platform::label(*label).to_string())
     .collect();
-    let code = format!("{:?}", hotkey.key);
-    let key = code
-        .strip_prefix("Key")
-        .or_else(|| code.strip_prefix("Digit"))
-        .unwrap_or(&code);
-    parts.push(key.to_string());
+    parts.push(key_name(hotkey.key));
     parts.join(platform::label(Label::ChordSeparator))
+}
+
+fn key_name(key: global_hotkey::hotkey::Code) -> String {
+    use global_hotkey::hotkey::Code;
+    let symbol = match key {
+        Code::Backquote => "`",
+        Code::Backslash => "\\",
+        Code::BracketLeft => "[",
+        Code::BracketRight => "]",
+        Code::Comma => ",",
+        Code::Equal => "=",
+        Code::Minus => "-",
+        Code::Period => ".",
+        Code::Quote => "'",
+        Code::Semicolon => ";",
+        Code::Slash => "/",
+        Code::ArrowUp => "↑",
+        Code::ArrowDown => "↓",
+        Code::ArrowLeft => "←",
+        Code::ArrowRight => "→",
+        _ => {
+            let code = format!("{key:?}");
+            return code
+                .strip_prefix("Key")
+                .or_else(|| code.strip_prefix("Digit"))
+                .unwrap_or(&code)
+                .to_string();
+        }
+    };
+    symbol.to_string()
 }
 
 /// The modifiers held with a key. `control` and `meta` both count as the
@@ -122,6 +147,7 @@ fn name(text: &str) -> Option<String> {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
 
     fn ctrl_alt_v() -> global_hotkey::hotkey::HotKey {
         use global_hotkey::hotkey::{Code, HotKey, Modifiers};
@@ -139,7 +165,15 @@ mod tests {
     fn a_hotkey_reads_with_the_windows_names() {
         assert_eq!(hotkey_label(&ctrl_alt_v()), "Ctrl+Alt+V");
     }
-    use super::*;
+
+    #[test]
+    fn a_hotkey_key_reads_as_its_character() {
+        use global_hotkey::hotkey::Code;
+        assert_eq!(key_name(Code::Semicolon), ";");
+        assert_eq!(key_name(Code::ArrowUp), "↑");
+        assert_eq!(key_name(Code::Digit5), "5");
+        assert_eq!(key_name(Code::F5), "F5");
+    }
 
     #[test]
     fn named_keys_take_their_web_names() {
