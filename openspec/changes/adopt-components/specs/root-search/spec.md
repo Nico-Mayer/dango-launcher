@@ -2,17 +2,11 @@
 
 ## ADDED Requirements
 
-### Requirement: Root results can show accessories
+### Requirement: A result shows its hotkey
 
-A root search result SHALL be able to show up to three accessories on its right,
-drawn as a list row's are (see design-system). A permission warning SHALL show
-the tag "Needs permission" in the danger role. A command with a global hotkey
-SHALL show that hotkey as a key chord, using the platform's names for the keys.
-
-#### Scenario: A permission warning
-
-- **WHEN** Accessibility is off on macOS and the user opens the launcher
-- **THEN** the warning's row shows "Needs permission" in the danger role
+A command or application result whose global hotkey is registered SHALL show
+that hotkey on its right as a key chord, using the platform's names for the
+keys. A result without a working hotkey SHALL show none.
 
 #### Scenario: A command's hotkey on Windows
 
@@ -26,7 +20,12 @@ SHALL show that hotkey as a key chord, using the platform's names for the keys.
   types "clip"
 - **THEN** its row shows "⌃⌥V" as a key chord
 
-#### Scenario: A command without a hotkey
+#### Scenario: An application's hotkey
 
-- **WHEN** a command has no hotkey
+- **WHEN** an application has a registered hotkey and the user types its name
+- **THEN** its row shows that hotkey
+
+#### Scenario: A hotkey that could not be registered
+
+- **WHEN** a command's configured hotkey was refused by the operating system
 - **THEN** its row shows no key chord

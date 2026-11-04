@@ -4,12 +4,11 @@
 
 ### Requirement: A running request is a background task
 
-A running request SHALL be a background task (see background-tasks). Escape
-SHALL leave its view the way it leaves any view, and leaving or hiding the
-launcher SHALL NOT stop the request. Cancel SHALL stop it, and a cancelled
-request's later output SHALL NOT appear. Running the same command again while
-it runs SHALL show its view again; running a different AI command SHALL cancel
-it.
+Once its prompt is ready, a request SHALL run as a background task (see
+background-tasks). Escape and hiding the launcher SHALL NOT stop it. Its view
+SHALL offer "Continue in background" with Enter and "Cancel" with the cancel
+chord. Running the same command again while it runs SHALL show its view again;
+running another AI command SHALL cancel it once that command's prompt is ready.
 
 #### Scenario: Escape leaves the request running
 
@@ -19,14 +18,14 @@ it.
 
 #### Scenario: Cancel on Windows
 
-- **WHEN** a request runs in the background and the user presses Ctrl+. on its
-  busy toast
+- **WHEN** a request runs and the user presses Ctrl+. in its view or on its busy
+  toast
 - **THEN** the request stops and nothing from it is shown later
 
 #### Scenario: Cancel on macOS
 
-- **WHEN** a request runs in the background and the user presses Cmd+. on its
-  busy toast
+- **WHEN** a request runs and the user presses Cmd+. in its view or on its busy
+  toast
 - **THEN** the request stops and nothing from it is shown later
 
 #### Scenario: Running the same command again
@@ -41,80 +40,57 @@ it.
 - **THEN** the first request is cancelled and only the second command's output
   is shown
 
-## MODIFIED Requirements
+#### Scenario: A form does not stop a running request
 
-### Requirement: What happens to the answer is the command's choice
+- **WHEN** a request runs in the background and the user opens another AI
+  command's argument form and leaves it
+- **THEN** the first request keeps running
 
-Each command SHALL declare what becomes of its answer: shown in the launcher,
-pasted into the application the user came from, or copied to the clipboard.
-Showing it SHALL be the default. Whatever the setting, the result view SHALL
-offer pasting and copying as actions. When a request finishes while its view
-is not on top, an answer to show or paste SHALL NOT be pasted. Instead a
-success toast SHALL read the command's title followed by "answer is ready" and
-offer "Show answer" with Ctrl+Enter on Windows and Cmd+Enter on macOS. An
-answer to copy SHALL be copied.
+### Requirement: A request that finishes away is kept, not pasted
 
-#### Scenario: The answer is shown
+A request finishes away when its view was left or the launcher is hidden. Then
+an answer to show or paste SHALL NOT be pasted: it SHALL be kept, and a success
+toast SHALL read "Answer ready: " and the title, offering "Show answer" with
+Ctrl+Enter on Windows and Cmd+Enter on macOS. An answer to copy SHALL be copied,
+with the toast "Copied to clipboard". A failure SHALL be reported as
+background-tasks says.
 
-- **WHEN** a command whose output is to be shown finishes
-- **THEN** the answer stays on screen with actions to paste or copy it
+#### Scenario: A paste command finishes after Escape
 
-#### Scenario: The answer is pasted on macOS
-
-- **WHEN** a command set to paste finishes and the user came from an application
-  with an editable field focused
-- **THEN** the launcher hides and the answer is inserted there
-- **AND** the text the user had selected is replaced by it
-
-#### Scenario: The answer is pasted on Windows
-
-- **WHEN** a command set to paste finishes and the user came from an application
-  with an editable field focused
-- **THEN** the launcher hides, the previous window is the foreground window, and
-  the answer is inserted there
-- **AND** the text the user had selected is replaced by it
-
-#### Scenario: The answer is copied
-
-- **WHEN** a command set to copy finishes
-- **THEN** the answer is on the clipboard and the launcher hides
-
-#### Scenario: Pasting from the result view
-
-- **WHEN** the user chooses to paste from a shown answer
-- **THEN** the launcher hides and the answer is inserted into the application
-  they came from
-
-#### Scenario: The answer cannot be pasted
-
-- **WHEN** pasting fails, because there is no application to return to or the
-  permission is missing
-- **THEN** the launcher stays open with the answer still on screen
-- **AND** the failure says what went wrong and what to do
-
-#### Scenario: An empty answer is not pasted
-
-- **WHEN** the model returns nothing
-- **THEN** nothing is inserted or copied
-- **AND** the launcher says the model returned no text
-
-#### Scenario: An answer finishes in the background
-
-- **WHEN** "Summarize" is set to paste and its answer finishes while the user is
-  at root search
-- **THEN** nothing is pasted, and a toast reads "Summarize answer is ready" with
+- **WHEN** "Summarize" is set to paste and the user pressed Escape before its
+  answer finished
+- **THEN** nothing is pasted, and a toast reads "Answer ready: Summarize" with
   "Show answer"
 
-#### Scenario: Showing a background answer
+#### Scenario: A paste command finishes while the launcher is held
 
-- **WHEN** that toast shows and the user presses its chord
+- **WHEN** a paste command runs, the user clicks into another application, and
+  the answer finishes within the grace period
+- **THEN** nothing is pasted and the toast shows when the launcher next opens
+
+#### Scenario: Showing the answer on Windows
+
+- **WHEN** the "Answer ready" toast shows on Windows and the user presses
+  Ctrl+Enter
 - **THEN** the answer's view opens with actions to paste or copy it
 
-#### Scenario: Copying in the background
+#### Scenario: Showing the answer on macOS
 
-- **WHEN** a command set to copy finishes while its view is not on top
+- **WHEN** the "Answer ready" toast shows on macOS and the user presses
+  Cmd+Enter
+- **THEN** the answer's view opens with actions to paste or copy it
+
+#### Scenario: Copying away
+
+- **WHEN** a command set to copy finishes after its view was left
 - **THEN** the answer is on the clipboard and a toast reads "Copied to
   clipboard"
+
+#### Scenario: Finishing in view still pastes
+
+- **WHEN** a paste command started from its hotkey finishes while its view is
+  still on screen
+- **THEN** the launcher hides and the answer is inserted, as before
 
 ## REMOVED Requirements
 
