@@ -2,6 +2,50 @@
 
 All notable changes to Dango. Generated from commit history at release time.
 
+## [6.4.0] - 2026-11-04
+
+### Features
+
+- **ui:** Add v5 pill and card size tokens
+- **ui:** Draw back and filter controls as pills
+- **ui:** Show the primary action as a chip
+- **ui:** Split the launcher into a pill and a card
+- **ui:** Hide when the gap is clicked
+- **search:** Start root closed, open with Down
+- **search:** Let Escape close the opened list
+- **ui:** Show the bare pill until there is a list
+
+### Fixes
+
+- **search:** Keep the pill until typed results land
+- **ui:** Give focus back after a click in the gap
+- **ui:** Stop the card flashing while typing
+
+### Refactoring
+
+- **ui:** Share one toast between bar and pill
+- **tray:** Call startup notices problems
+- Rename toast to ticker and HUD to notice
+
+### Documentation
+
+- **v5:** Propose split launcher shell
+- **v5:** Fold review into split shell change
+- **v5:** Name the toast and HUD rename
+- **v5:** Design files
+- **v5:** Record the Windows hand check
+- **v5:** Mark the code review done
+- **v5:** Point design file tasks at .design
+- **v5:** Match back arrow and card timing to code
+- **v5:** Record the macOS hand check
+- **agents:** Add macOS launcher click traps
+- **v5:** Archive the split shell change
+- **rename:** Propose status line and notice
+- **rename:** Use ticker and fold in review
+- **rename:** Say ticker and notice in specs
+- **rename:** Mark the code review done
+- Keep notice for the window, not the verb
+- **rename:** Note the v5 archive in the plan
 ## [6.3.1] - 2026-11-04
 
 ### Fixes
