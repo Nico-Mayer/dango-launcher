@@ -227,19 +227,19 @@ running another AI command SHALL cancel it once that command's prompt is ready.
 #### Scenario: Escape leaves the request running
 
 - **WHEN** an answer is streaming and the user presses Escape
-- **THEN** the view is closed and the busy toast reads "Running" followed by the
+- **THEN** the view is closed and the busy ticker reads "Running" followed by the
   command's title
 
 #### Scenario: Cancel on Windows
 
 - **WHEN** a request runs and the user presses Ctrl+. in its view or on its busy
-  toast
+  ticker
 - **THEN** the request stops and nothing from it is shown later
 
 #### Scenario: Cancel on macOS
 
 - **WHEN** a request runs and the user presses Cmd+. in its view or on its busy
-  toast
+  ticker
 - **THEN** the request stops and nothing from it is shown later
 
 #### Scenario: Running the same command again
@@ -264,17 +264,17 @@ running another AI command SHALL cancel it once that command's prompt is ready.
 
 A request finishes away when its view was left or the launcher is hidden. Then
 an answer to show or paste SHALL NOT be pasted: it SHALL be kept, and a success
-toast SHALL read "Answer ready: " and the title, offering "Show answer" with
+ticker SHALL read "Answer ready: " and the title, offering "Show answer" with
 Ctrl+Enter on Windows and Cmd+Enter on macOS. An answer to copy SHALL be
-copied, with the toast "Copied to clipboard". A failure SHALL be reported as
+copied, with the ticker "Copied to clipboard". A failure SHALL be reported as
 background-tasks says. When the request's view is held behind a hide, that
-view SHALL show the answer, and reopening onto it SHALL show no toast.
+view SHALL show the answer, and reopening onto it SHALL show no ticker.
 
 #### Scenario: A paste command finishes after Escape
 
 - **WHEN** "Summarize" is set to paste and the user pressed Escape before its
   answer finished
-- **THEN** nothing is pasted, and a toast reads "Answer ready: Summarize" with
+- **THEN** nothing is pasted, and a ticker reads "Answer ready: Summarize" with
   "Show answer"
 
 #### Scenario: A paste command finishes while the launcher is held
@@ -282,24 +282,24 @@ view SHALL show the answer, and reopening onto it SHALL show no toast.
 - **WHEN** a paste command runs, the user clicks into another application, and
   the answer finishes within the grace period
 - **THEN** nothing is pasted, and when the launcher next opens it shows the
-  finished answer with no toast
+  finished answer with no ticker
 
 #### Scenario: Showing the answer on Windows
 
-- **WHEN** the "Answer ready" toast shows on Windows and the user presses
+- **WHEN** the "Answer ready" ticker shows on Windows and the user presses
   Ctrl+Enter
 - **THEN** the answer's view opens with actions to paste or copy it
 
 #### Scenario: Showing the answer on macOS
 
-- **WHEN** the "Answer ready" toast shows on macOS and the user presses
+- **WHEN** the "Answer ready" ticker shows on macOS and the user presses
   Cmd+Enter
 - **THEN** the answer's view opens with actions to paste or copy it
 
 #### Scenario: Copying away
 
 - **WHEN** a command set to copy finishes after its view was left
-- **THEN** the answer is on the clipboard and a toast reads "Copied to
+- **THEN** the answer is on the clipboard and a ticker reads "Copied to
   clipboard"
 
 #### Scenario: Finishing in view still pastes
@@ -312,7 +312,7 @@ view SHALL show the answer, and reopening onto it SHALL show no toast.
 
 Running a command whose answer was kept SHALL open that answer instead of
 starting a new request. A kept answer SHALL be dropped once shown, from the
-toast or by running the command again.
+ticker or by running the command again.
 
 #### Scenario: Running the command again after it finished away
 

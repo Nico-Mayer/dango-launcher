@@ -92,36 +92,54 @@ SearchBar and the results; when no result matches, the card alone stands in
 for the empty view. Overlays SHALL float above these regions and SHALL NOT
 move them.
 
-The launcher SHALL be 720 logical pixels wide. The SearchBar SHALL be 64
-logical pixels high, the ActionBar 44, and a list row 44.
+The SearchBar SHALL be a pill on its own. The view and the ActionBar SHALL sit
+together in one card below it, separated from the pill by a gap through which
+what is behind the launcher shows. At root with an empty query the card MAY be
+hidden, as root-search describes; the pill alone is then the launcher.
+
+The pill and the card SHALL each be 720 logical pixels wide. The pill SHALL be
+52 logical pixels high and fully rounded at its ends, the gap 8, the ActionBar
+44, and a list row 44.
 
 #### Scenario: Root search
 
-- **WHEN** the launcher opens at root
-- **THEN** it shows the SearchBar, a list of results, and the ActionBar
+- **WHEN** the user types a query at root
+- **THEN** the launcher shows the SearchBar pill and, below the gap, one card
+  holding a list of results and the ActionBar
 
 #### Scenario: Sizes at default text scale
 
-- **WHEN** root search is shown at the default text scale
-- **THEN** the launcher is 720 logical pixels wide, the SearchBar is 64 high,
-  each result row is 44 high, and the ActionBar is 44 high
+- **WHEN** root search shows results at the default text scale
+- **THEN** the pill and the card are 720 logical pixels wide, the pill is 52
+  high, the gap 8, each result row 44, and the ActionBar 44
+
+#### Scenario: The gap shows what is behind
+
+- **WHEN** the launcher shows the pill and the card over another application
+- **THEN** that application is visible through the gap between them
 
 #### Scenario: Root search with an answer
 
 - **WHEN** the user types "2+2" at root
-- **THEN** the launcher shows the SearchBar, the answer card, the results, and
-  the ActionBar, from top to bottom
+- **THEN** the card shows the answer card, the results, and the ActionBar, from
+  top to bottom
+
+#### Scenario: A pushed view
+
+- **WHEN** a command pushes a list, grid, detail, or form
+- **THEN** the pill and the card are both shown
 
 ### Requirement: The SearchBar holds the query and shows where the user is
 
 The SearchBar SHALL hold the query for a list or grid, with a placeholder the
 view sets. When a view has been pushed, it SHALL show a back control before
-the query; activating it SHALL go back one view, as Escape does. While the busy
-marks are shown, it SHALL show an indeterminate progress bar along its bottom
-edge: a thin bar in which a short segment in the accent role sweeps from one
-end to the other, again and again, at a steady pace. When the view declares a
-filter dropdown, the SearchBar SHALL show it at its right end. For a detail or
-form view, the SearchBar SHALL show the command's title in place of the query.
+the query, drawn as a back arrow in a small circle; activating it SHALL go back
+one view, as Escape does. While the busy marks are shown, it SHALL show an
+indeterminate progress bar along its bottom edge: a thin bar in which a short
+segment in the accent role sweeps from one end to the other, again and again,
+at a steady pace. When the view declares a filter dropdown, the SearchBar
+SHALL show it at its right end as a pill. For a detail or form view, the
+SearchBar SHALL show the command's title in place of the query.
 
 #### Scenario: Root shows no back control
 
@@ -131,18 +149,24 @@ form view, the SearchBar SHALL show the command's title in place of the query.
 #### Scenario: A pushed view shows the back control
 
 - **WHEN** a command has pushed a list
-- **THEN** the SearchBar shows a back control before the query
+- **THEN** the SearchBar shows a back control, a back arrow in a small circle,
+  before the query
 
 #### Scenario: Clicking back
 
 - **WHEN** the user clicks the back control
 - **THEN** the previous view is shown with its query and selection intact
 
+#### Scenario: A filter dropdown
+
+- **WHEN** a pushed list declares a filter dropdown
+- **THEN** the SearchBar shows the selected option as a pill at its right end
+
 #### Scenario: A loading view
 
 - **WHEN** the busy marks are shown for a view marked loading
-- **THEN** the loading bar is shown under the SearchBar with its segment
-  sweeping along it
+- **THEN** the loading bar is shown along the bottom of the SearchBar pill
+  with its segment sweeping along it, inside the pill's rounded outline
 
 #### Scenario: Loading ends
 
@@ -156,19 +180,20 @@ form view, the SearchBar SHALL show the command's title in place of the query.
 
 ### Requirement: The ActionBar answers what Enter does
 
-The ActionBar SHALL show, on its left, the context: in root search the name and
-icon of the extension that contributed the selected result, and in a pushed
-view the command's title and icon. On its right it SHALL show the label of the
-action Enter runs with the Enter key, and, when the selection has more than one
-action, the word "Actions" with the action panel's chord. When nothing can be
-confirmed, the primary action and its key SHALL be hidden. Clicking "Actions"
-SHALL open the action panel.
+The ActionBar SHALL sit at the bottom of the card. It SHALL show, on its left,
+the context: in root search the name and icon of the extension that
+contributed the selected result, and in a pushed view the command's title and
+icon. On its right it SHALL show the label of the action Enter runs with the
+Enter key, together as one chip on a raised fill, and, when the selection has
+more than one action, the word "Actions" with the action panel's chord. When
+nothing can be confirmed, the primary action and its key SHALL be hidden.
+Clicking "Actions" SHALL open the action panel.
 
 #### Scenario: An application is selected in root search
 
 - **WHEN** an application result is selected in root search
-- **THEN** the ActionBar shows "Applications" with its icon on the left and
-  "Open" with the Enter key on the right
+- **THEN** the ActionBar shows "Applications" with its icon on the left and a
+  chip reading "Open" with the Enter key on the right
 
 #### Scenario: Inside a pushed view
 
@@ -178,64 +203,79 @@ SHALL open the action panel.
 #### Scenario: A single action
 
 - **WHEN** the selected item has exactly one action
-- **THEN** the ActionBar shows the primary action and no "Actions" hint
+- **THEN** the ActionBar shows the primary action chip and no "Actions" hint
 
 #### Scenario: Nothing to confirm
 
 - **WHEN** a list is empty and its empty view declares no action
 - **THEN** the ActionBar shows only its context
 
-### Requirement: A toast reports status in the ActionBar
+### Requirement: A ticker reports status in the ActionBar
 
-A toast SHALL replace the ActionBar's context while it shows. A toast has a
-style and one line of text, and MAY carry one action, shown after the text as
-its label and chord. Pressing that chord while the toast shows SHALL run the
-action and SHALL NOT also act on the view. A busy toast SHALL show a spinner in
-the working role and stay while its work runs, following the busy-mark timing.
-A success toast SHALL show a dot in the done role and disappear after about two
-seconds, unless it carries an action: then it SHALL stay until the next key
-press or click, so the action is still there when the user looks. A failure
-toast SHALL show a dot in the danger role and stay until the next key press or
-click. The success and failure dots SHALL NOT move. Assistive
-technology SHALL be told the toast's text, its action, and whether it reports
-a failure. Showing a toast SHALL NOT take focus.
+A ticker SHALL replace the ActionBar's context while it shows. When the card is
+hidden and only the pill shows, the ticker SHALL instead show at the pill's
+right end, with the same style, text, and action, cut off with an ellipsis
+before it reaches the query. A ticker
+has a style and one line of text, and MAY carry one action, shown after the
+text as its label and chord. Pressing that chord while the ticker shows SHALL
+run the action and SHALL NOT also act on the view. A busy ticker SHALL show a
+spinner in the working role and stay while its work runs, following the
+busy-mark timing. A success ticker SHALL show a dot in the done role and
+disappear after about two seconds, unless it carries an action: then it SHALL
+stay until the next key press or click, so the action is still there when the
+user looks. A failure ticker SHALL show a dot in the danger role and stay until
+the next key press or click. The success and failure dots SHALL NOT move.
+Assistive technology SHALL be told the ticker's text, its action, and whether
+it reports a failure. Showing a ticker SHALL NOT take focus.
 
-#### Scenario: A success toast
+#### Scenario: A success ticker
 
-- **WHEN** an action that keeps the launcher open reports success with a toast
-- **THEN** the toast shows with a dot in the done role and is gone after about
+- **WHEN** an action that keeps the launcher open reports success with a ticker
+- **THEN** the ticker shows with a dot in the done role and is gone after about
   two seconds, and the context returns
 
-#### Scenario: A success toast with an action stays
+#### Scenario: A ticker on the bare pill
 
-- **WHEN** a success toast reads "Answer ready: Summarize" with "Show answer"
+- **WHEN** a ticker shows while the launcher is the pill alone
+- **THEN** it shows at the pill's right end, the card stays hidden, and the
+  launcher does not change size
+
+#### Scenario: The card opens while a ticker shows on the pill
+
+- **WHEN** a ticker shows at the pill's end and the user types a character
+- **THEN** the card opens and the ticker, if it is still showing, moves into
+  the ActionBar's context
+
+#### Scenario: A success ticker with an action stays
+
+- **WHEN** a success ticker reads "Answer ready: Summarize" with "Show answer"
 - **THEN** it stays until the user presses a key or clicks
 
-#### Scenario: A failure toast stays
+#### Scenario: A failure ticker stays
 
 - **WHEN** an action fails
-- **THEN** a failure toast shows its sentence with a dot in the danger role
+- **THEN** a failure ticker shows its sentence with a dot in the danger role
 - **AND** it stays until the user presses a key or clicks
 
-#### Scenario: A failure toast with an action on Windows
+#### Scenario: A failure ticker with an action on Windows
 
-- **WHEN** a failure toast carries "Retry" and the user presses Ctrl+R
-- **THEN** the retry runs once and the toast is gone
+- **WHEN** a failure ticker carries "Retry" and the user presses Ctrl+R
+- **THEN** the retry runs once and the ticker is gone
 
-#### Scenario: A failure toast with an action on macOS
+#### Scenario: A failure ticker with an action on macOS
 
-- **WHEN** a failure toast carries "Retry" and the user presses Cmd+R
-- **THEN** the retry runs once and the toast is gone
+- **WHEN** a failure ticker carries "Retry" and the user presses Cmd+R
+- **THEN** the retry runs once and the ticker is gone
 
-#### Scenario: A busy toast
+#### Scenario: A busy ticker
 
 - **WHEN** the busy marks are shown
-- **THEN** the busy toast shows a spinner in the working role, turning while
+- **THEN** the busy ticker shows a spinner in the working role, turning while
   the work runs
 
 #### Scenario: Typing is not interrupted
 
-- **WHEN** a toast appears while the user types in the SearchBar
+- **WHEN** a ticker appears while the user types in the SearchBar
 - **THEN** every character still reaches the SearchBar
 
 ### Requirement: Small parts look the same everywhere
@@ -249,7 +289,7 @@ The launcher SHALL build every surface from the same small parts:
 - A key chord is drawn as keys in Geist Mono, using the platform's names as the
   view protocol requires, in a chip that fits its text. On Windows the keys are
   separated by a space; on macOS they are joined with none. Every key chord
-  uses this one format: the footer, the action panel, toasts, and result rows.
+  uses this one format: the footer, the action panel, tickers, and result rows.
 - A tag is short text in its role's colour on a rounded, faint fill of the same
   role. Its role is accent, muted, or danger.
 - A progress ring as an accessory is 16 logical pixels.
@@ -265,13 +305,13 @@ The launcher SHALL build every surface from the same small parts:
 
 #### Scenario: Key chords on Windows
 
-- **WHEN** the launcher shows the action panel's chord, a toast's "Show answer"
+- **WHEN** the launcher shows the action panel's chord, a ticker's "Show answer"
   chord, and a result's hotkey on Windows
 - **THEN** they read "Ctrl K", "Ctrl ↵", and "Ctrl Alt V"
 
 #### Scenario: Key chords on macOS
 
-- **WHEN** the launcher shows the action panel's chord, a toast's "Show answer"
+- **WHEN** the launcher shows the action panel's chord, a ticker's "Show answer"
   chord, and a result's hotkey on macOS
 - **THEN** they read "⌘K", "⌘↵", and "⌃⌥V"
 
@@ -426,7 +466,7 @@ list SHALL scroll and keep the selected action in view.
 
 #### Scenario: Long titles and labels
 
-- **WHEN** results, actions, toasts, and form help are longer than their space
+- **WHEN** results, actions, tickers, and form help are longer than their space
 - **THEN** they are cut off or wrapped, the ActionBar stays in view, and nothing
   scrolls sideways
 
@@ -510,11 +550,11 @@ skeleton rows.
 
 ### Requirement: Busy marks do not blink
 
-The busy marks, the SearchBar's loading bar and the busy toast, SHALL appear
+The busy marks, the SearchBar's loading bar and the busy ticker, SHALL appear
 only once Dango has been busy for about 150 milliseconds. Dango is busy while a
 command invoked from root search has not finished or shown a view, while the
 top view is marked loading, or while a background task runs and its progress
-view is not shown. A running background task SHALL show only the busy toast,
+view is not shown. A running background task SHALL show only the busy ticker,
 never the loading bar. Once shown, the marks SHALL stay for at least
 about 400 milliseconds, even if the work ends sooner. While Dango stays busy,
 replacing the view SHALL NOT restart the marks. Leaving the view or a reset
@@ -524,13 +564,13 @@ SHALL remove them at once.
 
 - **WHEN** a command invoked from root search finishes within about 150
   milliseconds
-- **THEN** no busy toast is shown
+- **THEN** no busy ticker is shown
 
 #### Scenario: A slow command shows a view that loads
 
 - **WHEN** a command takes a second to show a view marked loading, and the
   view loads for another second
-- **THEN** the busy toast appears after a short moment reading "Running"
+- **THEN** the busy ticker appears after a short moment reading "Running"
   followed by the command's title, then reads "Loading…" without disappearing
   in between
 
@@ -554,5 +594,5 @@ SHALL remove them at once.
 #### Scenario: A background task shows no loading bar
 
 - **WHEN** an update downloads and the user opens clipboard history
-- **THEN** the busy toast shows the download and the SearchBar shows no
+- **THEN** the busy ticker shows the download and the SearchBar shows no
   loading bar

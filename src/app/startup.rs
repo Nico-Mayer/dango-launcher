@@ -72,16 +72,16 @@ pub fn start(startup: Startup) -> Arc<Core> {
     let file_config = Arc::new(FileConfig::new(config_path, initial_config));
 
     let core = Arc::new_cyclic(|weak: &Weak<Core>| {
-        let mut notices = Vec::new();
+        let mut problems = Vec::new();
         let services = build_services(
             &startup,
             &file_config,
             config_error.is_some(),
             weak,
-            &mut notices,
+            &mut problems,
         );
         let tray = TrayStatus {
-            notices,
+            problems,
             config_error: config_error.is_some(),
             missing: platform::permissions().missing(),
         };
@@ -145,13 +145,13 @@ fn register(host: &mut ExtensionHost, name: &str, extension: Arc<dyn extension::
 }
 
 /// The tray menu is the only surface for startup problems, so they are
-/// collected into `notices`. None of them stops Dango from starting.
+/// collected into `problems`. None of them stops Dango from starting.
 fn build_services(
     startup: &Startup,
     file_config: &Arc<FileConfig>,
     config_broken: bool,
     core: &Weak<Core>,
-    notices: &mut Vec<String>,
+    problems: &mut Vec<String>,
 ) -> Services {
     let tasks = super::tasks_for(core.clone());
     let store: Option<Arc<Store>> = match open_store() {
@@ -164,7 +164,7 @@ fn build_services(
                     "database was corrupt, moved to {}",
                     aside.display()
                 ));
-                notices.push("Database was reset, see dango.log".to_string());
+                problems.push("Database was reset, see dango.log".to_string());
             }
             eprintln!(
                 "[dango] store ready at schema version {}",
@@ -174,7 +174,7 @@ fn build_services(
         }
         Err(error) => {
             crate::log::append(&format!("database unavailable: {error}"));
-            notices.push("Database unavailable, see dango.log".to_string());
+            problems.push("Database unavailable, see dango.log".to_string());
             None
         }
     };
@@ -242,7 +242,7 @@ fn build_services(
         Some(exchange) => Some(exchange),
         None => {
             crate::log::append("no key injection or clipboard, so pasting is off");
-            notices.push("Pasting is off, see dango.log".to_string());
+            problems.push("Pasting is off, see dango.log".to_string());
             None
         }
     };
@@ -258,7 +258,7 @@ fn build_services(
         register(&mut host, "clipboard", extension);
     }
 
-    register_snippets(&mut host, file_config, exchange.clone(), core, notices);
+    register_snippets(&mut host, file_config, exchange.clone(), core, problems);
 
     let system = Arc::new(SystemExtension::new(
         platform::system_control(),
@@ -327,16 +327,16 @@ fn build_services(
         },
     };
     {
-        let (extension, problems) = {
+        let (extension, ai_errors) = {
             let config = file_config.shared();
             let config = config.read().unwrap();
             super::build_ai(&ai, &config)
         };
-        for problem in &problems {
-            crate::log::append(problem);
+        for error in &ai_errors {
+            crate::log::append(error);
         }
-        if !problems.is_empty() {
-            notices.push("An AI command has an error, see dango.log".to_string());
+        if !ai_errors.is_empty() {
+            problems.push("An AI command has an error, see dango.log".to_string());
         }
         register(&mut host, "ai", extension);
     }
@@ -365,12 +365,12 @@ fn build_services(
     let host = Arc::new(Mutex::new(host));
     let invoker = Arc::new(Invoker::new(Arc::new(HostResolver(host.clone()))));
 
-    let hotkeys = register_hotkeys(file_config, notices);
+    let hotkeys = register_hotkeys(file_config, problems);
     let hyperkey = Mutex::default();
     if let Some(failure) = apply_hyperkey(file_config, &hyperkey) {
         crate::log::append(failure.log_line());
         if failure == HyperkeyFailure::Refused {
-            notices.push("Hyperkey didn't start, see dango.log".to_string());
+            problems.push("Hyperkey didn't start, see dango.log".to_string());
         }
     }
     {
@@ -383,7 +383,7 @@ fn build_services(
                 crate::autostart::apply(config.launcher.autostart.unwrap_or(false))
             {
                 crate::log::append(&message);
-                notices.push("Autostart couldn't be applied, see dango.log".to_string());
+                problems.push("Autostart couldn't be applied, see dango.log".to_string());
             }
         }
     }
@@ -412,7 +412,7 @@ fn register_snippets(
     file_config: &Arc<FileConfig>,
     exchange: Option<Arc<dyn text::TextTarget>>,
     core: &Weak<Core>,
-    notices: &mut Vec<String>,
+    problems: &mut Vec<String>,
 ) {
     let opener: Arc<dyn snippets::OpenUrl> = Arc::new(SystemOpener);
     // Keyword expansion skips the applications the clipboard history is told to
@@ -431,7 +431,7 @@ fn register_snippets(
         let (records, load_error) = snippets::Records::open(&records_dir, kind);
         if let Some(error) = load_error {
             crate::log::append(&format!("{}: {error}", kind.file_name()));
-            notices.push(format!("{} has an error, see dango.log", kind.file_name()));
+            problems.push(format!("{} has an error, see dango.log", kind.file_name()));
         }
         // Apply hand-edits to the file live, keeping the last good records on a
         // parse failure.
@@ -471,14 +471,14 @@ fn register_snippets(
     }
 }
 
-fn register_hotkeys(file_config: &Arc<FileConfig>, notices: &mut Vec<String>) -> Registry {
+fn register_hotkeys(file_config: &Arc<FileConfig>, problems: &mut Vec<String>) -> Registry {
     let config = file_config.shared();
     let config = config.read().unwrap();
     let shortcut = platform::label(Label::LauncherShortcut);
     let (launcher, launcher_problem) = hotkeys::launcher(&config);
     if let Some(problem) = &launcher_problem {
         crate::log::append(problem);
-        notices.push(format!(
+        problems.push(format!(
             "Invalid launcher.hotkey, using {shortcut}, see dango.log"
         ));
     }
@@ -501,14 +501,14 @@ fn register_hotkeys(file_config: &Arc<FileConfig>, notices: &mut Vec<String>) ->
             Some(spec) if launcher_problem.is_none() => spec,
             _ => shortcut,
         };
-        notices.push(format!("{taken} is in use, set launcher.hotkey"));
+        problems.push(format!("{taken} is in use, set launcher.hotkey"));
     }
     let conflicts = registry.apply(&config);
     if !conflicts.is_empty() {
         for conflict in &conflicts {
             crate::log::append(conflict);
         }
-        notices.push("Some hotkeys are already in use, see dango.log".to_string());
+        problems.push("Some hotkeys are already in use, see dango.log".to_string());
     }
     registry
 }

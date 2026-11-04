@@ -2,7 +2,7 @@ import { Theme } from "../theme.slint";
 
 export enum Status { working, needs-input, done, failed, queued }
 
-/// Still in every state. Only an accessory dot announces its state; a toast's
+/// Still in every state. Only an accessory dot announces its state; a ticker's
 /// text already says it.
 export component Dot inherits Rectangle {
     in property <Status> status;

@@ -1,12 +1,13 @@
-//! How tall the launcher is: the SearchBar, the view, and the ActionBar, from
-//! the same fixed sizes the parts are drawn with. Each size here matches one
-//! in `Theme`.
+//! How tall the launcher is: the SearchBar pill, the gap, and the card with
+//! the view and the ActionBar, from the same fixed sizes the parts are drawn
+//! with. Each size here matches one in `Theme`.
 
 use crate::ui::snapshot::{Screen, Snapshot, ViewBody};
 
 pub const MAX: f32 = crate::platform::LAUNCHER_MAX_HEIGHT as f32;
 pub const WIDTH: f32 = 720.0;
-const SEARCH_BAR: f32 = 64.0;
+const SEARCH_BAR: f32 = 52.0;
+const SHELL_GAP: f32 = 8.0;
 const ACTION_BAR: f32 = 44.0;
 const LIST_PADDING: f32 = 8.0;
 pub const ROW: f32 = 44.0;
@@ -24,6 +25,9 @@ pub const TILE_TITLE: f32 = 24.0;
 /// else, and an empty view, takes the maximum. An open panel keeps the room
 /// it needs above the ActionBar.
 pub fn height(snapshot: &Snapshot) -> f32 {
+    if matches!(&snapshot.screen, Screen::Root(root) if root.bare) {
+        return SEARCH_BAR;
+    }
     let body = match &snapshot.screen {
         Screen::Root(root) if root.empty.is_none() => {
             let headings = root.sections.iter().filter(|s| s.heading.is_some()).count();
@@ -44,9 +48,10 @@ pub fn height(snapshot: &Snapshot) -> f32 {
         },
         _ => MAX,
     };
-    let content = SEARCH_BAR + body + ACTION_BAR;
+    let pill = SEARCH_BAR + SHELL_GAP;
+    let content = pill + body + ACTION_BAR;
     let panel = if snapshot.panel.open {
-        panel(snapshot) + ACTION_BAR + 2.0 * PANEL_MARGIN
+        pill + panel(snapshot) + ACTION_BAR + 2.0 * PANEL_MARGIN
     } else {
         0.0
     };

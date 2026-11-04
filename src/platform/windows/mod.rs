@@ -53,7 +53,7 @@ use windows_sys::Win32::UI::WindowsAndMessaging::{
     WS_EX_TOOLWINDOW, WS_EX_TOPMOST,
 };
 
-use super::{HudWindow, LauncherWindow, RunningApp, SystemControl, SystemError};
+use super::{LauncherWindow, NoticeWindow, RunningApp, SystemControl, SystemError};
 
 #[derive(Default)]
 pub struct WindowsLauncherWindow {
@@ -160,9 +160,9 @@ impl LauncherWindow for WindowsLauncherWindow {
     }
 }
 
-pub struct WindowsHudWindow;
+pub struct WindowsNoticeWindow;
 
-impl HudWindow for WindowsHudWindow {
+impl NoticeWindow for WindowsNoticeWindow {
     /// In physical pixels at the target display's DPI, as the launcher is.
     fn place(&self, window: RawWindowHandle) {
         let Some(hwnd) = hwnd(window) else {
@@ -178,14 +178,14 @@ impl HudWindow for WindowsHudWindow {
                 return;
             }
             let scale = f64::from(target_dpi) / f64::from(window_dpi);
-            let (x, y) = super::hud_origin(
+            let (x, y) = super::notice_origin(
                 f64::from(area.left),
                 f64::from(area.top),
                 f64::from(area.right - area.left),
                 f64::from(area.bottom - area.top),
                 f64::from(rect.right - rect.left) * scale,
                 f64::from(rect.bottom - rect.top) * scale,
-                super::HUD_MARGIN * f64::from(target_dpi) / 96.0,
+                super::NOTICE_MARGIN * f64::from(target_dpi) / 96.0,
             );
             SetWindowPos(
                 hwnd,
@@ -379,7 +379,7 @@ fn hwnd(window: RawWindowHandle) -> Option<HWND> {
 
 /// The foreground application's name, resolved the same way the clipboard names
 /// the copying application, so the one exclusion list matches both. Used to skip
-/// excluded applications and to notice a focus change.
+/// excluded applications and to detect a focus change.
 pub(super) fn foreground_app() -> Option<String> {
     use windows::Win32::UI::WindowsAndMessaging::{GetForegroundWindow, GetWindowThreadProcessId};
     unsafe {

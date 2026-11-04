@@ -222,6 +222,22 @@ async fn showing_within_the_hold_continues_where_the_user_left_off() {
     assert_eq!(query(&shell), "fire");
 }
 
+#[tokio::test(start_paused = true)]
+async fn a_click_outside_hides_and_holds_the_query() {
+    let (core, shell) = core(r#"launcher = { reset-after-seconds = 5 }"#);
+    core.toggle();
+    type_query(&core, "fire");
+    core.dispatch(Intent::ClickedOutside);
+    assert_eq!(
+        shell.calls().last(),
+        Some(&Call::Hide {
+            restore_focus: true
+        })
+    );
+    core.toggle();
+    assert_eq!(query(&shell), "fire");
+}
+
 #[tokio::test]
 async fn a_zero_hold_resets_at_once() {
     let (core, shell) = core(r#"launcher = { reset-after-seconds = 0 }"#);
@@ -488,22 +504,22 @@ async fn a_refused_launcher_hotkey_on_reload_keeps_the_old_one_and_reports_it() 
 }
 
 #[tokio::test]
-async fn a_hotkey_for_a_missing_command_is_reported_in_the_hud() {
+async fn a_hotkey_for_a_missing_command_is_reported_in_the_notice() {
     let (core, shell) = core("");
     core.dispatch_command("x.missing");
     assert_eq!(
-        hud(&shell).as_deref(),
+        notice(&shell).as_deref(),
         Some("That command is no longer available")
     );
     assert!(!core.tray().config_error);
 }
 
 #[tokio::test]
-async fn an_application_hotkey_without_its_application_is_reported_in_the_hud() {
+async fn an_application_hotkey_without_its_application_is_reported_in_the_notice() {
     let (core, shell) = core("");
     core.dispatch_application("Visual Studio Code");
     assert_eq!(
-        hud(&shell).as_deref(),
+        notice(&shell).as_deref(),
         Some("Can't open Visual Studio Code")
     );
     assert!(!core.tray().config_error);
@@ -708,8 +724,8 @@ async fn a_command_disabled_by_a_reload_leaves_search_and_a_stale_result_fails()
     assert_eq!(
         shell
             .last_snapshot()
-            .toast
-            .map(|toast| toast.text)
+            .ticker
+            .map(|ticker| ticker.text)
             .as_deref(),
         Some("That command is no longer available")
     );
@@ -810,9 +826,13 @@ fn copied(core: &Arc<Core>) {
     }));
 }
 
-fn hud(shell: &RecordingShell) -> Option<String> {
+fn notice(shell: &RecordingShell) -> Option<String> {
     let published = shell.published.lock().unwrap();
-    published.last()?.hud.as_ref().map(|hud| hud.text.clone())
+    published
+        .last()?
+        .notice
+        .as_ref()
+        .map(|notice| notice.text.clone())
 }
 
 type Hide = fn(&Arc<Core>);
@@ -832,7 +852,7 @@ async fn every_hide_path_tells_the_launcher_it_is_hidden() {
         hide(&core);
         copied(&core);
         assert_eq!(
-            hud(&shell).as_deref(),
+            notice(&shell).as_deref(),
             Some("Copied to clipboard"),
             "{name}"
         );
@@ -840,27 +860,27 @@ async fn every_hide_path_tells_the_launcher_it_is_hidden() {
 }
 
 #[tokio::test(start_paused = true)]
-async fn a_success_hud_goes_after_two_seconds() {
+async fn a_success_notice_goes_after_two_seconds() {
     let (core, shell) = core("");
     copied(&core);
     tokio::time::sleep(Duration::from_millis(1900)).await;
-    assert!(hud(&shell).is_some());
+    assert!(notice(&shell).is_some());
     tokio::time::sleep(Duration::from_millis(200)).await;
-    assert_eq!(hud(&shell), None);
+    assert_eq!(notice(&shell), None);
 }
 
 #[tokio::test(start_paused = true)]
-async fn a_failure_while_hidden_shows_in_the_hud_for_four_seconds() {
+async fn a_failure_while_hidden_shows_in_the_notice_for_four_seconds() {
     let (core, shell) = core("");
     core.apply(crate::ui::Input::Event(crate::ui::Event::Failed(
         "Nope".into(),
     )));
     tokio::time::sleep(Duration::from_millis(3900)).await;
-    assert_eq!(hud(&shell).as_deref(), Some("Nope"));
+    assert_eq!(notice(&shell).as_deref(), Some("Nope"));
     tokio::time::sleep(Duration::from_millis(200)).await;
-    assert_eq!(hud(&shell), None);
+    assert_eq!(notice(&shell), None);
     core.toggle();
-    assert!(shell.last_snapshot().toast.is_none());
+    assert!(shell.last_snapshot().ticker.is_none());
 }
 
 fn with_code(launch_fails: bool) -> (Arc<Core>, Arc<RecordingShell>) {
@@ -884,9 +904,9 @@ fn with_code(launch_fails: bool) -> (Arc<Core>, Arc<RecordingShell>) {
     )
 }
 
-async fn wait_for_hud(shell: &RecordingShell) -> Option<String> {
+async fn wait_for_notice(shell: &RecordingShell) -> Option<String> {
     for _ in 0..200 {
-        if let Some(text) = hud(shell) {
+        if let Some(text) = notice(shell) {
             return Some(text);
         }
         tokio::time::sleep(Duration::from_millis(5)).await;
@@ -895,22 +915,22 @@ async fn wait_for_hud(shell: &RecordingShell) -> Option<String> {
 }
 
 #[tokio::test]
-async fn an_application_hotkey_for_an_app_not_installed_is_reported_in_the_hud() {
+async fn an_application_hotkey_for_an_app_not_installed_is_reported_in_the_notice() {
     let (core, shell) = with_code(false);
     core.dispatch_application("Slack");
     assert_eq!(
-        hud(&shell).as_deref(),
+        notice(&shell).as_deref(),
         Some("Can't open Slack because it isn't installed")
     );
     assert!(!core.tray().config_error);
 }
 
 #[tokio::test]
-async fn an_application_hotkey_whose_launch_fails_is_reported_in_the_hud() {
+async fn an_application_hotkey_whose_launch_fails_is_reported_in_the_notice() {
     let (core, shell) = with_code(true);
     core.dispatch_application("Code");
     assert_eq!(
-        wait_for_hud(&shell).await.as_deref(),
+        wait_for_notice(&shell).await.as_deref(),
         Some("Couldn't open Code")
     );
     assert!(!core.tray().config_error);
@@ -963,8 +983,11 @@ async fn a_task_report_reaches_the_launcher() {
         .start("dango.updates", "update", "Dango 0.5.0");
     task.report(|state| state.line = "Downloading Dango 0.5.0 · 42%".into());
     tokio::time::sleep(Duration::from_millis(200)).await;
-    let toast = shell.last_snapshot().toast.expect("the task's busy toast");
-    assert_eq!(toast.text, "Downloading Dango 0.5.0 · 42%");
+    let ticker = shell
+        .last_snapshot()
+        .ticker
+        .expect("the task's busy ticker");
+    assert_eq!(ticker.text, "Downloading Dango 0.5.0 · 42%");
 }
 
 #[tokio::test]
@@ -1039,11 +1062,11 @@ fn answer_ready() -> crate::tasks::TaskState {
     }
 }
 
-fn answer_toast(shell: &RecordingShell) -> bool {
+fn answer_ticker(shell: &RecordingShell) -> bool {
     shell
         .last_snapshot()
-        .toast
-        .is_some_and(|toast| toast.text == "Answer ready: Summarize")
+        .ticker
+        .is_some_and(|ticker| ticker.text == "Answer ready: Summarize")
 }
 
 /// Only an open the user asked for may run the answer's "Show answer".
@@ -1055,7 +1078,7 @@ async fn the_launcher_hotkey_opens_an_answer_but_a_command_hotkey_does_not() {
     ))));
     core.toggle();
     settle().await;
-    assert!(!answer_toast(&shell), "the answer opened instead");
+    assert!(!answer_ticker(&shell), "the answer opened instead");
 
     let (core, shell) = core_with("", FakeGrab::default(), vec![two_commands()]);
     core.apply(crate::ui::Input::Event(crate::ui::Event::Task(Box::new(
@@ -1063,7 +1086,7 @@ async fn the_launcher_hotkey_opens_an_answer_but_a_command_hotkey_does_not() {
     ))));
     core.dispatch_command("x.keep");
     settle().await;
-    assert!(answer_toast(&shell), "the toast offers it instead");
+    assert!(answer_ticker(&shell), "the ticker offers it instead");
 }
 
 #[tokio::test]

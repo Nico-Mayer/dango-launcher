@@ -22,7 +22,7 @@ export component LauncherWindow inherits Window {
     height: Shell.height;
     default-font-size: Theme.text-body;
     default-font-family: Theme.font;
-    out property <bool> toast-cut: Shell.toast-shown && action-bar.label-cut;
+    out property <bool> ticker-cut: Shell.ticker-shown && action-bar.ticker-cut;
 
     public function set-query(text: string) {
         search.set-text(text);
@@ -65,60 +65,89 @@ export component LauncherWindow inherits Window {
             reject
         }
 
-        frame := Rectangle {
+        // Plain rectangles let a click through, so the pill and the card each
+        // hold an empty TouchArea that keeps their clicks from reaching this one.
+        TouchArea {
+            clicked => {
+                Intents.clicked-outside();
+            }
+        }
+
+        pill := Rectangle {
+            y: 0;
+            height: Theme.search-height;
             background: Theme.popover;
-            border-radius: Theme.radius * 1.5;
+            border-radius: self.height / 2;
             accessible-role: groupbox;
-            accessible-label: "Dango";
+            accessible-label: "Search bar";
+
+            TouchArea { }
+
+            search := SearchBar { }
+
+            // Drawn last so the SearchBar's fill does not paint over it.
+            Rectangle {
+                border-radius: parent.border-radius;
+                border-width: 1px;
+                border-color: Theme.border;
+            }
+        }
+
+        card := Rectangle {
+            visible: Shell.card-shown;
+            y: Theme.search-height + Theme.shell-gap;
+            // Never past the window: a resize can land a frame before the
+            // card's new height, and a cut card loses its rounded corners.
+            height: max(0, min(Shell.launcher-height, root.height) - self.y);
+            background: Theme.popover;
+            border-radius: Theme.card-radius;
+            accessible-role: groupbox;
+            accessible-label: "Results";
             clip: true;
 
-            property <length> body-top: Theme.search-height;
-            property <length> body-height: self.height - Theme.search-height - Theme.action-bar-height;
+            TouchArea { }
 
-            search := SearchBar {
-                y: 0;
-            }
-
+            property <length> body-height: self.height - Theme.action-bar-height;
             property <length> answer-room: AnswerData.shown ? Theme.answer-height : 0;
 
             if AnswerData.shown: InlineAnswer {
-                y: parent.body-top;
+                y: 0;
             }
 
             list := List {
                 visible: Shell.screen == ScreenKind.root || Shell.screen == ScreenKind.list;
-                y: parent.body-top + parent.answer-room;
+                y: parent.answer-room;
                 height: parent.body-height - parent.answer-room;
             }
             grid := Grid {
                 visible: Shell.screen == ScreenKind.grid;
-                y: parent.body-top;
+                y: 0;
                 height: parent.body-height;
             }
             if Shell.screen == ScreenKind.empty: EmptyView {
-                y: parent.body-top;
+                y: 0;
                 height: parent.body-height;
             }
             if Shell.screen == ScreenKind.detail: Detail {
-                y: parent.body-top;
+                y: 0;
                 height: parent.body-height;
             }
             if Shell.screen == ScreenKind.form: Form {
-                y: parent.body-top;
+                y: 0;
                 height: parent.body-height;
             }
             if Shell.screen == ScreenKind.progress: ProgressView {
-                y: parent.body-top;
+                y: 0;
                 height: parent.body-height;
             }
 
             // Rounded itself: the software renderer, which Windows falls back
             // to without OpenGL 2, clips children to a square, not to the
-            // frame's corners.
+            // card's corners.
             action-bar := ActionBar {
                 y: parent.height - Theme.action-bar-height;
-                border-bottom-left-radius: frame.border-radius;
-                border-bottom-right-radius: frame.border-radius;
+                border-bottom-left-radius: card.border-radius;
+                border-bottom-right-radius: card.border-radius;
             }
 
             // Swallows a press outside the open panel, so it never reaches the
@@ -139,7 +168,7 @@ export component LauncherWindow inherits Window {
 
             // Drawn last so no region paints over the outline.
             Rectangle {
-                border-radius: frame.border-radius;
+                border-radius: card.border-radius;
                 border-width: 1px;
                 border-color: Theme.border;
             }

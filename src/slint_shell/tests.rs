@@ -18,11 +18,12 @@ use crate::protocol::{
 use crate::shell::TrayStatus;
 use crate::ui::{Context, Effect, Event, Input, Intent, Launcher, ResultItem, TemplateInspection};
 
-const SEARCH_BAR: f32 = 64.0;
+/// The SearchBar pill and the gap below it, above the card.
+const PILL: f32 = 52.0 + 8.0;
 const ACTION_BAR: f32 = 44.0;
 const LIST_PADDING: f32 = 8.0;
 const ROW: f32 = 44.0;
-const LIST_TOP: f32 = SEARCH_BAR + LIST_PADDING;
+const LIST_TOP: f32 = PILL + LIST_PADDING;
 const LIST_BOTTOM: f32 = 480.0 - ACTION_BAR - LIST_PADDING;
 
 struct Harness {
@@ -88,6 +89,7 @@ impl Harness {
         harness
     }
 
+    /// Root with the empty-query list opened, as most tests want it.
     fn root(items: Vec<ResultItem>) -> Self {
         let harness = Self::new();
         harness.event(Event::Results {
@@ -95,6 +97,9 @@ impl Harness {
             items,
             complete: true,
         });
+        harness.arrow_down();
+        harness.intents.borrow_mut().clear();
+        harness.effects.borrow_mut().clear();
         harness
     }
 
@@ -185,6 +190,15 @@ impl Harness {
 
     fn arrow_down(&self) {
         self.key("\u{F701}");
+    }
+
+    fn click_at(&self, x: f32, y: f32) {
+        let window = self.ui.window();
+        let position = LogicalPosition::new(x, y);
+        let button = PointerEventButton::Left;
+        window.dispatch_event(WindowEvent::PointerMoved { position });
+        window.dispatch_event(WindowEvent::PointerPressed { position, button });
+        window.dispatch_event(WindowEvent::PointerReleased { position, button });
     }
 
     fn move_pointer_to(&self, element: &ElementHandle) {
@@ -591,14 +605,14 @@ mod action_bar {
     }
 }
 
-mod toast {
+mod ticker {
     use super::*;
     use crate::extension::ActionOutcome;
     use crate::ui::{ActionRequest, Origin};
 
-    fn toast(h: &Harness) -> ElementHandle {
-        let text = h.shell().get_toast_text();
-        h.find(&text).expect("the toast")
+    fn ticker(h: &Harness) -> ElementHandle {
+        let text = h.shell().get_ticker_text();
+        h.find(&text).expect("the ticker")
     }
 
     fn request() -> ActionRequest {
@@ -613,7 +627,7 @@ mod toast {
     }
 
     #[test]
-    fn a_busy_toast_says_what_is_running() {
+    fn a_busy_ticker_says_what_is_running() {
         let mut command = result(1);
         command.title = "Clipboard History".into();
         command.actions.clear();
@@ -624,11 +638,11 @@ mod toast {
         );
         h.wake_busy();
         assert_eq!(
-            h.shell().get_toast_style(),
-            super::super::generated::ToastStyle::Busy
+            h.shell().get_ticker_style(),
+            super::super::generated::TickerStyle::Busy
         );
         assert!(h.find("Running Clipboard History…").is_some());
-        let spinner = h.find("Working").expect("the busy toast's spinner");
+        let spinner = h.find("Working").expect("the busy ticker's spinner");
         assert_eq!(
             spinner.accessible_role(),
             Some(i_slint_backend_testing::AccessibleRole::ProgressIndicator)
@@ -636,32 +650,32 @@ mod toast {
     }
 
     #[test]
-    fn a_success_toast_replaces_the_context() {
+    fn a_success_ticker_replaces_the_context() {
         let h = Harness::root(results(3));
         h.view(views::list_tree());
         h.event(Event::ActionFinished {
             request: request(),
-            outcome: ActionOutcome::Toast("Entry pinned".into()),
+            outcome: ActionOutcome::Ticker("Entry pinned".into()),
         });
-        assert!(h.shell().get_toast_shown());
+        assert!(h.shell().get_ticker_shown());
         assert_eq!(
-            h.shell().get_toast_style(),
-            super::super::generated::ToastStyle::Success
+            h.shell().get_ticker_style(),
+            super::super::generated::TickerStyle::Success
         );
         assert!(h.find("Entry pinned").is_some());
         assert!(h.find("Fixture Command").is_none());
     }
 
     #[test]
-    fn a_failure_toast_says_it_failed() {
+    fn a_failure_ticker_says_it_failed() {
         let h = Harness::root(results(3));
         h.event(Event::Failed("That command is no longer available".into()));
         assert_eq!(
-            h.shell().get_toast_style(),
-            super::super::generated::ToastStyle::Failure
+            h.shell().get_ticker_style(),
+            super::super::generated::TickerStyle::Failure
         );
         assert_eq!(
-            toast(&h).accessible_description().as_deref(),
+            ticker(&h).accessible_description().as_deref(),
             Some("Failed")
         );
     }
@@ -682,14 +696,14 @@ mod toast {
         ] {
             h.event(Event::Failed(message.into()));
             assert!(h.shell().get_panel_hint());
-            assert!(!h.ui.get_toast_cut(), "{message} is cut off");
+            assert!(!h.ui.get_ticker_cut(), "{message} is cut off");
         }
         h.event(Event::Failed("Too long ".repeat(20)));
-        assert!(h.ui.get_toast_cut(), "the measure sees a cut");
+        assert!(h.ui.get_ticker_cut(), "the measure sees a cut");
     }
 
     #[test]
-    fn typing_reaches_the_search_bar_while_a_toast_shows() {
+    fn typing_reaches_the_search_bar_while_a_ticker_shows() {
         let h = Harness::root(results(3));
         h.event(Event::Failed("That command is no longer available".into()));
         h.type_text("res");
@@ -724,6 +738,11 @@ mod root_search {
         let h = Harness::root(results(5));
         h.type_text("re");
         assert_eq!(h.query(), "re");
+        h.event(Event::Results {
+            query: "re".into(),
+            items: results(5),
+            complete: true,
+        });
 
         h.row("Result 2")
             .mock_single_click(PointerEventButton::Left);
@@ -748,8 +767,9 @@ mod root_search {
         for item in &mut items[2..5] {
             item.suggested = true;
         }
+        // Opening the list from the pinned card already stepped to row 2.
         let h = Harness::root(items);
-        for _ in 0..5 {
+        for _ in 0..4 {
             h.arrow_down();
         }
         let row = h.row("Result 6");
@@ -924,10 +944,10 @@ mod list_view {
             tray: slint::Weak::default(),
             platform: std::sync::Arc::new(std::sync::Mutex::new(Box::new(NoPlatform))),
             attached: Default::default(),
-            hud: super::super::Hud {
+            notice: super::super::Notice {
                 window: slint::Weak::default(),
                 platform: std::sync::Arc::new(std::sync::Mutex::new(Box::new(
-                    super::hud::NoPlatform,
+                    super::notice::NoPlatform,
                 ))),
                 attached: Default::default(),
             },
@@ -1497,7 +1517,7 @@ mod grid {
         let h = Harness::root(results(1));
         h.view(grid_tree(7));
         let content = h.ui.global::<GridData>().get_content_height();
-        assert!((h.height() - (SEARCH_BAR + content + ACTION_BAR)).abs() < 0.01);
+        assert!((h.height() - (PILL + content + ACTION_BAR)).abs() < 0.01);
         let last = h.row("Tile 7");
         let bottom = last.absolute_position().y + last.size().height;
         assert!(
@@ -1628,15 +1648,156 @@ mod filter_dropdown {
     }
 }
 
+mod bare_pill {
+    use super::*;
+
+    fn bare() -> Harness {
+        let h = Harness::new();
+        h.event(Event::Results {
+            query: String::new(),
+            items: results(5),
+            complete: true,
+        });
+        h
+    }
+
+    #[test]
+    fn the_launcher_opens_as_the_pill_alone() {
+        let h = bare();
+        assert!(!h.shell().get_card_shown());
+        assert_eq!(h.height(), 52.0);
+        assert!(h.find("Result 1").is_none());
+        assert!(h.find("Actions").is_none());
+    }
+
+    #[test]
+    fn the_first_keystroke_keeps_the_pill_until_results_land() {
+        let h = bare();
+        h.arrow_down();
+        h.type_text("r");
+        assert_eq!(h.height(), 52.0);
+        assert!(!h.shell().get_card_shown());
+    }
+
+    #[test]
+    fn typing_on_after_no_results_keeps_the_full_height() {
+        let h = bare();
+        h.type_text("x");
+        h.event(Event::Results {
+            query: "x".into(),
+            items: Vec::new(),
+            complete: true,
+        });
+        assert_eq!(h.height(), 480.0);
+        h.type_text("y");
+        assert_eq!(h.height(), 480.0);
+        assert!(h.shell().get_card_shown());
+    }
+
+    #[test]
+    fn the_first_keystroke_opens_the_card() {
+        let h = bare();
+        h.type_text("r");
+        h.event(Event::Results {
+            query: "r".into(),
+            items: results(3),
+            complete: true,
+        });
+        assert!(h.shell().get_card_shown());
+        assert_eq!(
+            h.height(),
+            PILL + LIST_PADDING + 3.0 * ROW + LIST_PADDING + ACTION_BAR
+        );
+        assert!(h.find("Result 1").is_some());
+    }
+
+    #[test]
+    fn a_ticker_shows_at_the_pills_end_without_resizing() {
+        let h = bare();
+        h.event(Event::Failed("Couldn't paste".into()));
+        let ticker = h.find("Couldn't paste").expect("the ticker on the pill");
+        let pill = h.find("Search bar").expect("the pill");
+        assert!(ticker.absolute_position().y < pill.size().height);
+        assert_eq!(ticker.accessible_description().as_deref(), Some("Failed"));
+        assert_eq!(h.height(), 52.0);
+    }
+
+    #[test]
+    fn opening_the_card_moves_the_ticker_into_the_action_bar() {
+        let h = bare();
+        h.event(Event::Task(Box::new(crate::tasks::TaskState {
+            id: 1,
+            owner: "dango.updates".into(),
+            title: "Dango 0.5.0".into(),
+            line: "Downloading Dango 0.5.1".into(),
+            status: crate::tasks::TaskStatus::Running,
+            progress: None,
+            steps: Vec::new(),
+            subtitle: String::new(),
+            detail: String::new(),
+            cancel: None,
+            retry: None,
+            show: None,
+            item_id: "update".into(),
+        })));
+        h.wake_busy();
+        let pill = h.find("Search bar").expect("the pill").size().height;
+        let on_pill = h.find("Downloading Dango 0.5.1").expect("the ticker");
+        assert!(on_pill.absolute_position().y < pill);
+        h.arrow_down();
+        let in_bar = h.find("Downloading Dango 0.5.1").expect("the ticker");
+        assert!(in_bar.absolute_position().y > pill);
+    }
+}
+
 mod window_height {
     use super::*;
+
+    #[test]
+    fn the_card_sits_below_the_pill_across_a_gap() {
+        let h = Harness::root(results(3));
+        let pill = h.find("Search bar").expect("the pill");
+        let card = h.find("Results").expect("the card");
+        assert_eq!(pill.size().height, 52.0);
+        assert_eq!(
+            card.absolute_position().y,
+            pill.absolute_position().y + pill.size().height + 8.0
+        );
+    }
+
+    #[test]
+    fn a_click_in_the_gap_is_a_click_outside() {
+        let h = Harness::root(results(3));
+        h.click_at(360.0, 52.0 + 4.0);
+        assert_eq!(h.intents(), [Intent::ClickedOutside]);
+    }
+
+    #[test]
+    fn a_click_on_the_pill_or_an_empty_part_of_the_card_stays_inside() {
+        let h = Harness::root(results(3));
+        h.click_at(360.0, 26.0);
+        let card = h.find("Results").expect("the card");
+        h.click_at(360.0, card.absolute_position().y + LIST_PADDING / 2.0);
+        assert!(!h.intents().contains(&Intent::ClickedOutside));
+    }
+
+    #[test]
+    fn the_card_fits_its_rows_when_the_window_keeps_its_size() {
+        let h = Harness::root(results(3));
+        let card = h.find("Results").expect("the card");
+        assert_eq!(
+            card.size().height,
+            LIST_PADDING + 3.0 * ROW + LIST_PADDING + ACTION_BAR
+        );
+        assert!(PILL + card.size().height < 480.0);
+    }
 
     #[test]
     fn three_results_make_a_short_window() {
         let h = Harness::root(results(3));
         assert_eq!(
             h.height(),
-            SEARCH_BAR + LIST_PADDING + 3.0 * ROW + LIST_PADDING + ACTION_BAR
+            PILL + LIST_PADDING + 3.0 * ROW + LIST_PADDING + ACTION_BAR
         );
     }
 
@@ -1649,8 +1810,14 @@ mod window_height {
     #[test]
     fn a_partial_answer_does_not_shrink_the_window() {
         let h = Harness::root(results(5));
+        h.type_text("r");
+        h.event(Event::Results {
+            query: "r".into(),
+            items: results(5),
+            complete: true,
+        });
         let full = h.height();
-        h.type_text("re");
+        h.type_text("e");
         h.event(Event::Results {
             query: "re".into(),
             items: results(2),
@@ -1664,7 +1831,7 @@ mod window_height {
         });
         assert_eq!(
             h.height(),
-            SEARCH_BAR + LIST_PADDING + 8.0 * ROW + LIST_PADDING + ACTION_BAR
+            PILL + LIST_PADDING + 8.0 * ROW + LIST_PADDING + ACTION_BAR
         );
         h.event(Event::Results {
             query: "re".into(),
@@ -1673,7 +1840,7 @@ mod window_height {
         });
         assert_eq!(
             h.height(),
-            SEARCH_BAR + LIST_PADDING + 2.0 * ROW + LIST_PADDING + ACTION_BAR
+            PILL + LIST_PADDING + 2.0 * ROW + LIST_PADDING + ACTION_BAR
         );
     }
 
@@ -1784,7 +1951,10 @@ mod action_panel {
                 element.accessible_role() == Some(i_slint_backend_testing::AccessibleRole::List)
             })
             .expect("the action panel");
-        assert_eq!(h.height(), panel.size().height + ACTION_BAR + 2.0 * 8.0);
+        assert_eq!(
+            h.height(),
+            PILL + panel.size().height + ACTION_BAR + 2.0 * 8.0
+        );
     }
 
     #[test]
@@ -1877,13 +2047,13 @@ mod tray {
     use super::*;
 
     #[test]
-    fn the_tray_lists_the_notices() {
+    fn the_tray_lists_the_problems() {
         i_slint_backend_testing::init_no_event_loop();
         let tray = Tray::new().unwrap();
         super::super::show_tray(
             &tray,
             &TrayStatus {
-                notices: vec!["Pasting is off, see dango.log".into()],
+                problems: vec!["Pasting is off, see dango.log".into()],
                 config_error: false,
                 missing: Vec::new(),
             },
@@ -1897,20 +2067,20 @@ mod tray {
     }
 }
 
-mod hud {
-    use super::super::generated::{HudWindow, ToastStyle as SlintToastStyle};
-    use super::super::render::hud;
+mod notice {
+    use super::super::generated::{NoticeWindow, TickerStyle as SlintTickerStyle};
+    use super::super::render::notice;
     use super::*;
-    use crate::ui::snapshot::Hud;
-    use crate::ui::ToastStyle;
+    use crate::ui::snapshot::Notice;
+    use crate::ui::TickerStyle;
 
-    fn shown(style: ToastStyle, text: &str) -> HudWindow {
+    fn shown(style: TickerStyle, text: &str) -> NoticeWindow {
         i_slint_backend_testing::init_no_event_loop();
-        let ui = HudWindow::new().unwrap();
+        let ui = NoticeWindow::new().unwrap();
         ui.show().unwrap();
-        hud::write(
+        notice::write(
             &ui,
-            &Hud {
+            &Notice {
                 id: 1,
                 style,
                 text: text.into(),
@@ -1923,73 +2093,73 @@ mod hud {
     /// reached.
     pub(super) struct NoPlatform;
 
-    impl crate::platform::HudWindow for NoPlatform {
+    impl crate::platform::NoticeWindow for NoPlatform {
         fn place(&self, _window: crate::platform::RawWindowHandle) {}
     }
 
     #[test]
-    fn the_shell_shows_a_new_hud_and_hides_a_gone_one() {
+    fn the_shell_shows_a_new_notice_and_hides_a_gone_one() {
         i_slint_backend_testing::init_no_event_loop();
-        let ui = HudWindow::new().unwrap();
-        let shell_hud = super::super::Hud {
+        let ui = NoticeWindow::new().unwrap();
+        let shell_notice = super::super::Notice {
             window: ui.as_weak(),
             platform: std::sync::Arc::new(std::sync::Mutex::new(Box::new(NoPlatform))),
             attached: Default::default(),
         };
-        let copied = Hud {
+        let copied = Notice {
             id: 7,
-            style: ToastStyle::Success,
+            style: TickerStyle::Success,
             text: "Copied to clipboard".into(),
         };
-        shell_hud.update(Some(&copied));
+        shell_notice.update(Some(&copied));
         assert!(ui.window().is_visible());
         assert_eq!(ui.get_text(), "Copied to clipboard");
-        shell_hud.update(Some(&Hud {
+        shell_notice.update(Some(&Notice {
             id: 8,
-            style: ToastStyle::Failure,
+            style: TickerStyle::Failure,
             text: "Nope".into(),
         }));
         assert_eq!(ui.get_text(), "Nope");
-        assert_eq!(ui.get_style(), SlintToastStyle::Failure);
-        shell_hud.update(None);
+        assert_eq!(ui.get_style(), SlintTickerStyle::Failure);
+        shell_notice.update(None);
         assert!(!ui.window().is_visible());
-        super::super::HUD_SHOWN.set(None);
+        super::super::NOTICE_SHOWN.set(None);
     }
 
-    fn label(ui: &HudWindow, text: &str) -> ElementHandle {
+    fn label(ui: &NoticeWindow, text: &str) -> ElementHandle {
         ElementHandle::find_by_accessible_label(ui, text)
             .next()
             .unwrap_or_else(|| panic!("no element labelled {text}"))
     }
 
     #[test]
-    fn a_failure_hud_says_it_failed() {
+    fn a_failure_notice_says_it_failed() {
         let ui = shown(
-            ToastStyle::Failure,
+            TickerStyle::Failure,
             "Dango can't move administrator windows",
         );
-        assert_eq!(ui.get_style(), SlintToastStyle::Failure);
+        assert_eq!(ui.get_style(), SlintTickerStyle::Failure);
         let text = label(&ui, "Dango can't move administrator windows");
         assert_eq!(text.accessible_description().as_deref(), Some("Failed"));
     }
 
     #[test]
-    fn a_success_hud_shows_its_text() {
-        let ui = shown(ToastStyle::Success, "Copied to clipboard");
-        assert_eq!(ui.get_style(), SlintToastStyle::Success);
+    fn a_success_notice_shows_its_text() {
+        let ui = shown(TickerStyle::Success, "Copied to clipboard");
+        assert_eq!(ui.get_style(), SlintTickerStyle::Success);
         let text = label(&ui, "Copied to clipboard");
         assert_eq!(text.accessible_description().as_deref(), Some(""));
     }
 
     #[test]
-    fn the_longest_failures_fit_the_hud() {
-        let ui = shown(ToastStyle::Failure, "");
-        let write = |ui: &HudWindow, text: &str| {
-            hud::write(
+    fn the_longest_failures_fit_the_notice() {
+        let ui = shown(TickerStyle::Failure, "");
+        let write = |ui: &NoticeWindow, text: &str| {
+            notice::write(
                 ui,
-                &Hud {
+                &Notice {
                     id: 1,
-                    style: ToastStyle::Failure,
+                    style: TickerStyle::Failure,
                     text: text.into(),
                 },
             )
@@ -2065,14 +2235,14 @@ mod progress_view {
     }
 }
 
-mod toast_action {
+mod ticker_action {
     use super::super::keys;
     use super::*;
     use crate::protocol::{Modifier, Shortcut};
-    use crate::ui::{ActionRequest, Origin, ToastAction};
+    use crate::ui::{ActionRequest, Origin, TickerAction};
 
     #[test]
-    fn a_toast_chord_is_as_wide_as_its_keys() {
+    fn a_ticker_chord_is_as_wide_as_its_keys() {
         let h = Harness::root(results(3));
         h.event(Event::Failed("Couldn't download the update.".into()));
         let mut snapshot = h.launcher.borrow().snapshot();
@@ -2080,8 +2250,8 @@ mod toast_action {
             key: "r".into(),
             modifiers: vec![Modifier::Cmd],
         };
-        if let Some(toast) = snapshot.toast.as_mut() {
-            toast.action = Some(ToastAction {
+        if let Some(ticker) = snapshot.ticker.as_mut() {
+            ticker.action = Some(TickerAction {
                 title: "Retry".into(),
                 shortcut: retry.clone(),
                 request: ActionRequest {
@@ -2096,9 +2266,9 @@ mod toast_action {
         }
         h.publish(snapshot);
         let keys = keys::shortcut_label(&retry);
-        let in_toast = ElementHandle::find_by_element_type_name(&h.ui, "Kbd")
+        let in_ticker = ElementHandle::find_by_element_type_name(&h.ui, "Kbd")
             .find(|kbd| kbd.accessible_label().as_deref() == Some(keys.as_str()))
-            .expect("the toast's chord")
+            .expect("the ticker's chord")
             .size()
             .width;
         let gallery = super::super::generated::AtomGallery::new().unwrap();
@@ -2109,11 +2279,11 @@ mod toast_action {
             .expect("the chord on its own")
             .size()
             .width;
-        assert_eq!(in_toast, alone);
+        assert_eq!(in_ticker, alone);
     }
 
     #[test]
-    fn a_failure_toast_shows_its_action_and_chord() {
+    fn a_failure_ticker_shows_its_action_and_chord() {
         let h = Harness::root(results(3));
         h.event(Event::Failed("Couldn't download the update.".into()));
         let mut snapshot = h.launcher.borrow().snapshot();
@@ -2121,8 +2291,8 @@ mod toast_action {
             key: "r".into(),
             modifiers: vec![Modifier::Cmd],
         };
-        if let Some(toast) = snapshot.toast.as_mut() {
-            toast.action = Some(ToastAction {
+        if let Some(ticker) = snapshot.ticker.as_mut() {
+            ticker.action = Some(TickerAction {
                 title: "Retry".into(),
                 shortcut: shortcut.clone(),
                 request: ActionRequest {
@@ -2137,11 +2307,11 @@ mod toast_action {
         }
         h.publish(snapshot);
         let chord = keys::shortcut_label(&shortcut);
-        assert_eq!(h.shell().get_toast_action_label(), "Retry");
-        assert_eq!(h.shell().get_toast_action_keys(), chord.as_str());
-        let toast = h.find("Couldn't download the update.").expect("the toast");
+        assert_eq!(h.shell().get_ticker_action_label(), "Retry");
+        assert_eq!(h.shell().get_ticker_action_keys(), chord.as_str());
+        let ticker = h.find("Couldn't download the update.").expect("the ticker");
         assert_eq!(
-            toast.accessible_description().as_deref(),
+            ticker.accessible_description().as_deref(),
             Some(format!("Failed. Retry, {chord}").as_str())
         );
     }

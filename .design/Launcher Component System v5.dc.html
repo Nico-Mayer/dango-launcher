@@ -1,0 +1,1113 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#0e0f11}
+*{box-sizing:border-box}
+a{color:inherit;text-decoration:none}
+a:hover{text-decoration:underline}
+pre{margin:0}
+code,.mono{font-family:'Geist Mono',ui-monospace,monospace}
+.nav-a{padding:6px 10px;border-radius:8px;color:var(--muted)}
+.nav-a:hover{background:var(--hover);color:var(--text);text-decoration:none}
+.nav-g{color:var(--dim);font-size:11px;font-weight:600;margin:18px 10px 4px}
+.sec{display:flex;flex-direction:column;gap:20px}
+.sec-h{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+.sec-h h2{margin:0;font-size:28px;font-weight:600;letter-spacing:-.028em}
+.badge{font-size:12px;font-weight:500;color:var(--muted);background:var(--raised);border-radius:99px;padding:2px 10px}
+.lead{margin:0;color:var(--muted);max-width:660px;text-wrap:pretty}
+.lead b{color:var(--text);font-weight:500}
+.props{display:grid;grid-template-columns:auto 1fr;gap:6px 16px;font-size:13px;align-content:start;max-width:760px}
+.props>.k{font-family:'Geist Mono',ui-monospace,monospace}
+.props>.v{color:var(--muted)}
+.props>.t{grid-column:1/-1;font-weight:500;margin-top:8px}
+.tile{background:var(--surface);border:1px solid var(--border);border-radius:13px;padding:20px;display:flex;flex-direction:column;gap:10px}
+.tile .n{font-family:'Geist Mono',ui-monospace,monospace;font-size:13px}
+.tile .d{color:var(--muted);font-size:13px}
+.lbl{font-size:12px;color:var(--dim)}
+.stage{padding:32px;background:radial-gradient(55% 70% at 12% 8%, color-mix(in oklch, var(--accent) 22%, transparent), transparent 70%), radial-gradient(45% 60% at 92% 95%, color-mix(in oklch, var(--working) 18%, transparent), transparent 70%), repeating-linear-gradient(135deg, color-mix(in oklch, var(--text) 4%, transparent) 0 2px, transparent 2px 14px), var(--chrome);border:1px solid var(--border);border-radius:16px;overflow-x:auto}
+.fig{margin:0;display:flex;flex-direction:column;gap:10px;min-width:0}
+.cap{display:flex;gap:10px;align-items:baseline;font-size:13px;flex-wrap:wrap}
+.cap .id{font-family:'Geist Mono',ui-monospace,monospace;font-size:11px;color:var(--accent)}
+.cap .nm{font-weight:500}
+.cap .ds{color:var(--muted)}
+.launcher{position:relative;width:720px;flex-shrink:0;display:flex;flex-direction:column;gap:8px;font-size:14px;color:var(--text)}
+.pill{position:relative;display:flex;align-items:center;gap:12px;height:52px;padding:0 12px 0 18px;background:var(--popover);border:1px solid var(--border);border-radius:26px;flex-shrink:0;overflow:hidden}
+.pill.pushed{padding-left:12px}
+.q{flex:1;min-width:0;font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ph{color:var(--dim)}
+.ttl{flex:1;min-width:0;font-size:16px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.caret{display:inline-block;width:1.5px;height:19px;background:var(--text);vertical-align:-4px;margin-left:1px}
+.back{width:28px;height:28px;border-radius:14px;background:var(--hover);display:grid;place-items:center;flex-shrink:0}
+.fpill{display:flex;align-items:center;gap:6px;height:28px;padding:0 12px;border-radius:14px;background:var(--hover);font-size:12px;color:var(--muted);white-space:nowrap;flex-shrink:0}
+.ptoast{display:flex;align-items:center;gap:8px;max-width:50%;min-width:0;font-size:12px;white-space:nowrap;flex-shrink:1}
+.ptoast span.tx{overflow:hidden;text-overflow:ellipsis}
+.lbar{position:absolute;left:26px;right:26px;bottom:0;height:2px;background:var(--border);overflow:hidden}
+.lbar i{position:absolute;left:30%;width:25%;top:0;bottom:0;background:var(--accent)}
+.card{position:relative;display:flex;flex-direction:column;background:var(--popover);border:1px solid var(--border);border-radius:14px;overflow:hidden;flex-shrink:0}
+.list{flex:1;min-height:0;padding:8px 0;display:flex;flex-direction:column;overflow:hidden;position:relative}
+.h{height:28px;flex-shrink:0;display:flex;align-items:center;gap:8px;padding:0 16px;font-size:12px;font-weight:500;color:var(--muted)}
+.row{height:44px;flex-shrink:0;display:flex;align-items:center;gap:12px;margin:0 6px;padding:0 10px;border-radius:8px}
+.row.sel{background:var(--sel)}
+.rt{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rs{max-width:240px;font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.u{text-decoration:underline;text-underline-offset:3px}
+.thumb{position:absolute;right:4px;top:12px;width:4px;height:90px;border-radius:2px;background:var(--border)}
+.ab{height:44px;flex-shrink:0;display:flex;align-items:center;gap:12px;padding:0 12px;background:var(--chrome);border-top:1px solid var(--border);font-size:12px;color:var(--muted);margin-top:auto}
+.ctx{flex:1;min-width:0;display:flex;align-items:center;gap:8px;white-space:nowrap;overflow:hidden}
+.chip{display:flex;align-items:center;gap:8px;height:28px;padding:0 6px 0 12px;border-radius:14px;background:var(--hover);color:var(--text);font-weight:500;white-space:nowrap;flex-shrink:0}
+.vsep{width:1px;height:14px;background:var(--border);flex-shrink:0}
+.acts{display:flex;align-items:center;gap:6px;white-space:nowrap;flex-shrink:0;cursor:pointer}
+.acts:hover{color:var(--text)}
+.kbd{display:inline-flex;align-items:center;height:20px;padding:0 5px;background:var(--raised);border:1px solid var(--border);border-radius:4px;font-family:'Geist Mono',ui-monospace,monospace;font-size:12px;font-weight:400;line-height:1;color:var(--muted);white-space:nowrap;flex-shrink:0}
+.panel{position:absolute;right:8px;bottom:52px;width:280px;background:var(--popover);border:1px solid var(--border);border-radius:8px;box-shadow:0 8px 24px var(--shadow);display:flex;flex-direction:column;overflow:hidden;z-index:2}
+.panel.static{position:relative;right:auto;bottom:auto}
+.prs{padding:6px;display:flex;flex-direction:column}
+.pr{height:32px;flex-shrink:0;display:flex;align-items:center;gap:8px;padding:0 10px;border-radius:4px;font-size:14px}
+.pr.sel{background:var(--sel)}
+.pr .pt{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ph2{height:28px;display:flex;align-items:center;padding-left:10px;font-size:12px;font-weight:500;color:var(--muted)}
+.pf{height:36px;flex-shrink:0;border-top:1px solid var(--border);display:flex;align-items:center;padding:0 16px;font-size:12px;color:var(--dim)}
+.dot{width:6px;height:6px;border-radius:3px;flex-shrink:0;display:inline-block}
+.spin{width:12px;height:12px;border-radius:50%;border:1.5px solid var(--raised);border-top-color:var(--working);flex-shrink:0;display:inline-block}
+.ring{width:16px;height:16px;border-radius:50%;flex-shrink:0;display:inline-block;-webkit-mask:radial-gradient(circle,transparent 6px,#000 6.5px);mask:radial-gradient(circle,transparent 6px,#000 6.5px)}
+.app{width:20px;height:20px;border-radius:5px;flex-shrink:0;display:inline-block}
+.tag{display:inline-flex;align-items:center;height:20px;padding:0 6px;border-radius:4px;font-size:12px;white-space:nowrap}
+.fld{height:32px;display:flex;align-items:center;padding:0 10px;background:var(--surface);border:1px solid var(--input);border-radius:4px;font-size:14px}
+.fld.focus{border-color:var(--accent)}
+.flabel{width:120px;flex-shrink:0;padding-top:8px;text-align:right;font-size:12px;color:var(--muted)}
+.frow{display:flex;gap:16px;align-items:flex-start}
+.fctl{flex:1;min-width:0;display:flex;flex-direction:column;gap:6px}
+.cbox{width:16px;height:16px;border-radius:4px;border:1px solid var(--input);background:var(--surface);display:grid;place-items:center;flex-shrink:0}
+.cbox i{width:8px;height:8px;border-radius:2px;background:var(--accent)}
+.lu{display:inline-block;width:20px;height:20px;flex-shrink:0;background:var(--muted);-webkit-mask-size:contain;mask-size:contain;-webkit-mask-repeat:no-repeat;mask-repeat:no-repeat;-webkit-mask-position:center;mask-position:center}
+.lu.s16{width:16px;height:16px}
+.lu.s32{width:32px;height:32px}
+.app-term{background:linear-gradient(135deg,#3a3f4b,#16181d);border:1px solid #5a6070}
+.mk{position:absolute;font-family:'Geist Mono',ui-monospace,monospace;font-size:10px;color:var(--accent)}
+.tbl{display:flex;flex-direction:column;border:1px solid var(--border);border-radius:13px;overflow:hidden;max-width:880px;font-size:13px}
+.tbl>div{display:grid;grid-template-columns:var(--cols);gap:16px;padding:11px 16px;border-top:1px solid var(--border)}
+.tbl>div:first-child{border-top:0;background:var(--chrome);color:var(--dim);font-size:12px;font-weight:500}
+.tbl .m{color:var(--muted)}
+.i-app-window{-webkit-mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='2' y='4' width='20' height='16' rx='2' /%3E %3Cpath d='M10 4v4' /%3E %3Cpath d='M2 8h20' /%3E %3Cpath d='M6 4v4' /%3E%3C/svg%3E");mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='2' y='4' width='20' height='16' rx='2' /%3E %3Cpath d='M10 4v4' /%3E %3Cpath d='M2 8h20' /%3E %3Cpath d='M6 4v4' /%3E%3C/svg%3E")}
+.i-arrow-left{-webkit-mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m12 19-7-7 7-7' /%3E %3Cpath d='M19 12H5' /%3E%3C/svg%3E");mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m12 19-7-7 7-7' /%3E %3Cpath d='M19 12H5' /%3E%3C/svg%3E")}
+.i-arrow-right{-webkit-mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12h14' /%3E %3Cpath d='m12 5 7 7-7 7' /%3E%3C/svg%3E");mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12h14' /%3E %3Cpath d='m12 5 7 7-7 7' /%3E%3C/svg%3E")}
+.i-calculator{-webkit-mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect width='16' height='20' x='4' y='2' rx='2' /%3E %3Cline x1='8' x2='16' y1='6' y2='6' /%3E %3Cline x1='16' x2='16' y1='14' y2='18' /%3E %3Cpath d='M16 10h.01' /%3E %3Cpath d='M12 10h.01' /%3E %3Cpath d='M8 10h.01' /%3E %3Cpath d='M12 14h.01' /%3E %3Cpath d='M8 14h.01' /%3E %3Cpath d='M12 18h.01' /%3E %3Cpath d='M8 18h.01' /%3E%3C/svg%3E");mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect width='16' height='20' x='4' y='2' rx='2' /%3E %3Cline x1='8' x2='16' y1='6' y2='6' /%3E %3Cline x1='16' x2='16' y1='14' y2='18' /%3E %3Cpath d='M16 10h.01' /%3E %3Cpath d='M12 10h.01' /%3E %3Cpath d='M8 10h.01' /%3E %3Cpath d='M12 14h.01' /%3E %3Cpath d='M8 14h.01' /%3E %3Cpath d='M12 18h.01' /%3E %3Cpath d='M8 18h.01' /%3E%3C/svg%3E")}
+.i-check{-webkit-mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5' /%3E%3C/svg%3E");mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5' /%3E%3C/svg%3E")}
+.i-circle-alert{-webkit-mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='10' /%3E %3Cline x1='12' x2='12' y1='8' y2='12' /%3E %3Cline x1='12' x2='12.01' y1='16' y2='16' /%3E%3C/svg%3E");mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='10' /%3E %3Cline x1='12' x2='12' y1='8' y2='12' /%3E %3Cline x1='12' x2='12.01' y1='16' y2='16' /%3E%3C/svg%3E")}
+.i-circle-arrow-down{-webkit-mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='10' /%3E %3Cpath d='M12 8v8' /%3E %3Cpath d='m8 12 4 4 4-4' /%3E%3C/svg%3E");mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='10' /%3E %3Cpath d='M12 8v8' /%3E %3Cpath d='m8 12 4 4 4-4' /%3E%3C/svg%3E")}
+.i-clipboard-list{-webkit-mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect width='8' height='4' x='8' y='2' rx='1' ry='1' /%3E %3Cpath d='M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2' /%3E %3Cpath d='M12 11h4' /%3E %3Cpath d='M12 16h4' /%3E %3Cpath d='M8 11h.01' /%3E %3Cpath d='M8 16h.01' /%3E%3C/svg%3E");mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect width='8' height='4' x='8' y='2' rx='1' ry='1' /%3E %3Cpath d='M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2' /%3E %3Cpath d='M12 11h4' /%3E %3Cpath d='M12 16h4' /%3E %3Cpath d='M8 11h.01' /%3E %3Cpath d='M8 16h.01' /%3E%3C/svg%3E")}
+.i-clipboard-type{-webkit-mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect width='8' height='4' x='8' y='2' rx='1' ry='1' /%3E %3Cpath d='M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2' /%3E %3Cpath d='M9 12v-1h6v1' /%3E %3Cpath d='M11 17h2' /%3E %3Cpath d='M12 11v6' /%3E%3C/svg%3E");mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect width='8' height='4' x='8' y='2' rx='1' ry='1' /%3E %3Cpath d='M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2' /%3E %3Cpath d='M9 12v-1h6v1' /%3E %3Cpath d='M11 17h2' /%3E %3Cpath d='M12 11v6' /%3E%3C/svg%3E")}
+.i-file{-webkit-mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z' /%3E %3Cpath d='M14 2v4a2 2 0 0 0 2 2h4' /%3E%3C/svg%3E");mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z' /%3E %3Cpath d='M14 2v4a2 2 0 0 0 2 2h4' /%3E%3C/svg%3E")}
+.i-gamepad-2{-webkit-mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cline x1='6' x2='10' y1='11' y2='11' /%3E %3Cline x1='8' x2='8' y1='9' y2='13' /%3E %3Cline x1='15' x2='15.01' y1='12' y2='12' /%3E %3Cline x1='18' x2='18.01' y1='10' y2='10' /%3E %3Cpath d='M17.32 5H6.68a4 4 0 0 0-3.978 3.59c-.006.052-.01.101-.017.152C2.604 9.416 2 14.456 2 16a3 3 0 0 0 3 3c1 0 1.5-.5 2-1l1.414-1.414A2 2 0 0 1 9.828 16h4.344a2 2 0 0 1 1.414.586L17 18c.5.5 1 1 2 1a3 3 0 0 0 3-3c0-1.545-.604-6.584-.685-7.258-.007-.05-.011-.1-.017-.151A4 4 0 0 0 17.32 5z' /%3E%3C/svg%3E");mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cline x1='6' x2='10' y1='11' y2='11' /%3E %3Cline x1='8' x2='8' y1='9' y2='13' /%3E %3Cline x1='15' x2='15.01' y1='12' y2='12' /%3E %3Cline x1='18' x2='18.01' y1='10' y2='10' /%3E %3Cpath d='M17.32 5H6.68a4 4 0 0 0-3.978 3.59c-.006.052-.01.101-.017.152C2.604 9.416 2 14.456 2 16a3 3 0 0 0 3 3c1 0 1.5-.5 2-1l1.414-1.414A2 2 0 0 1 9.828 16h4.344a2 2 0 0 1 1.414.586L17 18c.5.5 1 1 2 1a3 3 0 0 0 3-3c0-1.545-.604-6.584-.685-7.258-.007-.05-.011-.1-.017-.151A4 4 0 0 0 17.32 5z' /%3E%3C/svg%3E")}
+.i-link{-webkit-mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71' /%3E %3Cpath d='M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71' /%3E%3C/svg%3E");mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71' /%3E %3Cpath d='M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71' /%3E%3C/svg%3E")}
+.i-lock{-webkit-mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect width='18' height='11' x='3' y='11' rx='2' ry='2' /%3E %3Cpath d='M7 11V7a5 5 0 0 1 10 0v4' /%3E%3C/svg%3E");mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect width='18' height='11' x='3' y='11' rx='2' ry='2' /%3E %3Cpath d='M7 11V7a5 5 0 0 1 10 0v4' /%3E%3C/svg%3E")}
+.i-monitor{-webkit-mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect width='20' height='14' x='2' y='3' rx='2' /%3E %3Cline x1='8' x2='16' y1='21' y2='21' /%3E %3Cline x1='12' x2='12' y1='17' y2='21' /%3E%3C/svg%3E");mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect width='20' height='14' x='2' y='3' rx='2' /%3E %3Cline x1='8' x2='16' y1='21' y2='21' /%3E %3Cline x1='12' x2='12' y1='17' y2='21' /%3E%3C/svg%3E")}
+.i-refresh-cw{-webkit-mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8' /%3E %3Cpath d='M21 3v5h-5' /%3E %3Cpath d='M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16' /%3E %3Cpath d='M8 16H3v5' /%3E%3C/svg%3E");mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8' /%3E %3Cpath d='M21 3v5h-5' /%3E %3Cpath d='M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16' /%3E %3Cpath d='M8 16H3v5' /%3E%3C/svg%3E")}
+.i-search{-webkit-mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m21 21-4.34-4.34' /%3E %3Ccircle cx='11' cy='11' r='8' /%3E%3C/svg%3E");mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m21 21-4.34-4.34' /%3E %3Ccircle cx='11' cy='11' r='8' /%3E%3C/svg%3E")}
+.i-settings{-webkit-mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z' /%3E %3Ccircle cx='12' cy='12' r='3' /%3E%3C/svg%3E");mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z' /%3E %3Ccircle cx='12' cy='12' r='3' /%3E%3C/svg%3E")}
+.i-sparkles{-webkit-mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z' /%3E %3Cpath d='M20 3v4' /%3E %3Cpath d='M22 5h-4' /%3E %3Cpath d='M4 17v2' /%3E %3Cpath d='M5 18H3' /%3E%3C/svg%3E");mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z' /%3E %3Cpath d='M20 3v4' /%3E %3Cpath d='M22 5h-4' /%3E %3Cpath d='M4 17v2' /%3E %3Cpath d='M5 18H3' /%3E%3C/svg%3E")}
+.i-square{-webkit-mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect width='18' height='18' x='3' y='3' rx='2' /%3E%3C/svg%3E");mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect width='18' height='18' x='3' y='3' rx='2' /%3E%3C/svg%3E")}
+.i-terminal{-webkit-mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 19h8' /%3E %3Cpath d='m4 17 6-6-6-6' /%3E%3C/svg%3E");mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 19h8' /%3E %3Cpath d='m4 17 6-6-6-6' /%3E%3C/svg%3E")}
+.i-trash-2{-webkit-mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 6h18' /%3E %3Cpath d='M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6' /%3E %3Cpath d='M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2' /%3E %3Cline x1='10' x2='10' y1='11' y2='17' /%3E %3Cline x1='14' x2='14' y1='11' y2='17' /%3E%3C/svg%3E");mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 6h18' /%3E %3Cpath d='M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6' /%3E %3Cpath d='M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2' /%3E %3Cline x1='10' x2='10' y1='11' y2='17' /%3E %3Cline x1='14' x2='14' y1='11' y2='17' /%3E%3C/svg%3E")}
+.i-triangle-alert{-webkit-mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3' /%3E %3Cpath d='M12 9v4' /%3E %3Cpath d='M12 17h.01' /%3E%3C/svg%3E");mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3' /%3E %3Cpath d='M12 9v4' /%3E %3Cpath d='M12 17h.01' /%3E%3C/svg%3E")}
+</style>
+</helmet>
+<div style="{{ themeVars }}">
+<div style="min-height:100vh;background:radial-gradient(50% 45% at 85% 0%, color-mix(in oklch, var(--accent) 10%, transparent), transparent 70%) fixed, radial-gradient(40% 40% at 30% 100%, color-mix(in oklch, var(--working) 8%, transparent), transparent 70%) fixed, var(--canvas);color:var(--text);font-family:'Geist',system-ui,sans-serif;font-size:14px;line-height:1.5;display:grid;grid-template-columns:minmax(0,240px) minmax(0,1fr);">
+
+<nav style="position:sticky;top:0;height:100vh;overflow:auto;padding:28px 12px;border-right:1px solid var(--border);background:var(--chrome);display:flex;flex-direction:column;gap:2px;font-size:13px;">
+  <div style="font-weight:600;font-size:15px;padding:0 10px;">Dango</div>
+  <div style="color:var(--dim);font-size:12px;padding:0 10px;margin-bottom:12px;">Launcher design system · v5</div>
+  <div class="nav-g" style="margin-top:14px;">Foundations</div>
+  <a class="nav-a" href="#principles">Principles</a>
+  <a class="nav-a" href="#anatomy">Anatomy</a>
+  <a class="nav-a" href="#tokens">Colour roles</a>
+  <a class="nav-a" href="#sizes">Sizes and type</a>
+  <a class="nav-a" href="#themes">Themes</a>
+  <a class="nav-a" href="#tree">Composition tree</a>
+  <a class="nav-a" href="#states">States and keys</a>
+  <a class="nav-a" href="#screens">Screens</a>
+  <div class="nav-g">Shell</div>
+  <a class="nav-a" href="#window">LauncherWindow</a>
+  <a class="nav-a" href="#searchbar">SearchBar</a>
+  <a class="nav-a" href="#dropdown">Filter dropdown</a>
+  <a class="nav-a" href="#inlineanswer">InlineAnswer</a>
+  <a class="nav-a" href="#actionbar">ActionBar</a>
+  <a class="nav-a" href="#toast">Toast</a>
+  <a class="nav-a" href="#actionpanel">ActionPanel</a>
+  <a class="nav-a" href="#nav">View stack</a>
+  <a class="nav-a" href="#hud">HUD</a>
+  <div class="nav-g">Views</div>
+  <a class="nav-a" href="#list">List</a>
+  <a class="nav-a" href="#grid">Grid</a>
+  <a class="nav-a" href="#detail">Detail</a>
+  <a class="nav-a" href="#form">Form</a>
+  <a class="nav-a" href="#progressview">ProgressView</a>
+  <a class="nav-a" href="#emptyview">EmptyView</a>
+  <div class="nav-g">Atoms</div>
+  <a class="nav-a" href="#atoms">Icon · Kbd · Tag · Accessory · Dot · Progress · Skeleton</a>
+  <a class="nav-a" href="#controls">Form controls</a>
+  <div class="nav-g">Patterns</div>
+  <a class="nav-a" href="#progress">Loading and progress</a>
+</nav>
+
+<main style="padding:72px clamp(24px,5vw,72px) 160px;max-width:1080px;display:flex;flex-direction:column;gap:120px;">
+
+<header id="principles" style="display:flex;flex-direction:column;gap:20px;">
+  <div style="font-size:13px;font-weight:500;color:var(--accent);">Component system</div>
+  <h1 style="margin:0;font-size:48px;font-weight:600;letter-spacing:-.035em;line-height:1.05;text-wrap:pretty;">A keyboard-first launcher: one pill, one card, one view.</h1>
+  <p class="lead">Dango is a SearchBar pill and, 8 px below it, one card that holds the view (list, grid, detail, form, progress view or empty view) and the ActionBar. Commands return data; Dango draws every surface. Every colour, radius, size and type face comes from one <code style="color:var(--text);">Theme</code> global in <code style="color:var(--text);">ui/theme.slint</code>.</p>
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;">
+    <div class="tile"><div style="font-weight:500;">Structure over style</div><div class="d">Parts define layout and behaviour. Colour, radius and size are Theme values. Rust never passes a colour.</div></div>
+    <div class="tile"><div style="font-weight:500;">Keyboard first</div><div class="d">In lists and grids the cursor stays in the SearchBar. ↑ ↓ move, ↵ runs the primary action, <span class="kbd">{{ k.panel }}</span> opens the rest, Escape steps back.</div></div>
+    <div class="tile"><div style="font-weight:500;">Starts as a pill</div><div class="d">The launcher opens as the bare pill. The card appears when results land, when something needs attention, or on ↓.</div></div>
+    <div class="tile"><div style="font-weight:500;">One primary action</div><div class="d">The first action of the selection runs on ↵ and shows as the chip in the ActionBar. Every action is in the ActionPanel.</div></div>
+    <div class="tile"><div style="font-weight:500;">Commands bring data, not chrome</div><div class="d">A command supplies items and actions; Dango draws the surfaces, so every command looks and behaves alike.</div></div>
+  </div>
+</header>
+
+<section id="anatomy" class="sec">
+  <div style="display:flex;flex-direction:column;gap:6px;">
+    <h2 style="margin:0;font-size:28px;font-weight:600;letter-spacing:-.028em;">Anatomy</h2>
+    <p class="lead">Live. Click into it, then ↑ ↓ to move. Select Windows Terminal and press <span class="kbd">{{ k.panel }}</span> or click “Actions” for the ActionPanel. Escape closes the panel, then the list; ↓ on the bare pill opens the list again. Numbers map to the list on the right.</p>
+  </div>
+  <div class="stage" style="display:flex;flex-direction:column;gap:28px;">
+    <div tabindex="0" onKeyDown="{{ onKey }}" class="launcher" style="outline:none;">
+      <div class="pill">
+        <span class="q ph">Search apps and commands</span>
+        <span class="mono" style="font-size:10px;color:var(--accent);">1</span>
+      </div>
+      <span class="mk" style="right:-14px;top:52px;">2</span>
+      <sc-if value="{{ demoOpen }}" hint-placeholder-val="{{ true }}">
+        <div class="card" style="height:420px;">
+          <span class="mk" style="right:6px;top:4px;">3</span>
+          <span class="mk" style="left:4px;top:4px;">4</span>
+          <div class="list">
+            <sc-for list="{{ rows }}" as="row" hint-placeholder-count="9">
+              <sc-if value="{{ row.isHeader }}" hint-placeholder-val="{{ false }}">
+                <div class="h">{{ row.title }}<span class="mono" style="color:var(--accent);font-size:10px;">{{ row.tag }}</span></div>
+              </sc-if>
+              <sc-if value="{{ row.isItem }}" hint-placeholder-val="{{ true }}">
+                <div onClick="{{ row.select }}" style="{{ row.style }}">
+                  <span class="{{ row.icon }}"></span>
+                  <span class="rt">{{ row.title }}</span>
+                  <span class="rs">{{ row.subtitle }}</span>
+                  <sc-if value="{{ row.hasHotkey }}" hint-placeholder-val="{{ false }}"><span class="kbd">{{ k.hotkey }}</span></sc-if>
+                  <span class="mono" style="font-size:10px;color:var(--accent);">{{ row.tag }}</span>
+                </div>
+              </sc-if>
+            </sc-for>
+          </div>
+          <div class="ab">
+            <span class="ctx"><span class="{{ ctxIcon }}"></span>{{ ctxTitle }}<span class="mono" style="font-size:10px;color:var(--accent);">8</span></span>
+            <span class="chip">{{ primaryLabel }}<span class="kbd">↵</span></span>
+            <sc-if value="{{ manyActions }}" hint-placeholder-val="{{ false }}">
+              <span class="vsep"></span>
+              <span class="acts" onClick="{{ togglePanel }}">Actions<span class="kbd">{{ k.panel }}</span></span>
+            </sc-if>
+          </div>
+          <sc-if value="{{ panelOpen }}" hint-placeholder-val="{{ false }}">
+            <div class="panel">
+              <div class="prs">
+                <sc-for list="{{ actions }}" as="a" hint-placeholder-count="3">
+                  <div onClick="{{ togglePanel }}" style="{{ a.style }}"><span class="pt">{{ a.label }}</span><sc-if value="{{ a.hasKey }}" hint-placeholder-val="{{ false }}"><span class="kbd">{{ a.key }}</span></sc-if></div>
+                </sc-for>
+              </div>
+              <div class="pf">Search actions<span class="mono" style="margin-left:auto;font-size:10px;color:var(--accent);">9</span></div>
+            </div>
+          </sc-if>
+        </div>
+      </sc-if>
+    </div>
+    <ol style="margin:0;padding:0;list-style:none;display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px 24px;font-size:13px;">
+      <li style="display:flex;gap:10px;"><span class="mono" style="color:var(--accent);">1</span><span><a href="#searchbar">SearchBar</a> <span style="color:var(--muted);">the pill · query or title</span></span></li>
+      <li style="display:flex;gap:10px;"><span class="mono" style="color:var(--accent);">2</span><span><a href="#window">Gap</a> <span style="color:var(--muted);">8 px, transparent · a click here hides</span></span></li>
+      <li style="display:flex;gap:10px;"><span class="mono" style="color:var(--accent);">3</span><span><a href="#window">Card</a> <span style="color:var(--muted);">view + ActionBar · radius 14</span></span></li>
+      <li style="display:flex;gap:10px;"><span class="mono" style="color:var(--accent);">4</span><span><a href="#list">List</a> <span style="color:var(--muted);">the active view</span></span></li>
+      <li style="display:flex;gap:10px;"><span class="mono" style="color:var(--accent);">5</span><span><a href="#list">Heading</a> <span style="color:var(--muted);">section title · 28 px</span></span></li>
+      <li style="display:flex;gap:10px;"><span class="mono" style="color:var(--accent);">6</span><span><a href="#list">Row</a> <span style="color:var(--muted);">icon · title · subtitle · 44 px</span></span></li>
+      <li style="display:flex;gap:10px;"><span class="mono" style="color:var(--accent);">7</span><span><a href="#atoms">Accessory</a> <span style="color:var(--muted);">here a hotkey as Kbd</span></span></li>
+      <li style="display:flex;gap:10px;"><span class="mono" style="color:var(--accent);">8</span><span><a href="#actionbar">ActionBar</a> <span style="color:var(--muted);">context · primary chip · Actions</span></span></li>
+      <li style="display:flex;gap:10px;"><span class="mono" style="color:var(--accent);">9</span><span><a href="#actionpanel">ActionPanel</a> <span style="color:var(--muted);">every action · filter at the bottom</span></span></li>
+    </ol>
+  </div>
+</section>
+
+<section id="tokens" class="sec">
+  <div style="display:flex;flex-direction:column;gap:6px;">
+    <h2 style="margin:0;font-size:28px;font-weight:600;letter-spacing:-.028em;">Colour roles</h2>
+    <p class="lead">The 25 colour roles of <code style="color:var(--text);">Theme</code>, with herdr’s role names and the exact values of the selected preset. Parts reference roles only, never hex. Content keeps its own colours: application icons, favicons, image previews and colour tiles. Roles marked “not drawn yet” exist in <code style="color:var(--text);">Theme</code> but no part uses them.</p>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;">
+    <sc-for list="{{ swatches }}" as="s" hint-placeholder-count="25">
+      <div style="border:1px solid var(--border);border-radius:13px;overflow:hidden;">
+        <div style="{{ s.style }}"></div>
+        <div style="padding:8px 10px;display:flex;flex-direction:column;"><span class="mono" style="font-size:12px;">{{ s.name }}</span><span class="mono" style="color:var(--dim);font-size:11px;">{{ s.value }}</span><span style="color:var(--muted);font-size:12px;">{{ s.use }}</span></div>
+      </div>
+    </sc-for>
+  </div>
+</section>
+
+<section id="sizes" class="sec">
+  <div style="display:flex;flex-direction:column;gap:6px;">
+    <h2 style="margin:0;font-size:28px;font-weight:600;letter-spacing:-.028em;">Sizes and type</h2>
+    <p class="lead">Fixed sizes from <code style="color:var(--text);">Theme</code>. Rows, headings and panel entries have fixed heights, so the renderer places, reveals and sizes the launcher by counting. The two themes differ only in colour, never in size or position.</p>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:24px;">
+    <div class="props">
+      <span class="t">Shell</span>
+      <span class="k">window-width</span><span class="v">720 · pill and card width</span>
+      <span class="k">search-height</span><span class="v">52 · the pill, fully rounded</span>
+      <span class="k">shell-gap</span><span class="v">8 · gap between pill and card</span>
+      <span class="k">card-radius</span><span class="v">14</span>
+      <span class="k">action-bar-height</span><span class="v">44</span>
+      <span class="k">max height</span><span class="v">480 · pill + gap + card</span>
+      <span class="t">Views</span>
+      <span class="k">row-height</span><span class="v">44 · list row</span>
+      <span class="k">heading-height</span><span class="v">28 · section heading</span>
+      <span class="k">answer-height</span><span class="v">64 · InlineAnswer</span>
+      <span class="k">list-padding</span><span class="v">8 · above and below the rows</span>
+      <span class="k">icon-size</span><span class="v">20</span>
+      <span class="k">detail-image-height</span><span class="v">200 · tallest image in a detail</span>
+    </div>
+    <div class="props">
+      <span class="t">Overlays</span>
+      <span class="k">panel-width</span><span class="v">280</span>
+      <span class="k">panel-row-height</span><span class="v">32</span>
+      <span class="k">panel-padding</span><span class="v">6</span>
+      <span class="k">panel-filter-height</span><span class="v">36</span>
+      <span class="k">panel-margin</span><span class="v">8 · from the card edge and ActionBar</span>
+      <span class="k">hud-width · height</span><span class="v">560 · 36, padding 14</span>
+      <span class="t">Shape and motion</span>
+      <span class="k">radius</span><span class="v">8 · rows, panel, tiles · half (4) for keys, tags, controls</span>
+      <span class="k">gap</span><span class="v">8</span>
+      <span class="k">loading-sweep</span><span class="v">segment 25 % of the bar · 1.2 s per sweep</span>
+      <span class="t">Type</span>
+      <span class="k">font</span><span class="v">Geist · bundled</span>
+      <span class="k">mono</span><span class="v">Geist Mono · key chords, code, plain text bodies</span>
+      <span class="k">text-small · body · large</span><span class="v">12 · 14 · 16</span>
+    </div>
+  </div>
+</section>
+
+<section id="themes" class="sec">
+  <div style="display:flex;flex-direction:column;gap:6px;">
+    <h2 style="margin:0;font-size:28px;font-weight:600;letter-spacing:-.028em;">Themes</h2>
+    <p class="lead">Two presets: <b>Graphite</b> when the operating system is dark, <b>Paper</b> when it is light. Dango follows the setting on the next paint, without a restart. There is no theme file and no theme picker. A new theme would be one more preset value, with no component change. The <b>theme</b> tweak here only previews the two.</p>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;max-width:720px;">
+    <sc-for list="{{ themeCards }}" as="c" hint-placeholder-count="2">
+      <div style="{{ c.card }}">
+        <div style="{{ c.pill }}"></div>
+        <div style="{{ c.win }}"><div style="{{ c.row }}"></div><div style="{{ c.row2 }}"></div><div style="{{ c.row2 }}"></div><div style="{{ c.bar }}"></div></div>
+        <div style="display:flex;gap:5px;"><sc-for list="{{ c.dots }}" as="d" hint-placeholder-count="5"><span style="{{ d }}"></span></sc-for></div>
+        <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;"><span class="mono" style="font-size:12px;">{{ c.name }}</span><span style="{{ c.muted }}">{{ c.light }}</span></div>
+      </div>
+    </sc-for>
+  </div>
+</section>
+
+<section id="tree" class="sec">
+  <div style="display:flex;flex-direction:column;gap:6px;">
+    <h2 style="margin:0;font-size:28px;font-weight:600;letter-spacing:-.028em;">Composition tree</h2>
+    <p class="lead">How the parts nest. The pill and the card are two shapes in one transparent window. The view slot swaps when a command pushes a view.</p>
+  </div>
+<pre style="background:var(--chrome);border:1px solid var(--border);border-radius:13px;padding:22px 24px;font-family:'Geist Mono',ui-monospace,monospace;font-size:13px;line-height:1.75;overflow:auto;color:var(--text);">LauncherWindow                <span style="color:var(--muted);">one transparent window · no frame · always on top · 720 wide</span>
+├─ gap                        <span style="color:var(--muted);">transparent · a click outside pill and card hides</span>
+├─ Pill · SearchBar           <span style="color:var(--muted);">52 high · fully rounded · popover fill · 1 px border</span>
+│  ├─ back control            <span style="color:var(--muted);">arrow in a circle · pushed views only</span>
+│  ├─ query | title           <span style="color:var(--muted);">query for list and grid · command title otherwise</span>
+│  ├─ Toast                   <span style="color:var(--muted);">at the pill’s end while the card is hidden</span>
+│  ├─ filter dropdown         <span style="color:var(--muted);">pill at the right end · when the view declares one</span>
+│  └─ loading bar             <span style="color:var(--muted);">2 px accent sweep along the bottom</span>
+└─ Card                       <span style="color:var(--muted);">8 below the pill · radius 14 · hidden for the bare pill</span>
+   ├─ InlineAnswer            <span style="color:var(--muted);">root search only · 64 high</span>
+   ├─ <span style="color:var(--accent);">View</span>  (exactly one)
+   │  ├─ List                 <span style="color:var(--muted);">Heading · Row → Icon, Accessory (≤ 3) · optional detail pane</span>
+   │  ├─ Grid                 <span style="color:var(--muted);">heading · Tile</span>
+   │  ├─ Detail               <span style="color:var(--muted);">image · body · metadata</span>
+   │  ├─ Form                 <span style="color:var(--muted);">TextField · TextArea · Checkbox · Dropdown · Separator</span>
+   │  ├─ ProgressView         <span style="color:var(--muted);">title · bar · detail line · steps</span>
+   │  └─ EmptyView            <span style="color:var(--muted);">icon · title · hint</span>
+   ├─ ActionBar               <span style="color:var(--muted);">44 high · context or Toast · primary chip · Actions</span>
+   └─ ActionPanel             <span style="color:var(--muted);">floats above the ActionBar at the right edge</span>
+HudWindow                     <span style="color:var(--muted);">own window · reports outcomes while the launcher is hidden</span></pre>
+</section>
+
+<section id="states" class="sec">
+  <div style="display:flex;flex-direction:column;gap:6px;">
+    <h2 style="margin:0;font-size:28px;font-weight:600;letter-spacing:-.028em;">States and keys</h2>
+    <p class="lead">What root search shows, and what Escape does at each stage. One state machine in Rust decides all of it; the UI only renders.</p>
+  </div>
+  <div class="tbl" style="--cols:170px minmax(0,1fr) minmax(0,1fr);">
+    <div><span>Root state</span><span>What shows</span><span>Keys</span></div>
+    <div><span>Bare pill</span><span class="m">Empty query, nothing pinned. The pill alone: no card, no ActionBar, no selection.</span><span class="m">↓ opens the list at its first row. ↑, ↵ and <span class="kbd">{{ k.panel }}</span> do nothing.</span></div>
+    <div><span>Needs attention</span><span class="m">Empty query with pinned items, such as an update or a missing permission. The card shows only them under “Needs attention”, first one selected.</span><span class="m">↓ opens the full list and selects the row after the pinned one.</span></div>
+    <div><span>Empty-query list</span><span class="m">Opened with ↓. “Needs attention”, then “Suggestions” (at most 6), then “Everything else”. Flat, without headings, when nothing is pinned or launched yet.</span><span class="m">↑ ↓ move. Typing replaces it with ranked results.</span></div>
+    <div><span>Typed query</span><span class="m">One ranked list, no headings. The card appears when the first result for the query lands. An answer card may sit on top.</span><span class="m">↑ ↓ move, ↵ runs the primary action, <span class="kbd">{{ k.panel }}</span> opens the panel.</span></div>
+    <div><span>No results</span><span class="m">EmptyView “No results for” and the query, only once every provider has answered.</span><span class="m">Escape clears the query.</span></div>
+  </div>
+  <div style="display:flex;flex-direction:column;gap:10px;max-width:880px;">
+    <h3 style="margin:0;font-size:17px;font-weight:600;letter-spacing:-.015em;">Escape, stage by stage</h3>
+    <ol style="margin:0;padding:0;list-style:none;display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px 24px;font-size:13px;">
+      <li style="display:flex;gap:10px;"><span class="mono" style="color:var(--accent);">1</span><span>ActionPanel open <span style="color:var(--muted);">→ closes only the panel.</span></span></li>
+      <li style="display:flex;gap:10px;"><span class="mono" style="color:var(--accent);">2</span><span>Pushed view <span style="color:var(--muted);">→ pops it, with or without text in the prompt.</span></span></li>
+      <li style="display:flex;gap:10px;"><span class="mono" style="color:var(--accent);">3</span><span>Root with text <span style="color:var(--muted);">→ clears the query; the closed root view shows.</span></span></li>
+      <li style="display:flex;gap:10px;"><span class="mono" style="color:var(--accent);">4</span><span>Empty query, list open <span style="color:var(--muted);">→ closes the list.</span></span></li>
+      <li style="display:flex;gap:10px;"><span class="mono" style="color:var(--accent);">5</span><span>Bare pill or Needs attention card <span style="color:var(--muted);">→ hides the launcher and resets it.</span></span></li>
+    </ol>
+    <p class="lead" style="font-size:13px;">The global shortcut, a click on another app, and a click in the gap hide the launcher too, but hold its state for a grace period: shown again in time, it comes back as it was.</p>
+  </div>
+</section>
+
+<section id="screens" class="sec">
+  <div style="display:flex;flex-direction:column;gap:6px;">
+    <h2 style="margin:0;font-size:28px;font-weight:600;letter-spacing:-.028em;">Screens</h2>
+    <p class="lead">Each screen at its real size: 720 wide, pill 52, gap 8, card up to 480 in total. A list or grid card is as tall as its rows; a list with a detail pane, a detail, a form, a progress view and an empty view take the full 480. The pill holds a query for lists and grids and the command’s title otherwise. The ActionBar’s left slot is the extension of the selected result at root, and the command in a pushed view.</p>
+  </div>
+  <div style="display:flex;flex-direction:column;gap:36px;">
+
+    <figure class="fig">
+      <div class="stage" style="display:flex;flex-direction:column;gap:24px;">
+        <div class="launcher">
+          <div class="pill"><span class="q ph">Search apps and commands</span></div>
+        </div>
+        <div class="launcher">
+          <div class="pill"><span class="q ph">Search apps and commands</span><span class="ptoast"><span class="dot" style="background:var(--danger);"></span><span class="tx">That command is no longer available</span></span></div>
+        </div>
+      </div>
+      <figcaption class="cap"><span class="id">A</span><span class="nm">Idle · bare pill</span><span class="ds">empty query, nothing pinned · no card, no ActionBar · below: a toast at the pill’s end</span></figcaption>
+    </figure>
+
+    <figure class="fig">
+      <div class="stage">
+        <div class="launcher">
+          <div class="pill"><span class="q">c<span class="caret"></span></span></div>
+          <div class="card" style="height:324px;">
+            <div class="list">
+              <div class="row sel"><span class="lu i-clipboard-list"></span><span class="rt"><span class="u">C</span>lipboard History</span><span class="rs">Clipboard History</span><span class="kbd">{{ k.hotkey }}</span></div>
+              <div class="row"><span class="lu i-settings"></span><span class="rt">Open <span class="u">C</span>onfig File</span><span class="rs">System</span></div>
+              <div class="row"><span class="lu i-refresh-cw"></span><span class="rt"><span class="u">C</span>heck for Updates</span><span class="rs">Updates</span></div>
+              <div class="row"><span class="lu i-clipboard-type"></span><span class="rt">Sear<span class="u">c</span>h Snippets</span><span class="rs">Snippets</span></div>
+              <div class="row"><span class="lu i-clipboard-type"></span><span class="rt"><span class="u">C</span>reate Snippet</span><span class="rs">Snippets</span></div>
+              <div class="row"><span class="app" style="background:linear-gradient(135deg,#f16436,#b8321b);"></span><span class="rt"><span class="u">C</span>urseForge</span><span class="rs">Applications</span></div>
+            </div>
+            <div class="ab"><span class="ctx"><span class="lu s16 i-clipboard-list"></span>Clipboard History</span><span class="chip">Open<span class="kbd">↵</span></span></div>
+          </div>
+        </div>
+      </div>
+      <figcaption class="cap"><span class="id">B</span><span class="nm">List after typing</span><span class="ds">one ranked list, no headings · matched letters underlined · card as tall as its rows · one action, so no “Actions”</span></figcaption>
+    </figure>
+
+    <figure class="fig">
+      <div class="stage">
+        <div class="launcher">
+          <div class="pill"><span class="q ph"><span class="caret" style="margin:0 1px 0 0;"></span>Search apps and commands</span></div>
+          <div class="card" style="height:420px;">
+            <div class="list">
+              <div class="h">Suggestions</div>
+              <div class="row sel" style="margin-right:16px;"><span class="lu i-sparkles"></span><span class="rt">Improve Writing</span><span class="rs">AI</span></div>
+              <div class="row" style="margin-right:16px;"><span class="lu i-clipboard-list"></span><span class="rt">Clipboard History</span><span class="rs">Clipboard History</span><span class="kbd">{{ k.hotkey }}</span></div>
+              <div class="row" style="margin-right:16px;"><span class="lu i-refresh-cw"></span><span class="rt">Check for Updates</span><span class="rs">Updates</span></div>
+              <div class="row" style="margin-right:16px;"><span class="lu i-settings"></span><span class="rt">Open Config File</span><span class="rs">System</span></div>
+              <div class="row" style="margin-right:16px;"><span class="lu i-clipboard-type"></span><span class="rt">Search Snippets</span><span class="rs">Snippets</span></div>
+              <div class="row" style="margin-right:16px;"><span class="lu i-sparkles"></span><span class="rt">Fix Spelling and Grammar</span><span class="rs">AI</span></div>
+              <div class="h">Everything else</div>
+              <div class="row" style="margin-right:16px;"><span class="lu i-sparkles"></span><span class="rt">Explain This</span><span class="rs">AI</span></div>
+              <span class="thumb"></span>
+            </div>
+            <div class="ab"><span class="ctx"><span class="lu s16 i-sparkles"></span>AI</span><span class="chip">Open<span class="kbd">↵</span></span></div>
+          </div>
+        </div>
+      </div>
+      <figcaption class="cap"><span class="id">C</span><span class="nm">Empty-query list · after ↓</span><span class="ds">“Suggestions” (at most 6), then “Everything else” · capped at 480, the list scrolls · Escape closes it</span></figcaption>
+    </figure>
+
+    <figure class="fig">
+      <div class="stage">
+        <div class="launcher">
+          <div class="pill"><span class="q ph"><span class="caret" style="margin:0 1px 0 0;"></span>Search apps and commands</span></div>
+          <div class="card" style="height:132px;">
+            <div class="list">
+              <div class="h">Needs attention</div>
+              <div class="row sel"><span class="lu i-circle-arrow-down"></span><span class="rt">Dango 6.4.0 is available</span><span class="rs">You have 6.3.1</span></div>
+            </div>
+            <div class="ab"><span class="ctx">Updates</span><span class="chip">Install update<span class="kbd">↵</span></span></div>
+          </div>
+        </div>
+      </div>
+      <figcaption class="cap"><span class="id">D</span><span class="nm">Pinned card</span><span class="ds">empty query with a pinned item · only “Needs attention” · ↓ opens the full list</span></figcaption>
+    </figure>
+
+    <figure class="fig">
+      <div class="stage">
+        <div class="launcher">
+          <div class="pill pushed"><span class="back"><span class="lu s16 i-arrow-left"></span></span><span class="q ph"><span class="caret" style="margin:0 1px 0 0;"></span>Search</span></div>
+          <div class="card" style="height:420px;">
+            <div style="flex:1;min-height:0;display:flex;">
+              <div class="list" style="width:40%;flex:none;">
+                <div class="row sel"><span class="lu i-clipboard-list"></span><span class="rt">git push --force-with-lease</span></div>
+                <div class="row"><span class="lu i-clipboard-list"></span><span class="rt">https://slint.dev/docs</span></div>
+                <div class="row"><span class="app" style="background:linear-gradient(135deg,#6d8bb3,#2f405a);border:1px solid var(--border);"></span><span class="rt">Image</span></div>
+                <div class="row"><span class="lu i-file"></span><span class="rt">report.pdf</span></div>
+                <div class="row"><span class="lu i-clipboard-list"></span><span class="rt">Meeting notes for Friday</span></div>
+              </div>
+              <div style="flex:1;min-width:0;border-left:1px solid var(--border);display:flex;flex-direction:column;">
+                <div style="flex:1;padding:16px;" class="mono"><span style="font-size:12px;">git push --force-with-lease</span></div>
+                <div style="border-top:1px solid var(--border);padding:16px;display:grid;grid-template-columns:120px 1fr;gap:6px 12px;font-size:12px;">
+                  <span style="color:var(--muted);">Source</span><span>Windows Terminal</span>
+                  <span style="color:var(--muted);">Copied</span><span>Today, 14:02</span>
+                  <span style="color:var(--muted);">Type</span><span>Text</span>
+                  <span style="color:var(--muted);">Characters</span><span>27</span>
+                </div>
+              </div>
+            </div>
+            <div class="ab"><span class="ctx"><span class="lu s16 i-clipboard-list"></span>Clipboard History</span><span class="chip">Paste<span class="kbd">↵</span></span><span class="vsep"></span><span class="acts">Actions<span class="kbd">{{ k.panel }}</span></span></div>
+          </div>
+        </div>
+      </div>
+      <figcaption class="cap"><span class="id">E</span><span class="nm">List + detail pane</span><span class="ds">Clipboard History · list two fifths, detail three fifths · back control in the pill · full height</span></figcaption>
+    </figure>
+
+    <figure class="fig">
+      <div class="stage">
+        <div class="launcher">
+          <div class="pill pushed"><span class="back"><span class="lu s16 i-arrow-left"></span></span><span class="q ph"><span class="caret" style="margin:0 1px 0 0;"></span>Search</span></div>
+          <div class="card" style="height:420px;">
+            <div style="flex:1;min-height:0;overflow:hidden;padding:16px;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;align-content:start;">
+              <div style="display:flex;flex-direction:column;gap:4px;"><div style="aspect-ratio:2/3;border-radius:8px;border:2px solid var(--accent);background:linear-gradient(160deg,#3a2a6b,#c0503a);position:relative;"><div style="position:absolute;inset:0;background:var(--sel);border-radius:6px;"></div></div><span style="font-size:12px;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Hades</span></div>
+              <div style="display:flex;flex-direction:column;gap:4px;"><div style="aspect-ratio:2/3;border-radius:8px;border:1px solid var(--border);background:linear-gradient(160deg,#2a4a7a,#d06a8a);"></div><span style="font-size:12px;color:var(--muted);text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Celeste</span></div>
+              <div style="display:flex;flex-direction:column;gap:4px;"><div style="aspect-ratio:2/3;border-radius:8px;border:1px solid var(--border);background:linear-gradient(160deg,#1d3b3a,#7fb3a8);"></div><span style="font-size:12px;color:var(--muted);text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Portal 2</span></div>
+              <div style="display:flex;flex-direction:column;gap:4px;"><div style="aspect-ratio:2/3;border-radius:8px;border:1px solid var(--border);background:linear-gradient(160deg,#4a6b2a,#e0c060);"></div><span style="font-size:12px;color:var(--muted);text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Stardew Valley</span></div>
+              <div style="display:flex;flex-direction:column;gap:4px;"><div style="aspect-ratio:2/3;border-radius:8px;border:1px solid var(--border);background:linear-gradient(160deg,#20242e,#5a6a8a);"></div><span style="font-size:12px;color:var(--muted);text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Hollow Knight</span></div>
+              <div style="aspect-ratio:2/3;border-radius:8px;border:1px solid var(--border);background:linear-gradient(160deg,#5a2a2a,#d0a070);"></div>
+              <div style="aspect-ratio:2/3;border-radius:8px;border:1px solid var(--border);background:var(--raised);display:grid;place-items:center;"><span class="lu s32 i-gamepad-2"></span></div>
+              <div style="aspect-ratio:2/3;border-radius:8px;border:1px solid var(--border);background:linear-gradient(160deg,#2a2a5a,#70a0d0);"></div>
+              <div style="aspect-ratio:2/3;border-radius:8px;border:1px solid var(--border);background:linear-gradient(160deg,#3a3a3a,#a0a0a0);"></div>
+              <div style="aspect-ratio:2/3;border-radius:8px;border:1px solid var(--border);background:linear-gradient(160deg,#6a3a1a,#e09040);"></div>
+            </div>
+            <div class="ab"><span class="ctx"><span class="lu s16 i-gamepad-2"></span>Search Games</span><span class="chip">Open<span class="kbd">↵</span></span></div>
+          </div>
+        </div>
+      </div>
+      <figcaption class="cap"><span class="id">F</span><span class="nm">Grid</span><span class="ds">Search Games · 5 columns, portrait covers · selected tile outlined in accent · title below each tile</span></figcaption>
+    </figure>
+
+    <figure class="fig">
+      <div class="stage">
+        <div class="launcher">
+          <div class="pill pushed"><span class="back"><span class="lu s16 i-arrow-left"></span></span><span class="ttl">Summarize</span></div>
+          <div class="card" style="height:420px;">
+            <div style="flex:1;min-height:0;padding:16px;display:flex;flex-direction:column;gap:12px;line-height:1.55;">
+              <span>The change splits the launcher into two shapes: a search pill and a card below it with the results and the footer.</span>
+              <span>The launcher now opens as the pill alone. Results appear as you type, and Arrow Down shows recent items.</span>
+              <span>Window height follows the content on Windows. On macOS the window keeps its size and the area below the card stays transparent.</span>
+            </div>
+            <div class="ab"><span class="ctx"><span class="lu s16 i-sparkles"></span>Summarize</span><span class="chip">Paste<span class="kbd">↵</span></span><span class="vsep"></span><span class="acts">Actions<span class="kbd">{{ k.panel }}</span></span></div>
+          </div>
+        </div>
+      </div>
+      <figcaption class="cap"><span class="id">G</span><span class="nm">Detail</span><span class="ds">an AI answer · the pill shows the command’s title and takes no typing · full height</span></figcaption>
+    </figure>
+
+    <figure class="fig">
+      <div class="stage">
+        <div class="launcher">
+          <div class="pill pushed"><span class="back"><span class="lu s16 i-arrow-left"></span></span><span class="ttl">Create Snippet</span></div>
+          <div class="card" style="height:420px;">
+            <div style="flex:1;min-height:0;padding:20px;display:flex;flex-direction:column;gap:16px;">
+              <div class="frow"><span class="flabel">Name</span><div class="fctl"><div class="fld focus">Signature<span class="caret"></span></div></div></div>
+              <div class="frow"><span class="flabel">Text</span><div class="fctl"><div class="fld" style="height:96px;align-items:flex-start;padding-top:8px;line-height:1.5;">Best regards,<br>Nico</div></div></div>
+              <div class="frow"><span class="flabel">Keyword (optional)</span><div class="fctl"><div class="fld">;sig</div></div></div>
+            </div>
+            <div class="ab"><span class="ctx"><span class="lu s16 i-clipboard-type"></span>Create Snippet</span><span class="chip">Save snippet<span class="kbd">{{ k.cmdEnter }}</span></span></div>
+          </div>
+        </div>
+      </div>
+      <figcaption class="cap"><span class="id">H</span><span class="nm">Form</span><span class="ds">label column 120 · focused control has an accent border · a multi-line field makes the confirm key <span class="kbd">{{ k.cmdEnter }}</span></span></figcaption>
+    </figure>
+
+    <figure class="fig">
+      <div class="stage">
+        <div class="launcher">
+          <div class="pill"><span class="q">zorks<span class="caret"></span></span></div>
+          <div class="card" style="height:420px;">
+            <div style="flex:1;min-height:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:0 24px;text-align:center;">
+              <span class="lu s32 i-search"></span>
+              <span style="font-weight:500;">No results for “zorks”</span>
+            </div>
+            <div class="ab"><span class="ctx"></span></div>
+          </div>
+        </div>
+      </div>
+      <figcaption class="cap"><span class="id">I</span><span class="nm">EmptyView</span><span class="ds">shown only once every provider has answered · icon, title, optional hint · nothing to confirm, so the ActionBar is empty</span></figcaption>
+    </figure>
+
+    <figure class="fig">
+      <div class="stage">
+        <div class="launcher">
+          <div class="pill"><span class="q">terminal<span class="caret"></span></span></div>
+          <div class="card" style="height:204px;">
+            <div class="list">
+              <div class="row sel"><span class="app app-term"></span><span class="rt">Windows <span class="u">Terminal</span></span><span class="rs">Applications</span></div>
+            </div>
+            <div class="ab"><span class="ctx">Applications</span><span class="chip">Open<span class="kbd">↵</span></span><span class="vsep"></span><span class="acts" style="color:var(--text);">Actions<span class="kbd">{{ k.panel }}</span></span></div>
+            <div class="panel">
+              <div class="prs">
+                <div class="pr sel"><span class="pt">Open</span></div>
+                <div class="pr"><span class="pt">Show in {{ k.fileManager }}</span><span class="kbd">{{ k.reveal }}</span></div>
+                <div class="pr"><span class="pt">Copy path</span><span class="kbd">{{ k.copy }}</span></div>
+              </div>
+              <div class="pf">Search actions</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <figcaption class="cap"><span class="id">J</span><span class="nm">ActionPanel open</span><span class="ds">an application · the card grows to fit the panel · the panel owns the keyboard until it closes</span></figcaption>
+    </figure>
+
+  </div>
+</section>
+
+<section id="window" class="sec">
+  <div class="sec-h"><h2>LauncherWindow</h2><span class="badge">shell</span></div>
+  <p class="lead"><b>Purpose:</b> the root. One borderless, always-on-top window with a transparent background, built once at startup and only shown and hidden after. It holds the pill and the card as two rounded shapes; what is behind the launcher shows through the gap and around the corners. A click on a transparent part counts as a click outside and hides the launcher. <b>Height:</b> pill, gap and card together are at most 480. On Windows the window follows the visible launcher, and while results still arrive it grows but does not shrink. On macOS the window stays 480 tall and everything below the card is transparent.</p>
+  <div class="props">
+    <span class="k">width</span><span class="v">Theme.window-width · 720</span>
+    <span class="k">Shell.launcher-height</span><span class="v">pill + gap + card, on every platform</span>
+    <span class="k">Shell.height</span><span class="v">window height · follows launcher-height on Windows, 480 on macOS</span>
+    <span class="k">Shell.card-shown</span><span class="v">bool · false while the launcher is the bare pill</span>
+    <span class="k">Shell.screen</span><span class="v">root | list | grid | detail | form | progress | empty</span>
+    <span class="k">Intents.clicked-outside()</span><span class="v">a click in the gap or below the card</span>
+  </div>
+</section>
+
+<section id="searchbar" class="sec">
+  <div class="sec-h"><h2>SearchBar</h2><span class="badge">shell</span></div>
+  <p class="lead"><b>Purpose:</b> the pill. It holds the query for a list or grid, with a placeholder the view sets (“Search apps and commands” at root, “Search” in pushed views). For a detail, form or progress view it shows the command’s title instead and takes no typing. In a pushed view a back control, an arrow in a small circle, sits before the query and goes back one view, as Escape does. There is no search icon.</p>
+  <div style="display:flex;flex-direction:column;gap:10px;">
+    <span class="lbl">root · typing</span>
+    <div class="launcher"><div class="pill"><span class="q">fire<span class="caret"></span></span></div></div>
+    <span class="lbl">pushed list · back control · filter dropdown</span>
+    <div class="launcher"><div class="pill pushed"><span class="back"><span class="lu s16 i-arrow-left"></span></span><span class="q ph"><span class="caret" style="margin:0 1px 0 0;"></span>Search</span><span class="fpill">All<span>▾</span></span></div></div>
+    <span class="lbl">title · detail, form, progress view</span>
+    <div class="launcher"><div class="pill pushed"><span class="back"><span class="lu s16 i-arrow-left"></span></span><span class="ttl">Create Snippet</span></div></div>
+    <span class="lbl">loading · busy marks shown</span>
+    <div class="launcher"><div class="pill pushed"><span class="back"><span class="lu s16 i-arrow-left"></span></span><span class="q ph"><span class="caret" style="margin:0 1px 0 0;"></span>Search</span><span class="lbar"><i></i></span></div></div>
+    <span class="lbl">toast at the pill’s end · card hidden</span>
+    <div class="launcher"><div class="pill"><span class="q ph">Search apps and commands</span><span class="ptoast"><span class="spin"></span><span class="tx" style="color:var(--muted);">Running Check for Updates…</span></span></div></div>
+  </div>
+  <div class="props">
+    <span class="k">Shell.typing</span><span class="v">bool · query (list, grid) or title (others)</span>
+    <span class="k">Search.placeholder</span><span class="v">string · in the dim role</span>
+    <span class="k">Shell.title</span><span class="v">string · the command’s title, 16 / 500</span>
+    <span class="k">Shell.can-go-back</span><span class="v">bool · shows the back control · padding 12 instead of 18</span>
+    <span class="k">Shell.back-icon</span><span class="v">icon:arrow-left · 28 px circle, hover fill, selected fill on pointer</span>
+    <span class="k">Shell.loading</span><span class="v">bool · 2 px bar on a border-role track, accent segment sweeping, kept clear of the rounded ends</span>
+    <span class="k">Search.filter-*</span><span class="v">shown · options · current · see Filter dropdown</span>
+    <span class="k">Intents.query-edited</span><span class="v">fires as the query changes</span>
+    <span class="k">Intents.go-back</span><span class="v">back control clicked</span>
+  </div>
+</section>
+
+<section id="dropdown" class="sec">
+  <div class="sec-h"><h2>Filter dropdown</h2><span class="badge">shell</span></div>
+  <p class="lead"><b>Purpose:</b> narrow a pushed list or grid. When the view declares a filter, the SearchBar shows the chosen option as a pill at its right end. A click opens a menu of the options below it. The same options also appear in the ActionPanel under “Filter”, with ✓ on the current one, so the keyboard reaches them through <span class="kbd">{{ k.panel }}</span>. Choosing one keeps the query and hands the option to the view’s command. Root search has no filter.</p>
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:24px;align-items:start;">
+    <div style="display:flex;flex-direction:column;gap:8px;align-items:flex-end;max-width:420px;">
+      <span class="lbl" style="align-self:flex-start;">pill and menu</span>
+      <span class="fpill">Text<span>▾</span></span>
+      <div style="width:200px;background:var(--popover);border:1px solid var(--border);border-radius:8px;box-shadow:0 4px 16px var(--shadow);padding:4px;display:flex;flex-direction:column;">
+        <div class="pr">All</div>
+        <div class="pr sel">Text</div>
+        <div class="pr">Images</div>
+        <div class="pr">Files</div>
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:8px;">
+      <span class="lbl">in the ActionPanel</span>
+      <div class="panel static">
+        <div class="prs">
+          <div class="pr sel"><span class="pt">Paste</span></div>
+          <div class="pr"><span class="pt">Copy</span></div>
+          <div class="ph2">Filter</div>
+          <div class="pr"><span class="pt">All</span></div>
+          <div class="pr"><span class="pt">Text</span><span style="color:var(--accent);">✓</span></div>
+          <div class="pr"><span class="pt">Images</span></div>
+        </div>
+        <div class="pf">Search actions</div>
+      </div>
+    </div>
+  </div>
+  <div class="props">
+    <span class="k">pill</span><span class="v">28 high · hover fill, selected fill on pointer · option title and ▾ in muted, 12</span>
+    <span class="k">menu</span><span class="v">200 wide · popover fill, border, shadow · 32 px options · current option in the selected role</span>
+    <span class="k">Search.filter-options</span><span class="v">[OptionData] · id, title</span>
+    <span class="k">Search.filter-current</span><span class="v">int · the chosen option</span>
+    <span class="k">Intents.filter-chosen(id)</span><span class="v">the view’s command re-filters</span>
+  </div>
+</section>
+
+<section id="inlineanswer" class="sec">
+  <div class="sec-h"><h2>InlineAnswer</h2><span class="badge">shell</span></div>
+  <p class="lead"><b>Purpose:</b> the calculator’s answer to the query, above the results in root search. One 64 px row: the expression on the left in muted, an arrow, the answer on the right, large and bold. It comes first in the order and is selected when nothing else is picked, so ↵ copies the answer. When nothing else matches, the answer card alone stands in for the empty view.</p>
+  <div class="launcher">
+    <div class="pill"><span class="q">5 km to m<span class="caret"></span></span></div>
+    <div class="card" style="height:124px;">
+      <div style="height:64px;flex-shrink:0;padding:8px 6px 0;">
+        <div style="height:56px;display:flex;align-items:center;gap:16px;padding:0 16px;border-radius:8px;background:var(--sel);">
+          <span style="flex:1;font-size:16px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">5 km to m</span>
+          <span class="lu i-arrow-right"></span>
+          <span style="flex:1;text-align:right;font-size:20px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">5000 m</span>
+        </div>
+      </div>
+      <div style="height:16px;flex-shrink:0;"></div>
+      <div class="ab"><span class="ctx"><span class="lu s16 i-calculator"></span>Calculator</span><span class="chip">Copy answer<span class="kbd">↵</span></span><span class="vsep"></span><span class="acts">Actions<span class="kbd">{{ k.panel }}</span></span></div>
+    </div>
+  </div>
+  <div class="props">
+    <span class="k">AnswerData.expression</span><span class="v">string · muted, 16</span>
+    <span class="k">AnswerData.answer</span><span class="v">string · foreground, 20 / 600 · “≈” in front when approximate</span>
+    <span class="k">AnswerData.arrow</span><span class="v">icon:arrow-right</span>
+    <span class="k">AnswerData.selected</span><span class="v">bool · selected fill, inset 6 like a row</span>
+    <span class="k">actions</span><span class="v">Copy answer · Paste answer</span>
+  </div>
+</section>
+
+<section id="actionbar" class="sec">
+  <div class="sec-h"><h2>ActionBar</h2><span class="badge">shell</span></div>
+  <p class="lead"><b>Purpose:</b> the foot of the card, answering “what does ↵ do?”. Left: the context, at root the name and icon of the extension behind the selected result, in a pushed view the command’s title and icon. A toast replaces the context while it shows. Right: the primary action as one chip, its label with the confirm key, then, only when the selection has more than one action, a divider and “Actions” with <span class="kbd">{{ k.panel }}</span>. With nothing to confirm, only the context shows.</p>
+  <div style="display:flex;flex-direction:column;gap:10px;max-width:720px;">
+    <span class="lbl">root · application selected</span>
+    <div class="card"><div class="ab"><span class="ctx">Applications</span><span class="chip">Open<span class="kbd">↵</span></span><span class="vsep"></span><span class="acts">Actions<span class="kbd">{{ k.panel }}</span></span></div></div>
+    <span class="lbl">pushed view · one action</span>
+    <div class="card"><div class="ab"><span class="ctx"><span class="lu s16 i-sparkles"></span>Improve Writing</span><span class="chip">Paste<span class="kbd">↵</span></span></div></div>
+    <span class="lbl">toast in the context slot</span>
+    <div class="card"><div class="ab"><span class="ctx"><span class="spin"></span>Running Clipboard History…</span><span class="chip">Open<span class="kbd">↵</span></span></div></div>
+    <span class="lbl">nothing to confirm</span>
+    <div class="card"><div class="ab"><span class="ctx"><span class="lu s16 i-clipboard-list"></span>Clipboard History</span></div></div>
+  </div>
+  <div class="props">
+    <span class="k">background</span><span class="v">chrome role · 1 px border line on top · 44 high</span>
+    <span class="k">Shell.context · context-icon</span><span class="v">string + 16 px icon · muted, 12</span>
+    <span class="k">Shell.primary-label</span><span class="v">string · chip 28 high, hover fill, label 12 / 500, cut off at 200</span>
+    <span class="k">Shell.confirm-key</span><span class="v">“↵”, or <span class="kbd">{{ k.cmdEnter }}</span> for a form with a multi-line field</span>
+    <span class="k">Shell.panel-hint</span><span class="v">bool · more than one action</span>
+    <span class="k">Shell.panel-key</span><span class="v"><span class="kbd">{{ k.panel }}</span> · clicking “Actions” opens the panel</span>
+    <span class="k">Shell.toast-*</span><span class="v">replaces the context · see Toast</span>
+  </div>
+</section>
+
+<section id="toast" class="sec">
+  <div class="sec-h"><h2>Toast</h2><span class="badge">shell</span></div>
+  <p class="lead"><b>Purpose:</b> status without taking focus. One component, two places: in the ActionBar’s left slot while the card shows, and at the pill’s right end (at most half its width) while only the pill shows. It never changes the launcher’s size; when the card opens, a toast still showing moves into the ActionBar. Long text is cut off with an ellipsis. It may carry one action, shown after the text as its label and chord; pressing the chord runs only that action. Typing is never interrupted. After the launcher hides, the <a href="#hud" style="text-decoration:underline;">HUD</a> reports instead.</p>
+  <div class="tbl" style="--cols:110px 150px minmax(0,1fr);">
+    <div><span>Style</span><span>Mark</span><span>Stays</span></div>
+    <div><span>busy</span><span class="m"><span class="spin" style="vertical-align:-2px;"></span> spinner · working</span><span class="m">while the work runs, with the busy-mark timing</span></div>
+    <div><span>success</span><span class="m"><span class="dot" style="background:var(--done);"></span> dot · done</span><span class="m">about 2 s; with an action, until the next key press or click</span></div>
+    <div><span>failure</span><span class="m"><span class="dot" style="background:var(--danger);"></span> dot · danger</span><span class="m">until the next key press or click</span></div>
+  </div>
+  <div style="display:flex;flex-direction:column;gap:8px;max-width:720px;">
+    <div class="card"><div class="ab"><span class="ctx"><span class="spin"></span>Loading…</span></div></div>
+    <div class="card"><div class="ab"><span class="ctx"><span class="dot" style="background:var(--done);"></span>Answer ready: Summarize<span style="color:var(--text);">Show answer</span><span class="kbd">{{ k.cmdEnter }}</span></span></div></div>
+    <div class="card"><div class="ab"><span class="ctx"><span class="dot" style="background:var(--danger);"></span><span style="color:var(--text);">That app is no longer installed</span></span></div></div>
+    <div class="launcher" style="width:100%;"><div class="pill"><span class="q ph">Search apps and commands</span><span class="ptoast"><span class="dot" style="background:var(--done);"></span><span class="tx" style="color:var(--muted);">Answer ready: Summarize</span><span style="color:var(--text);">Show answer</span><span class="kbd">{{ k.cmdEnter }}</span></span></div></div>
+  </div>
+  <div class="props">
+    <span class="k">text</span><span class="v">12 · muted, foreground for a failure</span>
+    <span class="k">action</span><span class="v">label in foreground + Kbd</span>
+    <span class="k">marks</span><span class="v">dot 6 px, still · spinner 12 px ring, turning</span>
+    <span class="k">assistive technology</span><span class="v">told the text, the action, and “Failed” for a failure</span>
+  </div>
+</section>
+
+<section id="actionpanel" class="sec">
+  <div class="sec-h"><h2>ActionPanel</h2><span class="badge">overlay</span></div>
+  <p class="lead"><b>Purpose:</b> every action on the selection, opened with <span class="kbd">{{ k.panel }}</span> or by clicking “Actions”. It floats above the ActionBar at the card’s right edge, with a shadow, and the card grows to make room. While open it owns navigation, typing and confirming: typing goes to its filter at the bottom, ↵ runs one action, Escape or a click outside closes only the panel and the selection below stays. Actions are grouped by section, the view’s filter options follow under “Filter”, and danger actions come last in the danger role. A long list scrolls and keeps the selected action in view.</p>
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:24px;align-items:start;">
+    <div class="panel static">
+      <div class="prs">
+        <div class="pr sel"><span class="pt">Paste</span></div>
+        <div class="pr"><span class="pt">Copy</span></div>
+        <div class="pr" style="color:var(--danger);"><span class="pt">Delete from history</span><span class="kbd">{{ k.del }}</span></div>
+      </div>
+      <div class="pf">Search actions</div>
+    </div>
+    <div class="panel static">
+      <div class="prs">
+        <div class="pr" style="color:var(--muted);font-size:14px;padding-left:10px;">No matching actions</div>
+      </div>
+      <div class="pf" style="color:var(--text);">zzz<span class="caret" style="height:14px;vertical-align:-2px;"></span></div>
+    </div>
+  </div>
+  <div class="props">
+    <span class="k">panel</span><span class="v">280 wide · popover fill · radius 8 · border · shadow 24 blur, 8 down</span>
+    <span class="k">ActionData.title</span><span class="v">14 · foreground, danger role when danger</span>
+    <span class="k">ActionData.shortcut</span><span class="v">Kbd on the right</span>
+    <span class="k">ActionData.heading</span><span class="v">a 28 px heading row, muted 12 / 500</span>
+    <span class="k">ActionData.checked</span><span class="v">✓ in accent · the current filter option</span>
+    <span class="k">ActionData.selected</span><span class="v">selected fill · rows 32, radius 4</span>
+    <span class="k">filter</span><span class="v">36 high · placeholder “Search actions” · “No matching actions” when empty</span>
+  </div>
+</section>
+
+<section id="nav" class="sec">
+  <div class="sec-h"><h2>View stack</h2><span class="badge">state machine</span></div>
+  <p class="lead"><b>Purpose:</b> running a command can push its view on top of root search. Escape or the back control pops one view, whether or not the prompt holds text, and the previous view comes back with its query and selection intact. Pushed views always show both the pill and the card.</p>
+  <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-family:'Geist Mono',ui-monospace,monospace;font-size:12px;">
+    <span style="border:1px solid var(--border);border-radius:13px;padding:8px 12px;background:var(--surface);">Root · list</span><span style="color:var(--muted);">↵ push →</span>
+    <span style="border:1px solid var(--border);border-radius:13px;padding:8px 12px;background:var(--surface);">Search Snippets · list</span><span style="color:var(--muted);">Edit →</span>
+    <span style="border:1px solid var(--accent);border-radius:13px;padding:8px 12px;background:var(--surface);">Edit · form</span><span style="color:var(--muted);">← Escape pops</span>
+  </div>
+</section>
+
+<section id="hud" class="sec">
+  <div class="sec-h"><h2>HUD</h2><span class="badge">own window</span></div>
+  <p class="lead"><b>Purpose:</b> report an outcome the user cannot see because the launcher is hidden: a failure, a copy that closed the launcher, or a background task that finished or needs input. It looks like a toast on its own: a dot and one line in a pill that fits its text, up to 560 wide. It shows centred near the bottom of the work area of the display under the pointer, over every window, and never takes focus or clicks. Success leaves after about 2 s, failure after about 4 s; a newer HUD replaces the old one, and showing the launcher removes it.</p>
+  <div style="display:flex;flex-direction:column;gap:10px;align-items:center;padding:28px;background:var(--chrome);border:1px solid var(--border);border-radius:16px;max-width:720px;">
+    <span style="display:inline-flex;align-items:center;gap:8px;height:36px;padding:0 14px;background:var(--popover);border:1px solid var(--border);border-radius:18px;font-size:12px;color:var(--muted);"><span class="dot" style="background:var(--done);"></span>Copied to clipboard</span>
+    <span style="display:inline-flex;align-items:center;gap:8px;height:36px;padding:0 14px;background:var(--popover);border:1px solid var(--border);border-radius:18px;font-size:12px;color:var(--muted);"><span class="dot" style="background:var(--done);"></span>Answer ready: Summarize</span>
+    <span style="display:inline-flex;align-items:center;gap:8px;height:36px;padding:0 14px;background:var(--popover);border:1px solid var(--border);border-radius:18px;font-size:12px;color:var(--text);"><span class="dot" style="background:var(--danger);"></span>Allow Accessibility in System Settings</span>
+  </div>
+  <div class="props">
+    <span class="k">HudWindow.style</span><span class="v">success | failure · dot in done or danger</span>
+    <span class="k">HudWindow.text</span><span class="v">12 · muted, foreground for a failure · cut off with an ellipsis</span>
+    <span class="k">size</span><span class="v">36 high · padding 14 · up to 560 wide · popover fill, 1 px border</span>
+  </div>
+</section>
+
+<section id="list" class="sec">
+  <div class="sec-h"><h2>List · Heading · Row</h2><span class="badge">view</span></div>
+  <p class="lead"><b>Purpose:</b> the default view and most of the product. Rows under optional section headings. Every row is built inside a scroll view, at most 50 items, so scrolling to any row is exact. A heading shows its title and, when given, a subtitle such as a count. With a detail pane the list takes two fifths of the width and the detail of the selected item the rest. While a list loads with no items it shows skeleton rows.</p>
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:20px;align-items:start;">
+    <div class="card" style="max-width:520px;">
+      <div class="list">
+        <div class="h">Today<span style="font-weight:400;">3</span></div>
+        <div class="row sel"><span class="lu i-terminal"></span><span class="rt">git push --force-with-lease</span><span style="font-size:12px;color:var(--muted);">2m</span></div>
+        <div class="row" style="background:var(--hover);"><span class="lu i-link"></span><span class="rt">https://slint.dev/docs</span><span class="tag" style="color:var(--accent);background:color-mix(in srgb, var(--accent) 18%, transparent);">Link</span></div>
+        <div class="row"><span class="app" style="background:linear-gradient(135deg,#6d8bb3,#2f405a);border:1px solid var(--border);"></span><span class="rt">Screenshot</span><span class="rs">1280 × 720</span><span style="font-size:12px;color:var(--muted);">1h</span></div>
+        <div class="h">Yesterday</div>
+        <div class="row"><span class="lu i-terminal"></span><span class="rt">cargo build --release</span><span class="ring" style="background:conic-gradient(var(--working) 0 42%, var(--raised) 42% 100%);"></span></div>
+      </div>
+    </div>
+    <div class="props">
+      <span class="t">Row</span>
+      <span class="k">fill</span><span class="v">inset 6 from each side · radius 8 · selected role when selected, hover role under the pointer</span>
+      <span class="k">icon</span><span class="v">20 px · padding 10 · gap 12</span>
+      <span class="k">title</span><span class="v">14 · foreground · root search underlines matched letters</span>
+      <span class="k">subtitle</span><span class="v">12 · muted · right of the title, up to 240 · root search shows the extension name</span>
+      <span class="k">accessories</span><span class="v">up to 3, right-aligned · root search shows a hotkey as Kbd</span>
+      <span class="t">Heading</span>
+      <span class="k">title · subtitle</span><span class="v">28 high · 12 / 500, muted · padding 16</span>
+      <span class="t">List</span>
+      <span class="k">ListData.rows</span><span class="v">[RowData] · headings and rows in order</span>
+      <span class="k">ListData.detail-pane</span><span class="v">bool · 2/5 list, 1 px divider, 3/5 Detail</span>
+      <span class="k">ListData.skeleton</span><span class="v">bool · loading with no items yet</span>
+    </div>
+  </div>
+  <p class="lead" style="font-size:13px;">The second row shows the hover fill: clearly weaker than selected.</p>
+</section>
+
+<section id="grid" class="sec">
+  <div class="sec-h"><h2>Grid · Tile</h2><span class="badge">view</span></div>
+  <p class="lead"><b>Purpose:</b> a list where the content is visual: cover art, images, colours, glyphs. Tiles sit in the number of columns the view declares, at the declared aspect ratio, each with its title below, under optional section headings. The selected tile is outlined 2 px in the accent role. A colour tile keeps its declared colour in both themes.</p>
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:20px;align-items:start;">
+    <div style="background:var(--popover);border:1px solid var(--border);border-radius:14px;padding:16px;display:grid;grid-template-columns:repeat(4,1fr);gap:8px;max-width:520px;">
+      <div style="grid-column:1/-1;font-size:12px;font-weight:500;color:var(--muted);">Colours</div>
+      <div style="display:flex;flex-direction:column;gap:4px;"><div style="aspect-ratio:1;border-radius:8px;background:#ff0000;border:2px solid var(--accent);"></div><span style="font-size:12px;text-align:center;">Red</span></div>
+      <div style="display:flex;flex-direction:column;gap:4px;"><div style="aspect-ratio:1;border-radius:8px;background:var(--raised);border:1px solid var(--border);display:grid;place-items:center;font-size:24px;">🍡</div><span style="font-size:12px;color:var(--muted);text-align:center;">Glyph</span></div>
+      <div style="display:flex;flex-direction:column;gap:4px;"><div style="aspect-ratio:1;border-radius:8px;background:linear-gradient(160deg,#2a4a7a,#d06a8a);border:1px solid var(--border);"></div><span style="font-size:12px;color:var(--muted);text-align:center;">Image</span></div>
+      <div style="display:flex;flex-direction:column;gap:4px;"><div style="aspect-ratio:1;border-radius:8px;background:var(--raised);border:1px solid var(--border);display:grid;place-items:center;"><span class="lu s32 i-gamepad-2"></span></div><span style="font-size:12px;color:var(--muted);text-align:center;">Named icon</span></div>
+    </div>
+    <div class="props">
+      <span class="k">columns</span><span class="v">int · set by the view</span>
+      <span class="k">aspect</span><span class="v">float · width / height, square by default</span>
+      <span class="k">content</span><span class="v">image | color | glyph | empty</span>
+      <span class="k">image</span><span class="v">a file fills the tile · a named icon is contained and drawn in muted</span>
+      <span class="k">tile</span><span class="v">raised fill · radius 8 · 1 px border · padding 16, gap 8, 24 for the title</span>
+      <span class="k">title</span><span class="v">12 · muted, foreground when selected</span>
+    </div>
+  </div>
+</section>
+
+<section id="detail" class="sec">
+  <div class="sec-h"><h2>Detail · Metadata</h2><span class="badge">view</span></div>
+  <p class="lead"><b>Purpose:</b> read-only content for one thing, on its own or as the pane of a list. From top to bottom: an image when declared, framed and at most 200 tall; the body; and the metadata as label and value pairs pinned to the bottom. The body scrolls above the metadata. A plain text body uses Geist Mono at 12; a markdown body and the metadata keep Geist.</p>
+  <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);max-width:720px;height:260px;background:var(--popover);border:1px solid var(--border);border-radius:14px;overflow:hidden;">
+    <div style="padding:16px;display:flex;flex-direction:column;gap:16px;border-right:1px solid var(--border);">
+      <div style="width:200px;height:120px;border-radius:8px;border:1px solid var(--border);background:linear-gradient(135deg,#6d8bb3,#2f405a);"></div>
+      <div style="flex:1;"></div>
+      <div style="border-top:1px solid var(--border);margin:0 -16px -16px;padding:16px;display:grid;grid-template-columns:120px 1fr;gap:6px 12px;font-size:12px;"><span style="color:var(--muted);">Type</span><span>Image</span><span style="color:var(--muted);">Size</span><span>1280 × 720</span></div>
+    </div>
+    <div style="display:flex;flex-direction:column;">
+      <div class="mono" style="flex:1;padding:16px;font-size:12px;">cargo build --release</div>
+      <div style="border-top:1px solid var(--border);padding:16px;display:grid;grid-template-columns:120px 1fr;gap:6px 12px;font-size:12px;"><span style="color:var(--muted);">Copied</span><span>Yesterday, 18:40</span><span style="color:var(--muted);">Characters</span><span>21</span></div>
+    </div>
+  </div>
+  <div class="props">
+    <span class="k">DetailData.image</span><span class="v">framed · radius 8, 1 px border · named icons drawn in muted</span>
+    <span class="k">DetailData.body · text · plain</span><span class="v">markdown in Geist 14, or plain text in Geist Mono 12 · padding 16</span>
+    <span class="k">DetailData.metadata</span><span class="v">[label, value] · label column 120 in muted · value in foreground · 12</span>
+    <span class="k">actions</span><span class="v">a standalone detail declares its own; a list pane uses its row’s</span>
+  </div>
+</section>
+
+<section id="form" class="sec">
+  <div class="sec-h"><h2>Form</h2><span class="badge">view</span></div>
+  <p class="lead"><b>Purpose:</b> collect input for a command, such as creating a snippet or a quicklink. A label column and a control column. The first field takes the cursor. Tab and Shift Tab move through the controls; the focused one shows an accent border. A field’s error shows under it in the danger role and is its accessible description; help text shows there when there is no error. The pill shows the command’s title. ↵ submits, or <span class="kbd">{{ k.cmdEnter }}</span> when a multi-line field would take ↵ as a newline.</p>
+  <div style="max-width:720px;background:var(--popover);border:1px solid var(--border);border-radius:14px;padding:20px;display:flex;flex-direction:column;gap:16px;">
+    <div class="frow"><span class="flabel">Name</span><div class="fctl"><div class="fld focus">Docs<span class="caret"></span></div></div></div>
+    <div class="frow"><span class="flabel">URL</span><div class="fctl"><div class="fld" style="height:96px;align-items:flex-start;padding-top:8px;">https://slint.dev/docs</div></div></div>
+    <div class="frow"><span class="flabel">Browser</span><div class="fctl"><div class="fld"><span style="flex:1;">Default browser</span><span style="color:var(--muted);font-size:12px;">▾</span></div></div></div>
+  </div>
+  <p class="lead" style="font-size:13px;">Example: the quicklink form. An error would show under its field in the danger role.</p>
+  <div class="props">
+    <span class="k">FormData.fields</span><span class="v">[FieldData] · text, password, textarea, template, toggle, dropdown, separator</span>
+    <span class="k">layout</span><span class="v">padding 20 · 16 between fields · label column 120, right-aligned, muted 12</span>
+    <span class="k">error · help</span><span class="v">12 under the control · danger, or muted help</span>
+    <span class="k">Intents.field-edited</span><span class="v">id, value</span>
+  </div>
+</section>
+
+<section id="progressview" class="sec">
+  <div class="sec-h"><h2>ProgressView</h2><span class="badge">view</span></div>
+  <p class="lead"><b>Purpose:</b> one long job, such as downloading an update. From top to bottom: the title with its subtitle in muted, a 4 px progress bar, the detail line in muted, and the steps, one per row, each with a status dot before its title. Queued steps are muted. Leaving the view does not stop the job; the busy toast takes over.</p>
+  <div style="max-width:720px;height:300px;background:var(--popover);border:1px solid var(--border);border-radius:14px;overflow:hidden;display:flex;flex-direction:column;">
+    <div style="flex:1;padding:24px;display:flex;flex-direction:column;gap:12px;">
+      <div style="display:flex;flex-direction:column;gap:2px;"><span style="font-size:16px;font-weight:600;">Dango 6.4.0</span><span style="font-size:12px;color:var(--muted);">You have 6.3.1</span></div>
+      <div style="height:4px;background:var(--raised);"><div style="width:62%;height:100%;background:var(--working);"></div></div>
+      <span style="font-size:12px;color:var(--muted);">18.4 MB of 29.6 MB</span>
+      <div style="display:flex;flex-direction:column;gap:4px;">
+        <div style="height:28px;display:flex;align-items:center;gap:10px;"><span class="dot" style="background:var(--working);"></span>Download</div>
+        <div style="height:28px;display:flex;align-items:center;gap:10px;color:var(--muted);"><span class="dot" style="background:var(--idle);"></span>Verify signature</div>
+        <div style="height:28px;display:flex;align-items:center;gap:10px;color:var(--muted);"><span class="dot" style="background:var(--idle);"></span>Restart</div>
+      </div>
+    </div>
+    <div class="ab"><span class="ctx">Updates</span><span class="chip">Continue in background<span class="kbd">↵</span></span><span class="vsep"></span><span class="acts">Actions<span class="kbd">{{ k.panel }}</span></span></div>
+  </div>
+  <div class="props">
+    <span class="k">ProgressData.title · subtitle</span><span class="v">16 / 600 · muted 12</span>
+    <span class="k">ProgressData.value</span><span class="v">0–1, below 0 indeterminate · 4 px bar, working on raised</span>
+    <span class="k">ProgressData.detail</span><span class="v">muted 12</span>
+    <span class="k">ProgressData.steps</span><span class="v">[title, status] · 28 high rows, Dot before the title</span>
+    <span class="k">example actions</span><span class="v">Continue in background ↵ · Cancel <span class="kbd">{{ k.cancel }}</span></span>
+  </div>
+</section>
+
+<section id="emptyview" class="sec">
+  <div class="sec-h"><h2>EmptyView</h2><span class="badge">view</span></div>
+  <p class="lead"><b>Purpose:</b> what a list or grid shows when there is nothing to show. One icon, one title, at most one line of hint, centred. The title says what is absent: “No results for” and the query when nothing matches, the view’s own title when it declares one, “Nothing to show” otherwise. It can carry actions, so ↵ can still do something useful.</p>
+  <div style="max-width:720px;height:180px;background:var(--popover);border:1px solid var(--border);border-radius:14px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;text-align:center;padding:0 24px;">
+    <span class="lu s32 i-clipboard-list"></span>
+    <span style="font-weight:500;">Nothing copied yet</span>
+    <span style="font-size:12px;color:var(--muted);">Text, images, and files you copy will show up here</span>
+  </div>
+  <div class="props">
+    <span class="k">EmptyData.icon</span><span class="v">32 px</span>
+    <span class="k">EmptyData.title</span><span class="v">14 / 500 · foreground</span>
+    <span class="k">EmptyData.hint</span><span class="v">12 · muted · optional</span>
+  </div>
+</section>
+
+<section id="atoms" class="sec">
+  <div class="sec-h"><h2>Atoms</h2><span class="badge">primitives</span></div>
+  <p class="lead">The smallest pieces, in <code style="color:var(--text);">ui/atoms/</code>, reused by everything above. Named icons are Lucide, from one registry in <code style="color:var(--text);">src/slint_shell/icons.rs</code>; nothing else draws an icon.</p>
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px;">
+    <div class="tile">
+      <div style="display:flex;gap:10px;align-items:center;"><span class="lu i-clipboard-list"></span><span class="lu i-sparkles"></span><span class="app" style="background:linear-gradient(135deg,#f16436,#b8321b);"></span><span class="app" style="background:linear-gradient(135deg,#6d8bb3,#2f405a);border:1px solid var(--border);"></span><span style="width:20px;height:20px;border-radius:4px;background:var(--raised);"></span></div>
+      <div class="n">Icon</div>
+      <div class="d">20 px, square or round. A named icon (<code>icon:&lt;name&gt;</code>) is drawn in a theme role, muted by default. An app icon or favicon keeps its colours and aspect ratio. A content preview, such as a copied image, fills a framed square. Unknown: a raised square.</div>
+    </div>
+    <div class="tile">
+      <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;"><span class="kbd">{{ k.panel }}</span><span class="kbd">{{ k.cmdEnter }}</span><span class="kbd">{{ k.hotkey }}</span></div>
+      <div class="n">Kbd</div>
+      <div class="d">A whole chord in one chip: Geist Mono 12, muted, raised fill, border, radius 4. Platform names: on Windows keys separated by a space (“Ctrl K”), on macOS joined (“⌘K”). One format everywhere.</div>
+    </div>
+    <div class="tile">
+      <div style="display:flex;gap:6px;align-items:center;"><span class="tag" style="color:var(--accent);background:color-mix(in srgb, var(--accent) 18%, transparent);">Link</span><span class="tag" style="color:var(--muted);background:color-mix(in srgb, var(--muted) 18%, transparent);">Draft</span><span class="tag" style="color:var(--danger);background:color-mix(in srgb, var(--danger) 18%, transparent);">Expired</span></div>
+      <div class="n">Tag</div>
+      <div class="d">Short text in its role’s colour on an 18 % fill of the same role, radius 4, no outline. Role: accent, muted or danger.</div>
+    </div>
+    <div class="tile">
+      <div style="display:flex;gap:10px;align-items:center;font-size:12px;color:var(--muted);"><span>2m</span><span class="lu s16 i-lock"></span><span class="tag" style="color:var(--accent);background:color-mix(in srgb, var(--accent) 18%, transparent);">Link</span><span class="ring" style="background:conic-gradient(var(--working) 0 42%, var(--raised) 42% 100%);"></span><span class="dot" style="background:var(--done);"></span></div>
+      <div class="n">Accessory</div>
+      <div class="d">Text (muted 12), icon, tag, Kbd, progress ring (16 px) or status dot. A row shows at most three, right-aligned.</div>
+    </div>
+    <div class="tile">
+      <div style="display:flex;gap:12px;align-items:center;font-size:12px;color:var(--muted);flex-wrap:wrap;">
+        <span style="display:flex;align-items:center;gap:6px;"><span class="dot" style="background:var(--working);"></span>Working</span>
+        <span style="display:flex;align-items:center;gap:6px;"><span class="dot" style="background:var(--blocked);"></span>Needs input</span>
+        <span style="display:flex;align-items:center;gap:6px;"><span class="dot" style="background:var(--done);"></span>Done</span>
+        <span style="display:flex;align-items:center;gap:6px;"><span class="dot" style="background:var(--danger);"></span>Failed</span>
+        <span style="display:flex;align-items:center;gap:6px;"><span class="dot" style="background:var(--idle);"></span>Queued</span>
+      </div>
+      <div class="n">Dot</div>
+      <div class="d">6 px, never moves. Five states, each in its own role. As an accessory it tells assistive technology its state.</div>
+    </div>
+    <div class="tile">
+      <div style="display:flex;gap:14px;align-items:center;">
+        <div style="width:90px;height:4px;background:var(--raised);position:relative;overflow:hidden;"><div style="width:62%;height:100%;background:var(--working);"></div></div>
+        <span class="ring" style="background:conic-gradient(var(--working) 0 42%, var(--raised) 42% 100%);"></span>
+        <span class="ring" style="background:var(--working);"></span>
+        <span class="spin"></span>
+      </div>
+      <div class="n">Progress</div>
+      <div class="d">Bar or ring, working fill on a raised track. Determinate only when the total is known; otherwise it moves without an amount. A spinner is a small indeterminate ring. The SearchBar’s loading bar is the one exception (accent on border).</div>
+    </div>
+    <div class="tile">
+      <div style="display:flex;flex-direction:column;gap:10px;">
+        <div style="display:flex;align-items:center;gap:12px;"><span style="width:20px;height:20px;border-radius:4px;background:var(--raised);"></span><span style="width:50%;height:10px;border-radius:5px;background:var(--raised);"></span></div>
+        <div style="display:flex;align-items:center;gap:12px;"><span style="width:20px;height:20px;border-radius:4px;background:var(--raised);"></span><span style="width:35%;height:10px;border-radius:5px;background:var(--raised);"></span></div>
+      </div>
+      <div class="n">Skeleton</div>
+      <div class="d">Rows of row height with raised shapes where icon and title go, as many as fit the full launcher. Not selectable, not read out. Only for a loading list with no items.</div>
+    </div>
+  </div>
+</section>
+
+<section id="controls" class="sec">
+  <div class="sec-h"><h2>Form controls</h2><span class="badge">atoms</span></div>
+  <p class="lead">Dango’s own controls, built on Slint primitives so they take Theme colours and radii. Surface fill, 1 px border in the input role, accent border while focused, radius 4. Each carries its own accessible role, label, value and description.</p>
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:16px;max-width:880px;">
+    <div style="display:flex;flex-direction:column;gap:8px;"><span class="lbl">TextField · 32 · text or password</span><div class="fld">Signature</div><div class="fld focus">Focused<span class="caret"></span></div></div>
+    <div style="display:flex;flex-direction:column;gap:8px;"><span class="lbl">TextArea · 96 · ↵ makes a newline</span><div class="fld" style="height:96px;align-items:flex-start;padding-top:8px;">Best regards,<br>Nico</div></div>
+    <div style="display:flex;flex-direction:column;gap:8px;"><span class="lbl">Dropdown · 32 · click or Space opens, ↑ ↓ step</span><div class="fld"><span style="flex:1;">Default browser</span><span style="color:var(--muted);font-size:12px;">▾</span></div></div>
+    <div style="display:flex;flex-direction:column;gap:10px;"><span class="lbl">Checkbox · Space or click toggles</span><span style="display:flex;align-items:center;gap:8px;"><span class="cbox"><i></i></span>Checked</span><span style="display:flex;align-items:center;gap:8px;"><span class="cbox"></span>Not checked</span></div>
+    <div style="display:flex;flex-direction:column;gap:8px;"><span class="lbl">Separator · 1 px border role</span><div style="height:1px;background:var(--border);margin-top:14px;"></div></div>
+  </div>
+</section>
+
+<section id="progress" class="sec" style="gap:28px;">
+  <div style="display:flex;flex-direction:column;gap:8px;">
+    <div class="sec-h"><h2>Loading and progress</h2><span class="badge">pattern</span></div>
+    <p class="lead"><b>Purpose:</b> show busy work by scope. Smaller scope, quieter mark. Typing, Escape and <span class="kbd">{{ k.panel }}</span> keep working throughout.</p>
+  </div>
+  <div class="tbl" style="--cols:190px minmax(0,1fr);">
+    <div><span>What is busy</span><span>Surface</span></div>
+    <div><span>The shown view is loading</span><span class="m"><a href="#searchbar">SearchBar</a> loading bar.</span></div>
+    <div><span>A list with nothing yet</span><span class="m"><a href="#atoms">Skeleton</a> rows, replaced by the items in the same frame they arrive.</span></div>
+    <div><span>Root search still answering</span><span class="m">The window grows with results but does not shrink, and “No results” waits, until every provider has answered.</span></div>
+    <div><span>A command from root search</span><span class="m">Busy <a href="#toast">toast</a> “Running” and the command’s title, then “Loading…” if its view loads.</span></div>
+    <div><span>One item</span><span class="m">Progress ring or status dot as the row’s accessory.</span></div>
+    <div><span>A background task</span><span class="m">Busy toast with its own line, never the loading bar. It survives hiding the launcher; the <a href="#hud">HUD</a> reports when it ends while hidden.</span></div>
+    <div><span>A multi-step job</span><span class="m"><a href="#progressview">ProgressView</a>, such as an update download.</span></div>
+  </div>
+  <div style="display:flex;flex-direction:column;gap:12px;max-width:880px;">
+    <h3 style="margin:0;font-size:17px;font-weight:600;letter-spacing:-.015em;">Rules</h3>
+    <ol style="margin:0;padding:0;list-style:none;display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px 24px;font-size:13px;">
+      <li style="display:flex;gap:10px;"><span class="mono" style="color:var(--accent);">1</span><span>No blinking <span style="color:var(--muted);">the busy marks appear only after about 150 ms of work and then stay at least about 400 ms. Replacing the view while still busy does not restart them.</span></span></li>
+      <li style="display:flex;gap:10px;"><span class="mono" style="color:var(--accent);">2</span><span>Honest numbers <span style="color:var(--muted);">determinate only when the total is known; never a fake percentage.</span></span></li>
+      <li style="display:flex;gap:10px;"><span class="mono" style="color:var(--accent);">3</span><span>Never take focus <span style="color:var(--muted);">a toast never interrupts typing.</span></span></li>
+      <li style="display:flex;gap:10px;"><span class="mono" style="color:var(--accent);">4</span><span>Leaving clears at once <span style="color:var(--muted);">leaving the view or a reset removes the marks in the same frame.</span></span></li>
+      <li style="display:flex;gap:10px;"><span class="mono" style="color:var(--accent);">5</span><span>Tasks outlive views <span style="color:var(--muted);">back, hide and the grace period do not cancel a background task.</span></span></li>
+    </ol>
+  </div>
+</section>
+
+</main>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;theme&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;graphite&quot;,&quot;paper&quot;],&quot;default&quot;:&quot;graphite&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Theme&quot;},&quot;platform&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;windows&quot;,&quot;macos&quot;],&quot;default&quot;:&quot;windows&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Platform&quot;}}">
+const THEMES = {
+  graphite: { canvas:'#0f1012', chrome:'#141518', background:'#17181b', surface:'#1b1c20', popover:'#1f2024', raised:'#26282d', hover:'#ffffff0d', selected:'#ffffff14', selection:'#a7b4c647', border:'#ffffff12', input:'#ffffff21', foreground:'#ececee', muted:'#9a9ca4', dim:'#6c6f77', accent:'#a7b4c6', 'accent-foreground':'#101114', solid:'#ececee', 'solid-foreground':'#141518', working:'#7aa2f7', blocked:'#e6a85a', done:'#7fc48a', idle:'#6c6f77', unknown:'#4a4d54', danger:'#ef7a6e', shadow:'#00000080' },
+  paper:    { canvas:'#ecebe7', chrome:'#f3f2ef', background:'#fbfaf8', surface:'#ffffff', popover:'#ffffff', raised:'#efeeea', hover:'#0000000a', selected:'#0000000f', selection:'#5b6b8238', border:'#00000014', input:'#00000026', foreground:'#1c1c1f', muted:'#62646b', dim:'#8d8f95', accent:'#5b6b82', 'accent-foreground':'#ffffff', solid:'#1c1c1f', 'solid-foreground':'#ffffff', working:'#3b6fd0', blocked:'#b8742a', done:'#3f8a4c', idle:'#8d8f95', unknown:'#b5b6ba', danger:'#c8473b', shadow:'#00000030' },
+};
+const VARS = { canvas:'--canvas', chrome:'--chrome', background:'--bg', surface:'--surface', popover:'--popover', raised:'--raised', hover:'--hover', selected:'--sel', selection:'--selection', border:'--border', input:'--input', foreground:'--text', muted:'--muted', dim:'--dim', accent:'--accent', 'accent-foreground':'--accent-fg', solid:'--solid', 'solid-foreground':'--solid-fg', working:'--working', blocked:'--blocked', done:'--done', idle:'--idle', unknown:'--unknown', danger:'--danger', shadow:'--shadow' };
+const USES = { canvas:'not drawn yet', chrome:'ActionBar', background:'not drawn yet', surface:'form controls', popover:'pill, card, panel, menus, HUD', raised:'keys, tiles, tracks, skeleton', hover:'pointer over · chip and back fill', selected:'selected row, tile, action', selection:'selected text', border:'outlines, dividers', input:'form control border', foreground:'main text', muted:'secondary text, named icons', dim:'placeholders', accent:'focus, selected tile, loading bar', 'accent-foreground':'not drawn yet', solid:'not drawn yet', 'solid-foreground':'not drawn yet', working:'busy spinner, progress fill', blocked:'needs-input dot', done:'success and done dot', idle:'queued dot', unknown:'not drawn yet', danger:'failure, danger actions, errors', shadow:'panel and menu shadow' };
+const KEYS = {
+  windows: { panel:'Ctrl K', cmdEnter:'Ctrl ↵', hotkey:'Ctrl Alt V', reveal:'Ctrl R', copy:'Ctrl C', del:'Ctrl X', cancel:'Ctrl .', fileManager:'File Explorer' },
+  macos:   { panel:'⌘K', cmdEnter:'⌘↵', hotkey:'⌃⌥V', reveal:'⌘R', copy:'⌘C', del:'⌘X', cancel:'⌘.', fileManager:'Finder' },
+};
+const APP_ACTIONS = (k) => [['Open',''],['Show in ' + k.fileManager, k.reveal],['Copy path', k.copy]];
+const ITEMS = [
+  { h:'Suggestions', tag:'5' },
+  { t:'Improve Writing', s:'AI', i:'lu i-sparkles', ctx:'AI', ci:'lu s16 i-sparkles', tag:'6' },
+  { t:'Clipboard History', s:'Clipboard History', i:'lu i-clipboard-list', hk:true, ctx:'Clipboard History', ci:'lu s16 i-clipboard-list', tag:'7' },
+  { t:'Check for Updates', s:'Updates', i:'lu i-refresh-cw', ctx:'Updates', ci:'' },
+  { t:'Open Config File', s:'System', i:'lu i-settings', ctx:'System', ci:'' },
+  { t:'Search Snippets', s:'Snippets', i:'lu i-clipboard-type', ctx:'Snippets', ci:'lu s16 i-clipboard-type' },
+  { t:'Fix Spelling and Grammar', s:'AI', i:'lu i-sparkles', ctx:'AI', ci:'lu s16 i-sparkles' },
+  { h:'Everything else' },
+  { t:'Windows Terminal', s:'Applications', i:'app app-term', app:true, ctx:'Applications', ci:'' },
+];
+class Component extends DCLogic {
+  state = { open: true, sel: 1, panel: false, pSel: 0 };
+  itemIdx() { return ITEMS.map((x,i)=>x.h?null:i).filter(i=>i!==null); }
+  move(d) {
+    const idx = this.itemIdx(); const p = idx.indexOf(this.state.sel);
+    this.setState({ sel: idx[Math.max(0, Math.min(idx.length-1, p+d))] });
+  }
+  keys() { return KEYS[this.props.platform ?? 'windows'] || KEYS.windows; }
+  actionsOf(item) { return item && item.app ? APP_ACTIONS(this.keys()) : []; }
+  renderVals() {
+    const name = this.props.theme ?? 'graphite';
+    const t = THEMES[name] || THEMES.graphite;
+    const k = this.keys();
+    const themeVars = Object.fromEntries(Object.entries(VARS).map(([role, v]) => [v, t[role]]));
+    const themeCards = Object.entries(THEMES).map(([n,x]) => ({ name: n === 'graphite' ? 'Graphite' : 'Paper', light: n === 'paper' ? 'light · OS light' : 'dark · OS dark',
+      card: { background:x.canvas, border:'1px solid '+(n === name ? x.accent : x.border), borderRadius:16, padding:14, display:'flex', flexDirection:'column', gap:8, color:x.foreground },
+      pill: { background:x.popover, border:'1px solid '+x.border, borderRadius:99, height:18 },
+      win: { background:x.popover, border:'1px solid '+x.border, borderRadius:8, padding:6, display:'flex', flexDirection:'column', gap:4 },
+      row: { background:x.selected, borderRadius:4, height:12 }, row2: { background:x.raised, borderRadius:4, height:12 }, bar: { background:x.chrome, borderTop:'1px solid '+x.border, height:12, margin:'2px -6px -6px' },
+      muted: { color:x.muted, fontSize:11 },
+      dots: [x.accent, x.working, x.blocked, x.done, x.danger].map(c => ({ width:10, height:10, borderRadius:99, background:c })) }));
+    const rows = ITEMS.map((x,i)=>{
+      if (x.h) return { isHeader:true, isItem:false, title:x.h, tag:x.tag || '', hasHotkey:false };
+      const sel = this.state.open && i === this.state.sel;
+      return { isHeader:false, isItem:true, title:x.t, subtitle:x.s, icon: x.i, hasHotkey: !!x.hk, tag: x.tag || '',
+        select: () => this.setState({ sel:i, open:true }),
+        style: { display:'flex', alignItems:'center', gap:12, height:44, flexShrink:0, margin:'0 6px', padding:'0 10px', borderRadius:8, cursor:'default', background: sel ? 'var(--sel)' : 'transparent' } };
+    });
+    const cur = ITEMS[this.state.sel];
+    const acts = this.actionsOf(cur);
+    const swatches = Object.keys(VARS).map(role => ({ name: role, value: t[role], use: USES[role],
+      style: { height:52, background:`linear-gradient(var(${VARS[role]}), var(${VARS[role]})), var(--popover)`, borderBottom:'1px solid var(--border)' } }));
+    return {
+      themeVars, rows, swatches, themeCards, k,
+      demoOpen: this.state.open,
+      panelOpen: this.state.open && this.state.panel,
+      ctxTitle: cur ? cur.ctx : '',
+      ctxIcon: cur ? cur.ci : '',
+      primaryLabel: acts.length ? acts[0][0] : 'Open',
+      manyActions: acts.length > 1,
+      actions: acts.map(([l,key],i)=>({ label:l, key, hasKey: key !== '', style:{ height:32, flexShrink:0, display:'flex', alignItems:'center', gap:8, padding:'0 10px', borderRadius:4, fontSize:14, cursor:'default', background: i===this.state.pSel ? 'var(--sel)' : 'transparent' } })),
+      togglePanel: () => this.setState(s=>({ panel: !s.panel && this.actionsOf(ITEMS[s.sel]).length > 0, pSel:0 })),
+      onKey: (e) => {
+        if ((e.metaKey||e.ctrlKey) && e.key.toLowerCase()==='k') {
+          e.preventDefault();
+          if (!this.state.open) return;
+          return this.setState(s=>({ panel: !s.panel && this.actionsOf(ITEMS[s.sel]).length > 0, pSel:0 }));
+        }
+        if (e.key==='Escape') {
+          e.preventDefault();
+          if (this.state.panel) return this.setState({ panel:false });
+          if (this.state.open) return this.setState({ open:false });
+          return;
+        }
+        const d = e.key==='ArrowDown' ? 1 : e.key==='ArrowUp' ? -1 : 0;
+        if (!d) return;
+        e.preventDefault();
+        if (!this.state.open) {
+          if (d > 0) this.setState({ open:true, sel: this.itemIdx()[0] });
+          return;
+        }
+        if (this.state.panel) this.setState(s=>({ pSel: Math.max(0, Math.min(acts.length-1, s.pSel+d)) }));
+        else this.move(d);
+      },
+    };
+  }
+}
+</script>
+</body>
+</html>

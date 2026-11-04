@@ -1,12 +1,12 @@
 import { Theme } from "../theme.slint";
 import { Dot, Status } from "../atoms/dot.slint";
-import { ToastStyle } from "../globals.slint";
+import { TickerStyle } from "../globals.slint";
 
-/// A toast on its own, for while the launcher is hidden. The window keeps one
+/// A ticker on its own, for while the launcher is hidden. The window keeps one
 /// size so the shell can place it before Slint lays it out; the pill inside
 /// fits its text.
-export component HudWindow inherits Window {
-    in property <ToastStyle> style;
+export component NoticeWindow inherits Window {
+    in property <TickerStyle> style;
     in property <string> text;
     /// The text does not fit and is cut off.
     out property <bool> cut: label.preferred-width > label.width;
@@ -14,13 +14,13 @@ export component HudWindow inherits Window {
     always-on-top: true;
     background: transparent;
     title: "Dango";
-    width: Theme.hud-width;
-    height: Theme.hud-height;
+    width: Theme.notice-width;
+    height: Theme.notice-height;
     default-font-size: Theme.text-body;
     default-font-family: Theme.font;
 
     pill := Rectangle {
-        width: min(parent.width, label.preferred-width + 2 * Theme.hud-padding + dot.width + Theme.gap);
+        width: min(parent.width, label.preferred-width + 2 * Theme.notice-padding + dot.width + Theme.gap);
         height: parent.height;
         background: Theme.popover;
         border-radius: self.height / 2;
@@ -28,26 +28,26 @@ export component HudWindow inherits Window {
         border-color: Theme.border;
 
         HorizontalLayout {
-            padding-left: Theme.hud-padding;
-            padding-right: Theme.hud-padding;
+            padding-left: Theme.notice-padding;
+            padding-right: Theme.notice-padding;
             spacing: Theme.gap;
 
             VerticalLayout {
                 alignment: center;
                 dot := Dot {
-                    status: root.style == ToastStyle.failure ? Status.failed : Status.done;
+                    status: root.style == TickerStyle.failure ? Status.failed : Status.done;
                 }
             }
 
             label := Text {
                 text: root.text;
-                color: root.style == ToastStyle.failure ? Theme.foreground : Theme.muted;
+                color: root.style == TickerStyle.failure ? Theme.foreground : Theme.muted;
                 font-size: Theme.text-small;
                 vertical-alignment: center;
                 overflow: elide;
                 accessible-role: AccessibleRole.text;
                 accessible-label: self.text;
-                accessible-description: root.style == ToastStyle.failure ? "Failed" : "";
+                accessible-description: root.style == TickerStyle.failure ? "Failed" : "";
             }
         }
     }

@@ -113,7 +113,7 @@ later" SHALL leave the progress view with the update kept ready. After
 installing, Dango SHALL restart into the new version.
 
 Dismissing the launcher SHALL NOT cancel a download. A failure SHALL be recorded
-in `dango.log`, and the update item SHALL stay available. A failure toast for a
+in `dango.log`, and the update item SHALL stay available. A failure ticker for a
 failed download or verification SHALL carry "Retry", which starts the download
 again.
 
@@ -156,7 +156,7 @@ again.
 
 #### Scenario: Retrying a failed download
 
-- **WHEN** a failure toast for the update carries "Retry" and the user runs it
+- **WHEN** a failure ticker for the update carries "Retry" and the user runs it
 - **THEN** the download starts again and its progress view is shown
 
 #### Scenario: Dismissed during the download

@@ -79,7 +79,7 @@ impl Proxy {
             .is_some_and(|u| !u.is_transport_closed())
     }
 
-    /// Notices a build that stopped, so its tools go away, and one that
+    /// Spots a build that stopped, so its tools go away, and one that
     /// started some other way, so its tools appear.
     async fn watch(self: Arc<Self>) {
         loop {
@@ -199,7 +199,7 @@ impl Proxy {
         if let Some(handle) = arguments.get("windowHandle") {
             return Ok(handle.clone());
         }
-        // The HUD is a window too, and lists first once it has shown. The
+        // The notice is a window too, and lists first once it has shown. The
         // launcher is always the taller one.
         let windows = self.call("list_windows", json!({})).await?;
         let mut tallest: Option<(f64, Value)> = None;

@@ -80,7 +80,7 @@ that uses F18 SHALL NOT be expected to fire. Dango does not refuse it; the
 settings reference SHALL state the clash.
 
 When the launcher hotkey is refused, Dango SHALL summon the launcher with the
-platform default instead, write the reason to the log, and show a tray notice
+platform default instead, write the reason to the log, and show a tray problem
 that the configured hotkey is invalid and the default is in use.
 
 #### Scenario: A bare letter is refused for the launcher
@@ -88,7 +88,7 @@ that the configured hotkey is invalid and the default is in use.
 - **WHEN** the configuration file sets the launcher hotkey to `a`
 - **THEN** the `a` key is not registered and still types `a` in other applications
 - **AND** the platform default summons the launcher
-- **AND** the log says why the hotkey was refused and the tray shows a notice
+- **AND** the log says why the hotkey was refused and the tray shows a problem
 
 #### Scenario: A bare Space is refused
 

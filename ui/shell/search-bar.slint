@@ -2,6 +2,7 @@ import { Theme } from "../theme.slint";
 import { Progress, ProgressKind } from "../atoms/progress.slint";
 import { Icon, IconKind } from "../atoms/icon.slint";
 import { Intents, Search, Shell } from "../globals.slint";
+import { Ticker } from "ticker.slint";
 
 /// The query for a list, or the command's title for a detail or form.
 export component SearchBar inherits Rectangle {
@@ -23,8 +24,8 @@ export component SearchBar inherits Rectangle {
     }
 
     HorizontalLayout {
-        padding-left: 16px;
-        padding-right: 16px;
+        padding-left: Shell.can-go-back ? 12px : 18px;
+        padding-right: 12px;
         spacing: 12px;
 
         if Shell.can-go-back: VerticalLayout {
@@ -32,8 +33,8 @@ export component SearchBar inherits Rectangle {
             Rectangle {
                 width: Theme.icon-size + 8px;
                 height: Theme.icon-size + 8px;
-                border-radius: Theme.radius / 2;
-                background: back-touch.has-hover ? Theme.hover : transparent;
+                border-radius: self.height / 2;
+                background: back-touch.has-hover ? Theme.selected : Theme.hover;
                 accessible-role: button;
                 accessible-label: "Go back";
                 accessible-action-default => {
@@ -111,15 +112,18 @@ export component SearchBar inherits Rectangle {
             }
         }
 
+        if !Shell.card-shown && Shell.ticker-shown: Ticker {
+            horizontal-stretch: 0;
+            max-width: root.width / 2;
+        }
+
         if Shell.typing && Search.filter-shown: VerticalLayout {
             alignment: center;
             horizontal-stretch: 0;
             Rectangle {
                 height: 28px;
-                border-radius: Theme.radius / 2;
-                border-width: 1px;
-                border-color: Theme.border;
-                background: filter-touch.has-hover ? Theme.hover : transparent;
+                border-radius: self.height / 2;
+                background: filter-touch.has-hover ? Theme.selected : Theme.hover;
                 accessible-role: combobox;
                 accessible-label: "Filter results";
                 accessible-value: Search.filter-options[Search.filter-current].title;
@@ -127,8 +131,8 @@ export component SearchBar inherits Rectangle {
                     filter-popup.show();
                 }
                 HorizontalLayout {
-                    padding-left: 10px;
-                    padding-right: 10px;
+                    padding-left: 12px;
+                    padding-right: 12px;
                     spacing: 6px;
                     Text {
                         text: Search.filter-options[Search.filter-current].title;
@@ -197,17 +201,16 @@ export component SearchBar inherits Rectangle {
         }
     }
 
+    // Kept clear of the rounded ends: the software renderer clips to a square,
+    // not to the pill.
     if Shell.loading: Progress {
         kind: ProgressKind.bar;
+        x: parent.height / 2;
+        width: parent.width - parent.height;
         y: parent.height - 2px;
         height: 2px;
         track: Theme.border;
         fill: Theme.accent;
         accessible-label: "Loading…";
-    }
-    if !Shell.loading: Rectangle {
-        y: parent.height - 1px;
-        height: 1px;
-        background: Theme.border;
     }
 }

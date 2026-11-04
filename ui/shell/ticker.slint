@@ -1,0 +1,51 @@
+import { Theme } from "../theme.slint";
+import { Kbd } from "../atoms/kbd.slint";
+import { Dot, Status } from "../atoms/dot.slint";
+import { Progress, ProgressKind } from "../atoms/progress.slint";
+import { Shell, TickerStyle } from "../globals.slint";
+
+/// The ticker's mark, text, and action, wherever it sits.
+export component Ticker inherits HorizontalLayout {
+    /// The text does not fit and is cut off.
+    out property <bool> cut: text.preferred-width > text.width;
+    spacing: Theme.gap;
+
+    VerticalLayout {
+        alignment: center;
+        if Shell.ticker-style == TickerStyle.busy: Progress {
+            kind: ProgressKind.ring;
+            width: 12px;
+            height: 12px;
+        }
+        if Shell.ticker-style != TickerStyle.busy: Dot {
+            status: Shell.ticker-style == TickerStyle.failure ? Status.failed : Status.done;
+        }
+    }
+    text := Text {
+        text: Shell.ticker-text;
+        color: Shell.ticker-style == TickerStyle.failure ? Theme.foreground : Theme.muted;
+        horizontal-stretch: 1;
+        font-size: Theme.text-small;
+        vertical-alignment: center;
+        overflow: elide;
+        accessible-role: AccessibleRole.text;
+        accessible-label: self.text;
+        accessible-description: (Shell.ticker-style == TickerStyle.failure ? "Failed" : "")
+            + (Shell.ticker-style == TickerStyle.failure && Shell.ticker-action-label != "" ? ". " : "")
+            + (Shell.ticker-action-label != "" ? Shell.ticker-action-label + ", " + Shell.ticker-action-keys : "");
+    }
+    if Shell.ticker-action-label != "": Text {
+        text: Shell.ticker-action-label;
+        color: Theme.foreground;
+        font-size: Theme.text-small;
+        vertical-alignment: center;
+        accessible-role: none;
+    }
+    if Shell.ticker-action-label != "": VerticalLayout {
+        alignment: center;
+        Kbd {
+            keys: Shell.ticker-action-keys;
+            accessible-role: none;
+        }
+    }
+}

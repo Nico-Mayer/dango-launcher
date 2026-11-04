@@ -1,6 +1,6 @@
 use crate::extension::FormValues;
 
-use super::state::ToastStyle;
+use super::state::TickerStyle;
 
 /// Work the shell does on the launcher's behalf. What comes of it returns as an
 /// `Event`, so the launcher itself never waits.
@@ -14,17 +14,19 @@ pub enum Effect {
     },
     CancelInvocation,
     Dismiss,
+    /// Hide and hold the state, as the hotkey does.
+    HideAndHold,
     CopyText(String),
     InspectTemplate {
         field: String,
         source: String,
     },
     ReportPaint(u64),
-    /// Answered with `Event::ToastExpired` once a success toast's or a HUD's
+    /// Answered with `Event::TickerExpired` once a success ticker's or a notice's
     /// time is up. The style decides how long that is.
-    ExpireToast {
+    ExpireTicker {
         id: u64,
-        style: ToastStyle,
+        style: TickerStyle,
     },
     /// Answered with `Event::BusyMarksWoke` once the stage's time is up.
     WakeBusyMarks {

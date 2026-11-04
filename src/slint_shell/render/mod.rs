@@ -9,8 +9,8 @@ mod empty;
 mod form;
 mod grid;
 mod height;
-pub mod hud;
 mod list;
+pub mod notice;
 mod panel;
 mod progress;
 mod shell;
@@ -75,7 +75,8 @@ impl Renderer {
     /// partial answer does not shrink the window just before the rest arrive.
     fn height(&mut self, snapshot: &Snapshot) -> f32 {
         let wanted = height::height(snapshot);
-        let settling = matches!(&snapshot.screen, Screen::Root(root) if root.settling);
+        let settling =
+            matches!(&snapshot.screen, Screen::Root(root) if root.settling && !root.bare);
         self.height = if settling {
             wanted.max(self.height)
         } else {
@@ -91,7 +92,14 @@ impl Renderer {
 
     pub fn render(&mut self, ui: &LauncherWindow, snapshot: Snapshot) {
         let kind = screen_kind(&snapshot.screen);
-        shell::write(ui, &snapshot, kind, typing(&snapshot.screen), &self.icons);
+        shell::write(
+            ui,
+            &snapshot,
+            kind,
+            typing(&snapshot.screen),
+            self.height,
+            &self.icons,
+        );
 
         let mut selected = None;
         let mut detail = false;
@@ -299,6 +307,8 @@ pub fn connect(ui: &LauncherWindow, renderer: Rc<RefCell<Renderer>>, dispatch: R
     intents.on_close_panel(move || send(Intent::ClosePanel));
     let send = dispatch.clone();
     intents.on_go_back(move || send(Intent::GoBack));
+    let send = dispatch.clone();
+    intents.on_clicked_outside(move || send(Intent::ClickedOutside));
     let send = dispatch.clone();
     intents.on_filter_chosen(move |id| send(Intent::FilterChosen { id: id.into() }));
     intents.on_panel_filter_edited(move |text| {

@@ -186,8 +186,8 @@ own primary action.
 A command declared as `no-view` SHALL NOT emit a view tree. It SHALL report
 success or failure. On success the launcher SHALL close if it is open. On
 failure an open launcher SHALL stay open and show the message in a failure
-toast; when the launcher is hidden, as for a command run from its hotkey, the
-message SHALL show in the HUD instead (see `hud`).
+ticker; when the launcher is hidden, as for a command run from its hotkey, the
+message SHALL show in the notice instead (see `notice`).
 
 #### Scenario: No-view command succeeds
 
@@ -197,12 +197,12 @@ message SHALL show in the HUD instead (see `hud`).
 #### Scenario: No-view command fails
 
 - **WHEN** a `no-view` command fails
-- **THEN** the launcher stays open and the failure is shown as a failure toast
+- **THEN** the launcher stays open and the failure is shown as a failure ticker
 
 #### Scenario: No-view command fails without the launcher
 
 - **WHEN** a `no-view` command run from its hotkey fails
-- **THEN** the launcher does not appear and the failure is shown in the HUD
+- **THEN** the launcher does not appear and the failure is shown in the notice
 
 ### Requirement: View stack
 
@@ -434,16 +434,16 @@ label beside it. Tab and Shift+Tab SHALL move between fields in order.
 - **WHEN** the user types two lines into a text area and submits
 - **THEN** the delivered value holds both lines with the line break
 
-### Requirement: An action can report success with a toast
+### Requirement: An action can report success with a ticker
 
 An action that keeps the launcher open SHALL be able to report success with a
-one-line message. The launcher SHALL show it as a success toast.
+one-line message. The launcher SHALL show it as a success ticker.
 
 #### Scenario: Pinning an entry
 
 - **WHEN** the user runs an action that pins a clipboard entry and the action
   reports "Entry pinned"
-- **THEN** a success toast reads "Entry pinned" and the view stays
+- **THEN** a success ticker reads "Entry pinned" and the view stays
 
 ### Requirement: The launcher filters lists and grids
 
@@ -557,7 +557,7 @@ A view SHALL be able to signal that it is loading and to declare what is shown
 when it has no content.
 
 Every list, grid, or detail view marked loading SHALL show the SearchBar's
-loading bar and a busy toast reading "Loading…", whether or not it already
+loading bar and a busy ticker reading "Loading…", whether or not it already
 contains content, following the busy-mark timing in design-system. Entering the
 loading state SHALL NOT itself clear, replace, dim into unreadability, or block
 interaction with content supplied by the command. The loading marks SHALL
@@ -576,7 +576,7 @@ shown.
 #### Scenario: Loading is visible
 
 - **WHEN** a command emits a view marked as loading and keeps it loading
-- **THEN** after a short moment the loading bar and the busy toast are shown
+- **THEN** after a short moment the loading bar and the busy ticker are shown
   without clearing any content already displayed
 
 #### Scenario: Empty state is shown
@@ -594,7 +594,7 @@ shown.
 #### Scenario: Empty list is loading
 
 - **WHEN** a command emits a loading list with no items
-- **THEN** the list shows skeleton rows at once, the busy toast reads
+- **THEN** the list shows skeleton rows at once, the busy ticker reads
   "Loading…" once the loading marks appear, and the completed empty state is
   not shown
 

@@ -77,14 +77,14 @@ pasting SHALL give the answer without that mark.
 
 With the card selected, the ActionBar SHALL show "Calculator" as its context and
 "Copy answer" with the Enter key. Enter SHALL copy the answer and close the
-launcher with the copied HUD. The action panel SHALL also offer "Paste answer",
+launcher with the copied notice. The action panel SHALL also offer "Paste answer",
 which pastes the answer into the application the user came from. Copying or
 pasting an answer SHALL NOT change how root results rank.
 
 #### Scenario: Copying
 
 - **WHEN** the card shows "4" and the user presses Enter
-- **THEN** "4" is on the clipboard and the HUD reads "Copied to clipboard"
+- **THEN** "4" is on the clipboard and the notice reads "Copied to clipboard"
 
 #### Scenario: Pasting
 

@@ -36,7 +36,7 @@ pub fn on_main_thread(shell: &dyn Shell, work: impl FnOnce() + Send + 'static) {
 /// have no other surface while the launcher is hidden.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct TrayStatus {
-    pub notices: Vec<String>,
+    pub problems: Vec<String>,
     pub config_error: bool,
     pub missing: Vec<Permission>,
 }
@@ -53,7 +53,7 @@ impl TrayStatus {
     /// the Slint menu.
     pub fn lines(&self) -> Vec<String> {
         let config = config_status_text(self.config_error).to_string();
-        self.notices.iter().cloned().chain([config]).collect()
+        self.problems.iter().cloned().chain([config]).collect()
     }
 }
 
@@ -161,9 +161,9 @@ mod tests {
     use super::*;
 
     #[test]
-    fn notices_come_before_the_config_status() {
+    fn problems_come_before_the_config_status() {
         let tray = TrayStatus {
-            notices: vec!["Database unavailable, see dango.log".into()],
+            problems: vec!["Database unavailable, see dango.log".into()],
             config_error: true,
             missing: vec![],
         };

@@ -37,12 +37,12 @@ const DEFAULT_RESET_AFTER_SECS: u32 = 60;
 
 const PERMISSION_POLL: Duration = Duration::from_secs(2);
 
-const TOAST_LIFETIME: Duration = Duration::from_secs(2);
+const TICKER_LIFETIME: Duration = Duration::from_secs(2);
 const BUSY_MARK_DELAY: Duration = Duration::from_millis(150);
 const BUSY_MARK_HOLD: Duration = Duration::from_millis(400);
 /// Longer than a success, so a whole sentence can be read: nothing but time
-/// takes a failure HUD away.
-const FAILURE_HUD_LIFETIME: Duration = Duration::from_secs(4);
+/// takes a failure notice away.
+const FAILURE_NOTICE_LIFETIME: Duration = Duration::from_secs(4);
 
 pub struct Core {
     shell: Arc<dyn Shell>,
@@ -216,6 +216,12 @@ impl Core {
                     }
                 });
             }
+            ui::Effect::HideAndHold => {
+                let core = self.clone();
+                self.on_main_thread(move || {
+                    core.hide(HideReason::Interrupted);
+                });
+            }
             ui::Effect::CopyText(text) => match self.services.clipboard.clone() {
                 Some(clipboard) => {
                     self.runtime
@@ -243,15 +249,15 @@ impl Core {
                     core.apply(ui::Input::Event(ui::Event::BusyMarksWoke { id }));
                 });
             }
-            ui::Effect::ExpireToast { id, style } => {
+            ui::Effect::ExpireTicker { id, style } => {
                 let lifetime = match style {
-                    ui::ToastStyle::Failure => FAILURE_HUD_LIFETIME,
-                    ui::ToastStyle::Success | ui::ToastStyle::Busy => TOAST_LIFETIME,
+                    ui::TickerStyle::Failure => FAILURE_NOTICE_LIFETIME,
+                    ui::TickerStyle::Success | ui::TickerStyle::Busy => TICKER_LIFETIME,
                 };
                 let core = self.clone();
                 self.runtime.spawn(async move {
                     tokio::time::sleep(lifetime).await;
-                    core.apply(ui::Input::Event(ui::Event::ToastExpired { id }));
+                    core.apply(ui::Input::Event(ui::Event::TickerExpired { id }));
                 });
             }
         }
@@ -325,7 +331,7 @@ impl Core {
     }
 
     /// `asked` when the user opened it: only then may it jump into an answer
-    /// whose HUD is showing.
+    /// whose notice is showing.
     pub fn show(self: &Arc<Self>, probe: Option<u64>, asked: bool) {
         let core = self.clone();
         self.on_main_thread(move || {
@@ -698,7 +704,7 @@ impl Core {
                     message,
                 ),
                 ActionOutcome::Started
-                | ActionOutcome::Toast(_)
+                | ActionOutcome::Ticker(_)
                 | ActionOutcome::CopyToClipboard(_)
                 | ActionOutcome::Copied
                 | ActionOutcome::Replaced(_)
@@ -708,7 +714,7 @@ impl Core {
         });
     }
 
-    /// A hotkey press that went wrong: the launcher says so, in the HUD while
+    /// A hotkey press that went wrong: the launcher says so, in the notice while
     /// it is hidden, and the log keeps the detail.
     fn report_failure(self: &Arc<Self>, detail: &str, message: String) {
         crate::log::append(detail);
@@ -1005,7 +1011,7 @@ fn aliased_candidates(host: &ExtensionHost, file_config: &FileConfig) -> Vec<Can
 /// asks for it. Returns a message to surface when a configured hyperkey could
 /// not start.
 /// Why the hyperkey did not start. A missing permission already has its own
-/// tray item and clears itself on a grant, so callers raise no notice for it.
+/// tray item and clears itself on a grant, so callers report no problem for it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum HyperkeyFailure {
     MissingPermission(Permission),

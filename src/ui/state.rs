@@ -41,12 +41,19 @@ pub struct Launcher {
     /// or before the one abandoned.
     abandoned_invocation: Option<u64>,
     panel: Option<PanelState>,
+    /// The empty-query list was opened with Arrow Down. Without it an empty
+    /// query shows only pinned items.
+    root_open: bool,
+    /// The typed query has shown the card, rows or "No results". From then on
+    /// the card stays while later keystrokes search, so it does not drop to
+    /// the pill and back on every key.
+    pub(super) typed_card: bool,
     /// The title of a command invoked from root that has neither finished nor
     /// shown a view yet.
     pub(super) working: Option<String>,
     /// A tree that cannot be drawn, shown in place of a view until Escape.
     pub(super) view_error: Option<ViewError>,
-    pub(super) toast: Option<HeldToast>,
+    pub(super) ticker: Option<HeldTicker>,
     pub(super) busy_marks: BusyMarks,
     /// The last report of every task that has not ended.
     pub(super) tasks: Vec<TaskState>,
@@ -54,29 +61,29 @@ pub struct Launcher {
     pending_result: Option<TaskState>,
     /// What the launcher reports while it is off screen. Set while it is still
     /// visible, it waits for the hide.
-    pub(super) hud: Option<HeldToast>,
+    pub(super) notice: Option<HeldTicker>,
     pub(super) visible: bool,
 }
 
-/// A toast the launcher holds until it expires or is cleared. Busy toasts are
+/// A ticker the launcher holds until it expires or is cleared. Busy tickers are
 /// not held: they follow the work that shows them.
 #[derive(Clone, Debug, PartialEq)]
-pub(super) struct HeldToast {
+pub(super) struct HeldTicker {
     pub(super) id: u64,
-    pub(super) style: ToastStyle,
+    pub(super) style: TickerStyle,
     pub(super) text: String,
-    pub(super) action: Option<ToastAction>,
+    pub(super) action: Option<TickerAction>,
 }
 
-/// One action a toast offers, run by its chord while the toast shows.
+/// One action a ticker offers, run by its chord while the ticker shows.
 #[derive(Clone, Debug, PartialEq)]
-pub struct ToastAction {
+pub struct TickerAction {
     pub title: String,
     pub shortcut: Shortcut,
     pub request: ActionRequest,
 }
 
-/// The loading bar and busy toast wait a moment before they appear and, once
+/// The loading bar and busy ticker wait a moment before they appear and, once
 /// shown, stay a moment, so fast work never blinks them.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub(super) enum BusyMarks {
@@ -158,7 +165,7 @@ impl Grouped for GridItem {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum ToastStyle {
+pub enum TickerStyle {
     Busy,
     Success,
     Failure,
@@ -222,11 +229,11 @@ impl Launcher {
     fn intent(&mut self, intent: Intent, fx: &mut Vec<Effect>) {
         if let Intent::Key { chord } = &intent {
             if let Some(action) = self
-                .toast_action()
+                .ticker_action()
                 .filter(|action| Chord::from(&action.shortcut) == *chord)
             {
                 fx.push(Effect::RunAction(action.request.clone()));
-                self.toast = None;
+                self.ticker = None;
                 return;
             }
         }
@@ -272,6 +279,7 @@ impl Launcher {
                 }
                 _ => {}
             },
+            Intent::ClickedOutside => fx.push(Effect::HideAndHold),
         }
     }
 
@@ -284,6 +292,9 @@ impl Launcher {
             } => {
                 // A late answer for an older query was cancelled and must not show.
                 if query == self.query {
+                    if !query.is_empty() && (complete || !items.is_empty()) {
+                        self.typed_card = true;
+                    }
                     self.results = items;
                     self.results_complete = complete;
                 }
@@ -316,7 +327,7 @@ impl Launcher {
             }
             Event::Activated { held, probe, asked } => {
                 self.visible = true;
-                let jump = self.hud.take().and_then(|hud| hud.action);
+                let jump = self.notice.take().and_then(|notice| notice.action);
                 self.activations += 1;
                 self.probe = probe;
                 if held {
@@ -337,28 +348,28 @@ impl Launcher {
                 self.visible = false;
                 // A command that pastes asks for the hide and goes on working,
                 // so its failure can land just before the window is gone.
-                if let Some(toast) = self
-                    .toast
-                    .take_if(|toast| toast.style == ToastStyle::Failure)
+                if let Some(ticker) = self
+                    .ticker
+                    .take_if(|ticker| ticker.style == TickerStyle::Failure)
                 {
-                    self.show_hud(ToastStyle::Failure, toast.text, None, fx);
+                    self.show_notice(TickerStyle::Failure, ticker.text, None, fx);
                     return;
                 }
-                if let Some(hud) = &self.hud {
-                    fx.push(Effect::ExpireToast {
-                        id: hud.id,
-                        style: hud.style,
+                if let Some(notice) = &self.notice {
+                    fx.push(Effect::ExpireTicker {
+                        id: notice.id,
+                        style: notice.style,
                     });
                 }
             }
             Event::BusyMarksWoke { id } => self.busy_marks_woke(id, fx),
             Event::Task(state) => self.task_changed(*state, fx),
-            Event::ToastExpired { id } => {
-                if self.toast.as_ref().is_some_and(|toast| toast.id == id) {
-                    self.toast = None;
+            Event::TickerExpired { id } => {
+                if self.ticker.as_ref().is_some_and(|ticker| ticker.id == id) {
+                    self.ticker = None;
                 }
-                if self.hud.as_ref().is_some_and(|hud| hud.id == id) {
-                    self.hud = None;
+                if self.notice.as_ref().is_some_and(|notice| notice.id == id) {
+                    self.notice = None;
                 }
             }
         }
@@ -370,6 +381,8 @@ impl Launcher {
         self.results.clear();
         self.results_complete = false;
         self.picked = None;
+        self.root_open = false;
+        self.typed_card = false;
         self.stack.clear();
         self.owner = None;
         // Deliberately not abandoning: a hide for work resets through here too,
@@ -379,12 +392,12 @@ impl Launcher {
         self.panel = None;
         self.view_error = None;
         self.working = None;
-        self.toast = None;
+        self.ticker = None;
         self.busy_marks = BusyMarks::Hidden;
         fx.push(Effect::Search(String::new()));
     }
 
-    /// What the busy toast says while Dango is busy, and nothing otherwise.
+    /// What the busy ticker says while Dango is busy, and nothing otherwise.
     pub(super) fn busy_text(&self) -> Option<String> {
         if let Some(title) = &self.working {
             return Some(format!("Running {title}…"));
@@ -448,11 +461,11 @@ impl Launcher {
         if !self.visible {
             match &state.status {
                 TaskStatus::Failed { sentence } => {
-                    self.show_hud(ToastStyle::Failure, sentence.clone(), None, fx)
+                    self.show_notice(TickerStyle::Failure, sentence.clone(), None, fx)
                 }
                 TaskStatus::Done { sentence } | TaskStatus::NeedsInput { sentence } => {
                     let action = show_answer(&state);
-                    self.show_hud(ToastStyle::Success, sentence.clone(), action, fx)
+                    self.show_notice(TickerStyle::Success, sentence.clone(), action, fx)
                 }
                 TaskStatus::Running | TaskStatus::Cancelled => {}
             }
@@ -470,9 +483,9 @@ impl Launcher {
             }
             TaskStatus::Failed { sentence } => {
                 let id = self.next_revision();
-                self.toast = Some(HeldToast {
+                self.ticker = Some(HeldTicker {
                     id,
-                    style: ToastStyle::Failure,
+                    style: TickerStyle::Failure,
                     text: sentence.clone(),
                     action: state
                         .retry
@@ -495,8 +508,8 @@ impl Launcher {
         self.working.is_none() && !self.top_loading() && self.busy_task().is_some()
     }
 
-    /// The running task's Cancel, while the busy toast is showing that task.
-    pub(super) fn busy_cancel(&self) -> Option<ToastAction> {
+    /// The running task's Cancel, while the busy ticker is showing that task.
+    pub(super) fn busy_cancel(&self) -> Option<TickerAction> {
         if !self.busy_shows_task() {
             return None;
         }
@@ -574,7 +587,7 @@ impl Launcher {
             return;
         }
         // The stack has one owner, who gets its actions: a view from another
-        // extension, such as an update retried from a toast, starts afresh.
+        // extension, such as an update retried from a ticker, starts afresh.
         if self.owner.as_deref() != Some(owner.as_str()) {
             self.stack.clear();
         }
@@ -602,7 +615,7 @@ impl Launcher {
                     fx.push(Effect::CopyText(text));
                 }
                 fx.push(Effect::Dismiss);
-                self.show_hud(ToastStyle::Success, "Copied to clipboard".into(), None, fx);
+                self.show_notice(TickerStyle::Success, "Copied to clipboard".into(), None, fx);
             }
             // A root action that produces a view opens it. A snippet needing
             // arguments has to ask before it can do anything.
@@ -643,7 +656,7 @@ impl Launcher {
                 }
             }
             (ActionOutcome::Back, Origin::Root) => {}
-            (ActionOutcome::Toast(text), _) => self.show_success(text, None, fx),
+            (ActionOutcome::Ticker(text), _) => self.show_success(text, None, fx),
             (ActionOutcome::Failed(message), _) => self.show_failure(message, fx),
         }
     }
@@ -656,83 +669,83 @@ impl Launcher {
         true
     }
 
-    /// Off screen nobody would see a toast, and it would be stale by the next
-    /// activation, so the HUD says it instead.
+    /// Off screen nobody would see a ticker, and it would be stale by the next
+    /// activation, so the notice says it instead.
     fn show_failure(&mut self, text: String, fx: &mut Vec<Effect>) {
         if !self.visible {
-            self.show_hud(ToastStyle::Failure, text, None, fx);
+            self.show_notice(TickerStyle::Failure, text, None, fx);
             return;
         }
         let id = self.next_revision();
-        self.toast = Some(HeldToast {
+        self.ticker = Some(HeldTicker {
             id,
-            style: ToastStyle::Failure,
+            style: TickerStyle::Failure,
             text,
             action: None,
         });
     }
 
-    /// The toast's action, while the toast shows and the panel does not own
+    /// The ticker's action, while the ticker shows and the panel does not own
     /// the keyboard.
-    pub(super) fn toast_action(&self) -> Option<ToastAction> {
+    pub(super) fn ticker_action(&self) -> Option<TickerAction> {
         if self.panel.is_some() {
             return None;
         }
-        match &self.toast {
-            Some(toast) => toast.action.clone(),
+        match &self.ticker {
+            Some(ticker) => ticker.action.clone(),
             None => self.busy_cancel(),
         }
     }
 
-    /// A toast that waits for the user, because it failed or offers an
+    /// A ticker that waits for the user, because it failed or offers an
     /// action, goes with their next key press or click.
     fn clear_lasting(&mut self) {
         if self
-            .toast
+            .ticker
             .as_ref()
-            .is_some_and(|toast| toast.style == ToastStyle::Failure || toast.action.is_some())
+            .is_some_and(|ticker| ticker.style == TickerStyle::Failure || ticker.action.is_some())
         {
-            self.toast = None;
+            self.ticker = None;
         }
     }
 
-    fn show_success(&mut self, text: String, action: Option<ToastAction>, fx: &mut Vec<Effect>) {
+    fn show_success(&mut self, text: String, action: Option<TickerAction>, fx: &mut Vec<Effect>) {
         let id = self.next_revision();
         let lasts = action.is_some();
-        self.toast = Some(HeldToast {
+        self.ticker = Some(HeldTicker {
             id,
-            style: ToastStyle::Success,
+            style: TickerStyle::Success,
             text,
             action,
         });
         if !lasts {
-            fx.push(Effect::ExpireToast {
+            fx.push(Effect::ExpireTicker {
                 id,
-                style: ToastStyle::Success,
+                style: TickerStyle::Success,
             });
         }
     }
 
-    /// The time runs from when the HUD can be seen, so one set while the
+    /// The time runs from when the notice can be seen, so one set while the
     /// launcher is still on screen starts its time at the hide.
-    /// An action on the HUD is not drawn: opening the launcher while it
+    /// An action on the notice is not drawn: opening the launcher while it
     /// shows runs it.
-    fn show_hud(
+    fn show_notice(
         &mut self,
-        style: ToastStyle,
+        style: TickerStyle,
         text: String,
-        action: Option<ToastAction>,
+        action: Option<TickerAction>,
         fx: &mut Vec<Effect>,
     ) {
         let id = self.next_revision();
-        self.hud = Some(HeldToast {
+        self.notice = Some(HeldTicker {
             id,
             style,
             text,
             action,
         });
         if !self.visible {
-            fx.push(Effect::ExpireToast { id, style });
+            fx.push(Effect::ExpireTicker { id, style });
         }
     }
 
@@ -794,6 +807,15 @@ impl Launcher {
     fn query_changed(&mut self, text: String, fx: &mut Vec<Effect>) {
         match self.stack.last_mut() {
             None => {
+                if text.is_empty() {
+                    self.root_open = false;
+                }
+                // The empty-query list is no partial answer for a typed query,
+                // nor the other way round.
+                if self.query.is_empty() != text.is_empty() {
+                    self.results.clear();
+                    self.typed_card = false;
+                }
                 self.query = text.clone();
                 self.results_complete = false;
                 self.picked = None;
@@ -867,6 +889,14 @@ impl Launcher {
         if escape {
             self.escape(fx);
         } else if (up || down) && mode == Mode::Root {
+            if down && self.root_closed() {
+                let bare = self.root_order().next().is_none();
+                self.root_open = true;
+                if bare {
+                    self.picked = None;
+                    return;
+                }
+            }
             let next = step(
                 self.root_order().map(|item| item.id.as_str()),
                 self.root_selected().map(|item| item.id.clone()),
@@ -923,7 +953,11 @@ impl Launcher {
         } else if !self.query.is_empty() {
             self.query.clear();
             self.query_revision = self.next_revision();
+            self.root_open = false;
             fx.push(Effect::Search(String::new()));
+        } else if self.root_open {
+            self.root_open = false;
+            self.picked = None;
         } else {
             fx.push(Effect::Dismiss);
         }
@@ -1119,7 +1153,11 @@ impl Launcher {
     /// suggestions, then everything else.
     pub(super) fn root_order(&self) -> impl Iterator<Item = &ResultItem> {
         let answer = self.results.iter().filter(|item| item.answer);
-        let rows = || self.results.iter().filter(|item| !item.answer);
+        let rows = || {
+            self.results
+                .iter()
+                .filter(|item| !item.answer && self.root_shows(item))
+        };
         let pinned = rows().filter(|item| item.pinned);
         let suggested = rows().filter(|item| !item.pinned && item.suggested);
         let rest = rows().filter(|item| !item.pinned && !item.suggested);
@@ -1129,8 +1167,17 @@ impl Launcher {
     pub(super) fn root_selected(&self) -> Option<&ResultItem> {
         self.picked
             .as_deref()
-            .and_then(|picked| self.results.iter().find(|item| item.id == picked))
+            .and_then(|picked| self.root_order().find(|item| item.id == picked))
             .or_else(|| self.root_order().next())
+    }
+
+    pub(super) fn root_closed(&self) -> bool {
+        self.query.is_empty() && !self.root_open
+    }
+
+    /// Whether root shows the item: a closed root shows pinned items only.
+    pub(super) fn root_shows(&self, item: &ResultItem) -> bool {
+        item.pinned || !self.root_closed()
     }
 
     /// A pushed list's items after launcher-side narrowing, grouped in section
@@ -1518,16 +1565,16 @@ fn is_loading(view: &View) -> bool {
     }
 }
 
-fn show_answer(task: &TaskState) -> Option<ToastAction> {
+fn show_answer(task: &TaskState) -> Option<TickerAction> {
     task.show
         .as_deref()
         .map(|show| task_action(task, "Show answer", "Enter", show))
 }
 
-/// An action of a task's owner, offered on a toast with the platform's
+/// An action of a task's owner, offered on a ticker with the platform's
 /// command key.
-fn task_action(task: &TaskState, title: &str, key: &str, action_id: &str) -> ToastAction {
-    ToastAction {
+fn task_action(task: &TaskState, title: &str, key: &str, action_id: &str) -> TickerAction {
+    TickerAction {
         title: title.into(),
         shortcut: Shortcut {
             key: key.into(),
