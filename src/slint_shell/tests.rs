@@ -691,6 +691,7 @@ mod ticker {
         let h = Harness::root(vec![item]);
         for message in [
             "Set up this command's provider in your config file",
+            crate::extensions::display::NO_MONITOR,
             "Couldn't verify the update, so it wasn't installed",
             "One keyword can't be the start of another, so choose a different keyword",
         ] {

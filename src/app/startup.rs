@@ -18,6 +18,7 @@ use crate::extensions::applications::{AppIndex, ApplicationsExtension};
 use crate::extensions::clipboard::{
     ClipboardExtension, ClipboardSource, ConfigPolicy, History, Watcher,
 };
+use crate::extensions::display::DisplayExtension;
 use crate::extensions::games::{GameList, GamesExtension, SteamSource};
 use crate::extensions::permissions::PermissionsExtension;
 use crate::extensions::snippets::{self, SnippetsExtension};
@@ -297,6 +298,9 @@ fn build_services(
         Arc::new(OnMainThread(startup.shell.clone())),
     )));
     register(&mut host, "window-management", window_management);
+
+    let display = Arc::new(DisplayExtension::new(platform::brightness_monitors()));
+    register(&mut host, "display", display);
 
     for error in config::schema::write_all(&config::config_dir(), &extensions::builtin_manifests())
     {

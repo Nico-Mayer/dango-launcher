@@ -1209,3 +1209,46 @@ async fn a_plain_success_shows_no_notice() {
         .any(|call| matches!(call, Call::Hide { .. })));
     assert_eq!(notice(&shell), None);
 }
+
+struct NoMonitors;
+
+impl crate::platform::BrightnessMonitors for NoMonitors {
+    fn external(&self) -> Vec<Box<dyn crate::platform::Monitor>> {
+        Vec::new()
+    }
+}
+
+fn display_core(config: &str) -> (Arc<Core>, Arc<RecordingShell>) {
+    let display = Arc::new(crate::extensions::display::DisplayExtension::new(Arc::new(
+        NoMonitors,
+    )));
+    let (core, shell) = core_with("", FakeGrab::default(), vec![display]);
+    core.apply_config_reload(Config::parse(config));
+    core.toggle();
+    (core, shell)
+}
+
+#[tokio::test]
+async fn brightness_commands_are_found_by_name_and_keyword() {
+    let (core, shell) = display_core("");
+    let both = [
+        "dango.display.decrease-brightness",
+        "dango.display.increase-brightness",
+    ];
+    for query in ["bright", "monitor", "display"] {
+        type_query(&core, query);
+        settle().await;
+        assert_eq!(root_ids(&shell), both, "{query}");
+    }
+    type_query(&core, "dim");
+    settle().await;
+    assert_eq!(root_ids(&shell), ["dango.display.decrease-brightness"]);
+}
+
+#[tokio::test]
+async fn a_disabled_display_extension_offers_no_brightness_command() {
+    let (core, shell) = display_core("display = { enabled = false }");
+    type_query(&core, "bright");
+    settle().await;
+    assert!(root_ids(&shell).is_empty());
+}

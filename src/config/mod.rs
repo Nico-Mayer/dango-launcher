@@ -65,6 +65,9 @@ pub struct Config {
     /// Settings for the Clipboard History extension.
     #[serde(default)]
     pub clipboard: ClipboardTable,
+    /// Settings for the Display extension.
+    #[serde(default)]
+    pub display: Table,
     /// Settings for the Games extension.
     #[serde(default)]
     pub games: Table,
@@ -99,11 +102,12 @@ fn is_built_in(extension_id: &str) -> bool {
 }
 
 /// The table names of the built-in extensions, each also its id after `dango.`.
-pub const BUILT_IN_TABLES: [&str; 11] = [
+pub const BUILT_IN_TABLES: [&str; 12] = [
     "ai",
     "applications",
     "calculator",
     "clipboard",
+    "display",
     "games",
     "permissions",
     "quicklinks",
@@ -327,6 +331,7 @@ impl Config {
             Some("applications") => Some(&self.applications),
             Some("calculator") => Some(&self.calculator),
             Some("clipboard") => Some(&self.clipboard),
+            Some("display") => Some(&self.display),
             Some("games") => Some(&self.games),
             Some("permissions") => Some(&self.permissions),
             Some("quicklinks") => Some(&self.quicklinks),

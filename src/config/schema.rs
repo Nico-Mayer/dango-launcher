@@ -625,6 +625,7 @@ mod tests {
         quicklinks = { favicons = false }
         window-management = { commands = { left-half = { alias = "lh", hotkey = "hyper+left" } } }
         system = { commands = { open-config = { hotkey = "hyper+comma" } } }
+        display = { commands = { increase-brightness = { hotkey = "hyper+up" } } }
 
         [launcher]
         hotkey = { macos = "cmd+space", windows = "ctrl+space" }

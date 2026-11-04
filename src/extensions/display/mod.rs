@@ -2,8 +2,13 @@
 
 use std::sync::{Arc, Mutex, PoisonError};
 
+use crate::extension::{CommandDecl, Extension, InvocationMode, Manifest, NAMED_ICON};
 use crate::invocation::{Command, InvocationContext};
 use crate::platform::{BrightnessMonitors, Level, Monitor};
+
+pub const EXTENSION_ID: &str = "dango.display";
+pub const COMMAND_INCREASE: &str = "increase-brightness";
+pub const COMMAND_DECREASE: &str = "decrease-brightness";
 
 pub const NO_MONITOR: &str = "Turn on DDC/CI in your monitor's menu to change brightness";
 pub const REFUSED: &str = "Couldn't change monitor brightness";
@@ -50,6 +55,81 @@ pub fn message(percents: &[u32]) -> String {
         [rest @ .., last] => format!("{}, and {last}", rest.join(", ")),
     };
     format!("Brightness set to {list}")
+}
+
+pub struct DisplayExtension {
+    manifest: Manifest,
+    monitors: Arc<dyn BrightnessMonitors>,
+}
+
+impl DisplayExtension {
+    pub fn new(monitors: Arc<dyn BrightnessMonitors>) -> Self {
+        Self {
+            manifest: manifest(),
+            monitors,
+        }
+    }
+}
+
+impl Extension for DisplayExtension {
+    fn manifest(&self) -> &Manifest {
+        &self.manifest
+    }
+
+    fn command(&self, command_id: &str) -> Option<Arc<dyn Command>> {
+        let direction = match command_id {
+            COMMAND_INCREASE => Direction::Up,
+            COMMAND_DECREASE => Direction::Down,
+            _ => return None,
+        };
+        Some(Arc::new(BrightnessStep {
+            monitors: self.monitors.clone(),
+            direction,
+        }))
+    }
+}
+
+pub(crate) fn manifest() -> Manifest {
+    Manifest {
+        manifest_version: 1,
+        id: EXTENSION_ID.into(),
+        name: "Display".into(),
+        icon: None,
+        commands: vec![
+            command(
+                COMMAND_INCREASE,
+                "Increase Brightness",
+                "sun",
+                &["brightness", "brighter", "monitor", "display", "screen"],
+            ),
+            command(
+                COMMAND_DECREASE,
+                "Decrease Brightness",
+                "sun-dim",
+                &[
+                    "brightness",
+                    "dim",
+                    "dimmer",
+                    "monitor",
+                    "display",
+                    "screen",
+                ],
+            ),
+        ],
+        root_items: false,
+        services: false,
+    }
+}
+
+fn command(id: &str, title: &str, icon: &str, keywords: &[&str]) -> CommandDecl {
+    CommandDecl {
+        id: id.into(),
+        title: title.into(),
+        mode: InvocationMode::NoView,
+        icon: Some(format!("{NAMED_ICON}{icon}")),
+        keywords: keywords.iter().map(|k| (*k).to_string()).collect(),
+        alias: None,
+    }
 }
 
 pub struct BrightnessStep {

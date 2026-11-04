@@ -22,6 +22,7 @@ pub fn builtin_manifests() -> Vec<Manifest> {
         applications::manifest(),
         calculator::manifest(),
         clipboard::manifest(),
+        display::manifest(),
         games::manifest(),
         permissions::manifest(),
         system::manifest(),

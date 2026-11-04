@@ -14,6 +14,7 @@ Every setting is optional; anything left out uses its built-in default. Dango ke
 | `applications` | object |  |  | Settings for the Applications extension. |
 | `calculator` | object |  |  | Settings for the Calculator extension. |
 | `clipboard` | object |  |  | Settings for the Clipboard History extension. |
+| `display` | object |  |  | Settings for the Display extension. |
 | `extensions` | map of [Extension table](#extension-table) |  |  | Extensions that are not built in, keyed by extension id. Holds only what Dango itself reads for them: enabled state, aliases, and hotkeys. |
 | `games` | object |  |  | Settings for the Games extension. |
 | `hyperkey` | [Hyperkey](#hyperkey) |  |  | CapsLock, remapped to act as the hyper modifier system-wide. On macOS it uses F18, so a hotkey with `f18` does not work while it is on. |
@@ -92,6 +93,24 @@ Per-command settings, keyed by command id.
 | Setting | Type | Default | Values | Description |
 | --- | --- | --- | --- | --- |
 | `history` | [Command settings](#command-settings) |  |  | Settings for the history command. |
+
+### `display`
+
+Settings for the Display extension.
+
+| Setting | Type | Default | Values | Description |
+| --- | --- | --- | --- | --- |
+| `commands` | object |  |  | Per-command settings, keyed by command id. |
+| `enabled` | boolean |  |  | Whether the extension runs. Absent means enabled. |
+
+### `display.commands`
+
+Per-command settings, keyed by command id.
+
+| Setting | Type | Default | Values | Description |
+| --- | --- | --- | --- | --- |
+| `decrease-brightness` | [Command settings](#command-settings) |  |  | Settings for the decrease-brightness command. |
+| `increase-brightness` | [Command settings](#command-settings) |  |  | Settings for the increase-brightness command. |
 
 ### `games`
 

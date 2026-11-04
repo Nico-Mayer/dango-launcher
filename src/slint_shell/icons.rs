@@ -142,6 +142,8 @@ fn named(name: &str) -> Option<&'static IconData> {
         "settings" => lu::LuSettings,
         "sparkles" => lu::LuSparkles,
         "square" => lu::LuSquare,
+        "sun" => lu::LuSun,
+        "sun-dim" => lu::LuSunDim,
         "terminal" => lu::LuTerminal,
         "trash-2" => lu::LuTrash2,
         "triangle-alert" => lu::LuTriangleAlert,
@@ -153,7 +155,7 @@ fn named(name: &str) -> Option<&'static IconData> {
 mod tests {
     use super::*;
 
-    const REGISTRY: [&str; 34] = [
+    const REGISTRY: [&str; 36] = [
         "app-window",
         "arrow-left",
         "arrow-right",
@@ -185,6 +187,8 @@ mod tests {
         "settings",
         "sparkles",
         "square",
+        "sun",
+        "sun-dim",
         "terminal",
         "trash-2",
         "triangle-alert",
