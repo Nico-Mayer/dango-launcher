@@ -16,7 +16,7 @@
 
 - [x] 3.1 Add the root-list flag to `State` and make `root_order()` yield only pinned items, or nothing, while the query is empty and the list closed; `reset()` and a cleared query close it. In the same commit, `Harness::root` and `root(count)` press Arrow Down after seeding. State machine tests: bare pill has no selection, Enter and Ctrl+K do nothing, a hidden item's shortcut does not fire, pinned items show alone in provider order, reset closes the list; `cargo test` passes
 - [x] 3.2 Arrow Down on an empty prompt opens the list (first row from bare pill, next row from the pinned card); Arrow Up does nothing; a typed character shows ranked results; state machine tests for each list-navigation scenario
-- [ ] 3.3 Escape stage: clear query, then close the open list, then dismiss; tests for each Dismissal scenario, including Escape on the pinned card
+- [x] 3.3 Escape stage: clear query, then close the open list, then dismiss; tests for each Dismissal scenario, including Escape on the pinned card
 - [ ] 3.4 Snapshot gains card-shown, the renderer writes it to `Shell`, the card hides, and `height.rs` counts pill only or pill + gap + card; UI tests for bare pill (no list, no ActionBar), first keystroke opening the card, and height unit tests for each case
 
 ## 4. Toast at the pill's end

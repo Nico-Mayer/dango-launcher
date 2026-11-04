@@ -939,7 +939,11 @@ impl Launcher {
         } else if !self.query.is_empty() {
             self.query.clear();
             self.query_revision = self.next_revision();
+            self.root_open = false;
             fx.push(Effect::Search(String::new()));
+        } else if self.root_open {
+            self.root_open = false;
+            self.picked = None;
         } else {
             fx.push(Effect::Dismiss);
         }

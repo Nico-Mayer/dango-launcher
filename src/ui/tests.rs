@@ -431,6 +431,33 @@ fn a_reset_closes_the_list() {
 }
 
 #[test]
+fn escape_clears_the_query_then_closes_the_list_then_dismisses() {
+    let mut h = bare_pill(5);
+    h.press("ArrowDown");
+    h.typed("R");
+    assert!(h.press("Escape").contains(&Effect::Search(String::new())));
+    h.results("", results(5));
+    assert!(
+        h.root_screen().sections.is_empty(),
+        "clearing closes the list"
+    );
+    h.press("ArrowDown");
+    assert!(!h.press("Escape").contains(&Effect::Dismiss));
+    assert!(h.root_screen().sections.is_empty());
+    assert_eq!(h.press("Escape"), vec![Effect::Dismiss]);
+}
+
+#[test]
+fn escape_on_the_pinned_card_dismisses() {
+    let mut h = Harness::new();
+    let mut items = results(3);
+    items[0].pinned = true;
+    h.results("", items);
+    assert_eq!(h.root_screen().sections.len(), 1);
+    assert_eq!(h.press("Escape"), vec![Effect::Dismiss]);
+}
+
+#[test]
 fn root_sections_group_pinned_and_suggested_results() {
     let mut h = Harness::new();
     let mut items = results(5);
