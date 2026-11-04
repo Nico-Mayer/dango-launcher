@@ -2047,13 +2047,13 @@ mod tray {
     use super::*;
 
     #[test]
-    fn the_tray_lists_the_notices() {
+    fn the_tray_lists_the_problems() {
         i_slint_backend_testing::init_no_event_loop();
         let tray = Tray::new().unwrap();
         super::super::show_tray(
             &tray,
             &TrayStatus {
-                notices: vec!["Pasting is off, see dango.log".into()],
+                problems: vec!["Pasting is off, see dango.log".into()],
                 config_error: false,
                 missing: Vec::new(),
             },

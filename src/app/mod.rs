@@ -1011,7 +1011,7 @@ fn aliased_candidates(host: &ExtensionHost, file_config: &FileConfig) -> Vec<Can
 /// asks for it. Returns a message to surface when a configured hyperkey could
 /// not start.
 /// Why the hyperkey did not start. A missing permission already has its own
-/// tray item and clears itself on a grant, so callers raise no notice for it.
+/// tray item and clears itself on a grant, so callers report no problem for it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum HyperkeyFailure {
     MissingPermission(Permission),

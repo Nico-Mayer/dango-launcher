@@ -58,7 +58,7 @@ Recycle Bin, Accessibility, Cmd, Ctrl, Option, Alt, Enter, Escape.
 
 #### Scenario: A message is sentence case
 
-- **WHEN** a failure, empty state, toast, or tray notice is shown
+- **WHEN** a failure, empty state, toast, or tray problem is shown
 - **THEN** it starts with a capital letter and is otherwise lower case except
   for names
 
@@ -240,10 +240,10 @@ verb and the count.
 - **AND** the first action is "Cancel" and the second is "Delete" followed by
   the count and noun
 
-### Requirement: Tray notices say what is wrong and where to look
+### Requirement: Tray problems say what is wrong and where to look
 
-A tray notice about a startup problem SHALL name the thing that failed and,
-when the detail is in the log, SHALL name the log file. A notice about the
+A tray problem from startup SHALL name the thing that failed and,
+when the detail is in the log, SHALL name the log file. A problem with the
 launcher hotkey SHALL name the chord and say what to change. The config status
 line SHALL say whether the config file loaded.
 
@@ -320,6 +320,6 @@ quoted there in its final form.
 #### Scenario: A change adds a message
 
 - **WHEN** a change's design introduces a new failure, empty state, label, or
-  notice
+  tray problem
 - **THEN** the design quotes the string
 - **AND** the string meets the casing, length, and shape rules above
