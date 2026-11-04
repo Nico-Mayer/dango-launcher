@@ -71,8 +71,9 @@ snapshot_types! {
         pub empty: Option<EmptyText>,
         /// More results may still arrive for the query.
         pub settling: bool,
-        /// Only the SearchBar shows: the query is empty, the list closed, and
-        /// nothing pinned.
+        /// Only the SearchBar shows: there is no row and no empty view to draw,
+        /// as with an empty query and the list closed, or before a typed
+        /// query's first result.
         pub bare: bool,
     }
 
@@ -385,6 +386,15 @@ impl Launcher {
         }
         sections.push(section(grouped.then_some("Everything else"), rest));
         sections.retain(|section| !section.items.is_empty());
+        // Said only once every provider has answered, so a slow one does not
+        // flash it up between keystrokes.
+        let empty = (self.results.is_empty() && !self.query.is_empty() && self.results_complete)
+            .then(|| EmptyText {
+                icon: Some(SEARCH_ICON.to_string()),
+                title: format!("No results for “{}”", self.query),
+                description: None,
+                truncate: true,
+            });
         RootScreen {
             query: Text {
                 text: self.query.clone(),
@@ -393,17 +403,9 @@ impl Launcher {
             answer,
             sections,
             selected,
-            // Said only once every provider has answered, so a slow one does
-            // not flash it up between keystrokes.
-            empty: (self.results.is_empty() && !self.query.is_empty() && self.results_complete)
-                .then(|| EmptyText {
-                    icon: Some(SEARCH_ICON.to_string()),
-                    title: format!("No results for “{}”", self.query),
-                    description: None,
-                    truncate: true,
-                }),
+            bare: empty.is_none() && self.root_order().next().is_none(),
+            empty,
             settling: !self.results_complete,
-            bare: self.root_closed() && self.root_order().next().is_none(),
         }
     }
 

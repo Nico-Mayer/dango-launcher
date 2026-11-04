@@ -411,6 +411,18 @@ fn typing_after_opening_shows_ranked_results_from_the_top() {
 }
 
 #[test]
+fn the_first_keystroke_drops_the_empty_query_list() {
+    let mut h = bare_pill(5);
+    h.press("ArrowDown");
+    h.typed("R");
+    let root = h.root_screen();
+    assert!(root.sections.is_empty());
+    assert!(root.bare, "the pill stays alone until a result for R lands");
+    h.results("R", results(2));
+    assert!(!h.root_screen().bare);
+}
+
+#[test]
 fn clearing_the_query_closes_the_list() {
     let mut h = bare_pill(5);
     h.press("ArrowDown");
@@ -2022,6 +2034,7 @@ fn a_root_action_answering_with_a_view_opens_it_for_that_extension() {
 fn a_root_removal_searches_again() {
     let mut h = Harness::root(3);
     h.typed("Res");
+    h.results("Res", results(3));
     h.press("Enter");
     let request = h.runs()[0].clone();
     let effects = h.finish(

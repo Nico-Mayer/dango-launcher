@@ -738,6 +738,11 @@ mod root_search {
         let h = Harness::root(results(5));
         h.type_text("re");
         assert_eq!(h.query(), "re");
+        h.event(Event::Results {
+            query: "re".into(),
+            items: results(5),
+            complete: true,
+        });
 
         h.row("Result 2")
             .mock_single_click(PointerEventButton::Left);
@@ -1666,6 +1671,15 @@ mod bare_pill {
     }
 
     #[test]
+    fn the_first_keystroke_keeps_the_pill_until_results_land() {
+        let h = bare();
+        h.arrow_down();
+        h.type_text("r");
+        assert_eq!(h.height(), 52.0);
+        assert!(!h.shell().get_card_shown());
+    }
+
+    #[test]
     fn the_first_keystroke_opens_the_card() {
         let h = bare();
         h.type_text("r");
@@ -1781,8 +1795,14 @@ mod window_height {
     #[test]
     fn a_partial_answer_does_not_shrink_the_window() {
         let h = Harness::root(results(5));
+        h.type_text("r");
+        h.event(Event::Results {
+            query: "r".into(),
+            items: results(5),
+            complete: true,
+        });
         let full = h.height();
-        h.type_text("re");
+        h.type_text("e");
         h.event(Event::Results {
             query: "re".into(),
             items: results(2),

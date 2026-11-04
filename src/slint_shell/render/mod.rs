@@ -75,7 +75,8 @@ impl Renderer {
     /// partial answer does not shrink the window just before the rest arrive.
     fn height(&mut self, snapshot: &Snapshot) -> f32 {
         let wanted = height::height(snapshot);
-        let settling = matches!(&snapshot.screen, Screen::Root(root) if root.settling);
+        let settling =
+            matches!(&snapshot.screen, Screen::Root(root) if root.settling && !root.bare);
         self.height = if settling {
             wanted.max(self.height)
         } else {

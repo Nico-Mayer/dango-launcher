@@ -802,6 +802,11 @@ impl Launcher {
                 if text.is_empty() {
                     self.root_open = false;
                 }
+                // The empty-query list is no partial answer for a typed query,
+                // nor the other way round.
+                if self.query.is_empty() != text.is_empty() {
+                    self.results.clear();
+                }
                 self.query = text.clone();
                 self.results_complete = false;
                 self.picked = None;
