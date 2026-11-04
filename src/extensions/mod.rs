@@ -2,6 +2,7 @@ pub mod ai;
 pub mod applications;
 pub mod calculator;
 pub mod clipboard;
+pub mod display;
 pub mod games;
 pub mod permissions;
 pub mod refresh;
