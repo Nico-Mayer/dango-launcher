@@ -3006,3 +3006,26 @@ fn another_view_of_the_same_extension_still_gets_the_toast() {
         Some("Answer ready: Summarize")
     );
 }
+
+#[test]
+fn leaving_a_running_task_s_view_shows_its_busy_toast() {
+    let mut tree = detail_tree("Bet");
+    if let crate::protocol::View::Detail(detail) = &mut tree.view {
+        detail.loading = true;
+    }
+    let mut h = Harness::view(tree);
+    report(
+        &mut h,
+        crate::tasks::TaskState {
+            owner: "fixture".into(),
+            line: "Running Fixture Command…".into(),
+            ..task(1, running_task())
+        },
+    );
+    h.press("Escape");
+    h.wake_busy();
+    assert_eq!(
+        h.toast(ToastStyle::Busy).as_deref(),
+        Some("Running Fixture Command…")
+    );
+}
