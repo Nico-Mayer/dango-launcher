@@ -7,6 +7,7 @@
 ## 2. Specs and docs
 
 - [x] 2.1 In one commit: `git mv openspec/specs/hud openspec/specs/notice` (H1 included), apply the substring rules and the prose pass from design.md to every main spec, every file of `openspec/changes/launcher-v5-split-shell`, and AGENTS.md. Check: `rg -i "toast|hud" openspec/specs openspec/changes/launcher-v5-split-shell AGENTS.md` finds nothing; every `### Requirement:` title under `## MODIFIED Requirements` in the v5 deltas is found with `rg -F` in `openspec/specs/<capability>/spec.md`; `openspec validate --specs` passes with no new strict warnings (69 old ones on `main`), and `openspec validate launcher-v5-split-shell --strict` passes
+  - The Mac session archived `launcher-v5-split-shell` on `v5-closed-root` before this branch landed. The restack kept the archive as written and re-ran the rename on the main specs it had merged into and on AGENTS.md. Strict warnings on the archived base: 70, unchanged by the rename.
 
 ## 3. Code
 
@@ -19,4 +20,4 @@
 
 ## Workflow follow-up
 
-- Archive `launcher-v5-split-shell` at the top of the stack, after this branch.
+- `launcher-v5-split-shell` is archived; its archive keeps the old words as history.

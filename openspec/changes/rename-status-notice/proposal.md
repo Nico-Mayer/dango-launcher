@@ -57,6 +57,6 @@ None at the behaviour level. Specs change wording only, so the change sets
   `tools/dango-ui-mcp/src/main.rs`. Files: `ui/shell/toast.slint`,
   `ui/shell/hud.slint`, `src/slint_shell/render/hud.rs`.
 - AGENTS.md platform traps that name the HUD.
-- Depends on `launcher-v5-split-shell`: this branch stacks on `v5-closed-root`.
-  Archive v5 at the top of the stack, after this branch, so the archive does
-  not conflict with this branch's spec edits when restacking.
+- Builds on `launcher-v5-split-shell`, now archived: this branch stacks on
+  `v5-closed-root`. The archive in `openspec/changes/archive/` keeps the old
+  words as history.
