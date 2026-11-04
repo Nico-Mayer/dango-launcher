@@ -50,7 +50,7 @@ The pill and the card SHALL each be 720 logical pixels wide. The pill SHALL be
 
 The SearchBar SHALL hold the query for a list or grid, with a placeholder the
 view sets. When a view has been pushed, it SHALL show a back control before
-the query, drawn as a chevron in a small circle; activating it SHALL go back
+the query, drawn as a back arrow in a small circle; activating it SHALL go back
 one view, as Escape does. While the busy marks are shown, it SHALL show an
 indeterminate progress bar along its bottom edge: a thin bar in which a short
 segment in the accent role sweeps from one end to the other, again and again,
@@ -66,7 +66,7 @@ SearchBar SHALL show the command's title in place of the query.
 #### Scenario: A pushed view shows the back control
 
 - **WHEN** a command has pushed a list
-- **THEN** the SearchBar shows a back control, a chevron in a small circle,
+- **THEN** the SearchBar shows a back control, a back arrow in a small circle,
   before the query
 
 #### Scenario: Clicking back

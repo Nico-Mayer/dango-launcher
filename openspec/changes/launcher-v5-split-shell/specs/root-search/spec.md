@@ -3,9 +3,10 @@
 ### Requirement: Empty query behaviour
 
 With an empty query the root view SHALL start closed: it SHALL show no
-results, and the launcher SHALL be the SearchBar pill alone. Results SHALL
-appear with the first typed character. When the query becomes empty again,
-the root view SHALL close again.
+results, and the launcher SHALL be the SearchBar pill alone. After the first
+typed character, the pill SHALL stay alone until the first result for the
+query arrives, and SHALL NOT show the empty-query list meanwhile. When the
+query becomes empty again, the root view SHALL close again.
 
 A provider MAY mark an item as pinned, such as a missing permission warning or
 an available update. While any item is pinned, the closed root view SHALL
@@ -36,8 +37,10 @@ show section headings.
 #### Scenario: The first character shows results
 
 - **WHEN** the launcher shows the pill alone and the user types one character
-- **THEN** the card opens with one ranked list for that query and no section
-  heading
+- **THEN** the pill stays alone until the first result for that character
+  arrives
+- **AND** the card then opens with one ranked list for that query and no
+  section heading
 
 #### Scenario: Clearing the query brings the sections back
 

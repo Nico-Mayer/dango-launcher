@@ -3,7 +3,7 @@
 ## 1. v5 part shapes (still one card)
 
 - [x] 1.1 Add pill height 52, shell gap 8 and pill/card radii to `ui/theme.slint`, with constants for pill height and gap in `src/slint_shell/render/height.rs`; `mise run check` passes
-- [x] 1.2 Restyle the back control as a chevron in a circle and the filter dropdown as a pill in `ui/shell/search-bar.slint`; UI tests in `src/slint_shell/tests.rs` still find both by accessible label, `cargo test` passes
+- [x] 1.2 Restyle the back control as an arrow in a circle and the filter dropdown as a pill in `ui/shell/search-bar.slint`; UI tests in `src/slint_shell/tests.rs` still find both by accessible label, `cargo test` passes
 - [x] 1.3 Show the primary action and its key as one chip in `ui/shell/action-bar.slint`; existing ActionBar UI tests pass
 
 ## 2. Split shell
@@ -39,8 +39,8 @@
 
 ## 7. Design files
 
-- [ ] 7.1 Update `Launcher Component System v5.dc.html` in `.design/` (gitignored) to match the built app: sizes, split shell, bare pill, Arrow Down list, Escape stages, toast at the pill's end, no glass, no shadows (until the follow-up). Remove stale or false content, such as parts, themes, tokens or screens the app does not have. Verify by rendering it with headless Edge and comparing against `dango-ui` screenshots
-- [ ] 7.2 After the author confirms 7.1, delete the older design files (`Launcher Component System.dc.html` and `v2` to `v4`) from `.design/`
+- [x] 7.1 Update `Launcher Component System v5.dc.html` in `.design/` (gitignored) to match the built app: sizes, split shell, bare pill, Arrow Down list, Escape stages, toast at the pill's end, no glass, no shadows (until the follow-up). Remove stale or false content, such as parts, themes, tokens or screens the app does not have. Verify by rendering it with headless Edge and comparing against `dango-ui` screenshots
+- [x] 7.2 After the author confirms 7.1, delete the older design files (`Launcher Component System.dc.html` and `v2` to `v4`) from `.design/`
 
 ## Workflow follow-up
 
