@@ -2,6 +2,94 @@
 
 All notable changes to Dango. Generated from commit history at release time.
 
+## [6.3.0] - 2026-11-04
+
+### Features
+
+- **ui:** Use design v2 bar and row sizes
+- **ui:** Add graphite and paper theme presets
+- **ui:** Fill key chords with the raised role
+- **ui:** Add progress bar and ring atom
+- **ui:** Give status dots five states
+- **ui:** Show a spinner in the busy toast
+- **protocol:** Add progress and status accessories
+- **ui:** Delay and hold busy marks
+- **ui:** Show skeleton rows for a cold list
+- **protocol:** Add the progress view
+- **extension:** Let an action leave its view
+- **ui:** Let a toast carry one action
+- **tasks:** Add the background task registry
+- **updates:** Run the update as a background task
+- **calculator:** Answer math and unit queries
+- **calculator:** Lead root search with the answer
+- **ui:** Show the answer card above root search
+- **search:** Carry a result's registered hotkey
+- **ui:** Label a global hotkey per platform
+- **ui:** Show a root result's hotkey
+- **tasks:** Offer to show what a finished task kept
+- **ai:** Run requests as background tasks
+- **ui:** Draw every key chord in one format
+- **ui:** Keep a toast that offers an action
+- **ui:** Show a task's success in the HUD
+- **ui:** Open an answer from its HUD
+
+### Fixes
+
+- **ui:** Keep skeleton rows beside a detail pane
+- **ui:** Clear busy marks when a command fails
+- **updates:** Keep one download and one view
+- **ui:** Scope views and busy marks to their source
+- **calculator:** Keep answers apart from other results
+- **hotkeys:** Find an app's chord ignoring case
+- **ui:** Show punctuation hotkeys as characters
+- **ai:** Finish held views and reopen kept answers
+- **ui:** Draw named shortcut keys as symbols
+- **ui:** Keep the toast's chord at its own width
+- **ai:** Name a shown answer after its command
+
+### Refactoring
+
+- **ui:** Draw the loading bar with Progress
+
+### Documentation
+
+- **theme:** Propose theme-graphite
+- **agents:** Describe theme presets
+- **theme:** Check off the review task
+- **theme:** Archive theme-graphite and sync specs
+- **progress:** Propose progress-atoms
+- **progress:** Apply plan review findings
+- **progress:** Check off the checks task
+- **progress:** Check off the review task
+- **progress:** Archive progress-atoms and sync specs
+- **tasks:** Propose task-registry
+- **tasks:** Apply plan review findings
+- **tasks:** Record how the ready update stays fixed
+- **tasks:** Check off the review task
+- **answer:** Propose inline-answer
+- **answer:** Apply plan review findings
+- **answer:** Check off the review task
+- **answer:** Note that dates get no answer card
+- **answer:** Archive inline-answer and sync specs
+- **adopt:** Propose adopt-components
+- **adopt:** Apply plan review findings
+- **adopt:** Check off the review task
+- **adopt:** Check off the Windows hand check
+- **adopt:** Check off the macos hotkey label task
+- **adopt:** Check off the macos hand check
+- **ui:** Put each view check under its own comment
+- **answers:** Check off the Windows hand check
+- **answers:** Check off the review task
+- **ui:** Put two comments back on their functions
+- **answers:** Check off the macos chord task
+- **answers:** Check off the macos hand check
+- **agents:** Note how to drive macos hand checks
+
+### Maintenance
+
+- **ui:** Keep slint_status above the tests
+- **ui:** Pin the busy toast after leaving a task
+- **ui:** Measure the gallery chord at its own width
 ## [6.2.0] - 2026-11-03
 
 ### Features
