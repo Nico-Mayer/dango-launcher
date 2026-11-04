@@ -169,10 +169,10 @@ impl LauncherWindow for MacLauncherWindow {
         }
     }
 
-    /// Centred on the display under the cursor, in AppKit's points, whose
-    /// origin is the bottom-left of the primary display.
-    fn position_on_active_display(&self, window: RawWindowHandle, _display: LauncherDisplay) {
-        let (Some(ns_window), Some(screen)) = (ns_window(window), screen_under_cursor()) else {
+    /// In AppKit's points, whose origin is the bottom-left of the primary
+    /// display.
+    fn position_on_active_display(&self, window: RawWindowHandle, display: LauncherDisplay) {
+        let (Some(ns_window), Some(screen)) = (ns_window(window), target_screen(display)) else {
             return;
         };
         let area = screen.frame();
@@ -218,8 +218,8 @@ impl NoticeWindow for MacNoticeWindow {
 
     /// In AppKit's points, whose origin is the bottom-left of the primary
     /// display, so the margin is measured up from the visible frame's bottom.
-    fn place(&self, window: RawWindowHandle, _display: LauncherDisplay) {
-        let (Some(ns_window), Some(screen)) = (ns_window(window), screen_under_cursor()) else {
+    fn place(&self, window: RawWindowHandle, display: LauncherDisplay) {
+        let (Some(ns_window), Some(screen)) = (ns_window(window), target_screen(display)) else {
             return;
         };
         let area = screen.visibleFrame();
@@ -237,8 +237,21 @@ impl NoticeWindow for MacNoticeWindow {
     }
 }
 
-fn screen_under_cursor() -> Option<Retained<NSScreen>> {
+fn target_screen(display: LauncherDisplay) -> Option<Retained<NSScreen>> {
     let mtm = MainThreadMarker::new()?;
+    match display {
+        LauncherDisplay::Pointer => screen_under_cursor(mtm),
+        LauncherDisplay::Primary => primary_screen(mtm),
+    }
+}
+
+/// `mainScreen` is the screen with the key window, not the one set as main in
+/// System Settings > Displays; that one is always first.
+fn primary_screen(mtm: MainThreadMarker) -> Option<Retained<NSScreen>> {
+    NSScreen::screens(mtm).firstObject()
+}
+
+fn screen_under_cursor(mtm: MainThreadMarker) -> Option<Retained<NSScreen>> {
     let cursor = NSEvent::mouseLocation();
     let screens = NSScreen::screens(mtm);
     (0..screens.count())
@@ -250,7 +263,7 @@ fn screen_under_cursor() -> Option<Retained<NSScreen>> {
                 && cursor.y >= frame.origin.y
                 && cursor.y < frame.origin.y + frame.size.height
         })
-        .or_else(|| NSScreen::mainScreen(mtm))
+        .or_else(|| primary_screen(mtm))
 }
 
 extern "C" fn can_become_key_window(_this: NonNull<AnyObject>, _cmd: Sel) -> Bool {

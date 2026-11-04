@@ -17,8 +17,10 @@
 
 ## 4. macOS
 
-- [ ] 4.1 In `src/platform/macos/mod.rs`, add a `primary_screen()` helper (`NSScreen::screens()` index 0), use it for `Primary` and as the fallback of `screen_under_cursor` instead of `mainScreen`, for both launcher and notice; verify `mise run check` passes on macOS (until then, CI compile check only)
+- [x] 4.1 In `src/platform/macos/mod.rs`, add a `primary_screen()` helper (`NSScreen::screens()` index 0), use it for `Primary` and as the fallback of `screen_under_cursor` instead of `mainScreen`, for both launcher and notice; verify `mise run check` passes on macOS (until then, CI compile check only)
 - [ ] 4.2 Hand check on macOS with two displays: with `display = "primary"` and the pointer on the secondary display, the launcher and a notice appear on the main display set in System Settings > Displays; switching to `"pointer"` without restart moves the next show to the pointer's display
+  - Open: the Mac had one display at archive time, so the secondary display
+    case was not checked. Do it once a second display is at hand.
 
 ## 5. Review
 
@@ -26,5 +28,5 @@
 
 ## Workflow follow-up
 
-- Leave 4.1 and 4.2 open until a session on the Mac. Archive only after they
-  are done.
+- Archived with 4.2 open by the author's choice: no second display on the
+  Mac.
