@@ -91,7 +91,14 @@ impl Renderer {
 
     pub fn render(&mut self, ui: &LauncherWindow, snapshot: Snapshot) {
         let kind = screen_kind(&snapshot.screen);
-        shell::write(ui, &snapshot, kind, typing(&snapshot.screen), &self.icons);
+        shell::write(
+            ui,
+            &snapshot,
+            kind,
+            typing(&snapshot.screen),
+            self.height,
+            &self.icons,
+        );
 
         let mut selected = None;
         let mut detail = false;

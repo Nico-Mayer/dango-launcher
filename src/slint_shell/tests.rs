@@ -18,11 +18,12 @@ use crate::protocol::{
 use crate::shell::TrayStatus;
 use crate::ui::{Context, Effect, Event, Input, Intent, Launcher, ResultItem, TemplateInspection};
 
-const SEARCH_BAR: f32 = 52.0;
+/// The SearchBar pill and the gap below it, above the card.
+const PILL: f32 = 52.0 + 8.0;
 const ACTION_BAR: f32 = 44.0;
 const LIST_PADDING: f32 = 8.0;
 const ROW: f32 = 44.0;
-const LIST_TOP: f32 = SEARCH_BAR + LIST_PADDING;
+const LIST_TOP: f32 = PILL + LIST_PADDING;
 const LIST_BOTTOM: f32 = 480.0 - ACTION_BAR - LIST_PADDING;
 
 struct Harness {
@@ -1497,7 +1498,7 @@ mod grid {
         let h = Harness::root(results(1));
         h.view(grid_tree(7));
         let content = h.ui.global::<GridData>().get_content_height();
-        assert!((h.height() - (SEARCH_BAR + content + ACTION_BAR)).abs() < 0.01);
+        assert!((h.height() - (PILL + content + ACTION_BAR)).abs() < 0.01);
         let last = h.row("Tile 7");
         let bottom = last.absolute_position().y + last.size().height;
         assert!(
@@ -1632,11 +1633,34 @@ mod window_height {
     use super::*;
 
     #[test]
+    fn the_card_sits_below_the_pill_across_a_gap() {
+        let h = Harness::root(results(3));
+        let pill = h.find("Search bar").expect("the pill");
+        let card = h.find("Results").expect("the card");
+        assert_eq!(pill.size().height, 52.0);
+        assert_eq!(
+            card.absolute_position().y,
+            pill.absolute_position().y + pill.size().height + 8.0
+        );
+    }
+
+    #[test]
+    fn the_card_fits_its_rows_when_the_window_keeps_its_size() {
+        let h = Harness::root(results(3));
+        let card = h.find("Results").expect("the card");
+        assert_eq!(
+            card.size().height,
+            LIST_PADDING + 3.0 * ROW + LIST_PADDING + ACTION_BAR
+        );
+        assert!(PILL + card.size().height < 480.0);
+    }
+
+    #[test]
     fn three_results_make_a_short_window() {
         let h = Harness::root(results(3));
         assert_eq!(
             h.height(),
-            SEARCH_BAR + LIST_PADDING + 3.0 * ROW + LIST_PADDING + ACTION_BAR
+            PILL + LIST_PADDING + 3.0 * ROW + LIST_PADDING + ACTION_BAR
         );
     }
 
@@ -1664,7 +1688,7 @@ mod window_height {
         });
         assert_eq!(
             h.height(),
-            SEARCH_BAR + LIST_PADDING + 8.0 * ROW + LIST_PADDING + ACTION_BAR
+            PILL + LIST_PADDING + 8.0 * ROW + LIST_PADDING + ACTION_BAR
         );
         h.event(Event::Results {
             query: "re".into(),
@@ -1673,7 +1697,7 @@ mod window_height {
         });
         assert_eq!(
             h.height(),
-            SEARCH_BAR + LIST_PADDING + 2.0 * ROW + LIST_PADDING + ACTION_BAR
+            PILL + LIST_PADDING + 2.0 * ROW + LIST_PADDING + ACTION_BAR
         );
     }
 
@@ -1784,7 +1808,10 @@ mod action_panel {
                 element.accessible_role() == Some(i_slint_backend_testing::AccessibleRole::List)
             })
             .expect("the action panel");
-        assert_eq!(h.height(), panel.size().height + ACTION_BAR + 2.0 * 8.0);
+        assert_eq!(
+            h.height(),
+            PILL + panel.size().height + ACTION_BAR + 2.0 * 8.0
+        );
     }
 
     #[test]

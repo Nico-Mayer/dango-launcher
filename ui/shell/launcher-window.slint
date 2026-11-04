@@ -65,60 +65,74 @@ export component LauncherWindow inherits Window {
             reject
         }
 
-        frame := Rectangle {
+        pill := Rectangle {
+            y: 0;
+            height: Theme.search-height;
+            background: Theme.popover;
+            border-radius: self.height / 2;
+            accessible-role: groupbox;
+            accessible-label: "Search bar";
+
+            search := SearchBar { }
+
+            // Drawn last so the SearchBar's fill does not paint over it.
+            Rectangle {
+                border-radius: parent.border-radius;
+                border-width: 1px;
+                border-color: Theme.border;
+            }
+        }
+
+        card := Rectangle {
+            y: Theme.search-height + Theme.shell-gap;
+            height: Shell.launcher-height - self.y;
             background: Theme.popover;
             border-radius: Theme.card-radius;
             accessible-role: groupbox;
-            accessible-label: "Dango";
+            accessible-label: "Results";
             clip: true;
 
-            property <length> body-top: Theme.search-height;
-            property <length> body-height: self.height - Theme.search-height - Theme.action-bar-height;
-
-            search := SearchBar {
-                y: 0;
-            }
-
+            property <length> body-height: self.height - Theme.action-bar-height;
             property <length> answer-room: AnswerData.shown ? Theme.answer-height : 0;
 
             if AnswerData.shown: InlineAnswer {
-                y: parent.body-top;
+                y: 0;
             }
 
             list := List {
                 visible: Shell.screen == ScreenKind.root || Shell.screen == ScreenKind.list;
-                y: parent.body-top + parent.answer-room;
+                y: parent.answer-room;
                 height: parent.body-height - parent.answer-room;
             }
             grid := Grid {
                 visible: Shell.screen == ScreenKind.grid;
-                y: parent.body-top;
+                y: 0;
                 height: parent.body-height;
             }
             if Shell.screen == ScreenKind.empty: EmptyView {
-                y: parent.body-top;
+                y: 0;
                 height: parent.body-height;
             }
             if Shell.screen == ScreenKind.detail: Detail {
-                y: parent.body-top;
+                y: 0;
                 height: parent.body-height;
             }
             if Shell.screen == ScreenKind.form: Form {
-                y: parent.body-top;
+                y: 0;
                 height: parent.body-height;
             }
             if Shell.screen == ScreenKind.progress: ProgressView {
-                y: parent.body-top;
+                y: 0;
                 height: parent.body-height;
             }
 
             // Rounded itself: the software renderer, which Windows falls back
             // to without OpenGL 2, clips children to a square, not to the
-            // frame's corners.
+            // card's corners.
             action-bar := ActionBar {
                 y: parent.height - Theme.action-bar-height;
-                border-bottom-left-radius: frame.border-radius;
-                border-bottom-right-radius: frame.border-radius;
+                border-bottom-left-radius: card.border-radius;
+                border-bottom-right-radius: card.border-radius;
             }
 
             // Swallows a press outside the open panel, so it never reaches the
@@ -139,7 +153,7 @@ export component LauncherWindow inherits Window {
 
             // Drawn last so no region paints over the outline.
             Rectangle {
-                border-radius: frame.border-radius;
+                border-radius: card.border-radius;
                 border-width: 1px;
                 border-color: Theme.border;
             }

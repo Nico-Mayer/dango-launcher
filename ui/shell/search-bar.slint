@@ -195,17 +195,16 @@ export component SearchBar inherits Rectangle {
         }
     }
 
+    // Kept clear of the rounded ends: the software renderer clips to a square,
+    // not to the pill.
     if Shell.loading: Progress {
         kind: ProgressKind.bar;
+        x: parent.height / 2;
+        width: parent.width - parent.height;
         y: parent.height - 2px;
         height: 2px;
         track: Theme.border;
         fill: Theme.accent;
         accessible-label: "Loading…";
-    }
-    if !Shell.loading: Rectangle {
-        y: parent.height - 1px;
-        height: 1px;
-        background: Theme.border;
     }
 }

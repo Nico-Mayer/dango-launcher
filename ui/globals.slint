@@ -106,6 +106,9 @@ export global Shell {
     in-out property <bool> multiline-focused;
     /// The window's height, set before each snapshot is drawn.
     in property <length> height: 480px;
+    /// The pill, gap, and card together, on every platform. Only Windows sizes
+    /// the window to it.
+    in property <length> launcher-height: 480px;
 }
 
 export global Search {

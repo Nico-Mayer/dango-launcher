@@ -8,8 +8,8 @@
 
 ## 2. Split shell
 
-- [ ] 2.1 Split `ui/shell/launcher-window.slint` into a pill Rectangle and a card Rectangle (view, answer card, ActionBar, action panel) with the transparent gap; card always shown, height from `Shell`; UI test asserts pill and card are separate elements with the gap between them
-- [ ] 2.2 `render/height.rs` counts pill 52 + gap 8 instead of SearchBar 64; the renderer writes the card height to `Shell` on both platforms and resizes the window only where `keeps_top_edge`; unit tests for the new sums and a UI test that a three-row card is shorter than the window when the window does not resize
+- [x] 2.1 Split `ui/shell/launcher-window.slint` into a pill Rectangle and a card Rectangle (view, answer card, ActionBar, action panel) with the transparent gap; card always shown, height from `Shell`; UI test asserts pill and card are separate elements with the gap between them
+- [x] 2.2 `render/height.rs` counts pill 52 + gap 8 instead of SearchBar 64; the renderer writes the card height to `Shell` on both platforms and resizes the window only where `keeps_top_edge`; unit tests for the new sums and a UI test that a three-row card is shorter than the window when the window does not resize
 - [ ] 2.3 Add a `TouchArea` behind pill and card that sends a new intent, routed in `Core` into the `hide_on_focus_loss` path; recording-shell test in `src/app` asserts the click hides the launcher as an interrupting hide
 
 ## 3. Closed root view

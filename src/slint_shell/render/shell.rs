@@ -25,10 +25,12 @@ pub fn write(
     snapshot: &Snapshot,
     kind: ScreenKind,
     typing: bool,
+    launcher_height: f32,
     icons: &Icons,
 ) {
     let shell = ui.global::<Shell>();
     shell.set_screen(kind);
+    shell.set_launcher_height(launcher_height);
     // The textarea's focus handler may not run when its form is torn down.
     if kind != ScreenKind::Form {
         shell.set_multiline_focused(false);
