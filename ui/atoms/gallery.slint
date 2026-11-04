@@ -14,8 +14,11 @@ export component AtomGallery inherits Window {
         Icon {
             label: "Icon";
         }
-        Kbd {
-            keys: root.chord;
+        HorizontalLayout {
+            alignment: start;
+            Kbd {
+                keys: root.chord;
+            }
         }
         Tag {
             text: "Link";
