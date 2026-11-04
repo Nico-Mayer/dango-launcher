@@ -19,7 +19,7 @@
 ## 4. Checks and review
 
 - [x] 4.1 Run `mise run check` and `cargo test`. Verify both pass.
-- [ ] 4.2 Windows hand check through `dango-ui`, `mise run keys`, and `mise run shot`: run "Fix Spelling and Grammar" on a Notepad selection and switch to Notepad before it finishes.
+- [x] 4.2 Windows hand check through `dango-ui`, `mise run keys`, and `mise run shot`: run "Fix Spelling and Grammar" on a Notepad selection and switch to Notepad before it finishes.
   - The HUD reads "Answer ready: Fix Spelling and Grammar".
   - Opening the launcher with its hotkey while the HUD shows lands on the answer.
   - A second run, opened after the HUD is gone, shows the toast with "Show answer" and "Ctrl ↵", and the toast stays until a key press.
