@@ -17,6 +17,9 @@ selection.
 The selection SHALL be the row a confirmation acts on, so what the user sees
 highlighted and what Enter acts on can never disagree.
 
+In root search, an answer card (see inline-answers) SHALL count as the row
+above the first result, under every rule here for rows.
+
 #### Scenario: A list opens with a selection
 
 - **WHEN** a list is shown with at least one row
@@ -98,6 +101,13 @@ last row leave the selection where it is.
 - **WHEN** the user arrows down into a scrolled list and then holds Arrow Up
   until the first row is selected
 - **THEN** the list is scrolled to the top with that first row fully visible
+
+#### Scenario: Arrow Up from the first result reaches the answer card
+
+- **WHEN** root search shows an answer card and results, and the first result
+  is selected
+- **THEN** Arrow Up selects the card, and Arrow Up on the card leaves it
+  selected
 
 ### Requirement: The pointer never changes the selection by hovering
 

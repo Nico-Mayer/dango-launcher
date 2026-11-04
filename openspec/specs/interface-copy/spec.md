@@ -174,7 +174,7 @@ error SHALL follow the failure requirement above.
 
 #### Scenario: Root search finds nothing
 
-- **WHEN** the user types a query with no matching result
+- **WHEN** the user types a query with no matching result and gets no answer
 - **THEN** the list shows "No results for" followed by the query
 
 #### Scenario: A pushed list is empty

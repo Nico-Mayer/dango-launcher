@@ -336,7 +336,8 @@ The launcher window SHALL be borderless, without a title bar, with a transparent
 background, always on top of other windows, and non-resizable by the user.
 
 On Windows, its height SHALL follow its content: a list or grid SHALL make the
-window as tall as the SearchBar, its rows, and the ActionBar, up to 480 logical
+window as tall as the SearchBar, an answer card when root search shows one,
+its rows, and the ActionBar, up to 480 logical
 pixels, and scroll beyond that. An empty view, a detail, and a form SHALL use
 the full 480 logical pixels. A height change SHALL NOT flicker or show the
 window at an old and a new size in the same frame. While root search is still

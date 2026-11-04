@@ -86,8 +86,11 @@ a system face rather than show as a missing glyph.
 ### Requirement: Every screen is one shell around one view
 
 The launcher SHALL show, from top to bottom, the SearchBar, exactly one view,
-and the ActionBar. The view is a list, a grid, a detail, a form, or an empty
-view. Overlays SHALL float above these regions and SHALL NOT move them.
+and the ActionBar. The view is a list, a grid, a detail, a form, a progress
+view, or an empty view. In root search, an answer card MAY sit between the
+SearchBar and the results; when no result matches, the card alone stands in
+for the empty view. Overlays SHALL float above these regions and SHALL NOT
+move them.
 
 The launcher SHALL be 720 logical pixels wide. The SearchBar SHALL be 64
 logical pixels high, the ActionBar 44, and a list row 44.
@@ -102,6 +105,12 @@ logical pixels high, the ActionBar 44, and a list row 44.
 - **WHEN** root search is shown at the default text scale
 - **THEN** the launcher is 720 logical pixels wide, the SearchBar is 64 high,
   each result row is 44 high, and the ActionBar is 44 high
+
+#### Scenario: Root search with an answer
+
+- **WHEN** the user types "2+2" at root
+- **THEN** the launcher shows the SearchBar, the answer card, the results, and
+  the ActionBar, from top to bottom
 
 ### Requirement: The SearchBar holds the query and shows where the user is
 
@@ -262,6 +271,10 @@ The launcher SHALL build every surface from the same small parts:
 - A form SHALL show a label column and a control column. A field's error SHALL
   be shown under the field in the danger role and be its accessible
   description.
+- A progress view SHALL show, from top to bottom, its title with its subtitle
+  in the muted role, a 4 logical pixel progress bar, its detail line in the
+  muted role, and its steps, one per row, each with a status dot before its
+  title. Queued steps' titles SHALL be in the muted role.
 - An empty view SHALL show one icon, one title, and at most one line of hint,
   centred in the view.
 
@@ -299,9 +312,16 @@ The launcher SHALL build every surface from the same small parts:
 - **THEN** its message shows under that field in the danger role and is exposed
   as the field's description, and the field can still be edited
 
+#### Scenario: A progress view
+
+- **WHEN** a progress view declares a title, a subtitle, a value, a detail, and
+  four steps
+- **THEN** the title and subtitle are at the top, the bar below them, then the
+  detail line, then the four steps with their status dots
+
 #### Scenario: No results
 
-- **WHEN** a query matches nothing
+- **WHEN** a query matches nothing and gets no answer
 - **THEN** the empty view shows its icon, "No results for" followed by the
   query, and its hint when one is declared
 
