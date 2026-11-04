@@ -37,8 +37,26 @@ pub fn shortcut_label(shortcut: &Shortcut) -> String {
             .to_string()
         })
         .collect();
-    parts.push(shortcut.key.to_uppercase());
+    parts.push(shortcut_key(&shortcut.key));
     parts.join(platform::label(Label::ChordSeparator))
+}
+
+/// A shortcut's key by its web name, drawn the way the footer draws Enter.
+fn shortcut_key(key: &str) -> String {
+    let symbol = match key.to_ascii_lowercase().as_str() {
+        "enter" => "↵",
+        "escape" => "Esc",
+        "backspace" => "⌫",
+        "delete" => "Del",
+        "tab" => "Tab",
+        " " | "space" => "Space",
+        "arrowup" => "↑",
+        "arrowdown" => "↓",
+        "arrowleft" => "←",
+        "arrowright" => "→",
+        _ => return key.to_uppercase(),
+    };
+    symbol.to_string()
 }
 
 /// A global hotkey as the operating system reads it. Unlike an action
@@ -164,6 +182,14 @@ mod tests {
     #[test]
     fn a_hotkey_reads_with_the_windows_names() {
         assert_eq!(hotkey_label(&ctrl_alt_v()), "Ctrl+Alt+V");
+    }
+
+    #[test]
+    fn a_shortcut_draws_named_keys_as_symbols() {
+        assert_eq!(shortcut_key("Enter"), "↵");
+        assert_eq!(shortcut_key("arrowdown"), "↓");
+        assert_eq!(shortcut_key("r"), "R");
+        assert_eq!(shortcut_key("f5"), "F5");
     }
 
     #[test]
