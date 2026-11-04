@@ -10,7 +10,7 @@
 
 ## 3. Code
 
-- [ ] 3.1 In one commit, apply the substring rules to `src/`, `ui/` and `tools/dango-ui-mcp/src/`: identifiers, Slint properties and enums, comments, the log line, test names; `git mv` `ui/shell/toast.slint` to `ticker.slint`, `ui/shell/hud.slint` to `notice.slint`, `src/slint_shell/render/hud.rs` to `notice.rs`. Check: `rg -i "toast|hud" src ui tools/dango-ui-mcp/src` finds nothing; `cargo test` and `mise run check` pass
+- [x] 3.1 In one commit, apply the substring rules to `src/`, `ui/` and `tools/dango-ui-mcp/src/`: identifiers, Slint properties and enums, comments, the log line, test names; `git mv` `ui/shell/toast.slint` to `ticker.slint`, `ui/shell/hud.slint` to `notice.slint`, `src/slint_shell/render/hud.rs` to `notice.rs`. Check: `rg -i "toast|hud" src ui tools/dango-ui-mcp/src` finds nothing; `cargo test` and `mise run check` pass
 - [ ] 3.2 macOS: CI's macOS job passes after the author pushes
 
 ## 4. Review

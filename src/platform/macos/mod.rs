@@ -39,7 +39,7 @@ use objc2_app_kit::{
 use objc2_foundation::{MainThreadMarker, NSPoint};
 use raw_window_handle::RawWindowHandle;
 
-use super::{HudWindow, LauncherWindow, RunningApp, SystemControl, SystemError};
+use super::{LauncherWindow, NoticeWindow, RunningApp, SystemControl, SystemError};
 
 /// Whether the Accessibility permission has been granted. macOS gates every
 /// route into another application behind it: key synthesis, reading the
@@ -131,8 +131,8 @@ pub(super) fn focused_field_is_secure() -> bool {
 /// it.
 const NS_POPUP_MENU_WINDOW_LEVEL: isize = 101;
 
-/// Above the launcher, so a HUD shown as the launcher hides is never under it.
-const HUD_WINDOW_LEVEL: isize = NS_POPUP_MENU_WINDOW_LEVEL + 1;
+/// Above the launcher, so a notice shown as the launcher hides is never under it.
+const NOTICE_WINDOW_LEVEL: isize = NS_POPUP_MENU_WINDOW_LEVEL + 1;
 
 pub struct MacLauncherWindow;
 
@@ -195,9 +195,9 @@ impl LauncherWindow for MacLauncherWindow {
     }
 }
 
-pub struct MacHudWindow;
+pub struct MacNoticeWindow;
 
-impl HudWindow for MacHudWindow {
+impl NoticeWindow for MacNoticeWindow {
     /// A plain NSPanel, not the launcher's class: that one can become key and
     /// records it in `PANEL_IS_KEY`. A borderless NSPanel never becomes key.
     fn attach(&mut self, window: RawWindowHandle) {
@@ -211,7 +211,7 @@ impl HudWindow for MacHudWindow {
                 | NSWindowCollectionBehavior::IgnoresCycle
                 | NSWindowCollectionBehavior::Stationary,
         );
-        ns_window.setLevel(HUD_WINDOW_LEVEL);
+        ns_window.setLevel(NOTICE_WINDOW_LEVEL);
         ns_window.setHidesOnDeactivate(false);
     }
 
@@ -224,14 +224,14 @@ impl HudWindow for MacHudWindow {
         let area = screen.visibleFrame();
         let size = ns_window.frame().size;
         let x = area.origin.x + (area.size.width - size.width) / 2.0;
-        let y = area.origin.y + super::HUD_MARGIN;
+        let y = area.origin.y + super::NOTICE_MARGIN;
         ns_window.setFrameOrigin(NSPoint::new(x, y));
     }
 
     /// The toolkit reapplies its own always-on-top level on show.
     fn did_show(&self, window: RawWindowHandle) {
         if let Some(ns_window) = ns_window(window) {
-            ns_window.setLevel(HUD_WINDOW_LEVEL);
+            ns_window.setLevel(NOTICE_WINDOW_LEVEL);
         }
     }
 }

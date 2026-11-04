@@ -199,7 +199,7 @@ impl Proxy {
         if let Some(handle) = arguments.get("windowHandle") {
             return Ok(handle.clone());
         }
-        // The HUD is a window too, and lists first once it has shown. The
+        // The notice is a window too, and lists first once it has shown. The
         // launcher is always the taller one.
         let windows = self.call("list_windows", json!({})).await?;
         let mut tallest: Option<(f64, Value)> = None;

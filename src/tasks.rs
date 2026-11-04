@@ -1,6 +1,6 @@
 //! Long jobs that outlive the view that started them. Work reports through a
 //! handle; every report reaches the launcher, which shows the job in its
-//! progress view, as a busy toast elsewhere, or as a result toast later.
+//! progress view, as a busy ticker elsewhere, or as a result ticker later.
 
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
@@ -24,7 +24,7 @@ pub struct TaskState {
     /// The extension that runs it, whose actions cancel and retry it.
     pub owner: String,
     pub title: String,
-    /// What the busy toast says while it runs.
+    /// What the busy ticker says while it runs.
     pub line: String,
     pub status: TaskStatus,
     /// From 0 to 1; none when the total is unknown.
@@ -35,7 +35,7 @@ pub struct TaskState {
     /// The owner's action ids, run through the owner like any action.
     pub cancel: Option<String>,
     pub retry: Option<String>,
-    /// Shows what a finished task kept, offered on its success toast.
+    /// Shows what a finished task kept, offered on its success ticker.
     pub show: Option<String>,
     /// Which of the owner's items the actions apply to.
     pub item_id: String,
@@ -44,7 +44,7 @@ pub struct TaskState {
 #[derive(Clone, Debug, PartialEq)]
 pub enum TaskStatus {
     Running,
-    /// Waiting for the user, with what a toast says about it.
+    /// Waiting for the user, with what a ticker says about it.
     NeedsInput {
         sentence: String,
     },

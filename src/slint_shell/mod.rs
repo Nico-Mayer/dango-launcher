@@ -35,18 +35,18 @@ use crate::extensions::updates;
 use crate::platform::{self, LauncherWindow as PlatformWindow, Permission, RawWindowHandle};
 use crate::shell::{Shell, TrayCommand, TrayStatus};
 use crate::ui::{self, Intent};
-use generated::{HudWindow, LauncherWindow, Tray};
-use render::hud::Change;
+use generated::{LauncherWindow, NoticeWindow, Tray};
+use render::notice::Change;
 use render::Renderer;
 
 thread_local! {
     /// Lives on the UI thread, as the component does.
     static RENDERER: RefCell<Option<Rc<RefCell<Renderer>>>> = const { RefCell::new(None) };
-    /// The id of the HUD on screen.
-    static HUD_SHOWN: Cell<Option<u64>> = const { Cell::new(None) };
-    /// Set while the HUD window is created, so the attributes hook can tell it
+    /// The id of the notice on screen.
+    static NOTICE_SHOWN: Cell<Option<u64>> = const { Cell::new(None) };
+    /// Set while the notice window is created, so the attributes hook can tell it
     /// from the launcher: the hook runs before Slint gives a window its title.
-    static CREATING_HUD: Cell<bool> = const { Cell::new(false) };
+    static CREATING_NOTICE: Cell<bool> = const { Cell::new(false) };
 }
 
 type Platform = Arc<Mutex<Box<dyn PlatformWindow>>>;
@@ -56,13 +56,13 @@ struct SlintShell {
     tray: slint::Weak<Tray>,
     platform: Platform,
     attached: AtomicBool,
-    hud: Hud,
+    notice: Notice,
 }
 
 #[derive(Clone)]
-struct Hud {
-    window: slint::Weak<HudWindow>,
-    platform: Arc<Mutex<Box<dyn platform::HudWindow>>>,
+struct Notice {
+    window: slint::Weak<NoticeWindow>,
+    platform: Arc<Mutex<Box<dyn platform::NoticeWindow>>>,
     attached: Arc<AtomicBool>,
 }
 
@@ -79,27 +79,27 @@ fn handle(window: &slint::Window) -> Option<RawWindowHandle> {
     Some(window.window_handle().window_handle().ok()?.as_raw())
 }
 
-impl Hud {
-    fn update(&self, hud: Option<&ui::snapshot::Hud>) {
+impl Notice {
+    fn update(&self, notice: Option<&ui::snapshot::Notice>) {
         let Some(window) = self.window.upgrade() else {
             return;
         };
-        match (render::hud::change(HUD_SHOWN.get(), hud), hud) {
-            (Some(Change::Show), Some(hud)) => {
-                render::hud::write(&window, hud);
+        match (render::notice::change(NOTICE_SHOWN.get(), notice), notice) {
+            (Some(Change::Show), Some(notice)) => {
+                render::notice::write(&window, notice);
                 if self.show(&window) {
-                    HUD_SHOWN.set(Some(hud.id));
+                    NOTICE_SHOWN.set(Some(notice.id));
                 }
             }
             (Some(Change::Hide), _) => {
                 let _ = window.hide();
-                HUD_SHOWN.set(None);
+                NOTICE_SHOWN.set(None);
             }
             _ => {}
         }
     }
 
-    fn show(&self, window: &HudWindow) -> bool {
+    fn show(&self, window: &NoticeWindow) -> bool {
         let mut platform = self.platform.lock().unwrap();
         // The native window may not exist before the first show.
         let existing = handle(window.window());
@@ -108,7 +108,7 @@ impl Hud {
             platform.place(handle);
         }
         if let Err(error) = window.show() {
-            eprintln!("[dango] could not show the HUD: {error}");
+            eprintln!("[dango] could not show the notice: {error}");
             return false;
         }
         window.window().with_winit_window(|window| {
@@ -125,7 +125,7 @@ impl Hud {
         true
     }
 
-    fn attach_once(&self, platform: &mut dyn platform::HudWindow, handle: RawWindowHandle) {
+    fn attach_once(&self, platform: &mut dyn platform::NoticeWindow, handle: RawWindowHandle) {
         if !self.attached.swap(true, Ordering::Relaxed) {
             platform.attach(handle);
         }
@@ -136,10 +136,10 @@ impl Shell for SlintShell {
     fn publish(&self, snapshot: &ui::Snapshot) {
         let window = self.window.clone();
         let platform = self.platform.clone();
-        let hud = self.hud.clone();
+        let notice = self.notice.clone();
         let snapshot = snapshot.clone();
         let _ = slint::invoke_from_event_loop(move || {
-            hud.update(snapshot.hud.as_ref());
+            notice.update(snapshot.notice.as_ref());
             let Some(window) = window.upgrade() else {
                 return;
             };
@@ -245,7 +245,7 @@ fn select_backend() -> Result<(), slint::PlatformError> {
     let selector = slint::BackendSelector::new()
         .backend_name("winit".into())
         .with_winit_window_attributes_hook(|attributes| {
-            if CREATING_HUD.get() {
+            if CREATING_NOTICE.get() {
                 attributes.with_active(false)
             } else {
                 attributes
@@ -282,7 +282,7 @@ pub fn run() {
 
     select_backend().expect("the winit backend");
     let window = LauncherWindow::new().expect("the launcher window");
-    let hud = create_hud();
+    let notice = create_notice();
     let tray = Tray::new().expect("the tray icon");
     tray.set_image(tray_icon());
     tray.set_hint("Dango".into());
@@ -295,9 +295,9 @@ pub fn run() {
         tray: tray.as_weak(),
         platform: Arc::new(Mutex::new(platform::launcher_window())),
         attached: AtomicBool::new(false),
-        hud: Hud {
-            window: hud.as_weak(),
-            platform: Arc::new(Mutex::new(platform::hud_window())),
+        notice: Notice {
+            window: notice.as_weak(),
+            platform: Arc::new(Mutex::new(platform::notice_window())),
             attached: Arc::new(AtomicBool::new(false)),
         },
     });
@@ -337,18 +337,18 @@ pub fn run() {
         eprintln!("[dango] the event loop stopped: {error}");
     }
     drop(window);
-    drop(hud);
+    drop(notice);
     drop(tray);
 }
 
 /// Slint makes a window's adapter, and with it the winit attributes, on first
 /// use rather than in `new`, so the window is touched while the flag is set.
-fn create_hud() -> HudWindow {
-    CREATING_HUD.set(true);
-    let hud = HudWindow::new().expect("the HUD window");
-    let _ = hud.window().scale_factor();
-    CREATING_HUD.set(false);
-    hud
+fn create_notice() -> NoticeWindow {
+    CREATING_NOTICE.set(true);
+    let notice = NoticeWindow::new().expect("the notice window");
+    let _ = notice.window().scale_factor();
+    CREATING_NOTICE.set(false);
+    notice
 }
 
 fn connect(

@@ -2,12 +2,12 @@ import { Theme } from "../theme.slint";
 import { Icon, IconKind } from "../atoms/icon.slint";
 import { Kbd } from "../atoms/kbd.slint";
 import { Intents, Shell } from "../globals.slint";
-import { Toast } from "toast.slint";
+import { Ticker } from "ticker.slint";
 
-/// Where the user is, or a toast, and what Enter does.
+/// Where the user is, or a ticker, and what Enter does.
 export component ActionBar inherits Rectangle {
-    /// The toast does not fit and is cut off.
-    out property <bool> toast-cut: toast.cut;
+    /// The ticker does not fit and is cut off.
+    out property <bool> ticker-cut: ticker.cut;
     height: Theme.action-bar-height;
     background: Theme.chrome;
 
@@ -22,19 +22,19 @@ export component ActionBar inherits Rectangle {
         padding-right: 12px;
         spacing: 12px;
 
-        // Not a layout: a hidden element keeps its place in one, so the toast
+        // Not a layout: a hidden element keeps its place in one, so the ticker
         // and the context would split the width.
         Rectangle {
             horizontal-stretch: 1;
 
-            toast := Toast {
-                visible: Shell.toast-shown;
+            ticker := Ticker {
+                visible: Shell.ticker-shown;
                 width: parent.width;
                 height: parent.height;
             }
 
             HorizontalLayout {
-                visible: !Shell.toast-shown;
+                visible: !Shell.ticker-shown;
                 spacing: Theme.gap;
                 if Shell.context-icon-kind != IconKind.none: VerticalLayout {
                     alignment: center;

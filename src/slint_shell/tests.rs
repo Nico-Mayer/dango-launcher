@@ -605,14 +605,14 @@ mod action_bar {
     }
 }
 
-mod toast {
+mod ticker {
     use super::*;
     use crate::extension::ActionOutcome;
     use crate::ui::{ActionRequest, Origin};
 
-    fn toast(h: &Harness) -> ElementHandle {
-        let text = h.shell().get_toast_text();
-        h.find(&text).expect("the toast")
+    fn ticker(h: &Harness) -> ElementHandle {
+        let text = h.shell().get_ticker_text();
+        h.find(&text).expect("the ticker")
     }
 
     fn request() -> ActionRequest {
@@ -627,7 +627,7 @@ mod toast {
     }
 
     #[test]
-    fn a_busy_toast_says_what_is_running() {
+    fn a_busy_ticker_says_what_is_running() {
         let mut command = result(1);
         command.title = "Clipboard History".into();
         command.actions.clear();
@@ -638,11 +638,11 @@ mod toast {
         );
         h.wake_busy();
         assert_eq!(
-            h.shell().get_toast_style(),
-            super::super::generated::ToastStyle::Busy
+            h.shell().get_ticker_style(),
+            super::super::generated::TickerStyle::Busy
         );
         assert!(h.find("Running Clipboard History…").is_some());
-        let spinner = h.find("Working").expect("the busy toast's spinner");
+        let spinner = h.find("Working").expect("the busy ticker's spinner");
         assert_eq!(
             spinner.accessible_role(),
             Some(i_slint_backend_testing::AccessibleRole::ProgressIndicator)
@@ -650,32 +650,32 @@ mod toast {
     }
 
     #[test]
-    fn a_success_toast_replaces_the_context() {
+    fn a_success_ticker_replaces_the_context() {
         let h = Harness::root(results(3));
         h.view(views::list_tree());
         h.event(Event::ActionFinished {
             request: request(),
-            outcome: ActionOutcome::Toast("Entry pinned".into()),
+            outcome: ActionOutcome::Ticker("Entry pinned".into()),
         });
-        assert!(h.shell().get_toast_shown());
+        assert!(h.shell().get_ticker_shown());
         assert_eq!(
-            h.shell().get_toast_style(),
-            super::super::generated::ToastStyle::Success
+            h.shell().get_ticker_style(),
+            super::super::generated::TickerStyle::Success
         );
         assert!(h.find("Entry pinned").is_some());
         assert!(h.find("Fixture Command").is_none());
     }
 
     #[test]
-    fn a_failure_toast_says_it_failed() {
+    fn a_failure_ticker_says_it_failed() {
         let h = Harness::root(results(3));
         h.event(Event::Failed("That command is no longer available".into()));
         assert_eq!(
-            h.shell().get_toast_style(),
-            super::super::generated::ToastStyle::Failure
+            h.shell().get_ticker_style(),
+            super::super::generated::TickerStyle::Failure
         );
         assert_eq!(
-            toast(&h).accessible_description().as_deref(),
+            ticker(&h).accessible_description().as_deref(),
             Some("Failed")
         );
     }
@@ -696,14 +696,14 @@ mod toast {
         ] {
             h.event(Event::Failed(message.into()));
             assert!(h.shell().get_panel_hint());
-            assert!(!h.ui.get_toast_cut(), "{message} is cut off");
+            assert!(!h.ui.get_ticker_cut(), "{message} is cut off");
         }
         h.event(Event::Failed("Too long ".repeat(20)));
-        assert!(h.ui.get_toast_cut(), "the measure sees a cut");
+        assert!(h.ui.get_ticker_cut(), "the measure sees a cut");
     }
 
     #[test]
-    fn typing_reaches_the_search_bar_while_a_toast_shows() {
+    fn typing_reaches_the_search_bar_while_a_ticker_shows() {
         let h = Harness::root(results(3));
         h.event(Event::Failed("That command is no longer available".into()));
         h.type_text("res");
@@ -944,10 +944,10 @@ mod list_view {
             tray: slint::Weak::default(),
             platform: std::sync::Arc::new(std::sync::Mutex::new(Box::new(NoPlatform))),
             attached: Default::default(),
-            hud: super::super::Hud {
+            notice: super::super::Notice {
                 window: slint::Weak::default(),
                 platform: std::sync::Arc::new(std::sync::Mutex::new(Box::new(
-                    super::hud::NoPlatform,
+                    super::notice::NoPlatform,
                 ))),
                 attached: Default::default(),
             },
@@ -1712,18 +1712,18 @@ mod bare_pill {
     }
 
     #[test]
-    fn a_toast_shows_at_the_pills_end_without_resizing() {
+    fn a_ticker_shows_at_the_pills_end_without_resizing() {
         let h = bare();
         h.event(Event::Failed("Couldn't paste".into()));
-        let toast = h.find("Couldn't paste").expect("the toast on the pill");
+        let ticker = h.find("Couldn't paste").expect("the ticker on the pill");
         let pill = h.find("Search bar").expect("the pill");
-        assert!(toast.absolute_position().y < pill.size().height);
-        assert_eq!(toast.accessible_description().as_deref(), Some("Failed"));
+        assert!(ticker.absolute_position().y < pill.size().height);
+        assert_eq!(ticker.accessible_description().as_deref(), Some("Failed"));
         assert_eq!(h.height(), 52.0);
     }
 
     #[test]
-    fn opening_the_card_moves_the_toast_into_the_action_bar() {
+    fn opening_the_card_moves_the_ticker_into_the_action_bar() {
         let h = bare();
         h.event(Event::Task(Box::new(crate::tasks::TaskState {
             id: 1,
@@ -1742,10 +1742,10 @@ mod bare_pill {
         })));
         h.wake_busy();
         let pill = h.find("Search bar").expect("the pill").size().height;
-        let on_pill = h.find("Downloading Dango 0.5.1").expect("the toast");
+        let on_pill = h.find("Downloading Dango 0.5.1").expect("the ticker");
         assert!(on_pill.absolute_position().y < pill);
         h.arrow_down();
-        let in_bar = h.find("Downloading Dango 0.5.1").expect("the toast");
+        let in_bar = h.find("Downloading Dango 0.5.1").expect("the ticker");
         assert!(in_bar.absolute_position().y > pill);
     }
 }
@@ -2067,20 +2067,20 @@ mod tray {
     }
 }
 
-mod hud {
-    use super::super::generated::{HudWindow, ToastStyle as SlintToastStyle};
-    use super::super::render::hud;
+mod notice {
+    use super::super::generated::{NoticeWindow, TickerStyle as SlintTickerStyle};
+    use super::super::render::notice;
     use super::*;
-    use crate::ui::snapshot::Hud;
-    use crate::ui::ToastStyle;
+    use crate::ui::snapshot::Notice;
+    use crate::ui::TickerStyle;
 
-    fn shown(style: ToastStyle, text: &str) -> HudWindow {
+    fn shown(style: TickerStyle, text: &str) -> NoticeWindow {
         i_slint_backend_testing::init_no_event_loop();
-        let ui = HudWindow::new().unwrap();
+        let ui = NoticeWindow::new().unwrap();
         ui.show().unwrap();
-        hud::write(
+        notice::write(
             &ui,
-            &Hud {
+            &Notice {
                 id: 1,
                 style,
                 text: text.into(),
@@ -2093,73 +2093,73 @@ mod hud {
     /// reached.
     pub(super) struct NoPlatform;
 
-    impl crate::platform::HudWindow for NoPlatform {
+    impl crate::platform::NoticeWindow for NoPlatform {
         fn place(&self, _window: crate::platform::RawWindowHandle) {}
     }
 
     #[test]
-    fn the_shell_shows_a_new_hud_and_hides_a_gone_one() {
+    fn the_shell_shows_a_new_notice_and_hides_a_gone_one() {
         i_slint_backend_testing::init_no_event_loop();
-        let ui = HudWindow::new().unwrap();
-        let shell_hud = super::super::Hud {
+        let ui = NoticeWindow::new().unwrap();
+        let shell_notice = super::super::Notice {
             window: ui.as_weak(),
             platform: std::sync::Arc::new(std::sync::Mutex::new(Box::new(NoPlatform))),
             attached: Default::default(),
         };
-        let copied = Hud {
+        let copied = Notice {
             id: 7,
-            style: ToastStyle::Success,
+            style: TickerStyle::Success,
             text: "Copied to clipboard".into(),
         };
-        shell_hud.update(Some(&copied));
+        shell_notice.update(Some(&copied));
         assert!(ui.window().is_visible());
         assert_eq!(ui.get_text(), "Copied to clipboard");
-        shell_hud.update(Some(&Hud {
+        shell_notice.update(Some(&Notice {
             id: 8,
-            style: ToastStyle::Failure,
+            style: TickerStyle::Failure,
             text: "Nope".into(),
         }));
         assert_eq!(ui.get_text(), "Nope");
-        assert_eq!(ui.get_style(), SlintToastStyle::Failure);
-        shell_hud.update(None);
+        assert_eq!(ui.get_style(), SlintTickerStyle::Failure);
+        shell_notice.update(None);
         assert!(!ui.window().is_visible());
-        super::super::HUD_SHOWN.set(None);
+        super::super::NOTICE_SHOWN.set(None);
     }
 
-    fn label(ui: &HudWindow, text: &str) -> ElementHandle {
+    fn label(ui: &NoticeWindow, text: &str) -> ElementHandle {
         ElementHandle::find_by_accessible_label(ui, text)
             .next()
             .unwrap_or_else(|| panic!("no element labelled {text}"))
     }
 
     #[test]
-    fn a_failure_hud_says_it_failed() {
+    fn a_failure_notice_says_it_failed() {
         let ui = shown(
-            ToastStyle::Failure,
+            TickerStyle::Failure,
             "Dango can't move administrator windows",
         );
-        assert_eq!(ui.get_style(), SlintToastStyle::Failure);
+        assert_eq!(ui.get_style(), SlintTickerStyle::Failure);
         let text = label(&ui, "Dango can't move administrator windows");
         assert_eq!(text.accessible_description().as_deref(), Some("Failed"));
     }
 
     #[test]
-    fn a_success_hud_shows_its_text() {
-        let ui = shown(ToastStyle::Success, "Copied to clipboard");
-        assert_eq!(ui.get_style(), SlintToastStyle::Success);
+    fn a_success_notice_shows_its_text() {
+        let ui = shown(TickerStyle::Success, "Copied to clipboard");
+        assert_eq!(ui.get_style(), SlintTickerStyle::Success);
         let text = label(&ui, "Copied to clipboard");
         assert_eq!(text.accessible_description().as_deref(), Some(""));
     }
 
     #[test]
-    fn the_longest_failures_fit_the_hud() {
-        let ui = shown(ToastStyle::Failure, "");
-        let write = |ui: &HudWindow, text: &str| {
-            hud::write(
+    fn the_longest_failures_fit_the_notice() {
+        let ui = shown(TickerStyle::Failure, "");
+        let write = |ui: &NoticeWindow, text: &str| {
+            notice::write(
                 ui,
-                &Hud {
+                &Notice {
                     id: 1,
-                    style: ToastStyle::Failure,
+                    style: TickerStyle::Failure,
                     text: text.into(),
                 },
             )
@@ -2235,14 +2235,14 @@ mod progress_view {
     }
 }
 
-mod toast_action {
+mod ticker_action {
     use super::super::keys;
     use super::*;
     use crate::protocol::{Modifier, Shortcut};
-    use crate::ui::{ActionRequest, Origin, ToastAction};
+    use crate::ui::{ActionRequest, Origin, TickerAction};
 
     #[test]
-    fn a_toast_chord_is_as_wide_as_its_keys() {
+    fn a_ticker_chord_is_as_wide_as_its_keys() {
         let h = Harness::root(results(3));
         h.event(Event::Failed("Couldn't download the update.".into()));
         let mut snapshot = h.launcher.borrow().snapshot();
@@ -2250,8 +2250,8 @@ mod toast_action {
             key: "r".into(),
             modifiers: vec![Modifier::Cmd],
         };
-        if let Some(toast) = snapshot.toast.as_mut() {
-            toast.action = Some(ToastAction {
+        if let Some(ticker) = snapshot.ticker.as_mut() {
+            ticker.action = Some(TickerAction {
                 title: "Retry".into(),
                 shortcut: retry.clone(),
                 request: ActionRequest {
@@ -2266,9 +2266,9 @@ mod toast_action {
         }
         h.publish(snapshot);
         let keys = keys::shortcut_label(&retry);
-        let in_toast = ElementHandle::find_by_element_type_name(&h.ui, "Kbd")
+        let in_ticker = ElementHandle::find_by_element_type_name(&h.ui, "Kbd")
             .find(|kbd| kbd.accessible_label().as_deref() == Some(keys.as_str()))
-            .expect("the toast's chord")
+            .expect("the ticker's chord")
             .size()
             .width;
         let gallery = super::super::generated::AtomGallery::new().unwrap();
@@ -2279,11 +2279,11 @@ mod toast_action {
             .expect("the chord on its own")
             .size()
             .width;
-        assert_eq!(in_toast, alone);
+        assert_eq!(in_ticker, alone);
     }
 
     #[test]
-    fn a_failure_toast_shows_its_action_and_chord() {
+    fn a_failure_ticker_shows_its_action_and_chord() {
         let h = Harness::root(results(3));
         h.event(Event::Failed("Couldn't download the update.".into()));
         let mut snapshot = h.launcher.borrow().snapshot();
@@ -2291,8 +2291,8 @@ mod toast_action {
             key: "r".into(),
             modifiers: vec![Modifier::Cmd],
         };
-        if let Some(toast) = snapshot.toast.as_mut() {
-            toast.action = Some(ToastAction {
+        if let Some(ticker) = snapshot.ticker.as_mut() {
+            ticker.action = Some(TickerAction {
                 title: "Retry".into(),
                 shortcut: shortcut.clone(),
                 request: ActionRequest {
@@ -2307,11 +2307,11 @@ mod toast_action {
         }
         h.publish(snapshot);
         let chord = keys::shortcut_label(&shortcut);
-        assert_eq!(h.shell().get_toast_action_label(), "Retry");
-        assert_eq!(h.shell().get_toast_action_keys(), chord.as_str());
-        let toast = h.find("Couldn't download the update.").expect("the toast");
+        assert_eq!(h.shell().get_ticker_action_label(), "Retry");
+        assert_eq!(h.shell().get_ticker_action_keys(), chord.as_str());
+        let ticker = h.find("Couldn't download the update.").expect("the ticker");
         assert_eq!(
-            toast.accessible_description().as_deref(),
+            ticker.accessible_description().as_deref(),
             Some(format!("Failed. Retry, {chord}").as_str())
         );
     }

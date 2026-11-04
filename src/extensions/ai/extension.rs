@@ -259,7 +259,7 @@ impl Inner {
                 task.report(|state| state.status = TaskStatus::Cancelled);
             }
             Ended::Answer(answer) if away => self.finish_away(command, &answer, &task, held),
-            // In view the answer reports itself, so the task ends without a toast.
+            // In view the answer reports itself, so the task ends without a ticker.
             Ended::Answer(answer) => {
                 self.deliver(command.output, &answer, &view.ctx);
                 task.report(|state| state.status = TaskStatus::Cancelled);

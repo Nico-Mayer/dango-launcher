@@ -131,7 +131,7 @@ pub enum Event {
     Reset,
     /// The launcher is off screen, for whatever reason it was hidden.
     Hidden,
-    ToastExpired {
+    TickerExpired {
         id: u64,
     },
     BusyMarksWoke {

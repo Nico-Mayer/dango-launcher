@@ -2,7 +2,7 @@ import { Theme } from "../theme.slint";
 import { Progress, ProgressKind } from "../atoms/progress.slint";
 import { Icon, IconKind } from "../atoms/icon.slint";
 import { Intents, Search, Shell } from "../globals.slint";
-import { Toast } from "toast.slint";
+import { Ticker } from "ticker.slint";
 
 /// The query for a list, or the command's title for a detail or form.
 export component SearchBar inherits Rectangle {
@@ -112,7 +112,7 @@ export component SearchBar inherits Rectangle {
             }
         }
 
-        if !Shell.card-shown && Shell.toast-shown: Toast {
+        if !Shell.card-shown && Shell.ticker-shown: Ticker {
             horizontal-stretch: 0;
             max-width: root.width / 2;
         }

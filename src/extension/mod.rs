@@ -35,7 +35,7 @@ pub enum ActionOutcome {
     Replaced(Box<crate::protocol::ViewTree>),
     Removed(Box<crate::protocol::ViewTree>),
     /// The action succeeded and the launcher stays open, saying so in one line.
-    Toast(String),
+    Ticker(String),
     Failed(String),
     /// Leave the view the action ran in, as Escape does, while the work it
     /// shows goes on elsewhere.

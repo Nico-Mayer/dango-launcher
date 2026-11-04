@@ -218,19 +218,19 @@ impl Harness {
         self.launcher.snapshot()
     }
 
-    fn toast(&self, style: ToastStyle) -> Option<String> {
+    fn ticker(&self, style: TickerStyle) -> Option<String> {
         self.snapshot()
-            .toast
-            .filter(|toast| toast.style == style)
-            .map(|toast| toast.text)
+            .ticker
+            .filter(|ticker| ticker.style == style)
+            .map(|ticker| ticker.text)
     }
 
     fn failure(&self) -> Option<String> {
-        self.toast(ToastStyle::Failure)
+        self.ticker(TickerStyle::Failure)
     }
 
     fn status(&self) -> String {
-        self.toast(ToastStyle::Busy).unwrap_or_default()
+        self.ticker(TickerStyle::Busy).unwrap_or_default()
     }
 
     fn root_screen(&self) -> RootScreen {
@@ -1907,7 +1907,7 @@ fn bindings_hold_the_shortcuts_of_the_current_selection() {
 }
 
 #[test]
-fn a_failure_around_a_hide_goes_to_the_hud_either_way_round() {
+fn a_failure_around_a_hide_goes_to_the_notice_either_way_round() {
     for before_hide in [true, false] {
         let mut h = Harness::root(18);
         if before_hide {
@@ -1919,14 +1919,14 @@ fn a_failure_around_a_hide_goes_to_the_hud_either_way_round() {
             effects = h.event(Event::Failed("Couldn't paste".into()));
         }
         assert_eq!(
-            hud_text(&h).as_deref(),
+            notice_text(&h).as_deref(),
             Some("Couldn't paste"),
             "{before_hide}"
         );
         assert!(matches!(
             effects.as_slice(),
-            [Effect::ExpireToast {
-                style: ToastStyle::Failure,
+            [Effect::ExpireTicker {
+                style: TickerStyle::Failure,
                 ..
             }]
         ));
@@ -1937,17 +1937,17 @@ fn a_failure_around_a_hide_goes_to_the_hud_either_way_round() {
             asked: false,
         });
         assert!(h.failure().is_none(), "{before_hide}");
-        assert_eq!(hud_text(&h), None);
+        assert_eq!(notice_text(&h), None);
     }
 }
 
 #[test]
-fn a_failure_while_held_goes_to_the_hud_and_not_into_the_held_view() {
+fn a_failure_while_held_goes_to_the_notice_and_not_into_the_held_view() {
     let mut h = Harness::view(detail_tree("x"));
     h.event(Event::Hidden);
     h.event(Event::Failed("That command is no longer available".into()));
     assert_eq!(
-        hud_text(&h).as_deref(),
+        notice_text(&h).as_deref(),
         Some("That command is no longer available")
     );
     h.event(Event::Activated {
@@ -1960,7 +1960,7 @@ fn a_failure_while_held_goes_to_the_hud_and_not_into_the_held_view() {
 }
 
 #[test]
-fn a_running_command_shows_a_busy_toast_until_it_fails_or_resets() {
+fn a_running_command_shows_a_busy_ticker_until_it_fails_or_resets() {
     let mut h = Harness::root(18);
     let mut command = result(1);
     command.title = "Clipboard History".into();
@@ -1998,7 +1998,7 @@ fn a_hotkey_failure_while_held_keeps_the_running_status() {
     h.press("Enter");
     h.event(Event::Hidden);
     h.event(Event::HotkeyFailed("Can't open Zed".into()));
-    assert_eq!(hud_text(&h).as_deref(), Some("Can't open Zed"));
+    assert_eq!(notice_text(&h).as_deref(), Some("Can't open Zed"));
     h.event(Event::Activated {
         held: true,
         probe: None,
@@ -2079,46 +2079,46 @@ fn a_failed_action_shows_its_message() {
     assert_eq!(h.failure().as_deref(), Some("Nope"));
 }
 
-fn finish_with_toast(h: &mut Harness, text: &str) -> u64 {
+fn finish_with_ticker(h: &mut Harness, text: &str) -> u64 {
     h.press("Enter");
     let request = h.runs().last().unwrap().clone();
-    let effects = h.finish(request, ActionOutcome::Toast(text.into()));
+    let effects = h.finish(request, ActionOutcome::Ticker(text.into()));
     match effects.as_slice() {
-        [Effect::ExpireToast { id, .. }] => *id,
+        [Effect::ExpireTicker { id, .. }] => *id,
         other => panic!("expected one expiry, got {other:?}"),
     }
 }
 
 #[test]
-fn a_success_toast_shows_until_it_expires() {
+fn a_success_ticker_shows_until_it_expires() {
     let mut h = Harness::view(list_tree((1..=3).map(list_item).collect()));
-    let id = finish_with_toast(&mut h, "Entry pinned");
+    let id = finish_with_ticker(&mut h, "Entry pinned");
     assert_eq!(
-        h.toast(ToastStyle::Success).as_deref(),
+        h.ticker(TickerStyle::Success).as_deref(),
         Some("Entry pinned")
     );
     assert_eq!(h.launcher.stack.len(), 1);
-    h.event(Event::ToastExpired { id });
-    assert!(h.snapshot().toast.is_none());
+    h.event(Event::TickerExpired { id });
+    assert!(h.snapshot().ticker.is_none());
 }
 
 #[test]
-fn a_stale_expiry_leaves_a_newer_toast() {
+fn a_stale_expiry_leaves_a_newer_ticker() {
     let mut h = Harness::view(list_tree((1..=3).map(list_item).collect()));
-    let first = finish_with_toast(&mut h, "Entry pinned");
-    finish_with_toast(&mut h, "Entry unpinned");
-    h.event(Event::ToastExpired { id: first });
+    let first = finish_with_ticker(&mut h, "Entry pinned");
+    finish_with_ticker(&mut h, "Entry unpinned");
+    h.event(Event::TickerExpired { id: first });
     assert_eq!(
-        h.toast(ToastStyle::Success).as_deref(),
+        h.ticker(TickerStyle::Success).as_deref(),
         Some("Entry unpinned")
     );
 }
 
 #[test]
-fn a_failure_toast_stays_until_a_key() {
+fn a_failure_ticker_stays_until_a_key() {
     let mut h = Harness::view(list_tree((1..=3).map(list_item).collect()));
     h.event(Event::Failed("Nope".into()));
-    h.event(Event::ToastExpired { id: u64::MAX });
+    h.event(Event::TickerExpired { id: u64::MAX });
     assert_eq!(h.failure().as_deref(), Some("Nope"));
     h.press("ArrowDown");
     assert!(h.failure().is_none());
@@ -2214,7 +2214,7 @@ fn a_reset_does_not_abandon_the_running_command() {
     assert!(matches!(h.view_body(), ViewBody::Detail(_)));
 }
 
-// HUD
+// Notice
 
 fn copy_from_root(h: &mut Harness) -> Vec<Effect> {
     h.press("Enter");
@@ -2222,80 +2222,80 @@ fn copy_from_root(h: &mut Harness) -> Vec<Effect> {
     h.finish(request, ActionOutcome::CopyToClipboard("x".into()))
 }
 
-fn hud_text(h: &Harness) -> Option<String> {
-    h.snapshot().hud.map(|hud| hud.text)
+fn notice_text(h: &Harness) -> Option<String> {
+    h.snapshot().notice.map(|notice| notice.text)
 }
 
-fn hud_expiry(effects: &[Effect]) -> u64 {
+fn notice_expiry(effects: &[Effect]) -> u64 {
     match effects {
-        [Effect::ExpireToast { id, .. }] => *id,
+        [Effect::ExpireTicker { id, .. }] => *id,
         other => panic!("expected one expiry, got {other:?}"),
     }
 }
 
 #[test]
-fn a_copy_dismisses_and_shows_its_hud_only_once_hidden() {
+fn a_copy_dismisses_and_shows_its_notice_only_once_hidden() {
     let mut h = Harness::root(3);
     let effects = copy_from_root(&mut h);
     assert_eq!(effects, vec![Effect::CopyText("x".into()), Effect::Dismiss]);
-    assert!(h.snapshot().toast.is_none());
-    assert_eq!(hud_text(&h), None);
+    assert!(h.snapshot().ticker.is_none());
+    assert_eq!(notice_text(&h), None);
     let effects = h.event(Event::Hidden);
-    let id = hud_expiry(&effects);
-    assert_eq!(hud_text(&h).as_deref(), Some("Copied to clipboard"));
+    let id = notice_expiry(&effects);
+    assert_eq!(notice_text(&h).as_deref(), Some("Copied to clipboard"));
     assert_eq!(
         effects,
-        vec![Effect::ExpireToast {
+        vec![Effect::ExpireTicker {
             id,
-            style: ToastStyle::Success
+            style: TickerStyle::Success
         }]
     );
-    h.event(Event::ToastExpired { id });
-    assert_eq!(hud_text(&h), None);
+    h.event(Event::TickerExpired { id });
+    assert_eq!(notice_text(&h), None);
 }
 
 #[test]
-fn an_action_that_copied_itself_dismisses_and_shows_the_copy_hud() {
+fn an_action_that_copied_itself_dismisses_and_shows_the_copy_notice() {
     let mut h = Harness::root(3);
     h.press("Enter");
     let request = h.runs().last().unwrap().clone();
     let effects = h.finish(request, ActionOutcome::Copied);
     assert_eq!(effects, vec![Effect::Dismiss]);
     h.event(Event::Hidden);
-    assert_eq!(hud_text(&h).as_deref(), Some("Copied to clipboard"));
+    assert_eq!(notice_text(&h).as_deref(), Some("Copied to clipboard"));
 }
 
 #[test]
-fn a_stale_expiry_leaves_a_newer_hud() {
+fn a_stale_expiry_leaves_a_newer_notice() {
     let mut h = Harness::root(3);
     copy_from_root(&mut h);
-    let first = hud_expiry(&h.event(Event::Hidden));
+    let first = notice_expiry(&h.event(Event::Hidden));
     h.event(Event::Activated {
         held: false,
         probe: None,
         asked: false,
     });
     copy_from_root(&mut h);
-    let second = hud_expiry(&h.event(Event::Hidden));
+    let second = notice_expiry(&h.event(Event::Hidden));
     assert_ne!(first, second);
-    h.event(Event::ToastExpired { id: first });
-    assert_eq!(hud_text(&h).as_deref(), Some("Copied to clipboard"));
-    assert_eq!(h.snapshot().hud.unwrap().id, second);
+    h.event(Event::TickerExpired { id: first });
+    assert_eq!(notice_text(&h).as_deref(), Some("Copied to clipboard"));
+    assert_eq!(h.snapshot().notice.unwrap().id, second);
 }
 
 #[test]
-fn a_newer_hud_replaces_the_one_showing() {
+fn a_newer_notice_replaces_the_one_showing() {
     let mut h = Harness::root(3);
     copy_from_root(&mut h);
-    let first = hud_expiry(&h.event(Event::Hidden));
+    let first = notice_expiry(&h.event(Event::Hidden));
     let effects = copy_from_root(&mut h);
-    let second = hud_expiry(&effects[2..]);
+    let second = notice_expiry(&effects[2..]);
     assert_ne!(first, second);
-    assert_eq!(h.snapshot().hud.unwrap().id, second);
+    assert_eq!(h.snapshot().notice.unwrap().id, second);
 }
 
 #[test]
-fn showing_the_launcher_removes_the_hud() {
+fn showing_the_launcher_removes_the_notice() {
     let mut h = Harness::root(3);
     copy_from_root(&mut h);
     h.event(Event::Hidden);
@@ -2304,9 +2304,9 @@ fn showing_the_launcher_removes_the_hud() {
         probe: None,
         asked: false,
     });
-    assert_eq!(hud_text(&h), None);
+    assert_eq!(notice_text(&h), None);
     h.event(Event::Hidden);
-    assert_eq!(hud_text(&h), None);
+    assert_eq!(notice_text(&h), None);
 }
 
 fn running(h: &mut Harness) {
@@ -2334,7 +2334,7 @@ fn marks_id(h: &Harness) -> Option<u64> {
 }
 
 #[test]
-fn a_fast_command_shows_no_busy_toast() {
+fn a_fast_command_shows_no_busy_ticker() {
     let mut h = Harness::new();
     running(&mut h);
     assert_eq!(h.status(), "", "nothing before the delay");
@@ -2526,12 +2526,12 @@ fn retry_request() -> ActionRequest {
     }
 }
 
-fn retry_toast(h: &mut Harness) {
-    h.launcher.toast = Some(super::state::HeldToast {
+fn retry_ticker(h: &mut Harness) {
+    h.launcher.ticker = Some(super::state::HeldTicker {
         id: 9_000,
-        style: ToastStyle::Failure,
+        style: TickerStyle::Failure,
         text: "Couldn't download the update. Check your connection and try again.".into(),
-        action: Some(ToastAction {
+        action: Some(TickerAction {
             title: "Retry".into(),
             shortcut: Shortcut {
                 key: "r".into(),
@@ -2543,9 +2543,9 @@ fn retry_toast(h: &mut Harness) {
 }
 
 #[test]
-fn a_toast_chord_runs_its_action_once_and_clears_it() {
+fn a_ticker_chord_runs_its_action_once_and_clears_it() {
     let mut h = Harness::root(3);
-    retry_toast(&mut h);
+    retry_ticker(&mut h);
     let effects = h.command("r");
     assert_eq!(effects, vec![Effect::RunAction(retry_request())]);
     assert!(h.failure().is_none());
@@ -2556,9 +2556,9 @@ fn a_toast_chord_runs_its_action_once_and_clears_it() {
 }
 
 #[test]
-fn another_key_clears_a_toast_without_running_its_action() {
+fn another_key_clears_a_ticker_without_running_its_action() {
     let mut h = Harness::root(3);
-    retry_toast(&mut h);
+    retry_ticker(&mut h);
     let effects = h.press("ArrowDown");
     assert!(h.failure().is_none());
     assert!(!effects
@@ -2567,7 +2567,7 @@ fn another_key_clears_a_toast_without_running_its_action() {
 }
 
 #[test]
-fn a_toast_chord_beats_an_item_action_with_the_same_chord() {
+fn a_ticker_chord_beats_an_item_action_with_the_same_chord() {
     let mut h = Harness::new();
     let mut item = result(1);
     item.actions.push(Action {
@@ -2580,7 +2580,7 @@ fn a_toast_chord_beats_an_item_action_with_the_same_chord() {
         ..Default::default()
     });
     h.results("", vec![item]);
-    retry_toast(&mut h);
+    retry_ticker(&mut h);
     assert!(h
         .snapshot()
         .bindings
@@ -2591,11 +2591,11 @@ fn a_toast_chord_beats_an_item_action_with_the_same_chord() {
 }
 
 #[test]
-fn the_panel_keeps_a_toast_chord_from_running() {
+fn the_panel_keeps_a_ticker_chord_from_running() {
     let mut h = Harness::root(3);
     h.command("k");
-    retry_toast(&mut h);
-    assert!(h.launcher.toast_action().is_none());
+    retry_ticker(&mut h);
+    assert!(h.launcher.ticker_action().is_none());
     let effects = h.command("r");
     assert!(!effects.contains(&Effect::RunAction(retry_request())));
 }
@@ -2639,7 +2639,7 @@ fn ready_task() -> crate::tasks::TaskStatus {
 }
 
 #[test]
-fn a_running_task_shows_in_the_busy_toast_at_root() {
+fn a_running_task_shows_in_the_busy_ticker_at_root() {
     let mut h = Harness::root(3);
     report(&mut h, task(1, running_task()));
     assert_eq!(h.status(), "", "the busy-mark delay applies");
@@ -2648,7 +2648,7 @@ fn a_running_task_shows_in_the_busy_toast_at_root() {
 }
 
 #[test]
-fn the_oldest_running_task_leads_the_busy_toast() {
+fn the_oldest_running_task_leads_the_busy_ticker() {
     let mut h = Harness::root(3);
     report(&mut h, task(1, running_task()));
     report(&mut h, task(2, running_task()));
@@ -2657,7 +2657,7 @@ fn the_oldest_running_task_leads_the_busy_toast() {
 }
 
 #[test]
-fn a_task_waiting_for_input_shows_no_busy_toast() {
+fn a_task_waiting_for_input_shows_no_busy_ticker() {
     let mut h = Harness::root(3);
     report(&mut h, task(1, running_task()));
     report(&mut h, task(1, ready_task()));
@@ -2670,8 +2670,8 @@ fn the_cancel_chord_runs_the_owner_s_cancel_action() {
     let mut h = Harness::root(3);
     report(&mut h, task(1, running_task()));
     h.wake_busy();
-    let toast = h.snapshot().toast.unwrap();
-    assert_eq!(toast.action.as_ref().unwrap().title, "Cancel");
+    let ticker = h.snapshot().ticker.unwrap();
+    assert_eq!(ticker.action.as_ref().unwrap().title, "Cancel");
     let effects = h.command(".");
     let Some(Effect::RunAction(request)) = effects.first() else {
         panic!("expected the cancel action, got {effects:?}");
@@ -2695,30 +2695,30 @@ fn a_running_task_draws_no_loading_bar_in_another_view() {
 }
 
 #[test]
-fn a_task_failing_while_hidden_shows_in_the_hud_and_on_the_next_open() {
+fn a_task_failing_while_hidden_shows_in_the_notice_and_on_the_next_open() {
     let mut h = Harness::root(3);
     report(&mut h, task(1, running_task()));
     h.event(Event::Hidden);
     report(&mut h, task(1, failed_task()));
-    assert!(hud_text(&h).is_some_and(|text| text.starts_with("Couldn't download")));
+    assert!(notice_text(&h).is_some_and(|text| text.starts_with("Couldn't download")));
     h.event(Event::Activated {
         held: false,
         probe: None,
         asked: false,
     });
-    let toast = h.snapshot().toast.unwrap();
-    assert_eq!(toast.style, ToastStyle::Failure);
-    assert_eq!(toast.action.unwrap().title, "Retry");
+    let ticker = h.snapshot().ticker.unwrap();
+    assert_eq!(ticker.style, TickerStyle::Failure);
+    assert_eq!(ticker.action.unwrap().title, "Retry");
 }
 
 #[test]
-fn a_task_ready_while_hidden_shows_a_success_toast_on_the_next_open() {
+fn a_task_ready_while_hidden_shows_a_success_ticker_on_the_next_open() {
     let mut h = Harness::root(3);
     report(&mut h, task(1, running_task()));
     h.event(Event::Hidden);
     report(&mut h, task(1, ready_task()));
     assert_eq!(
-        hud_text(&h).as_deref(),
+        notice_text(&h).as_deref(),
         Some("Dango 0.5.0 is ready to restart")
     );
     h.event(Event::Activated {
@@ -2727,13 +2727,13 @@ fn a_task_ready_while_hidden_shows_a_success_toast_on_the_next_open() {
         asked: false,
     });
     assert_eq!(
-        h.toast(ToastStyle::Success).as_deref(),
+        h.ticker(TickerStyle::Success).as_deref(),
         Some("Dango 0.5.0 is ready to restart")
     );
 }
 
 #[test]
-fn reopening_onto_the_task_s_own_view_shows_no_result_toast() {
+fn reopening_onto_the_task_s_own_view_shows_no_result_ticker() {
     let mut h = Harness::view(progress_tree());
     let own = |status| crate::tasks::TaskState {
         owner: "fixture".into(),
@@ -2751,12 +2751,12 @@ fn reopening_onto_the_task_s_own_view_shows_no_result_toast() {
 }
 
 #[test]
-fn a_task_ready_while_at_root_shows_a_toast_at_once() {
+fn a_task_ready_while_at_root_shows_a_ticker_at_once() {
     let mut h = Harness::root(3);
     report(&mut h, task(1, running_task()));
     report(&mut h, task(1, ready_task()));
     assert_eq!(
-        h.toast(ToastStyle::Success).as_deref(),
+        h.ticker(TickerStyle::Success).as_deref(),
         Some("Dango 0.5.0 is ready to restart")
     );
 }
@@ -2786,7 +2786,7 @@ fn a_task_s_lingering_marks_draw_no_loading_bar() {
         panic!("expected a view");
     };
     assert!(!view.busy);
-    assert!(h.snapshot().toast.unwrap().action.is_none());
+    assert!(h.snapshot().ticker.unwrap().action.is_none());
 }
 
 fn answer_item() -> ResultItem {
@@ -2921,9 +2921,9 @@ fn a_finished_task_offers_to_show_what_it_kept() {
             )
         },
     );
-    let toast = h.snapshot().toast.unwrap();
-    assert_eq!(toast.text, "Answer ready: Summarize");
-    let action = toast.action.expect("Show answer");
+    let ticker = h.snapshot().ticker.unwrap();
+    assert_eq!(ticker.text, "Answer ready: Summarize");
+    let action = ticker.action.expect("Show answer");
     assert_eq!(action.title, "Show answer");
     let effects = h.command("Enter");
     let Some(Effect::RunAction(request)) = effects.first() else {
@@ -2948,15 +2948,15 @@ fn answer_ready(id: u64) -> crate::tasks::TaskState {
 fn expires(effects: &[Effect]) -> bool {
     effects
         .iter()
-        .any(|effect| matches!(effect, Effect::ExpireToast { .. }))
+        .any(|effect| matches!(effect, Effect::ExpireTicker { .. }))
 }
 
 #[test]
-fn a_toast_with_an_action_waits_for_the_user() {
+fn a_ticker_with_an_action_waits_for_the_user() {
     let mut h = Harness::root(3);
     report(&mut h, task(1, running_task()));
     let effects = h.event(Event::Task(Box::new(answer_ready(1))));
-    assert!(!expires(&effects), "no timer on a toast you may act on");
+    assert!(!expires(&effects), "no timer on a ticker you may act on");
 
     let effects = h.press("ArrowDown");
     assert!(
@@ -2965,11 +2965,11 @@ fn a_toast_with_an_action_waits_for_the_user() {
             .any(|effect| matches!(effect, Effect::RunAction(_))),
         "another key does not run the action"
     );
-    assert!(h.snapshot().toast.is_none(), "but it clears the toast");
+    assert!(h.snapshot().ticker.is_none(), "but it clears the ticker");
 }
 
 #[test]
-fn a_toast_without_an_action_still_expires() {
+fn a_ticker_without_an_action_still_expires() {
     let mut h = Harness::root(3);
     report(&mut h, task(1, running_task()));
     let effects = h.event(Event::Task(Box::new(task(
@@ -2982,32 +2982,32 @@ fn a_toast_without_an_action_still_expires() {
 }
 
 #[test]
-fn a_task_finishing_while_hidden_shows_a_success_hud() {
+fn a_task_finishing_while_hidden_shows_a_success_notice() {
     let mut h = Harness::root(3);
     report(&mut h, task(1, running_task()));
     h.event(Event::Hidden);
     report(&mut h, answer_ready(1));
-    let hud = h.snapshot().hud.expect("a HUD");
-    assert_eq!(hud.style, ToastStyle::Success);
-    assert_eq!(hud.text, "Answer ready: Summarize");
+    let notice = h.snapshot().notice.expect("a notice");
+    assert_eq!(notice.style, TickerStyle::Success);
+    assert_eq!(notice.text, "Answer ready: Summarize");
 }
 
 #[test]
-fn a_task_finishing_in_view_shows_no_hud() {
+fn a_task_finishing_in_view_shows_no_notice() {
     let mut h = Harness::root(3);
     report(&mut h, task(1, running_task()));
     report(&mut h, answer_ready(1));
-    assert!(hud_text(&h).is_none());
+    assert!(notice_text(&h).is_none());
 }
 
 #[test]
-fn needing_input_again_shows_the_hud_once() {
+fn needing_input_again_shows_the_notice_once() {
     let mut h = Harness::root(3);
     report(&mut h, task(1, running_task()));
     h.event(Event::Hidden);
     let first = h.event(Event::Task(Box::new(task(1, ready_task()))));
     let again = h.event(Event::Task(Box::new(task(1, ready_task()))));
-    assert!(expires(&first), "the HUD shows and times out");
+    assert!(expires(&first), "the notice shows and times out");
     assert!(!expires(&again), "a repeated report shows nothing new");
 }
 
@@ -3033,28 +3033,28 @@ fn ran_show(effects: &[Effect]) -> usize {
 }
 
 #[test]
-fn opening_during_an_answer_s_hud_opens_the_answer() {
+fn opening_during_an_answer_s_notice_opens_the_answer() {
     let mut h = Harness::root(3);
     h.event(Event::Hidden);
     hidden_answer(&mut h);
     let effects = open(&mut h, false, true);
     assert_eq!(ran_show(&effects), 1);
-    assert!(h.snapshot().toast.is_none());
-    assert!(h.snapshot().hud.is_none());
+    assert!(h.snapshot().ticker.is_none());
+    assert!(h.snapshot().notice.is_none());
 }
 
 #[test]
-fn opening_after_an_answer_s_hud_shows_the_toast() {
+fn opening_after_an_answer_s_notice_shows_the_ticker() {
     let mut h = Harness::root(3);
     h.event(Event::Hidden);
     let shown = h.event(Event::Task(Box::new(answer_ready(1))));
-    h.event(Event::ToastExpired {
-        id: hud_expiry(&shown),
+    h.event(Event::TickerExpired {
+        id: notice_expiry(&shown),
     });
     let effects = open(&mut h, false, true);
     assert_eq!(ran_show(&effects), 0);
-    let toast = h.snapshot().toast.expect("the toast");
-    assert_eq!(toast.action.unwrap().title, "Show answer");
+    let ticker = h.snapshot().ticker.expect("the ticker");
+    assert_eq!(ticker.action.unwrap().title, "Show answer");
 }
 
 #[test]
@@ -3065,13 +3065,13 @@ fn a_command_showing_the_launcher_does_not_open_the_answer() {
     let effects = open(&mut h, false, false);
     assert_eq!(ran_show(&effects), 0);
     assert_eq!(
-        h.toast(ToastStyle::Success).as_deref(),
+        h.ticker(TickerStyle::Success).as_deref(),
         Some("Answer ready: Summarize")
     );
 }
 
 #[test]
-fn a_newer_hud_takes_the_answer_s_place() {
+fn a_newer_notice_takes_the_answer_s_place() {
     let mut h = Harness::root(3);
     h.event(Event::Hidden);
     hidden_answer(&mut h);
@@ -3111,24 +3111,24 @@ fn held_answer_view() -> Harness {
 fn reopening_held_onto_the_answer_s_own_view_shows_nothing_more() {
     let mut h = held_answer_view();
     let effects = open(&mut h, true, true);
-    assert_eq!(ran_show(&effects), 0, "its HUD still shows, yet no jump");
-    assert!(h.snapshot().toast.is_none());
+    assert_eq!(ran_show(&effects), 0, "its notice still shows, yet no jump");
+    assert!(h.snapshot().ticker.is_none());
 }
 
 #[test]
 fn after_a_reset_the_answer_is_offered_again() {
     let mut h = held_answer_view();
     h.event(Event::Reset);
-    let shown = h.snapshot().hud.is_some();
+    let shown = h.snapshot().notice.is_some();
     assert!(shown);
     let effects = open(&mut h, false, false);
     assert_eq!(ran_show(&effects), 0);
-    let toast = h.snapshot().toast.expect("the toast");
-    assert_eq!(toast.action.unwrap().title, "Show answer");
+    let ticker = h.snapshot().ticker.expect("the ticker");
+    assert_eq!(ticker.action.unwrap().title, "Show answer");
 }
 
 #[test]
-fn another_view_of_the_same_extension_still_gets_the_toast() {
+fn another_view_of_the_same_extension_still_gets_the_ticker() {
     let mut h = Harness::view(detail_tree("A form"));
     h.event(Event::Hidden);
     report(
@@ -3141,13 +3141,13 @@ fn another_view_of_the_same_extension_still_gets_the_toast() {
     );
     open(&mut h, true, false);
     assert_eq!(
-        h.toast(ToastStyle::Success).as_deref(),
+        h.ticker(TickerStyle::Success).as_deref(),
         Some("Answer ready: Summarize")
     );
 }
 
 #[test]
-fn leaving_a_running_task_s_view_shows_its_busy_toast() {
+fn leaving_a_running_task_s_view_shows_its_busy_ticker() {
     let mut tree = detail_tree("Bet");
     if let crate::protocol::View::Detail(detail) = &mut tree.view {
         detail.loading = true;
@@ -3164,7 +3164,7 @@ fn leaving_a_running_task_s_view_shows_its_busy_toast() {
     h.press("Escape");
     h.wake_busy();
     assert_eq!(
-        h.toast(ToastStyle::Busy).as_deref(),
+        h.ticker(TickerStyle::Busy).as_deref(),
         Some("Running Fixture Command…")
     );
 }

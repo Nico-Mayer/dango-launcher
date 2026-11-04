@@ -4,7 +4,7 @@ use crate::protocol::{
 
 use super::input::{Chord, Context, ResultItem};
 use super::state::{
-    Entry, Launcher, Mode, PushedView, ToastAction, ToastStyle, ViewError, FILTER_PREFIX,
+    Entry, Launcher, Mode, PushedView, TickerAction, TickerStyle, ViewError, FILTER_PREFIX,
 };
 
 macro_rules! snapshot_types {
@@ -25,9 +25,9 @@ snapshot_types! {
         /// focused control.
         pub bindings: Vec<Binding>,
         pub screen: Screen,
-        pub toast: Option<Toast>,
+        pub ticker: Option<Ticker>,
         /// Shown in its own window, only while the launcher is hidden.
-        pub hud: Option<Hud>,
+        pub notice: Option<Notice>,
         pub footer: Footer,
         pub panel: Panel,
     }
@@ -192,16 +192,16 @@ snapshot_types! {
         pub options: Vec<FieldOption>,
     }
 
-    pub struct Toast {
-        pub style: ToastStyle,
+    pub struct Ticker {
+        pub style: TickerStyle,
         pub text: String,
-        pub action: Option<ToastAction>,
+        pub action: Option<TickerAction>,
     }
 
-    pub struct Hud {
-        /// A new id is a new HUD, even with the same text.
+    pub struct Notice {
+        /// A new id is a new notice, even with the same text.
         pub id: u64,
-        pub style: ToastStyle,
+        pub style: TickerStyle,
         pub text: String,
     }
 
@@ -255,12 +255,16 @@ impl Launcher {
                 (None, None) => Screen::Root(self.root_screen()),
                 (None, Some(view)) => Screen::View(self.view_screen(view, selected)),
             },
-            toast: self.toast(),
-            hud: self.hud.as_ref().filter(|_| !self.visible).map(|hud| Hud {
-                id: hud.id,
-                style: hud.style,
-                text: hud.text.clone(),
-            }),
+            ticker: self.ticker(),
+            notice: self
+                .notice
+                .as_ref()
+                .filter(|_| !self.visible)
+                .map(|notice| Notice {
+                    id: notice.id,
+                    style: notice.style,
+                    text: notice.text.clone(),
+                }),
             footer: self.footer(actions),
             panel: Panel {
                 selected: self.panel_selected(&panel_actions),
@@ -333,7 +337,7 @@ impl Launcher {
             bindings.push(plain("Tab"));
             bindings.push(anywhere(shift_tab));
         }
-        if let Some(action) = self.toast_action() {
+        if let Some(action) = self.ticker_action() {
             let chord = Chord::from(&action.shortcut);
             if !bindings.iter().any(|taken| taken.chord == chord) {
                 bindings.push(anywhere(chord));
@@ -542,17 +546,17 @@ impl Launcher {
         })
     }
 
-    /// A held toast wins; otherwise the work in progress shows as busy.
-    fn toast(&self) -> Option<Toast> {
-        if let Some(toast) = &self.toast {
-            return Some(Toast {
-                style: toast.style,
-                text: toast.text.clone(),
-                action: toast.action.clone(),
+    /// A held ticker wins; otherwise the work in progress shows as busy.
+    fn ticker(&self) -> Option<Ticker> {
+        if let Some(ticker) = &self.ticker {
+            return Some(Ticker {
+                style: ticker.style,
+                text: ticker.text.clone(),
+                action: ticker.action.clone(),
             });
         }
-        self.busy_marks_shown().map(|text| Toast {
-            style: ToastStyle::Busy,
+        self.busy_marks_shown().map(|text| Ticker {
+            style: TickerStyle::Busy,
             text: text.to_string(),
             action: self.busy_cancel(),
         })
@@ -588,7 +592,7 @@ impl Launcher {
 const SEARCH_ICON: &str = "icon:search";
 
 /// What a list or grid with nothing to show says. A loading view says so in
-/// its busy toast, not in its body.
+/// its busy ticker, not in its body.
 fn empty_text(
     nothing: bool,
     loading: bool,

@@ -3,7 +3,7 @@ import { AccessoryData } from "atoms/accessory.slint";
 import { OptionData } from "atoms/dropdown.slint";
 import { Status } from "atoms/dot.slint";
 
-export enum ToastStyle { busy, success, failure }
+export enum TickerStyle { busy, success, failure }
 
 export enum ScreenKind { root, list, grid, detail, form, progress, empty }
 
@@ -86,12 +86,12 @@ export global Shell {
     in property <string> context;
     in property <image> context-icon;
     in property <IconKind> context-icon-kind;
-    in property <bool> toast-shown;
-    in property <ToastStyle> toast-style;
-    in property <string> toast-text;
-    /// The toast's action and its chord, empty when it has none.
-    in property <string> toast-action-label;
-    in property <string> toast-action-keys;
+    in property <bool> ticker-shown;
+    in property <TickerStyle> ticker-style;
+    in property <string> ticker-text;
+    /// The ticker's action and its chord, empty when it has none.
+    in property <string> ticker-action-label;
+    in property <string> ticker-action-keys;
     in property <string> primary-label;
     in property <string> confirm-key;
     in property <string> panel-key;

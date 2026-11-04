@@ -7,12 +7,12 @@ use slint::{ComponentHandle, ModelRc, VecModel};
 
 use super::icon;
 use crate::slint_shell::generated::{
-    LauncherWindow, OptionData, ScreenKind, Search, Shell, ToastStyle as SlintToastStyle,
+    LauncherWindow, OptionData, ScreenKind, Search, Shell, TickerStyle as SlintTickerStyle,
 };
 use crate::slint_shell::icons::Icons;
 use crate::slint_shell::keys;
 use crate::ui::snapshot::{Screen, Snapshot, ViewBody};
-use crate::ui::ToastStyle;
+use crate::ui::TickerStyle;
 
 pub fn init(ui: &LauncherWindow, icons: &Icons) {
     let shell = ui.global::<Shell>();
@@ -50,12 +50,12 @@ pub fn write(
     shell.set_confirm_key(keys::confirm_label(footer.confirm_with_command).into());
     shell.set_panel_hint(footer.many_actions);
 
-    match &snapshot.toast {
-        Some(toast) => {
-            shell.set_toast_shown(true);
-            shell.set_toast_text(toast.text.as_str().into());
-            shell.set_toast_style(toast_style(toast.style));
-            let (label, keys) = toast
+    match &snapshot.ticker {
+        Some(ticker) => {
+            shell.set_ticker_shown(true);
+            shell.set_ticker_text(ticker.text.as_str().into());
+            shell.set_ticker_style(ticker_style(ticker.style));
+            let (label, keys) = ticker
                 .action
                 .as_ref()
                 .map_or_else(Default::default, |action| {
@@ -64,10 +64,10 @@ pub fn write(
                         keys::shortcut_label(&action.shortcut).into(),
                     )
                 });
-            shell.set_toast_action_label(label);
-            shell.set_toast_action_keys(keys);
+            shell.set_ticker_action_label(label);
+            shell.set_ticker_action_keys(keys);
         }
-        None => shell.set_toast_shown(false),
+        None => shell.set_ticker_shown(false),
     }
 
     let search = ui.global::<Search>();
@@ -107,10 +107,10 @@ pub fn write(
     }
 }
 
-pub(super) fn toast_style(style: ToastStyle) -> SlintToastStyle {
+pub(super) fn ticker_style(style: TickerStyle) -> SlintTickerStyle {
     match style {
-        ToastStyle::Busy => SlintToastStyle::Busy,
-        ToastStyle::Success => SlintToastStyle::Success,
-        ToastStyle::Failure => SlintToastStyle::Failure,
+        TickerStyle::Busy => SlintTickerStyle::Busy,
+        TickerStyle::Success => SlintTickerStyle::Success,
+        TickerStyle::Failure => SlintTickerStyle::Failure,
     }
 }
