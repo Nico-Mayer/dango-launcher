@@ -26,7 +26,7 @@
 
   Verify with screenshots.
 - [ ] 4.3 macOS hand check of the same flow, with "⌘↵" on the toast. Leave open until a session on the Mac.
-- [ ] 4.4 Run the `ponytail-review` skill in a fresh subagent on this change's commits, without the apply context. Report the findings to the author.
+- [x] 4.4 Run the `ponytail-review` skill in a fresh subagent on this change's commits, without the apply context. Report the findings to the author.
 
 ## Workflow follow-up
 
