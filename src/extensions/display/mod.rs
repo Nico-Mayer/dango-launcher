@@ -255,14 +255,14 @@ mod tests {
         }
     }
 
-    fn run(answers: Vec<Answer>, direction: Direction) -> (Option<Outcome>, Vec<String>) {
+    fn run(answers: Vec<Answer>, direction: Direction) -> (Outcome, Vec<String>) {
         let mut lines = Vec::new();
         let monitors = FakeMonitors(answers).external();
         let outcome = match step_all(monitors, direction, &mut |line| lines.push(line)) {
             Ok(message) => Outcome::Success(Some(message)),
             Err(message) => Outcome::Failure(message.into()),
         };
-        (Some(outcome), lines)
+        (outcome, lines)
     }
 
     fn at(value: u16) -> (Answer, Arc<Mutex<u16>>) {
@@ -299,19 +299,17 @@ mod tests {
         let (outcome, _) = run(vec![low, high], Direction::Up);
         assert_eq!(
             outcome,
-            Some(Outcome::Success(Some(
-                "Brightness set to 40% and 70%".into()
-            )))
+            Outcome::Success(Some("Brightness set to 40% and 70%".into()))
         );
     }
 
     #[test]
     fn no_monitor_answering_says_to_turn_on_ddc_ci() {
         let (outcome, lines) = run(vec![Answer::Silent], Direction::Up);
-        assert_eq!(outcome, Some(Outcome::Failure(NO_MONITOR.into())));
+        assert_eq!(outcome, Outcome::Failure(NO_MONITOR.into()));
         assert_eq!(lines, ["brightness: Fake did not answer: timeout"]);
         let (outcome, _) = run(vec![], Direction::Up);
-        assert_eq!(outcome, Some(Outcome::Failure(NO_MONITOR.into())));
+        assert_eq!(outcome, Outcome::Failure(NO_MONITOR.into()));
     }
 
     #[test]
@@ -320,7 +318,7 @@ mod tests {
             vec![Answer::Refuses(50), Answer::Refuses(20)],
             Direction::Down,
         );
-        assert_eq!(outcome, Some(Outcome::Failure(REFUSED.into())));
+        assert_eq!(outcome, Outcome::Failure(REFUSED.into()));
         assert_eq!(lines.len(), 2);
     }
 
@@ -330,7 +328,7 @@ mod tests {
         let (outcome, lines) = run(vec![answer, Answer::Refuses(10)], Direction::Up);
         assert_eq!(
             outcome,
-            Some(Outcome::Success(Some("Brightness set to 70%".into())))
+            Outcome::Success(Some("Brightness set to 70%".into()))
         );
         assert_eq!(*level.lock().unwrap(), 70);
         assert_eq!(lines, ["brightness: Fake refused: rejected"]);
