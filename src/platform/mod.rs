@@ -326,7 +326,7 @@ pub fn start_key_monitor(sink: Box<dyn Fn(KeyStroke) + Send>) -> Option<Box<dyn 
 }
 
 /// The foreground application's identity, used to skip excluded applications and
-/// to notice a focus change. `None` when it cannot be determined.
+/// to detect a focus change. `None` when it cannot be determined.
 pub fn foreground_app() -> Option<String> {
     #[cfg(target_os = "windows")]
     {

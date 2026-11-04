@@ -379,7 +379,7 @@ fn hwnd(window: RawWindowHandle) -> Option<HWND> {
 
 /// The foreground application's name, resolved the same way the clipboard names
 /// the copying application, so the one exclusion list matches both. Used to skip
-/// excluded applications and to notice a focus change.
+/// excluded applications and to detect a focus change.
 pub(super) fn foreground_app() -> Option<String> {
     use windows::Win32::UI::WindowsAndMessaging::{GetForegroundWindow, GetWindowThreadProcessId};
     unsafe {

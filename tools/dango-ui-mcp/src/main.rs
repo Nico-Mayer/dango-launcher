@@ -79,7 +79,7 @@ impl Proxy {
             .is_some_and(|u| !u.is_transport_closed())
     }
 
-    /// Notices a build that stopped, so its tools go away, and one that
+    /// Spots a build that stopped, so its tools go away, and one that
     /// started some other way, so its tools appear.
     async fn watch(self: Arc<Self>) {
         loop {
