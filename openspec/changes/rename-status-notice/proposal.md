@@ -6,32 +6,34 @@ look and language, so the two status surfaces get plain names.
 
 ## What Changes
 
-- "Toast" becomes **status line**: the one-line status inside the launcher,
-  in the ActionBar's left slot or at the pill's end while only the pill shows.
-  Code: `StatusLine`, `status-line-*`, `ActionOutcome::Status`.
+- "Toast" becomes **ticker**: the one-line status inside the launcher, in the
+  ActionBar's left slot or at the pill's end while only the pill shows. Code:
+  `Ticker`, `TickerStyle`, `ActionOutcome::Ticker`, Slint `Shell.ticker-*`.
 - "HUD" becomes **notice**: the small window shown after the launcher hides.
   Code: `Notice`, `NoticeWindow`, `notice.slint`.
-- The tray's startup "notices" become **tray problems**, so "notice" means one
-  thing. Code: `TrayStatus::problems`.
+- The tray's startup "notices" become **tray problems** first, so "notice"
+  means one thing. Code: `TrayStatus::problems`.
 - The `hud` spec capability becomes `notice`. Every spec, the open
-  `launcher-v5-split-shell` change, and AGENTS.md use the new words.
+  `launcher-v5-split-shell` change, AGENTS.md and the `dango-ui` MCP proxy
+  use the new words.
 - **BREAKING** for the internal Rust API (`ActionOutcome::Toast`). No wire
-  format, manifest field, config key, or user-visible text says "toast" or
-  "HUD", so nothing outside the code changes.
+  format, manifest field, config key, accessible label, or user-visible text
+  says "toast" or "HUD", so nothing outside the code changes.
 
 ## Non-goals
 
-- No behaviour change. The status line and the notice look and act exactly as
+- No behaviour change. The ticker and the notice look and act exactly as
   before.
-- No rename of the protocol's `Status` (step and accessory states) or of the
-  status dots. "Status line" is chosen so they can keep their names.
+- No rename of the protocol's `Status`, the status dots, or the existing
+  "status lines" (tray, pinned results, tasks).
 - No new or changed user-visible text.
+- CHANGELOG and `.design/` keep their history as written.
 
 ## Platforms
 
 Windows and macOS. The rename touches shared code and both platforms' notice
 window code (`platform/windows`, `platform/macos`). Behaviour does not change,
-so no hand checks: a build on each platform is enough. CI compiles Windows.
+so no hand checks: this machine builds Windows, CI's macOS job builds macOS.
 
 ## Capabilities
 
@@ -49,10 +51,12 @@ None at the behaviour level. Specs change wording only, so the change sets
 
 - Specs: `design-system`, `hud` (moves to `notice`), `view-protocol`,
   `launcher-shell`, `background-tasks`, `ai-commands`, `app-updates`,
-  `command-hotkeys`, `inline-answers`, `interface-copy`, and the deltas of
-  `launcher-v5-split-shell`.
-- Code: about 480 references in `src/` and `ui/`, mostly `src/ui/state.rs`,
-  `src/ui/snapshot.rs`, tests, `src/slint_shell/`, `ui/shell/toast.slint`,
-  `ui/shell/hud.slint`, `ui/globals.slint`.
+  `command-hotkeys`, `inline-answers`, `interface-copy`, `global-activation`,
+  and all files of `openspec/changes/launcher-v5-split-shell`.
+- Code: about 480 references in `src/` and `ui/`, one comment in
+  `tools/dango-ui-mcp/src/main.rs`. Files: `ui/shell/toast.slint`,
+  `ui/shell/hud.slint`, `src/slint_shell/render/hud.rs`.
 - AGENTS.md platform traps that name the HUD.
 - Depends on `launcher-v5-split-shell`: this branch stacks on `v5-closed-root`.
+  Archive v5 at the top of the stack, after this branch, so the archive does
+  not conflict with this branch's spec edits when restacking.
