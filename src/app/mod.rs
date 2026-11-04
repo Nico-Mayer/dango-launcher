@@ -609,7 +609,10 @@ impl Core {
                             tree: Box::new(tree),
                         }));
                     }
-                    Output::Finished(Outcome::Success(_)) => {
+                    Output::Finished(Outcome::Success(message)) => {
+                        if let Some(message) = message {
+                            core.apply(ui::Input::Event(ui::Event::Succeeded(message)));
+                        }
                         core.hide_after_launch();
                         break;
                     }

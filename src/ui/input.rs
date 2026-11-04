@@ -114,6 +114,8 @@ pub enum Event {
     },
     /// A command failed, or refused to start.
     Failed(String),
+    /// A no-view command succeeded with a message for the notice.
+    Succeeded(String),
     /// A hotkey press failed. Unlike `Failed`, a command still running from
     /// the launcher keeps running.
     HotkeyFailed(String),

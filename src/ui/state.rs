@@ -314,6 +314,11 @@ impl Launcher {
                 self.busy_marks = BusyMarks::Hidden;
             }
             Event::HotkeyFailed(message) => self.show_failure(message, fx),
+            Event::Succeeded(message) => {
+                self.show_notice(TickerStyle::Success, message, None, fx);
+                self.working = None;
+                self.busy_marks = BusyMarks::Hidden;
+            }
             Event::TemplateInspected {
                 field,
                 source,

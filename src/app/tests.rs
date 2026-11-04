@@ -1116,3 +1116,96 @@ async fn work_started_for_a_command_is_named_after_it() {
     settle().await;
     assert_eq!(shell.last_snapshot().footer.context.title, "Summarize");
 }
+
+/// A no-view command that succeeds, with `message` when it has one.
+struct Reports(crate::extension::Manifest, Option<&'static str>);
+
+impl crate::extension::Extension for Reports {
+    fn manifest(&self) -> &crate::extension::Manifest {
+        &self.0
+    }
+    fn command(&self, _command_id: &str) -> Option<Arc<dyn crate::invocation::Command>> {
+        struct Succeed(Option<&'static str>);
+        impl crate::invocation::Command for Succeed {
+            fn invoke(&self, ctx: &InvocationContext) {
+                match self.0 {
+                    Some(message) => ctx.succeed_with(message),
+                    None => ctx.succeed(),
+                }
+            }
+        }
+        Some(Arc::new(Succeed(self.1)))
+    }
+}
+
+fn reporting(message: Option<&'static str>) -> Arc<Reports> {
+    let mut manifest = two_commands().0.clone();
+    manifest.commands.truncate(1);
+    manifest.commands[0].mode = crate::extension::InvocationMode::NoView;
+    Arc::new(Reports(manifest, message))
+}
+
+#[tokio::test]
+async fn a_success_message_from_a_hotkey_shows_in_the_notice() {
+    let shell = Arc::new(RecordingShell::default());
+    let (core, _) = core_with_shell(
+        "",
+        vec![reporting(Some("Brightness set to 60%"))],
+        shell.clone(),
+    );
+
+    core.dispatch_command("x.keep");
+
+    assert_eq!(
+        wait_for_notice(&shell).await.as_deref(),
+        Some("Brightness set to 60%")
+    );
+    assert!(!shell.calls().contains(&Call::Show));
+}
+
+#[tokio::test]
+async fn a_success_message_from_the_launcher_hides_it_and_shows_in_the_notice() {
+    let shell = Arc::new(RecordingShell::default());
+    let (core, _) = core_with_shell(
+        "",
+        vec![reporting(Some("Brightness set to 60%"))],
+        shell.clone(),
+    );
+    core.toggle();
+
+    core.run_command("x.keep").unwrap();
+
+    assert_eq!(
+        wait_for_notice(&shell).await.as_deref(),
+        Some("Brightness set to 60%")
+    );
+    assert!(shell
+        .calls()
+        .iter()
+        .any(|call| matches!(call, Call::Hide { .. })));
+}
+
+#[tokio::test]
+async fn a_plain_success_shows_no_notice() {
+    let shell = Arc::new(RecordingShell::default());
+    let (core, _) = core_with_shell("", vec![reporting(None)], shell.clone());
+    core.toggle();
+
+    core.run_command("x.keep").unwrap();
+
+    for _ in 0..200 {
+        if shell
+            .calls()
+            .iter()
+            .any(|call| matches!(call, Call::Hide { .. }))
+        {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(5)).await;
+    }
+    assert!(shell
+        .calls()
+        .iter()
+        .any(|call| matches!(call, Call::Hide { .. })));
+    assert_eq!(notice(&shell), None);
+}

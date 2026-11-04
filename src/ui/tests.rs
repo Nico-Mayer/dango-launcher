@@ -3168,3 +3168,14 @@ fn leaving_a_running_task_s_view_shows_its_busy_ticker() {
         Some("Running Fixture Command…")
     );
 }
+
+#[test]
+fn a_success_message_shows_in_the_notice_once_hidden() {
+    let mut h = Harness::root(3);
+    let effects = h.event(Event::Succeeded("Brightness set to 60%".into()));
+    assert!(effects.is_empty());
+    assert!(h.snapshot().ticker.is_none());
+    let effects = h.event(Event::Hidden);
+    notice_expiry(&effects);
+    assert_eq!(notice_text(&h).as_deref(), Some("Brightness set to 60%"));
+}
