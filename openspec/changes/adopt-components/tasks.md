@@ -3,7 +3,7 @@
 ## 1. Hotkey chords on root rows
 
 - [x] 1.1 Add `hotkey: Option<HotKey>` to `ResultItem` (`src/ui/input.rs`), filled in `Core::result_item` from `services.hotkeys`' registered bindings (commands and applications). Verify with an app test in `src/app/tests.rs`: a command with a registered hotkey gets it, one whose chord was refused gets none.
-- [ ] 1.2 Add `keys::hotkey_label(&HotKey)` in `src/slint_shell/keys.rs` for macOS ("⌃⌥⇧⌘" order, then the key). Verify with a `#[cfg(target_os = "macos")]` unit test ("ctrl+alt+v" → "⌃⌥V"). It runs on the Mac.
+- [x] 1.2 Add `keys::hotkey_label(&HotKey)` in `src/slint_shell/keys.rs` for macOS ("⌃⌥⇧⌘" order, then the key). Verify with a `#[cfg(target_os = "macos")]` unit test ("ctrl+alt+v" → "⌃⌥V"). It runs on the Mac.
 - [x] 1.3 The same for Windows ("Ctrl+Alt+Shift+Win+" then the key). Verify with a `#[cfg(windows)]` unit test ("ctrl+alt+v" → "Ctrl+Alt+V").
 - [x] 1.4 Draw a root row's hotkey as a key chord accessory in `result_row` (`src/slint_shell/render/list.rs`). Verify with a UI test in `src/slint_shell/tests.rs`: a root row with a hotkey shows its label, and one without shows none.
 
