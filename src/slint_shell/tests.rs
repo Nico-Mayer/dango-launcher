@@ -18,7 +18,7 @@ use crate::protocol::{
 use crate::shell::TrayStatus;
 use crate::ui::{Context, Effect, Event, Input, Intent, Launcher, ResultItem, TemplateInspection};
 
-const SEARCH_BAR: f32 = 64.0;
+const SEARCH_BAR: f32 = 52.0;
 const ACTION_BAR: f32 = 44.0;
 const LIST_PADDING: f32 = 8.0;
 const ROW: f32 = 44.0;

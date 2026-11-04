@@ -2,7 +2,7 @@
 
 ## 1. v5 part shapes (still one card)
 
-- [ ] 1.1 Add pill height 52, shell gap 8 and pill/card radii to `ui/theme.slint`, with constants for pill height and gap in `src/slint_shell/render/height.rs`; `mise run check` passes
+- [x] 1.1 Add pill height 52, shell gap 8 and pill/card radii to `ui/theme.slint`, with constants for pill height and gap in `src/slint_shell/render/height.rs`; `mise run check` passes
 - [ ] 1.2 Restyle the back control as a chevron in a circle and the filter dropdown as a pill in `ui/shell/search-bar.slint`; UI tests in `src/slint_shell/tests.rs` still find both by accessible label, `cargo test` passes
 - [ ] 1.3 Show the primary action and its key as one chip in `ui/shell/action-bar.slint`; existing ActionBar UI tests pass
 

@@ -6,7 +6,7 @@ use crate::ui::snapshot::{Screen, Snapshot, ViewBody};
 
 pub const MAX: f32 = crate::platform::LAUNCHER_MAX_HEIGHT as f32;
 pub const WIDTH: f32 = 720.0;
-const SEARCH_BAR: f32 = 64.0;
+const SEARCH_BAR: f32 = 52.0;
 const ACTION_BAR: f32 = 44.0;
 const LIST_PADDING: f32 = 8.0;
 pub const ROW: f32 = 44.0;
