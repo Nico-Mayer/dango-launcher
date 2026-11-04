@@ -34,7 +34,7 @@
 ## 3. Checks and review
 
 - [x] 3.1 Run `mise run check` and `cargo test`. Verify both pass.
-- [ ] 3.2 Windows hand check with the real keyboard (`mise run keys`, `mise run shot`):
+- [x] 3.2 Windows hand check with the real keyboard (`mise run keys`, `mise run shot`):
   - press an AI paste command's hotkey in a text field and wait: the answer is pasted there;
   - press it again, then click into another app before the answer arrives: nothing is pasted, and the next open shows "Answer ready" with "Show answer".
 
