@@ -130,8 +130,9 @@ Clicking "Actions" SHALL open the action panel.
 ### Requirement: A toast reports status in the ActionBar
 
 A toast SHALL replace the ActionBar's context while it shows. When the card is
-hidden and only the pill shows, the toast SHALL instead show as a small
-capsule centred under the pill, with the same style, text, and action. A toast
+hidden and only the pill shows, the toast SHALL instead show at the pill's
+right end, with the same style, text, and action, cut off with an ellipsis
+before it reaches the query. A toast
 has a style and one line of text, and MAY carry one action, shown after the
 text as its label and chord. Pressing that chord while the toast shows SHALL
 run the action and SHALL NOT also act on the view. A busy toast SHALL show a
@@ -150,15 +151,15 @@ it reports a failure. Showing a toast SHALL NOT take focus.
 - **THEN** the toast shows with a dot in the done role and is gone after about
   two seconds, and the context returns
 
-#### Scenario: A toast under the bare pill
+#### Scenario: A toast on the bare pill
 
 - **WHEN** a toast shows while the launcher is the pill alone
-- **THEN** it shows as a capsule centred under the pill, and the card stays
-  hidden
+- **THEN** it shows at the pill's right end, the card stays hidden, and the
+  launcher does not change size
 
-#### Scenario: The card opens while a capsule shows
+#### Scenario: The card opens while a toast shows on the pill
 
-- **WHEN** a toast shows as a capsule and the user types a character
+- **WHEN** a toast shows at the pill's end and the user types a character
 - **THEN** the card opens and the toast, if it is still showing, moves into
   the ActionBar's context
 
@@ -194,58 +195,3 @@ it reports a failure. Showing a toast SHALL NOT take focus.
 - **WHEN** a toast appears while the user types in the SearchBar
 - **THEN** every character still reaches the SearchBar
 
-### Requirement: Selection, hover, and focus are told apart
-
-The selected row, tile, or action SHALL be filled with the selected role. A
-selected or hovered row SHALL be drawn as a rounded fill set in from the
-card's edges, not as a band from edge to edge. A hovered one SHALL be filled
-with the hover role, which SHALL be clearly weaker than selected, following
-the list-navigation requirements. Selected text in an input SHALL be filled
-with the selection role. A focused form control SHALL show a border in the
-accent role. A surface that keeps focus in its input and moves a selection
-SHALL show that selection, not a focus ring around the surface.
-
-#### Scenario: A selected row is inset
-
-- **WHEN** a result row is selected
-- **THEN** its fill has rounded corners and leaves a gap to the card's left
-  and right edges
-
-#### Scenario: Hovering another row
-
-- **WHEN** a row is selected and the pointer rests on another
-- **THEN** the hovered row is clearly weaker than the selected row
-
-#### Scenario: Tabbing through a form
-
-- **WHEN** the user presses Tab in a form
-- **THEN** the next control shows the accent border and the previous one loses
-  it
-
-#### Scenario: Selecting text in the SearchBar
-
-- **WHEN** the user selects the query text in the SearchBar
-- **THEN** the selected text is filled with the selection role, not the
-  selected role
-
-## ADDED Requirements
-
-### Requirement: The pill and the card cast a shadow
-
-The pill and the card SHALL each cast a soft shadow below them, so they read
-as floating above what is behind. When the launcher is drawn without graphics
-acceleration and cannot draw shadows, the pill and the card SHALL be drawn
-without them and keep their outlines. The shadow SHALL NOT be cut off by the
-window's edge.
-
-#### Scenario: Shadows with graphics acceleration
-
-- **WHEN** the launcher is drawn with graphics acceleration
-- **THEN** the pill and the card each show a soft shadow below them, and no
-  shadow ends in a straight cut
-
-#### Scenario: Without graphics acceleration
-
-- **WHEN** the launcher is drawn without graphics acceleration
-- **THEN** the pill and the card show their outlines and no shadow, and look
-  otherwise the same
