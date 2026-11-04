@@ -38,7 +38,7 @@
 
   Verify with screenshots.
 - [ ] 3.3 macOS hand check with the real keyboard: Cmd+. cancels a running AI request from its busy toast (winit delivers it through `cancelOperation:`), and the paste-command hotkey flow from 3.2 behaves the same. Leave open until a session on the Mac, with task-registry's 5.2.
-- [ ] 3.4 Run the `ponytail-review` skill in a fresh subagent on this change's commits, without the apply context. Report the findings to the author. Verify that the findings are listed in the session.
+- [x] 3.4 Run the `ponytail-review` skill in a fresh subagent on this change's commits, without the apply context. Report the findings to the author. Verify that the findings are listed in the session.
 
 ## Workflow follow-up
 
