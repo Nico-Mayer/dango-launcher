@@ -41,6 +41,9 @@ pub struct Launcher {
     /// or before the one abandoned.
     abandoned_invocation: Option<u64>,
     panel: Option<PanelState>,
+    /// The empty-query list was opened with Arrow Down. Without it an empty
+    /// query shows only pinned items.
+    root_open: bool,
     /// The title of a command invoked from root that has neither finished nor
     /// shown a view yet.
     pub(super) working: Option<String>,
@@ -371,6 +374,7 @@ impl Launcher {
         self.results.clear();
         self.results_complete = false;
         self.picked = None;
+        self.root_open = false;
         self.stack.clear();
         self.owner = None;
         // Deliberately not abandoning: a hide for work resets through here too,
@@ -795,6 +799,9 @@ impl Launcher {
     fn query_changed(&mut self, text: String, fx: &mut Vec<Effect>) {
         match self.stack.last_mut() {
             None => {
+                if text.is_empty() {
+                    self.root_open = false;
+                }
                 self.query = text.clone();
                 self.results_complete = false;
                 self.picked = None;
@@ -868,6 +875,14 @@ impl Launcher {
         if escape {
             self.escape(fx);
         } else if (up || down) && mode == Mode::Root {
+            if down && self.root_closed() {
+                let bare = self.root_order().next().is_none();
+                self.root_open = true;
+                if bare {
+                    self.picked = None;
+                    return;
+                }
+            }
             let next = step(
                 self.root_order().map(|item| item.id.as_str()),
                 self.root_selected().map(|item| item.id.clone()),
@@ -1120,7 +1135,11 @@ impl Launcher {
     /// suggestions, then everything else.
     pub(super) fn root_order(&self) -> impl Iterator<Item = &ResultItem> {
         let answer = self.results.iter().filter(|item| item.answer);
-        let rows = || self.results.iter().filter(|item| !item.answer);
+        let rows = || {
+            self.results
+                .iter()
+                .filter(|item| !item.answer && self.root_shows(item))
+        };
         let pinned = rows().filter(|item| item.pinned);
         let suggested = rows().filter(|item| !item.pinned && item.suggested);
         let rest = rows().filter(|item| !item.pinned && !item.suggested);
@@ -1130,8 +1149,17 @@ impl Launcher {
     pub(super) fn root_selected(&self) -> Option<&ResultItem> {
         self.picked
             .as_deref()
-            .and_then(|picked| self.results.iter().find(|item| item.id == picked))
+            .and_then(|picked| self.root_order().find(|item| item.id == picked))
             .or_else(|| self.root_order().next())
+    }
+
+    pub(super) fn root_closed(&self) -> bool {
+        self.query.is_empty() && !self.root_open
+    }
+
+    /// Whether root shows the item: a closed root shows pinned items only.
+    pub(super) fn root_shows(&self, item: &ResultItem) -> bool {
+        item.pinned || !self.root_closed()
     }
 
     /// A pushed list's items after launcher-side narrowing, grouped in section

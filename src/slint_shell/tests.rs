@@ -89,6 +89,7 @@ impl Harness {
         harness
     }
 
+    /// Root with the empty-query list opened, as most tests want it.
     fn root(items: Vec<ResultItem>) -> Self {
         let harness = Self::new();
         harness.event(Event::Results {
@@ -96,6 +97,9 @@ impl Harness {
             items,
             complete: true,
         });
+        harness.arrow_down();
+        harness.intents.borrow_mut().clear();
+        harness.effects.borrow_mut().clear();
         harness
     }
 
@@ -758,8 +762,9 @@ mod root_search {
         for item in &mut items[2..5] {
             item.suggested = true;
         }
+        // Opening the list from the pinned card already stepped to row 2.
         let h = Harness::root(items);
-        for _ in 0..5 {
+        for _ in 0..4 {
             h.arrow_down();
         }
         let row = h.row("Result 6");

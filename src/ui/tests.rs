@@ -134,9 +134,12 @@ impl Harness {
         }
     }
 
+    /// Root with the empty-query list opened, as most tests want it.
     fn root(count: usize) -> Self {
         let mut harness = Self::new();
         harness.results("", results(count));
+        harness.press("ArrowDown");
+        harness.effects.clear();
         harness
     }
 
@@ -355,6 +358,78 @@ fn typing_searches_and_resets_the_pick_without_echoing_the_query() {
     assert_eq!(h.root_screen().query.revision, revision);
 }
 
+/// Root with results for the empty query and the list still closed.
+fn bare_pill(count: usize) -> Harness {
+    let mut h = Harness::new();
+    h.results("", results(count));
+    h
+}
+
+#[test]
+fn a_bare_pill_shows_and_selects_nothing() {
+    let h = bare_pill(5);
+    assert!(h.root_screen().sections.is_empty());
+    assert_eq!(h.selected(), None);
+}
+
+#[test]
+fn a_bare_pill_ignores_enter_and_the_panel_and_hidden_shortcuts() {
+    let mut h = bare_pill(5);
+    assert!(h.press("Enter").is_empty());
+    h.command("k");
+    assert!(!h.snapshot().panel.open);
+    let copy = Chord::command("c");
+    assert!(!h.snapshot().bindings.iter().any(|b| b.chord == copy));
+    assert!(h.key(copy).is_empty());
+}
+
+#[test]
+fn arrow_down_on_a_bare_pill_opens_the_list_at_the_first_row() {
+    let mut h = bare_pill(5);
+    h.press("ArrowDown");
+    assert_eq!(h.root_screen().sections[0].items.len(), 5);
+    assert_eq!(h.selected(), id(1));
+}
+
+#[test]
+fn arrow_up_on_a_bare_pill_does_nothing() {
+    let mut h = bare_pill(5);
+    h.press("ArrowUp");
+    assert!(h.root_screen().sections.is_empty());
+    assert_eq!(h.selected(), None);
+}
+
+#[test]
+fn typing_after_opening_shows_ranked_results_from_the_top() {
+    let mut h = bare_pill(5);
+    h.press("ArrowDown");
+    h.press("ArrowDown");
+    h.typed("R");
+    h.results("R", results(3));
+    assert_eq!(h.root_screen().sections.len(), 1);
+    assert_eq!(h.selected(), id(1));
+}
+
+#[test]
+fn clearing_the_query_closes_the_list() {
+    let mut h = bare_pill(5);
+    h.press("ArrowDown");
+    h.typed("R");
+    h.typed("");
+    h.results("", results(5));
+    assert!(h.root_screen().sections.is_empty());
+}
+
+#[test]
+fn a_reset_closes_the_list() {
+    let mut h = bare_pill(5);
+    h.press("ArrowDown");
+    h.event(Event::Hidden);
+    h.event(Event::Reset);
+    h.results("", results(5));
+    assert!(h.root_screen().sections.is_empty());
+}
+
 #[test]
 fn root_sections_group_pinned_and_suggested_results() {
     let mut h = Harness::new();
@@ -363,6 +438,11 @@ fn root_sections_group_pinned_and_suggested_results() {
     items[0].suggested = true;
     items[1].suggested = true;
     h.results("", items);
+    let closed = h.root_screen().sections;
+    assert_eq!(closed.len(), 1, "a closed root shows only what is pinned");
+    assert_eq!(closed[0].heading.as_deref(), Some("Needs attention"));
+    assert_eq!(h.selected(), id(4));
+    h.press("ArrowDown");
     let sections = h.root_screen().sections;
     let headings: Vec<_> = sections.iter().map(|s| s.heading.as_deref()).collect();
     assert_eq!(
@@ -385,9 +465,7 @@ fn root_sections_group_pinned_and_suggested_results() {
             vec!["result-3", "result-5"]
         ]
     );
-    assert_eq!(h.selected(), id(4));
-    h.press("ArrowDown");
-    assert_eq!(h.selected(), id(1));
+    assert_eq!(h.selected(), id(1), "opening steps past the pinned row");
 }
 
 #[test]
@@ -1512,6 +1590,7 @@ fn danger_actions_come_last_under_their_section() {
     ];
     let mut h = Harness::new();
     h.results("", vec![item]);
+    h.press("ArrowDown");
     h.command("k");
     let panel = h.snapshot().panel;
     let titles: Vec<&str> = panel.actions.iter().map(|a| a.title.as_str()).collect();
@@ -1639,6 +1718,7 @@ fn panel_selection_survives_replacement_of_unchanged_actions() {
         .collect();
     let mut h = Harness::new();
     h.results("", items.clone());
+    h.press("ArrowDown");
     h.command("k");
     h.press("ArrowDown");
     h.results("", items);
@@ -1670,6 +1750,7 @@ fn a_reset_while_the_panel_is_open_closes_it_and_the_next_open_starts_fresh() {
         let snapshot = h.snapshot();
         assert!(!snapshot.panel.open);
         assert_eq!(snapshot.focus, Focus::RootInput);
+        h.press("ArrowDown");
         h.command("k");
         assert_eq!(h.panel_selected().as_deref(), Some("open"));
         h.press("Escape");
@@ -1751,6 +1832,7 @@ fn bindings_hold_the_shortcuts_of_the_current_selection() {
     }];
     let mut h = Harness::new();
     h.results("", items);
+    h.press("ArrowDown");
     let copy = Chord::command("c");
     let pin = Chord {
         key: "p".into(),
@@ -1880,6 +1962,7 @@ fn a_view_arriving_ends_the_running_status() {
     let mut command = result(1);
     command.actions.clear();
     h.results("", vec![command]);
+    h.press("ArrowDown");
     h.press("Enter");
     h.render(3, detail_tree("x"));
     assert!(h.launcher.working.is_none());
@@ -2065,7 +2148,9 @@ fn a_reset_starts_at_an_empty_prompt() {
     assert_eq!(snapshot.focus, Focus::RootInput);
     let root = h.root_screen();
     assert_eq!(root.query.text, "");
-    assert_eq!(root.sections[0].items.len(), 18);
+    assert!(root.sections.is_empty(), "the list starts closed");
+    h.press("ArrowDown");
+    assert_eq!(h.root_screen().sections[0].items.len(), 18);
 }
 
 #[test]
@@ -2176,6 +2261,7 @@ fn running(h: &mut Harness) {
     command.title = "Clipboard History".into();
     command.actions.clear();
     h.results("", vec![command]);
+    h.press("ArrowDown");
     h.press("Enter");
 }
 

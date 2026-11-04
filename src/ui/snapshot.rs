@@ -350,7 +350,7 @@ impl Launcher {
         let pick = |keep: fn(&ResultItem) -> bool| -> Vec<ResultItem> {
             self.results
                 .iter()
-                .filter(|r| !r.answer && keep(r))
+                .filter(|r| !r.answer && self.root_shows(r) && keep(r))
                 .cloned()
                 .collect()
         };
