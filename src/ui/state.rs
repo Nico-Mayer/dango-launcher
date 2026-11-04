@@ -684,7 +684,6 @@ impl Launcher {
         }
     }
 
-    /// A failure stays until the next key press or click.
     /// A toast that waits for the user, because it failed or offers an
     /// action, goes with their next key press or click.
     fn clear_lasting(&mut self) {
@@ -1519,14 +1518,14 @@ fn is_loading(view: &View) -> bool {
     }
 }
 
-/// An action of a task's owner, offered on a toast with the platform's
-/// command key.
 fn show_answer(task: &TaskState) -> Option<ToastAction> {
     task.show
         .as_deref()
         .map(|show| task_action(task, "Show answer", "Enter", show))
 }
 
+/// An action of a task's owner, offered on a toast with the platform's
+/// command key.
 fn task_action(task: &TaskState, title: &str, key: &str, action_id: &str) -> ToastAction {
     ToastAction {
         title: title.into(),
