@@ -124,24 +124,40 @@ wait for a key press or a click.
   hotkey of a command that shows the launcher
 - **THEN** that command runs and the answer does not open
 
-### Requirement: The notice sits at the bottom of the active screen
+### Requirement: The notice sits at the bottom of the launcher's display
 
-The notice SHALL show centred horizontally near the bottom of the work area of the
-display under the mouse pointer, the display the launcher would open on, above
+The notice SHALL show centred horizontally near the bottom of the work area of
+the display the launcher would open on, as chosen by `launcher.display`, above
 the taskbar or the Dock. It SHALL show over every other window, including
 fullscreen applications.
 
 #### Scenario: Placement on Windows
 
-- **WHEN** the notice shows on Windows with the mouse pointer on a second monitor
+- **WHEN** the notice shows on Windows with the mouse pointer on a second
+  monitor and `launcher.display` is `"pointer"`
 - **THEN** it is centred near the bottom of that monitor's work area, above the
   taskbar
 
 #### Scenario: Placement on macOS
 
 - **WHEN** the notice shows on macOS with the mouse pointer on a second display
+  and `launcher.display` is `"pointer"`
 - **THEN** it is centred near the bottom of that display's visible frame, above
   the Dock
+
+#### Scenario: Pinned to the primary display on Windows
+
+- **WHEN** the notice shows on Windows with the mouse pointer on a second
+  monitor and `launcher.display` is `"primary"`
+- **THEN** it is centred near the bottom of the main display's work area, above
+  the taskbar
+
+#### Scenario: Pinned to the primary display on macOS
+
+- **WHEN** the notice shows on macOS with the mouse pointer on a second display
+  and `launcher.display` is `"primary"`
+- **THEN** it is centred near the bottom of the visible frame of the main
+  display set in System Settings > Displays, above the Dock
 
 #### Scenario: Over a fullscreen application on Windows
 
