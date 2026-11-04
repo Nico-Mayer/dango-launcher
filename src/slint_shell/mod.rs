@@ -58,7 +58,6 @@ struct SlintShell {
     platform: Platform,
     attached: AtomicBool,
     notice: Notice,
-    display: Arc<Mutex<LauncherDisplay>>,
 }
 
 #[derive(Clone)]
@@ -166,7 +165,7 @@ impl Shell for SlintShell {
         let existing = handle(window.window());
         if let Some(handle) = existing {
             self.attach_once(platform.as_mut(), handle);
-            platform.position_on_active_display(handle, *self.display.lock().unwrap());
+            platform.position_on_active_display(handle, *self.notice.display.lock().unwrap());
         }
         if let Err(error) = window.show() {
             eprintln!("[dango] could not show the launcher: {error}");
@@ -177,7 +176,7 @@ impl Shell for SlintShell {
         };
         if existing.is_none() {
             self.attach_once(platform.as_mut(), handle);
-            platform.position_on_active_display(handle, *self.display.lock().unwrap());
+            platform.position_on_active_display(handle, *self.notice.display.lock().unwrap());
         }
         platform.did_show(handle);
     }
@@ -197,7 +196,7 @@ impl Shell for SlintShell {
     }
 
     fn set_display(&self, display: LauncherDisplay) {
-        *self.display.lock().unwrap() = display;
+        *self.notice.display.lock().unwrap() = display;
     }
 
     fn on_main_thread(&self, work: Box<dyn FnOnce() + Send>) {
@@ -297,7 +296,6 @@ pub fn run() {
     let renderer = Rc::new(RefCell::new(Renderer::new(&window)));
     RENDERER.with(|slot| *slot.borrow_mut() = Some(renderer.clone()));
 
-    let display = Arc::new(Mutex::new(LauncherDisplay::default()));
     let shell = Arc::new(SlintShell {
         window: window.as_weak(),
         tray: tray.as_weak(),
@@ -307,9 +305,8 @@ pub fn run() {
             window: notice.as_weak(),
             platform: Arc::new(Mutex::new(platform::notice_window())),
             attached: Arc::new(AtomicBool::new(false)),
-            display: display.clone(),
+            display: Default::default(),
         },
-        display,
     });
 
     // The hotkeys and the tray need the event loop running on this thread.

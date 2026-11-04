@@ -957,7 +957,6 @@ mod list_view {
                 attached: Default::default(),
                 display: Default::default(),
             },
-            display: Default::default(),
         };
         shell.hide(false);
         super::super::RENDERER.with(|slot| *slot.borrow_mut() = None);
