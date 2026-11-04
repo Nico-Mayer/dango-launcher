@@ -39,7 +39,7 @@ export component Detail inherits Rectangle {
                 }
                 if DetailData.plain: Text {
                     text: DetailData.text;
-                    color: Theme.text;
+                    color: Theme.foreground;
                     font-family: Theme.mono;
                     font-size: Theme.text-small;
                     wrap: word-wrap;
@@ -48,7 +48,7 @@ export component Detail inherits Rectangle {
                 }
                 if !DetailData.plain: StyledText {
                     text: DetailData.body;
-                    default-color: Theme.text;
+                    default-color: Theme.foreground;
                     default-font-size: Theme.text-body;
                     accessible-role: AccessibleRole.text;
                     accessible-label: DetailData.text;
@@ -77,7 +77,7 @@ export component Detail inherits Rectangle {
                 Text {
                     horizontal-stretch: 1;
                     text: pair.value;
-                    color: Theme.text;
+                    color: Theme.foreground;
                     font-size: Theme.text-small;
                     wrap: word-wrap;
                     accessible-role: AccessibleRole.text;

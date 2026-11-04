@@ -1,5 +1,5 @@
 import { Theme } from "../theme.slint";
-import { Intents, Panel, ScreenKind, Shell } from "../globals.slint";
+import { AnswerData, Intents, Panel, ScreenKind, Shell } from "../globals.slint";
 import { SearchBar } from "search-bar.slint";
 import { ActionBar } from "action-bar.slint";
 import { ActionPanel } from "action-panel.slint";
@@ -8,6 +8,8 @@ import { Grid } from "../views/grid.slint";
 import { Detail } from "../views/detail.slint";
 import { EmptyView } from "../views/empty-view.slint";
 import { Form } from "../views/form.slint";
+import { InlineAnswer } from "inline-answer.slint";
+import { ProgressView } from "../views/progress-view.slint";
 
 /// The SearchBar, one view, and the ActionBar, with the action panel
 /// floating above them.
@@ -64,7 +66,7 @@ export component LauncherWindow inherits Window {
         }
 
         frame := Rectangle {
-            background: Theme.background;
+            background: Theme.popover;
             border-radius: Theme.radius * 1.5;
             accessible-role: groupbox;
             accessible-label: "Dango";
@@ -77,10 +79,16 @@ export component LauncherWindow inherits Window {
                 y: 0;
             }
 
+            property <length> answer-room: AnswerData.shown ? Theme.answer-height : 0;
+
+            if AnswerData.shown: InlineAnswer {
+                y: parent.body-top;
+            }
+
             list := List {
                 visible: Shell.screen == ScreenKind.root || Shell.screen == ScreenKind.list;
-                y: parent.body-top;
-                height: parent.body-height;
+                y: parent.body-top + parent.answer-room;
+                height: parent.body-height - parent.answer-room;
             }
             grid := Grid {
                 visible: Shell.screen == ScreenKind.grid;
@@ -96,6 +104,10 @@ export component LauncherWindow inherits Window {
                 height: parent.body-height;
             }
             if Shell.screen == ScreenKind.form: Form {
+                y: parent.body-top;
+                height: parent.body-height;
+            }
+            if Shell.screen == ScreenKind.progress: ProgressView {
                 y: parent.body-top;
                 height: parent.body-height;
             }

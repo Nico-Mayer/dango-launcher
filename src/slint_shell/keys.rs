@@ -10,10 +10,14 @@ fn command_label() -> &'static str {
     platform::label(Label::CommandKey)
 }
 
+fn join_keys(keys: &[&str]) -> String {
+    keys.join(platform::label(Label::ChordSeparator))
+}
+
 /// The confirm key shown in the footer.
 pub fn confirm_label(with_command: bool) -> String {
     if with_command {
-        format!("{}↵", command_label())
+        join_keys(&[command_label(), "↵"])
     } else {
         "↵".to_string()
     }
@@ -21,7 +25,7 @@ pub fn confirm_label(with_command: bool) -> String {
 
 /// The chord shown on the Actions button.
 pub fn panel_label() -> String {
-    format!("{} K", command_label())
+    join_keys(&[command_label(), "K"])
 }
 
 pub fn shortcut_label(shortcut: &Shortcut) -> String {
@@ -37,8 +41,74 @@ pub fn shortcut_label(shortcut: &Shortcut) -> String {
             .to_string()
         })
         .collect();
-    parts.push(shortcut.key.to_uppercase());
+    parts.push(shortcut_key(&shortcut.key));
     parts.join(platform::label(Label::ChordSeparator))
+}
+
+/// A shortcut's key by its web name, drawn the way the footer draws Enter.
+fn shortcut_key(key: &str) -> String {
+    let symbol = match key.to_ascii_lowercase().as_str() {
+        "enter" => "↵",
+        "escape" => "Esc",
+        "backspace" => "⌫",
+        "delete" => "Del",
+        "tab" => "Tab",
+        " " | "space" => "Space",
+        "arrowup" => "↑",
+        "arrowdown" => "↓",
+        "arrowleft" => "←",
+        "arrowright" => "→",
+        _ => return key.to_uppercase(),
+    };
+    symbol.to_string()
+}
+
+/// A global hotkey as the operating system reads it. Unlike an action
+/// shortcut, Control stays Control on macOS rather than becoming Cmd.
+pub fn hotkey_label(hotkey: &global_hotkey::hotkey::HotKey) -> String {
+    use global_hotkey::hotkey::Modifiers;
+    let mut parts: Vec<String> = [
+        (Modifiers::CONTROL, Label::ControlKey),
+        (Modifiers::ALT, Label::AltKey),
+        (Modifiers::SHIFT, Label::ShiftKey),
+        (Modifiers::SUPER, Label::SuperKey),
+    ]
+    .iter()
+    .filter(|(modifier, _)| hotkey.mods.contains(*modifier))
+    .map(|(_, label)| platform::label(*label).to_string())
+    .collect();
+    parts.push(key_name(hotkey.key));
+    parts.join(platform::label(Label::ChordSeparator))
+}
+
+fn key_name(key: global_hotkey::hotkey::Code) -> String {
+    use global_hotkey::hotkey::Code;
+    let symbol = match key {
+        Code::Backquote => "`",
+        Code::Backslash => "\\",
+        Code::BracketLeft => "[",
+        Code::BracketRight => "]",
+        Code::Comma => ",",
+        Code::Equal => "=",
+        Code::Minus => "-",
+        Code::Period => ".",
+        Code::Quote => "'",
+        Code::Semicolon => ";",
+        Code::Slash => "/",
+        Code::ArrowUp => "↑",
+        Code::ArrowDown => "↓",
+        Code::ArrowLeft => "←",
+        Code::ArrowRight => "→",
+        _ => {
+            let code = format!("{key:?}");
+            return code
+                .strip_prefix("Key")
+                .or_else(|| code.strip_prefix("Digit"))
+                .unwrap_or(&code)
+                .to_string();
+        }
+    };
+    symbol.to_string()
 }
 
 /// The modifiers held with a key. `control` and `meta` both count as the
@@ -100,6 +170,63 @@ fn name(text: &str) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn ctrl_alt_v() -> global_hotkey::hotkey::HotKey {
+        use global_hotkey::hotkey::{Code, HotKey, Modifiers};
+        HotKey::new(Some(Modifiers::CONTROL | Modifiers::ALT), Code::KeyV)
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn a_hotkey_reads_with_the_mac_symbols() {
+        assert_eq!(hotkey_label(&ctrl_alt_v()), "⌃⌥V");
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn a_hotkey_reads_with_the_windows_names() {
+        assert_eq!(hotkey_label(&ctrl_alt_v()), "Ctrl Alt V");
+    }
+
+    fn command_enter() -> Shortcut {
+        Shortcut {
+            key: "Enter".into(),
+            modifiers: vec![Modifier::Cmd],
+        }
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn every_chord_reads_with_spaces_on_windows() {
+        assert_eq!(panel_label(), "Ctrl K");
+        assert_eq!(confirm_label(true), "Ctrl ↵");
+        assert_eq!(shortcut_label(&command_enter()), "Ctrl ↵");
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn every_chord_reads_joined_on_macos() {
+        assert_eq!(panel_label(), "⌘K");
+        assert_eq!(confirm_label(true), "⌘↵");
+        assert_eq!(shortcut_label(&command_enter()), "⌘↵");
+    }
+
+    #[test]
+    fn a_shortcut_draws_named_keys_as_symbols() {
+        assert_eq!(shortcut_key("Enter"), "↵");
+        assert_eq!(shortcut_key("arrowdown"), "↓");
+        assert_eq!(shortcut_key("r"), "R");
+        assert_eq!(shortcut_key("f5"), "F5");
+    }
+
+    #[test]
+    fn a_hotkey_key_reads_as_its_character() {
+        use global_hotkey::hotkey::Code;
+        assert_eq!(key_name(Code::Semicolon), ";");
+        assert_eq!(key_name(Code::ArrowUp), "↑");
+        assert_eq!(key_name(Code::Digit5), "5");
+        assert_eq!(key_name(Code::F5), "F5");
+    }
 
     #[test]
     fn named_keys_take_their_web_names() {

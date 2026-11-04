@@ -1,9 +1,11 @@
 use crate::protocol::{
-    Action, EmptyState, FieldKind, FieldOption, GridItem, ListItem, Metadata, View,
+    Action, EmptyState, FieldKind, FieldOption, GridItem, ListItem, Metadata, Step, View,
 };
 
 use super::input::{Chord, Context, ResultItem};
-use super::state::{Entry, Launcher, Mode, PushedView, ToastStyle, ViewError, FILTER_PREFIX};
+use super::state::{
+    Entry, Launcher, Mode, PushedView, ToastAction, ToastStyle, ViewError, FILTER_PREFIX,
+};
 
 macro_rules! snapshot_types {
     ($($item:item)*) => {
@@ -62,12 +64,20 @@ snapshot_types! {
 
     pub struct RootScreen {
         pub query: Text,
+        /// The calculator's answer, shown as a card above the sections.
+        pub answer: Option<AnswerCard>,
         pub sections: Vec<Section>,
         pub selected: Option<String>,
         pub empty: Option<EmptyText>,
-        pub busy: bool,
         /// More results may still arrive for the query.
         pub settling: bool,
+    }
+
+    pub struct AnswerCard {
+        pub id: String,
+        pub expression: String,
+        pub answer: String,
+        pub selected: bool,
     }
 
     /// A text field's value. The renderer writes `text` into the field only
@@ -93,6 +103,7 @@ snapshot_types! {
         Grid(GridBody),
         Detail(DetailBody),
         Form(FormBody),
+        Progress(ProgressBody),
     }
 
     pub struct ListBody {
@@ -103,6 +114,8 @@ snapshot_types! {
         pub pane: Option<DetailBody>,
         pub selected: Option<String>,
         pub empty: Option<EmptyText>,
+        /// Loading with nothing declared yet: placeholder rows fill the body.
+        pub skeleton: bool,
     }
 
     /// The view's filter dropdown with the option it shows.
@@ -149,6 +162,14 @@ snapshot_types! {
         pub metadata: Vec<Metadata>,
     }
 
+    pub struct ProgressBody {
+        pub title: String,
+        pub subtitle: String,
+        pub value: Option<f32>,
+        pub detail: String,
+        pub steps: Vec<Step>,
+    }
+
     pub struct FormBody {
         /// Bumped when the form is seeded from a tree. The fields take their
         /// values from the snapshot only then.
@@ -170,6 +191,7 @@ snapshot_types! {
     pub struct Toast {
         pub style: ToastStyle,
         pub text: String,
+        pub action: Option<ToastAction>,
     }
 
     pub struct Hud {
@@ -307,6 +329,12 @@ impl Launcher {
             bindings.push(plain("Tab"));
             bindings.push(anywhere(shift_tab));
         }
+        if let Some(action) = self.toast_action() {
+            let chord = Chord::from(&action.shortcut);
+            if !bindings.iter().any(|taken| taken.chord == chord) {
+                bindings.push(anywhere(chord));
+            }
+        }
         if !matches!(mode, Mode::Error | Mode::Panel) {
             let shortcuts = actions.iter().filter_map(|a| a.shortcut.as_ref());
             for chord in shortcuts.map(Chord::from) {
@@ -320,8 +348,23 @@ impl Launcher {
 
     fn root_screen(&self) -> RootScreen {
         let pick = |keep: fn(&ResultItem) -> bool| -> Vec<ResultItem> {
-            self.results.iter().filter(|r| keep(r)).cloned().collect()
+            self.results
+                .iter()
+                .filter(|r| !r.answer && keep(r))
+                .cloned()
+                .collect()
         };
+        let selected = self.root_selected().map(|item| item.id.clone());
+        let answer = self
+            .results
+            .iter()
+            .find(|item| item.answer)
+            .map(|item| AnswerCard {
+                id: item.id.clone(),
+                expression: self.query.trim().to_string(),
+                answer: item.title.clone(),
+                selected: selected.as_deref() == Some(item.id.as_str()),
+            });
         let pinned = pick(|r| r.pinned);
         let suggested = pick(|r| !r.pinned && r.suggested);
         let rest = pick(|r| !r.pinned && !r.suggested);
@@ -344,8 +387,9 @@ impl Launcher {
                 text: self.query.clone(),
                 revision: self.query_revision,
             },
+            answer,
             sections,
-            selected: self.root_selected().map(|item| item.id.clone()),
+            selected,
             // Said only once every provider has answered, so a slow one does
             // not flash it up between keystrokes.
             empty: (self.results.is_empty() && !self.query.is_empty() && self.results_complete)
@@ -355,7 +399,6 @@ impl Launcher {
                     description: None,
                     truncate: true,
                 }),
-            busy: self.working.is_some(),
             settling: !self.results_complete,
         }
     }
@@ -402,6 +445,7 @@ impl Launcher {
                     }),
                     selected: list_selected.map(|item| item.id.clone()),
                     empty,
+                    skeleton: list.loading && list.items.is_empty(),
                 })
             }
             View::Grid(grid) => {
@@ -439,6 +483,13 @@ impl Launcher {
                 text: detail.text.clone(),
                 metadata: detail.metadata.clone(),
             }),
+            View::Progress(progress) => ViewBody::Progress(ProgressBody {
+                title: progress.title.clone(),
+                subtitle: progress.subtitle.clone(),
+                value: progress.value,
+                detail: progress.detail.clone(),
+                steps: progress.steps.clone(),
+            }),
             View::Form(form) => ViewBody::Form(FormBody {
                 revision: view.form.revision,
                 fields: form
@@ -471,7 +522,7 @@ impl Launcher {
             }),
         };
         ViewScreen {
-            busy: is_busy(&view.tree.view),
+            busy: self.busy_marks_shown().is_some() && !self.busy_shows_task(),
             body,
         }
     }
@@ -489,21 +540,14 @@ impl Launcher {
             return Some(Toast {
                 style: toast.style,
                 text: toast.text.clone(),
+                action: toast.action.clone(),
             });
         }
-        let busy = |text: String| {
-            Some(Toast {
-                style: ToastStyle::Busy,
-                text,
-            })
-        };
-        if let Some(title) = &self.working {
-            return busy(format!("Running {title}…"));
-        }
-        match self.stack.last() {
-            Some(view) if is_busy(&view.tree.view) => busy("Loading…".to_string()),
-            _ => None,
-        }
+        self.busy_marks_shown().map(|text| Toast {
+            style: ToastStyle::Busy,
+            text: text.to_string(),
+            action: self.busy_cancel(),
+        })
     }
 
     fn footer(&self, actions: &[Action]) -> Footer {
@@ -589,14 +633,5 @@ impl EmptyText {
             description: None,
             truncate: false,
         }
-    }
-}
-
-fn is_busy(view: &View) -> bool {
-    match view {
-        View::List(list) => list.loading,
-        View::Grid(grid) => grid.loading,
-        View::Detail(detail) => detail.loading,
-        View::Form(_) => false,
     }
 }

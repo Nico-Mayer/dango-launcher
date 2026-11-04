@@ -122,6 +122,8 @@ pub enum Event {
     Activated {
         held: bool,
         probe: Option<u64>,
+        /// The user opened it, rather than a command bringing it back.
+        asked: bool,
     },
     Reset,
     /// The launcher is off screen, for whatever reason it was hidden.
@@ -129,6 +131,11 @@ pub enum Event {
     ToastExpired {
         id: u64,
     },
+    BusyMarksWoke {
+        id: u64,
+    },
+    /// A background task reported a change.
+    Task(Box<crate::tasks::TaskState>),
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -144,6 +151,10 @@ pub struct ResultItem {
     pub match_positions: Vec<usize>,
     pub suggested: bool,
     pub pinned: bool,
+    /// The calculator's answer to the query, drawn as the card above the rows.
+    pub answer: bool,
+    /// The global hotkey that runs it, when one is registered.
+    pub hotkey: Option<global_hotkey::hotkey::HotKey>,
 }
 
 /// A name and icon the ActionBar shows for where the user is.

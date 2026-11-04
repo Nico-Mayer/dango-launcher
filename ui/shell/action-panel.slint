@@ -24,7 +24,7 @@ component PanelRow inherits Rectangle {
     in property <ActionData> data;
     height: Theme.panel-row-height;
     border-radius: Theme.radius / 2;
-    background: root.data.selected ? Theme.selection
+    background: root.data.selected ? Theme.selected
         : touch.has-hover && !Shell.pointer-resting ? Theme.hover : transparent;
     accessible-role: list-item;
     accessible-label: root.data.title;
@@ -37,7 +37,7 @@ component PanelRow inherits Rectangle {
         spacing: Theme.gap;
         Text {
             text: root.data.title;
-            color: root.data.danger ? Theme.danger : Theme.text;
+            color: root.data.danger ? Theme.danger : Theme.foreground;
             font-size: Theme.text-body;
             overflow: elide;
             vertical-alignment: center;
@@ -78,7 +78,7 @@ component PanelRow inherits Rectangle {
 export component ActionPanel inherits Rectangle {
     property <length> filter-height: Theme.panel-filter-height;
     out property <length> content-height: (Panel.rows.length > 0 ? column.preferred-height : Theme.panel-row-height + 2 * Theme.panel-padding) + self.filter-height;
-    background: Theme.surface;
+    background: Theme.popover;
     border-radius: Theme.radius;
     border-width: 1px;
     border-color: Theme.border;
@@ -159,7 +159,7 @@ export component ActionPanel inherits Rectangle {
             x: 0;
             width: parent.width;
             text: filter.text == "" && filter.preedit-text == "" ? "Search actions" : "";
-            color: Theme.muted;
+            color: Theme.dim;
             font-size: Theme.text-small;
             vertical-alignment: center;
             accessible-role: none;
@@ -169,9 +169,9 @@ export component ActionPanel inherits Rectangle {
             width: parent.width;
             height: parent.height;
             single-line: true;
-            color: Theme.text;
+            color: Theme.foreground;
             selection-background-color: Theme.selection;
-            selection-foreground-color: Theme.text;
+            selection-foreground-color: Theme.foreground;
             font-size: Theme.text-small;
             vertical-alignment: center;
             accessible-role: none;

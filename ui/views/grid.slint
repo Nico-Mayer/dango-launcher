@@ -27,14 +27,14 @@ component Tile inherits Rectangle {
         }
         if root.data.kind == TileKind.glyph: Text {
             text: root.data.glyph;
-            color: Theme.text;
+            color: Theme.foreground;
             font-size: min(parent.height, parent.width) / 2;
             horizontal-alignment: center;
             vertical-alignment: center;
             accessible-role: none;
         }
         Rectangle {
-            background: root.data.selected ? Theme.selection
+            background: root.data.selected ? Theme.selected
                 : touch.has-hover && !Shell.pointer-resting ? Theme.hover : transparent;
         }
     }
@@ -44,7 +44,7 @@ component Tile inherits Rectangle {
         height: 16px;
         width: parent.width;
         text: root.data.title;
-        color: root.data.selected ? Theme.text : Theme.muted;
+        color: root.data.selected ? Theme.foreground : Theme.muted;
         font-size: Theme.text-small;
         horizontal-alignment: center;
         overflow: elide;

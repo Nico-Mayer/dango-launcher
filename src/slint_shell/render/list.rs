@@ -7,9 +7,10 @@ use slint::{ComponentHandle, Model, ModelRc, StyledText, VecModel};
 
 use super::height::{HEADING, ROW};
 use super::icon;
-use crate::protocol::{Accessory, ListItem, TagRole};
+use crate::protocol::{Accessory, ListItem, Status, TagRole};
 use crate::slint_shell::generated::{
-    AccessoryData, AccessoryKind, LauncherWindow, ListData, RowData, TagRole as SlintTagRole,
+    AccessoryData, AccessoryKind, LauncherWindow, ListData, RowData, Status as SlintStatus,
+    TagRole as SlintTagRole,
 };
 use crate::slint_shell::icons::Icons;
 use crate::slint_shell::keys;
@@ -41,6 +42,7 @@ impl Writer {
 
     pub fn root(&mut self, ui: &LauncherWindow, root: &RootScreen, icons: &Icons) {
         ui.global::<ListData>().set_detail_pane(false);
+        ui.global::<ListData>().set_skeleton(false);
         let selected = root.selected.as_deref();
         let rows = root.sections.iter().flat_map(|section| {
             let heading = section.heading.iter().map(|title| heading(title, None));
@@ -55,6 +57,7 @@ impl Writer {
 
     pub fn view(&mut self, ui: &LauncherWindow, list: &ListBody, icons: &Icons) {
         ui.global::<ListData>().set_detail_pane(list.pane.is_some());
+        ui.global::<ListData>().set_skeleton(list.skeleton);
         let selected = list.selected.as_deref();
         let rows = list.sections.iter().flat_map(|section| {
             let heading = section
@@ -126,6 +129,16 @@ fn result_row(item: &ResultItem, selected: Option<&str>, icons: &Icons) -> RowDa
         icon,
         icon_kind,
         selected: selected == Some(item.id.as_str()),
+        accessories: ModelRc::from(Rc::new(VecModel::from(
+            item.hotkey
+                .iter()
+                .map(|hotkey| AccessoryData {
+                    kind: AccessoryKind::Kbd,
+                    text: keys::hotkey_label(hotkey).into(),
+                    ..Default::default()
+                })
+                .collect::<Vec<_>>(),
+        ))),
         ..Default::default()
     }
 }
@@ -178,6 +191,16 @@ fn accessory_data(accessory: &Accessory, icons: &Icons) -> AccessoryData {
             ..text(AccessoryKind::Tag, value)
         },
         Accessory::Kbd { shortcut } => text(AccessoryKind::Kbd, &keys::shortcut_label(shortcut)),
+        Accessory::Progress { value } => AccessoryData {
+            kind: AccessoryKind::Progress,
+            value: value.map_or(-1.0, |value| value.clamp(0.0, 1.0)),
+            ..Default::default()
+        },
+        Accessory::Status { status } => AccessoryData {
+            kind: AccessoryKind::Status,
+            status: slint_status(*status),
+            ..Default::default()
+        },
     }
 }
 
@@ -205,6 +228,16 @@ fn highlighted(title: &str, positions: &[usize]) -> StyledText {
         markdown.push_str("</u>");
     }
     StyledText::from_markdown(&markdown).unwrap_or_else(|_| StyledText::from_plain_text(title))
+}
+
+pub(super) fn slint_status(status: Status) -> SlintStatus {
+    match status {
+        Status::Working => SlintStatus::Working,
+        Status::NeedsInput => SlintStatus::NeedsInput,
+        Status::Done => SlintStatus::Done,
+        Status::Failed => SlintStatus::Failed,
+        Status::Queued => SlintStatus::Queued,
+    }
 }
 
 #[cfg(test)]

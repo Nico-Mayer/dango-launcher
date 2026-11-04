@@ -1,0 +1,67 @@
+import { Theme } from "../theme.slint";
+import { Icon, IconKind } from "../atoms/icon.slint";
+import { AnswerData, Intents, Shell } from "../globals.slint";
+
+/// The calculator's answer to the query, above the results: the expression on
+/// the left, the answer on the right. A row for selection and clicks.
+export component InlineAnswer inherits Rectangle {
+    height: Theme.answer-height;
+    accessible-role: list-item;
+    accessible-label: AnswerData.expression + " = " + AnswerData.answer;
+    accessible-item-selected: AnswerData.selected;
+
+    fill := Rectangle {
+        x: 6px;
+        y: Theme.list-padding;
+        width: parent.width - 12px;
+        height: parent.height - Theme.list-padding;
+        border-radius: Theme.radius;
+        background: AnswerData.selected ? Theme.selected
+            : touch.has-hover && !Shell.pointer-resting ? Theme.hover : transparent;
+
+        HorizontalLayout {
+            padding-left: 16px;
+            padding-right: 16px;
+            spacing: 16px;
+            Text {
+                horizontal-stretch: 1;
+                text: AnswerData.expression;
+                color: Theme.muted;
+                font-size: Theme.text-large;
+                vertical-alignment: center;
+                overflow: elide;
+                accessible-role: none;
+            }
+            VerticalLayout {
+                alignment: center;
+                Icon {
+                    source: AnswerData.arrow;
+                    kind: IconKind.named;
+                }
+            }
+            Text {
+                horizontal-stretch: 1;
+                text: AnswerData.answer;
+                color: Theme.foreground;
+                font-size: 20px;
+                font-weight: 600;
+                horizontal-alignment: right;
+                vertical-alignment: center;
+                overflow: elide;
+                accessible-role: none;
+            }
+        }
+
+        touch := TouchArea {
+            clicked => {
+                Intents.activate(AnswerData.id);
+            }
+            changed mouse-x => {
+                Shell.pointer-resting = false;
+            }
+            changed mouse-y => {
+                Shell.pointer-resting = false;
+            }
+        }
+    }
+}

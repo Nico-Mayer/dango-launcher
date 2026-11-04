@@ -322,13 +322,13 @@ pub fn run() {
         connect(&window, &tray, &core, renderer);
         {
             let core = core.clone();
-            if let Err(error) = instance::listen(instance::NAME, move || core.show(None)) {
+            if let Err(error) = instance::listen(instance::NAME, move || core.show(None, true)) {
                 eprintln!("[dango] a second launch cannot reach this one: {error}");
             }
         }
         {
             let core = core.clone();
-            platform::watch_reopen(Box::new(move || core.show(None)));
+            platform::watch_reopen(Box::new(move || core.show(None, true)));
         }
         core.dispatch(Intent::Ready);
     });

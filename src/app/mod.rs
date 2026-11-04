@@ -5,6 +5,7 @@ mod startup;
 #[cfg(test)]
 mod tests;
 
+use crate::tasks::Tasks;
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, Weak};
@@ -37,6 +38,8 @@ const DEFAULT_RESET_AFTER_SECS: u32 = 60;
 const PERMISSION_POLL: Duration = Duration::from_secs(2);
 
 const TOAST_LIFETIME: Duration = Duration::from_secs(2);
+const BUSY_MARK_DELAY: Duration = Duration::from_millis(150);
+const BUSY_MARK_HOLD: Duration = Duration::from_millis(400);
 /// Longer than a success, so a whole sentence can be read: nothing but time
 /// takes a failure HUD away.
 const FAILURE_HUD_LIFETIME: Duration = Duration::from_secs(4);
@@ -72,6 +75,17 @@ pub struct Services {
     pub clipboard: Option<Arc<dyn ClipboardSource>>,
     pub hotkeys: Registry,
     pub hyperkey: Mutex<HyperkeySlot>,
+    pub tasks: Arc<Tasks>,
+}
+
+/// The registry, telling the launcher about every report as views are told:
+/// straight into the state machine, from whichever thread reports.
+pub(crate) fn tasks_for(core: Weak<Core>) -> Arc<Tasks> {
+    Tasks::new(move |state| {
+        if let Some(core) = core.upgrade() {
+            core.apply(ui::Input::Event(ui::Event::Task(Box::new(state))));
+        }
+    })
 }
 
 /// The running hyperkey and the settings it was started from, so a reload that
@@ -108,29 +122,11 @@ enum HideReason {
     ForWork,
 }
 
-/// What the AI extension needs besides the configuration. Kept so a config
-/// reload can build the extension again: its commands come from the file, so an
-/// edit means a new instance rather than a mutated one.
-pub struct AiParts {
-    pub keys: Arc<dyn extensions::ai::Keys>,
-    pub client: Arc<dyn extensions::ai::Completions>,
-    pub text: Option<Arc<dyn text::TextTarget>>,
-    pub clipboard: Option<Arc<dyn ClipboardSource>>,
-    pub runner: Arc<dyn invocation::Runner>,
-}
+pub use extensions::ai::Parts as AiParts;
 
-impl AiParts {
-    fn build(&self, config: &config::Config) -> (Arc<AiExtension>, Vec<String>) {
-        let (extension, problems) = AiExtension::new(
-            config,
-            self.keys.clone(),
-            self.client.clone(),
-            self.text.clone(),
-            self.clipboard.clone(),
-            Some(self.runner.clone()),
-        );
-        (Arc::new(extension), problems)
-    }
+fn build_ai(parts: &AiParts, config: &config::Config) -> (Arc<AiExtension>, Vec<String>) {
+    let (extension, problems) = AiExtension::new(config, parts);
+    (Arc::new(extension), problems)
 }
 
 impl Core {
@@ -236,6 +232,17 @@ impl Core {
                 }));
             }
             ui::Effect::ReportPaint(probe) => self.latency.finish(probe),
+            ui::Effect::WakeBusyMarks { id, stage } => {
+                let after = match stage {
+                    ui::BusyStage::Delay => BUSY_MARK_DELAY,
+                    ui::BusyStage::Hold => BUSY_MARK_HOLD,
+                };
+                let core = self.clone();
+                self.runtime.spawn(async move {
+                    tokio::time::sleep(after).await;
+                    core.apply(ui::Input::Event(ui::Event::BusyMarksWoke { id }));
+                });
+            }
             ui::Effect::ExpireToast { id, style } => {
                 let lifetime = match style {
                     ui::ToastStyle::Failure => FAILURE_HUD_LIFETIME,
@@ -281,7 +288,17 @@ impl Core {
         } else {
             Some(context.title.clone())
         };
+        let target = if c.source == crate::search::Source::Command {
+            Some(hotkeys::Target::Command(c.id.clone()))
+        } else if c.extension_id == extensions::applications::EXTENSION_ID {
+            Some(hotkeys::Target::Application(c.title.clone()))
+        } else {
+            None
+        };
+        let hotkey = target.and_then(|target| self.services.hotkeys.chord_for(&target));
         ui::ResultItem {
+            hotkey,
+            answer: c.source == crate::search::Source::Answer,
             context,
             extension_id: c.extension_id,
             id: c.id,
@@ -302,12 +319,14 @@ impl Core {
                 core.hide(HideReason::Interrupted);
             } else {
                 let probe = core.latency.start();
-                core.show(probe);
+                core.show(probe, true);
             }
         });
     }
 
-    pub fn show(self: &Arc<Self>, probe: Option<u64>) {
+    /// `asked` when the user opened it: only then may it jump into an answer
+    /// whose HUD is showing.
+    pub fn show(self: &Arc<Self>, probe: Option<u64>, asked: bool) {
         let core = self.clone();
         self.on_main_thread(move || {
             let held = core.clear_hold();
@@ -316,7 +335,11 @@ impl Core {
             if !core.visible.swap(true, Ordering::SeqCst) {
                 core.shell.show();
             }
-            core.apply(ui::Input::Event(ui::Event::Activated { held, probe }));
+            core.apply(ui::Input::Event(ui::Event::Activated {
+                held,
+                probe,
+                asked,
+            }));
         });
     }
 
@@ -494,7 +517,9 @@ impl Core {
     /// press never gets here, because a chord says nothing about what the user
     /// types to find an item.
     fn record_use(&self, extension_id: &str, item_id: &str, query: Option<&str>) {
-        if item_id.is_empty() {
+        // An answer is the query's own result, not something the user reaches
+        // for again, so learning it would only fill the tables.
+        if item_id.is_empty() || extension_id == extensions::calculator::EXTENSION_ID {
             return;
         }
         let now = now_millis();
@@ -559,7 +584,7 @@ impl Core {
                         // can see. A held launcher is different: the user closed
                         // it and will find the output when they come back.
                         if !core.visible.load(Ordering::SeqCst) && !core.holding() {
-                            core.show(None);
+                            core.show(None, false);
                         }
                         core.apply(ui::Input::Event(ui::Event::Rendered {
                             owner: owner.clone(),
@@ -608,7 +633,7 @@ impl Core {
             .unwrap_or(false);
 
         if shows_view {
-            self.show(None);
+            self.show(None, false);
         } else {
             // The launcher never showed to record the window the press acts on.
             platform::note_insertion_target();
@@ -677,7 +702,8 @@ impl Core {
                 | ActionOutcome::CopyToClipboard(_)
                 | ActionOutcome::Copied
                 | ActionOutcome::Replaced(_)
-                | ActionOutcome::Removed(_) => {}
+                | ActionOutcome::Removed(_)
+                | ActionOutcome::Back => {}
             }
         });
     }
@@ -818,7 +844,7 @@ impl Core {
                 let (extension, problems) = {
                     let config = self.config.shared();
                     let config = config.read().unwrap();
-                    parts.build(&config)
+                    build_ai(parts, &config)
                 };
                 for problem in &problems {
                     crate::log::append(problem);
@@ -872,10 +898,14 @@ struct ViewRunner {
 }
 
 impl invocation::Runner for ViewRunner {
-    fn start(&self) -> Option<Arc<InvocationContext>> {
+    fn start(&self, title: Option<&str>) -> Option<Arc<InvocationContext>> {
         let core = self.core.upgrade()?;
         let (ctx, running) = core.services.invoker.detached(self.owner);
-        core.pump(self.owner.to_string(), core.context(self.owner), running);
+        let mut context = core.context(self.owner);
+        if let Some(title) = title {
+            context.title = title.to_string();
+        }
+        core.pump(self.owner.to_string(), context, running);
         Some(Arc::new(ctx))
     }
 }

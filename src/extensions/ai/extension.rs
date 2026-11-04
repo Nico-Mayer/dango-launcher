@@ -11,6 +11,7 @@
 //! and the work moves to its own thread; the launcher hears about both the same
 //! way.
 
+use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
 use crate::extension::{
@@ -19,8 +20,10 @@ use crate::extension::{
 use crate::extensions::clipboard::ClipboardSource;
 use crate::invocation::{Command, InvocationContext, Runner};
 use crate::protocol::{
-    Action, DetailView, FieldKind, FormField, FormView, View, ViewTree, PROTOCOL_VERSION,
+    Action, DetailView, FieldKind, FormField, FormView, Modifier, Shortcut, View, ViewTree,
+    PROTOCOL_VERSION,
 };
+use crate::tasks::{TaskHandle, TaskStatus, Tasks};
 use crate::templates::{Template, Values};
 use crate::text::TextTarget;
 
@@ -32,6 +35,9 @@ use super::Keys;
 pub const ACTION_RUN: &str = "run";
 pub const ACTION_PASTE: &str = "paste";
 pub const ACTION_COPY: &str = "copy";
+pub const ACTION_BACKGROUND: &str = "background";
+pub const ACTION_CANCEL: &str = "cancel";
+pub const ACTION_SHOW: &str = "show";
 
 /// Argument fields are prefixed on the way out and stripped on the way back, so
 /// a prompt argument cannot collide with a field of the form's own.
@@ -58,30 +64,58 @@ struct Inner {
     /// The last complete answer, so the result view's actions have something to
     /// paste or copy. One answer at a time, because one command runs at a time.
     answer: Mutex<Option<String>>,
+    tasks: Arc<Tasks>,
+    /// Whether the launcher is on screen. An answer that arrives while it is
+    /// not is kept rather than pasted into whatever the user is doing.
+    visible: Arc<dyn Fn() -> bool + Send + Sync>,
+    /// The run in progress and the view it streams into, swapped when the
+    /// user opens the same command again.
+    live: Mutex<Option<Live>>,
+    /// Answers that finished away from their view, by command, until shown.
+    kept: Mutex<HashMap<String, String>>,
+}
+
+struct Live {
+    command_id: String,
+    task: TaskHandle,
+    ctx: InvocationContext,
+    text: String,
+}
+
+/// What the extension needs besides the configuration. Kept so a config
+/// reload can build the extension again: its commands come from the file, so an
+/// edit means a new instance rather than a mutated one.
+#[derive(Clone)]
+pub struct Parts {
+    pub keys: Arc<dyn Keys>,
+    pub client: Arc<dyn Completions>,
+    pub text: Option<Arc<dyn TextTarget>>,
+    pub clipboard: Option<Arc<dyn ClipboardSource>>,
+    pub runner: Option<Arc<dyn Runner>>,
+    pub tasks: Arc<Tasks>,
+    pub visible: Arc<dyn Fn() -> bool + Send + Sync>,
 }
 
 impl AiExtension {
-    pub fn new(
-        config: &crate::config::Config,
-        keys: Arc<dyn Keys>,
-        client: Arc<dyn Completions>,
-        text: Option<Arc<dyn TextTarget>>,
-        clipboard: Option<Arc<dyn ClipboardSource>>,
-        runner: Option<Arc<dyn Runner>>,
-    ) -> (Self, Vec<String>) {
+    pub fn new(config: &crate::config::Config, parts: &Parts) -> (Self, Vec<String>) {
         let built = build(config);
         let manifest = manifest(&built.commands);
+        let parts = parts.clone();
         let extension = Self {
             manifest,
             inner: Arc::new(Inner {
                 commands: built.commands,
                 providers: Providers::from_config(config),
-                keys,
-                client,
-                text,
-                clipboard,
-                runner,
+                keys: parts.keys,
+                client: parts.client,
+                text: parts.text,
+                clipboard: parts.clipboard,
+                runner: parts.runner,
                 answer: Mutex::new(None),
+                tasks: parts.tasks,
+                visible: parts.visible,
+                live: Mutex::new(None),
+                kept: Mutex::new(HashMap::new()),
             }),
         };
         (extension, built.problems)
@@ -109,6 +143,9 @@ impl Extension for AiExtension {
                 Some(answer) => ActionOutcome::CopyToClipboard(answer),
                 None => ActionOutcome::Failed(NO_ANSWER.into()),
             },
+            ACTION_BACKGROUND => ActionOutcome::Back,
+            ACTION_CANCEL => self.inner.cancel(),
+            ACTION_SHOW => self.inner.show_kept(item_id),
             _ => ActionOutcome::Failed("That action isn't available".into()),
         }
     }
@@ -131,7 +168,8 @@ impl Inner {
         let Some(runner) = &self.runner else {
             return ActionOutcome::Failed("This command can't run right now".into());
         };
-        let Some(ctx) = runner.start() else {
+        let title = self.find(command_id).map(|command| command.title.as_str());
+        let Some(ctx) = runner.start(title) else {
             return ActionOutcome::Failed("This command can't run right now".into());
         };
         let inner = self.clone();
@@ -140,8 +178,13 @@ impl Inner {
         ActionOutcome::Started
     }
 
-    /// One run, start to finish, on whatever thread is already carrying it.
+    /// One run, start to finish, on whatever thread is already carrying it. Once
+    /// its prompt is ready it is a background task: leaving its view or hiding
+    /// the launcher no longer stops it, only Cancel or another command does.
     fn run(&self, command_id: &str, arguments: FormValues, ctx: &InvocationContext) {
+        if self.reshow(command_id, ctx) {
+            return;
+        }
         let Some(command) = self.find(command_id) else {
             ctx.fail("That command is no longer available");
             return;
@@ -150,20 +193,182 @@ impl Inner {
             return;
         };
 
+        if let Some(previous) = self.live.lock().unwrap().take() {
+            previous.task.cancel();
+        }
+        let task = self.tasks.start(EXTENSION_ID, command_id, &command.title);
+        task.report(|state| {
+            state.line = format!("Running {}…", command.title);
+            state.cancel = Some(ACTION_CANCEL.into());
+        });
         let waiting = format!("Waiting for {}…", request.provider);
-        ctx.push_view(detail_tree(&waiting, true, false));
+        *self.live.lock().unwrap() = Some(Live {
+            command_id: command_id.to_string(),
+            task: task.clone(),
+            ctx: ctx.clone(),
+            text: String::new(),
+        });
+        self.stream_into_view(&task, &waiting);
 
         let limit = limit_for(&request);
         let chunks = self.client.stream(request);
-        let ended = drive(&chunks, limit, &|| ctx.is_cancelled(), &mut |so_far| {
-            ctx.push_view(detail_tree(so_far, true, false))
+        let cancelled = task.cancelled();
+        let ended = drive(&chunks, limit, &|| *cancelled.borrow(), &mut |so_far| {
+            self.stream_into_view(&task, so_far)
         });
 
+        let (view, away) = {
+            let mut live = self.live.lock().unwrap();
+            let Some(view) = live.take_if(|live| live.task.id() == task.id()) else {
+                drop(live);
+                task.report(|state| state.status = TaskStatus::Cancelled);
+                return;
+            };
+            let away = view.ctx.is_cancelled() || !(self.visible)();
+            // Kept before the run is let go, so running the command again finds
+            // either the run or its answer, never neither.
+            if let (true, Ended::Answer(answer)) = (away, &ended) {
+                if command.output != Output::Copy && !answer.trim().is_empty() {
+                    self.kept
+                        .lock()
+                        .unwrap()
+                        .insert(command.id.clone(), answer.trim().to_string());
+                }
+            }
+            (view, away)
+        };
+        // Hidden but held, the view comes back on the next open, so it must not
+        // still look like it is loading.
+        let held = (away && !view.ctx.is_cancelled()).then_some(&view.ctx);
         match ended {
-            Ended::Cancelled => {}
-            Ended::Failed(error) => ctx.fail(error.to_string()),
-            Ended::Answer(answer) => self.deliver(command.output, &answer, ctx),
+            Ended::Cancelled => {
+                task.report(|state| state.status = TaskStatus::Cancelled);
+            }
+            Ended::Failed(error) if away => {
+                if let Some(held) = held {
+                    held.push_view(detail_tree(&view.text, false, false));
+                }
+                task.report(|state| {
+                    state.status = TaskStatus::Failed {
+                        sentence: error.to_string(),
+                    }
+                });
+            }
+            Ended::Failed(error) => {
+                view.ctx.fail(error.to_string());
+                task.report(|state| state.status = TaskStatus::Cancelled);
+            }
+            Ended::Answer(answer) if away => self.finish_away(command, &answer, &task, held),
+            // In view the answer reports itself, so the task ends without a toast.
+            Ended::Answer(answer) => {
+                self.deliver(command.output, &answer, &view.ctx);
+                task.report(|state| state.status = TaskStatus::Cancelled);
+            }
         }
+    }
+
+    /// The same command again while it runs: its view comes back with what has
+    /// arrived so far, and the run streams there from now on. Once it finished
+    /// away, its kept answer opens instead of a new request.
+    fn reshow(&self, command_id: &str, ctx: &InvocationContext) -> bool {
+        let mut live = self.live.lock().unwrap();
+        if let Some(live) = live.as_mut().filter(|live| live.command_id == command_id) {
+            live.ctx = ctx.clone();
+            ctx.push_view(running_tree(&live.text));
+            return true;
+        }
+        let Some(answer) = self.kept.lock().unwrap().remove(command_id) else {
+            return false;
+        };
+        self.show_answer(answer, ctx);
+        true
+    }
+
+    fn show_answer(&self, answer: String, ctx: &InvocationContext) {
+        ctx.push_view(detail_tree(&answer, false, true));
+        *self.answer.lock().unwrap() = Some(answer);
+    }
+
+    fn stream_into_view(&self, task: &TaskHandle, text: &str) {
+        let mut live = self.live.lock().unwrap();
+        if let Some(live) = live.as_mut().filter(|live| live.task.id() == task.id()) {
+            live.text = text.to_string();
+            live.ctx.push_view(running_tree(text));
+        }
+    }
+
+    /// Nobody is looking any more, so nothing is pasted into whatever has the
+    /// focus now: the answer was kept for "Show answer", or is copied when that
+    /// is the command's choice.
+    fn finish_away(
+        &self,
+        command: &AiCommand,
+        answer: &str,
+        task: &TaskHandle,
+        held: Option<&InvocationContext>,
+    ) {
+        let answer = answer.trim();
+        if let Some(held) = held {
+            match answer.is_empty() {
+                true => held.push_view(detail_tree("", false, false)),
+                false => self.show_answer(answer.to_string(), held),
+            }
+        }
+        if answer.is_empty() {
+            task.report(|state| {
+                state.status = TaskStatus::Failed {
+                    sentence: NO_ANSWER.into(),
+                }
+            });
+            return;
+        }
+        if command.output == Output::Copy {
+            let Some(clipboard) = &self.clipboard else {
+                task.report(|state| {
+                    state.status = TaskStatus::Failed {
+                        sentence: crate::text::TextError::Clipboard.to_string(),
+                    }
+                });
+                return;
+            };
+            clipboard.set_text(answer);
+            task.report(|state| {
+                state.status = TaskStatus::Done {
+                    sentence: "Copied to clipboard".into(),
+                }
+            });
+            return;
+        }
+        task.report(|state| {
+            state.status = TaskStatus::Done {
+                sentence: format!("Answer ready: {}", command.title),
+            };
+            state.show = Some(ACTION_SHOW.into());
+        });
+    }
+
+    fn cancel(&self) -> ActionOutcome {
+        if let Some(live) = self.live.lock().unwrap().as_ref() {
+            live.task.cancel();
+        }
+        ActionOutcome::Back
+    }
+
+    /// Opens an answer that finished while its view was not on screen.
+    fn show_kept(&self, command_id: &str) -> ActionOutcome {
+        let Some(answer) = self.kept.lock().unwrap().remove(command_id) else {
+            return ActionOutcome::Failed(NO_ANSWER.into());
+        };
+        let title = self.find(command_id).map(|command| command.title.as_str());
+        let Some(ctx) = self.runner.as_ref().and_then(|runner| runner.start(title)) else {
+            self.kept
+                .lock()
+                .unwrap()
+                .insert(command_id.to_string(), answer);
+            return ActionOutcome::Failed("This command can't run right now".into());
+        };
+        self.show_answer(answer, &ctx);
+        ActionOutcome::Started
     }
 
     /// Everything that has to be true before a model is asked anything: the
@@ -358,6 +563,31 @@ fn detail_tree(markdown: &str, loading: bool, actionable: bool) -> ViewTree {
             ..Default::default()
         }),
     }
+}
+
+/// A request still answering: Enter sends it to the background, and Cancel
+/// stops it, so a stray Enter never throws away a paid answer.
+fn running_tree(markdown: &str) -> ViewTree {
+    let mut tree = detail_tree(markdown, true, false);
+    if let View::Detail(detail) = &mut tree.view {
+        detail.actions = vec![
+            Action {
+                id: ACTION_BACKGROUND.into(),
+                title: "Continue in background".into(),
+                ..Default::default()
+            },
+            Action {
+                id: ACTION_CANCEL.into(),
+                title: "Cancel".into(),
+                shortcut: Some(Shortcut {
+                    key: ".".into(),
+                    modifiers: vec![Modifier::Cmd],
+                }),
+                ..Default::default()
+            },
+        ];
+    }
+    tree
 }
 
 fn argument_tree(command: &AiCommand, template: &Template) -> ViewTree {
@@ -566,11 +796,15 @@ mod tests {
         let clipboard = Arc::new(FakeClipboard::default());
         let (extension, problems) = AiExtension::new(
             &config,
-            Arc::new(keys),
-            client.clone(),
-            Some(text.clone()),
-            Some(clipboard.clone()),
-            None,
+            &Parts {
+                keys: Arc::new(keys),
+                client: client.clone(),
+                text: Some(text.clone()),
+                clipboard: Some(clipboard.clone()),
+                runner: None,
+                tasks: crate::tasks::Tasks::new(|_| {}),
+                visible: Arc::new(|| true),
+            },
         );
         assert!(problems.is_empty(), "{problems:?}");
         Fixture {
@@ -620,7 +854,7 @@ mod tests {
     }
 
     #[test]
-    fn the_first_view_names_the_provider_and_carries_no_actions() {
+    fn the_first_view_names_the_provider_and_offers_the_background() {
         let fixture = fixture(LOCAL, Scripted::answering(&["Better."]), selected("text"));
         let sink = Arc::new(Recorded::default());
         run(&fixture, "improve-writing", sink.clone());
@@ -630,9 +864,11 @@ mod tests {
         };
         assert_eq!(first.markdown, "Waiting for local…");
         assert!(first.loading, "the first view is not marked loading");
-        assert!(
-            first.actions.is_empty(),
-            "a half-written answer offers actions"
+        let ids: Vec<&str> = first.actions.iter().map(|a| a.id.as_str()).collect();
+        assert_eq!(
+            ids,
+            [ACTION_BACKGROUND, ACTION_CANCEL],
+            "Enter sends it to the background, never cancels or pastes"
         );
     }
 
@@ -932,5 +1168,327 @@ mod tests {
             .commands
             .iter()
             .all(|command| command.mode == InvocationMode::View));
+    }
+
+    struct Background {
+        fixture: Fixture,
+        reports: Arc<Mutex<Vec<crate::tasks::TaskState>>>,
+        visible: Arc<std::sync::atomic::AtomicBool>,
+        shown: Arc<Recorded>,
+        titled: Arc<Mutex<Option<String>>>,
+    }
+
+    struct ShowRunner(Arc<Recorded>, Arc<Mutex<Option<String>>>);
+
+    impl Runner for ShowRunner {
+        fn start(&self, title: Option<&str>) -> Option<Arc<InvocationContext>> {
+            *self.1.lock().unwrap() = title.map(str::to_string);
+            Some(Arc::new(InvocationContext::for_test(
+                EXTENSION_ID,
+                self.0.clone(),
+            )))
+        }
+    }
+
+    fn background(config_json: &str, client: Scripted) -> Background {
+        let config = Config::parse(config_json).unwrap();
+        let client = Arc::new(client);
+        let text = Arc::new(selected("text"));
+        let clipboard = Arc::new(FakeClipboard::default());
+        let shown = Arc::new(Recorded::default());
+        let titled = Arc::new(Mutex::new(None));
+        let reports = Arc::new(Mutex::new(Vec::new()));
+        let sink = reports.clone();
+        let visible = Arc::new(std::sync::atomic::AtomicBool::new(true));
+        let probe = visible.clone();
+        let (extension, _) = AiExtension::new(
+            &config,
+            &Parts {
+                keys: Arc::new(FixedKeys(Some("sk-test"))),
+                client: client.clone(),
+                text: Some(text.clone()),
+                clipboard: Some(clipboard.clone()),
+                runner: Some(Arc::new(ShowRunner(shown.clone(), titled.clone()))),
+                tasks: crate::tasks::Tasks::new(move |state| sink.lock().unwrap().push(state)),
+                visible: Arc::new(move || probe.load(std::sync::atomic::Ordering::SeqCst)),
+            },
+        );
+        Background {
+            fixture: Fixture {
+                extension,
+                text,
+                clipboard,
+                client,
+            },
+            reports,
+            visible,
+            shown,
+            titled,
+        }
+    }
+
+    impl Background {
+        fn last_status(&self) -> Option<crate::tasks::TaskStatus> {
+            self.reports
+                .lock()
+                .unwrap()
+                .last()
+                .map(|state| state.status.clone())
+        }
+
+        fn last_report(&self) -> crate::tasks::TaskState {
+            self.reports.lock().unwrap().last().cloned().unwrap()
+        }
+
+        fn wait_for_live(&self) {
+            self.wait_until(|live| live.is_some());
+        }
+
+        fn wait_until(&self, done: impl Fn(&Option<Live>) -> bool) {
+            let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+            while !done(&self.fixture.inner().live.lock().unwrap()) {
+                assert!(
+                    std::time::Instant::now() < deadline,
+                    "the run never got there"
+                );
+                std::thread::yield_now();
+            }
+        }
+    }
+
+    fn left_behind() -> Arc<Recorded> {
+        Arc::new(Recorded {
+            cancelled: true,
+            ..Default::default()
+        })
+    }
+
+    #[test]
+    fn a_run_left_behind_keeps_its_answer_for_later() {
+        let b = background(LOCAL, Scripted::answering(&["Better."]));
+        let sink = left_behind();
+        run(&b.fixture, "improve-writing", sink.clone());
+
+        let report = b.last_report();
+        assert_eq!(
+            report.status,
+            crate::tasks::TaskStatus::Done {
+                sentence: "Answer ready: Improve Writing".into()
+            }
+        );
+        assert_eq!(report.show.as_deref(), Some(ACTION_SHOW));
+        assert!(!sink.succeeded() && sink.failure().is_none());
+
+        let outcome =
+            b.fixture
+                .extension
+                .perform_action("improve-writing", ACTION_SHOW, &FormValues::new());
+        assert_eq!(outcome, ActionOutcome::Started);
+        assert_eq!(
+            b.shown.markdown().last().map(String::as_str),
+            Some("Better.")
+        );
+        assert_eq!(
+            b.titled.lock().unwrap().as_deref(),
+            Some("Improve Writing"),
+            "the view is named after the command, not the extension"
+        );
+    }
+
+    #[test]
+    fn a_paste_command_finishing_while_hidden_pastes_nothing() {
+        let b = background(
+            r#"
+            [ai]
+            providers = { local = { kind = "ollama", model = "qwen3:8b" } }
+            commands = { improve-writing = { output = "paste" } }
+            "#,
+            Scripted::answering(&["Better."]),
+        );
+        b.visible.store(false, std::sync::atomic::Ordering::SeqCst);
+        let held = Arc::new(Recorded::default());
+        run(&b.fixture, "improve-writing", held.clone());
+
+        assert!(b.fixture.text.inserted.lock().unwrap().is_empty());
+        assert!(matches!(
+            b.last_status(),
+            Some(crate::tasks::TaskStatus::Done { .. })
+        ));
+        let last = held.trees.lock().unwrap().last().cloned().unwrap();
+        let View::Detail(detail) = last.view else {
+            panic!("the held view shows a detail");
+        };
+        assert!(!detail.loading, "the view the next open shows is finished");
+        assert_eq!(detail.markdown, "Better.");
+    }
+
+    #[test]
+    fn a_failure_while_hidden_leaves_no_loading_view() {
+        let b = background(
+            LOCAL,
+            Scripted::failing(super::super::provider::AiError::LocalUnreachable),
+        );
+        b.visible.store(false, std::sync::atomic::Ordering::SeqCst);
+        let held = Arc::new(Recorded::default());
+        run(&b.fixture, "improve-writing", held.clone());
+
+        assert!(matches!(
+            b.last_status(),
+            Some(crate::tasks::TaskStatus::Failed { .. })
+        ));
+        let last = held.trees.lock().unwrap().last().cloned().unwrap();
+        let View::Detail(detail) = last.view else {
+            panic!("the held view shows a detail");
+        };
+        assert!(!detail.loading);
+    }
+
+    #[test]
+    fn the_same_command_again_shows_its_kept_answer_once() {
+        let b = background(LOCAL, Scripted::answering(&["Better."]));
+        run(&b.fixture, "improve-writing", left_behind());
+
+        let again = Arc::new(Recorded::default());
+        run(&b.fixture, "improve-writing", again.clone());
+        assert_eq!(again.markdown(), ["Better."]);
+        assert_eq!(
+            b.fixture.client.seen.lock().unwrap().len(),
+            1,
+            "no second request"
+        );
+
+        let outcome =
+            b.fixture
+                .extension
+                .perform_action("improve-writing", ACTION_SHOW, &FormValues::new());
+        assert!(
+            matches!(outcome, ActionOutcome::Failed(_)),
+            "shown once, then gone"
+        );
+
+        run(&b.fixture, "improve-writing", Arc::new(Recorded::default()));
+        assert_eq!(b.fixture.client.seen.lock().unwrap().len(), 2);
+    }
+
+    #[test]
+    fn a_copy_command_finishing_away_still_copies() {
+        let b = background(
+            r#"
+            [ai]
+            providers = { local = { kind = "ollama", model = "qwen3:8b" } }
+            commands = { summarize = { output = "copy" } }
+            "#,
+            Scripted::answering(&["Short."]),
+        );
+        run(&b.fixture, "summarize", left_behind());
+
+        assert_eq!(*b.fixture.clipboard.written.lock().unwrap(), ["Short."]);
+        assert_eq!(
+            b.last_status(),
+            Some(crate::tasks::TaskStatus::Done {
+                sentence: "Copied to clipboard".into()
+            })
+        );
+    }
+
+    #[test]
+    fn a_paste_command_finishing_in_view_pastes_and_posts_no_result() {
+        let b = background(
+            r#"
+            [ai]
+            providers = { local = { kind = "ollama", model = "qwen3:8b" } }
+            commands = { improve-writing = { output = "paste" } }
+            "#,
+            Scripted::answering(&["Better."]),
+        );
+        run(&b.fixture, "improve-writing", Arc::new(Recorded::default()));
+
+        assert_eq!(*b.fixture.text.inserted.lock().unwrap(), ["Better."]);
+        assert_eq!(b.last_status(), Some(crate::tasks::TaskStatus::Cancelled));
+    }
+
+    #[test]
+    fn cancel_stops_a_running_request() {
+        let b = background(LOCAL, Scripted::holding(&["Bet"]));
+        let inner = b.fixture.inner().clone();
+        let sink = Arc::new(Recorded::default());
+        let ctx = InvocationContext::for_test("improve-writing", sink.clone());
+        let running =
+            std::thread::spawn(move || inner.run("improve-writing", FormValues::new(), &ctx));
+        b.wait_for_live();
+
+        let outcome = b.fixture.extension.perform_action(
+            "improve-writing",
+            ACTION_CANCEL,
+            &FormValues::new(),
+        );
+        assert_eq!(outcome, ActionOutcome::Back);
+        running.join().unwrap();
+        b.fixture.client.release();
+
+        assert_eq!(b.last_status(), Some(crate::tasks::TaskStatus::Cancelled));
+        assert!(!sink.succeeded() && sink.failure().is_none());
+        assert!(b.fixture.inner().kept.lock().unwrap().is_empty());
+    }
+
+    #[test]
+    fn the_same_command_again_shows_the_running_request() {
+        let b = background(LOCAL, Scripted::holding(&["Bet"]));
+        let inner = b.fixture.inner().clone();
+        let first = Arc::new(Recorded::default());
+        let ctx = InvocationContext::for_test("improve-writing", first.clone());
+        let running =
+            std::thread::spawn(move || inner.run("improve-writing", FormValues::new(), &ctx));
+        b.wait_until(|live| live.as_ref().is_some_and(|live| live.text == "Bet"));
+
+        let again = Arc::new(Recorded::default());
+        run(&b.fixture, "improve-writing", again.clone());
+        assert_eq!(again.markdown(), ["Bet"]);
+        assert_eq!(
+            b.fixture.client.seen.lock().unwrap().len(),
+            1,
+            "no second request"
+        );
+
+        b.fixture.client.release();
+        running.join().unwrap();
+        assert_eq!(again.markdown().last().map(String::as_str), Some("Bet"));
+    }
+
+    #[test]
+    fn a_form_does_not_stop_a_running_request_but_another_command_does() {
+        let b = background(LOCAL, Scripted::holding(&["Bet"]));
+        let inner = b.fixture.inner().clone();
+        let ctx = InvocationContext::for_test("improve-writing", Arc::new(Recorded::default()));
+        let running =
+            std::thread::spawn(move || inner.run("improve-writing", FormValues::new(), &ctx));
+        b.wait_for_live();
+
+        run(&b.fixture, "translate", Arc::new(Recorded::default()));
+        assert_eq!(
+            b.fixture
+                .inner()
+                .live
+                .lock()
+                .unwrap()
+                .as_ref()
+                .map(|live| live.command_id.clone()),
+            Some("improve-writing".to_string()),
+            "a form waiting for input left the run alone"
+        );
+
+        let inner = b.fixture.inner().clone();
+        let ctx = InvocationContext::for_test("summarize", Arc::new(Recorded::default()));
+        let second = std::thread::spawn(move || inner.run("summarize", FormValues::new(), &ctx));
+        running.join().unwrap();
+        b.fixture.client.release();
+        second.join().unwrap();
+        assert!(b
+            .reports
+            .lock()
+            .unwrap()
+            .iter()
+            .any(|state| state.title == "Improve Writing"
+                && state.status == crate::tasks::TaskStatus::Cancelled));
     }
 }

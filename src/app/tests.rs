@@ -109,14 +109,19 @@ fn core_with_applications(
         clipboard: None,
         hotkeys: Registry::new(Box::new(grab), launcher),
         hyperkey: Mutex::default(),
+        tasks: crate::tasks::Tasks::new(|_| {}),
     };
-    let core = Arc::new(Core::new(
-        shell.clone(),
-        Handle::current(),
-        config,
-        TrayStatus::default(),
-        services,
-    ));
+    let core = Arc::new_cyclic(|weak| {
+        let mut services = services;
+        services.tasks = super::tasks_for(weak.clone());
+        Core::new(
+            shell.clone(),
+            Handle::current(),
+            config,
+            TrayStatus::default(),
+            services,
+        )
+    });
     (core, shell)
 }
 
@@ -138,11 +143,15 @@ fn escape(core: &Arc<Core>) {
 }
 
 fn start_work(core: &Arc<Core>) -> Arc<InvocationContext> {
+    start_titled(core, None)
+}
+
+fn start_titled(core: &Arc<Core>, title: Option<&str>) -> Arc<InvocationContext> {
     ViewRunner {
         core: Arc::downgrade(core),
         owner: "test",
     }
-    .start()
+    .start(title)
     .unwrap()
 }
 
@@ -328,7 +337,7 @@ async fn a_hide_for_work_while_hidden_keeps_the_held_query() {
 async fn showing_a_visible_launcher_does_not_show_it_again() {
     let (core, shell) = core("");
     core.toggle();
-    core.show(None);
+    core.show(None, true);
     assert_eq!(shell.calls(), [Call::Show]);
 }
 
@@ -366,7 +375,7 @@ impl crate::extensions::ai::Completions for StopCounter {
 struct NoRunner;
 
 impl Runner for NoRunner {
-    fn start(&self) -> Option<Arc<InvocationContext>> {
+    fn start(&self, _title: Option<&str>) -> Option<Arc<InvocationContext>> {
         None
     }
 }
@@ -408,12 +417,14 @@ async fn a_failed_selection_read_shows_in_the_launcher_at_once() {
         client: Arc::new(StopCounter::default()),
         text: Some(Arc::new(NothingSelected)),
         clipboard: None,
-        runner: Arc::new(NoRunner),
+        runner: Some(Arc::new(NoRunner)),
+        tasks: crate::tasks::Tasks::new(|_| {}),
+        visible: Arc::new(|| true),
     };
     let config = r#"
         ai = { providers = { local = { kind = "ollama", model = "qwen3:8b" } } }
     "#;
-    let (extension, _) = ai.build(&Config::parse(config).unwrap());
+    let (extension, _) = super::build_ai(&ai, &Config::parse(config).unwrap());
     let (core, shell) = core_with_ai(config, FakeGrab::default(), vec![extension], Some(ai));
     core.toggle();
     core.run_command("dango.ai.improve-writing").unwrap();
@@ -445,7 +456,9 @@ async fn quitting_stops_running_agent_programs() {
         client: client.clone(),
         text: None,
         clipboard: None,
-        runner: Arc::new(NoRunner),
+        runner: Some(Arc::new(NoRunner)),
+        tasks: crate::tasks::Tasks::new(|_| {}),
+        visible: Arc::new(|| true),
     };
     let (core, _) = core_with_ai("", FakeGrab::default(), Vec::new(), Some(ai));
     core.quit();
@@ -901,4 +914,163 @@ async fn an_application_hotkey_whose_launch_fails_is_reported_in_the_hud() {
         Some("Couldn't open Code")
     );
     assert!(!core.tray().config_error);
+}
+
+fn a_loading_view() -> ViewTree {
+    ViewTree::new(View::List(ListView {
+        loading: true,
+        ..ListView::default()
+    }))
+}
+
+fn busy(shell: &RecordingShell) -> bool {
+    matches!(shell.last_snapshot().screen, Screen::View(view) if view.busy)
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_view_loading_past_the_delay_shows_busy_marks() {
+    let (core, shell) = core("");
+    core.toggle();
+    let work = start_work(&core);
+    work.push_view(a_loading_view());
+    settle().await;
+    assert!(!busy(&shell), "not before the delay");
+    tokio::time::sleep(Duration::from_millis(200)).await;
+    assert!(busy(&shell));
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_view_done_before_the_delay_never_shows_busy_marks() {
+    let (core, shell) = core("");
+    core.toggle();
+    let work = start_work(&core);
+    work.push_view(a_loading_view());
+    settle().await;
+    work.push_view(a_view());
+    for _ in 0..10 {
+        tokio::time::sleep(Duration::from_millis(50)).await;
+        assert!(!busy(&shell));
+    }
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_task_report_reaches_the_launcher() {
+    let (core, shell) = core("");
+    core.toggle();
+    let task = core
+        .services
+        .tasks
+        .start("dango.updates", "update", "Dango 0.5.0");
+    task.report(|state| state.line = "Downloading Dango 0.5.0 · 42%".into());
+    tokio::time::sleep(Duration::from_millis(200)).await;
+    let toast = shell.last_snapshot().toast.expect("the task's busy toast");
+    assert_eq!(toast.text, "Downloading Dango 0.5.0 · 42%");
+}
+
+#[tokio::test]
+async fn an_answer_is_never_learned() {
+    let (core, _) = core("");
+    core.record_use(
+        crate::extensions::calculator::EXTENSION_ID,
+        "4",
+        Some("2+2"),
+    );
+    let now = crate::ranking::now_millis();
+    assert_eq!(
+        core.services
+            .frecency
+            .score(crate::extensions::calculator::EXTENSION_ID, "4", now),
+        0.0
+    );
+}
+
+#[tokio::test]
+async fn a_command_shows_its_registered_hotkey() {
+    let (core, _) = core_with("", FakeGrab::default(), vec![two_commands()]);
+    let config = Config::parse(
+        r#"[extensions."x".commands.first]
+hotkey = "ctrl+alt+v""#,
+    )
+    .unwrap();
+    core.services.hotkeys.apply(&config);
+    let candidate = crate::search::Candidate {
+        id: "x.first".into(),
+        ..x_candidate(crate::search::Source::Command, false)
+    };
+    let item = core.result_item(candidate);
+    let chord = item.hotkey.expect("the registered hotkey");
+    assert!(chord.mods.contains(Modifiers::CONTROL | Modifiers::ALT));
+    assert_eq!(chord.key, Code::KeyV);
+
+    let refused = HotKey::new(Some(Modifiers::CONTROL | Modifiers::ALT), Code::KeyV);
+    let (core, _) = core_with(
+        "",
+        FakeGrab {
+            refused: vec![refused],
+            ..FakeGrab::default()
+        },
+        vec![two_commands()],
+    );
+    core.services.hotkeys.apply(&config);
+    let candidate = crate::search::Candidate {
+        id: "x.first".into(),
+        ..x_candidate(crate::search::Source::Command, false)
+    };
+    assert_eq!(core.result_item(candidate).hotkey, None);
+}
+
+fn answer_ready() -> crate::tasks::TaskState {
+    crate::tasks::TaskState {
+        id: 1,
+        owner: "x".into(),
+        title: "Summarize".into(),
+        line: String::new(),
+        status: crate::tasks::TaskStatus::Done {
+            sentence: "Answer ready: Summarize".into(),
+        },
+        progress: None,
+        steps: Vec::new(),
+        subtitle: String::new(),
+        detail: String::new(),
+        cancel: None,
+        retry: None,
+        show: Some("show".into()),
+        item_id: "summarize".into(),
+    }
+}
+
+fn answer_toast(shell: &RecordingShell) -> bool {
+    shell
+        .last_snapshot()
+        .toast
+        .is_some_and(|toast| toast.text == "Answer ready: Summarize")
+}
+
+/// Only an open the user asked for may run the answer's "Show answer".
+#[tokio::test]
+async fn the_launcher_hotkey_opens_an_answer_but_a_command_hotkey_does_not() {
+    let (core, shell) = core_with("", FakeGrab::default(), vec![two_commands()]);
+    core.apply(crate::ui::Input::Event(crate::ui::Event::Task(Box::new(
+        answer_ready(),
+    ))));
+    core.toggle();
+    settle().await;
+    assert!(!answer_toast(&shell), "the answer opened instead");
+
+    let (core, shell) = core_with("", FakeGrab::default(), vec![two_commands()]);
+    core.apply(crate::ui::Input::Event(crate::ui::Event::Task(Box::new(
+        answer_ready(),
+    ))));
+    core.dispatch_command("x.keep");
+    settle().await;
+    assert!(answer_toast(&shell), "the toast offers it instead");
+}
+
+#[tokio::test]
+async fn work_started_for_a_command_is_named_after_it() {
+    let (core, shell) = core("");
+    core.toggle();
+    start_titled(&core, Some("Summarize")).push_view(a_view());
+    settle().await;
+    assert_eq!(shell.last_snapshot().footer.context.title, "Summarize");
 }

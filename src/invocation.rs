@@ -41,7 +41,9 @@ pub trait Sink: Send + Sync {
     }
 }
 
-/// Handed to a command for the length of one invocation.
+/// Handed to a command for the length of one invocation. A clone shares the
+/// invocation, so work that outlives the call can keep reporting into it.
+#[derive(Clone)]
 pub struct InvocationContext {
     pub command_id: String,
     sink: Arc<dyn Sink>,
@@ -86,7 +88,9 @@ pub trait Command: Send + Sync {
 /// Somewhere to start work that is not an invocation: a submitted form has an
 /// answer to stream but no command running behind it.
 pub trait Runner: Send + Sync {
-    fn start(&self) -> Option<Arc<InvocationContext>>;
+    /// `title` names the view in the ActionBar; without one it carries the
+    /// extension's name.
+    fn start(&self, title: Option<&str>) -> Option<Arc<InvocationContext>>;
 }
 
 pub struct Resolved {

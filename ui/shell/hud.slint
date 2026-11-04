@@ -1,5 +1,6 @@
 import { Theme } from "../theme.slint";
-import { Dot, ToastStyle } from "../atoms/dot.slint";
+import { Dot, Status } from "../atoms/dot.slint";
+import { ToastStyle } from "../globals.slint";
 
 /// A toast on its own, for while the launcher is hidden. The window keeps one
 /// size so the shell can place it before Slint lays it out; the pill inside
@@ -21,7 +22,7 @@ export component HudWindow inherits Window {
     pill := Rectangle {
         width: min(parent.width, label.preferred-width + 2 * Theme.hud-padding + dot.width + Theme.gap);
         height: parent.height;
-        background: Theme.raised;
+        background: Theme.popover;
         border-radius: self.height / 2;
         border-width: 1px;
         border-color: Theme.border;
@@ -34,13 +35,13 @@ export component HudWindow inherits Window {
             VerticalLayout {
                 alignment: center;
                 dot := Dot {
-                    style: root.style;
+                    status: root.style == ToastStyle.failure ? Status.failed : Status.done;
                 }
             }
 
             label := Text {
                 text: root.text;
-                color: root.style == ToastStyle.failure ? Theme.text : Theme.muted;
+                color: root.style == ToastStyle.failure ? Theme.foreground : Theme.muted;
                 font-size: Theme.text-small;
                 vertical-alignment: center;
                 overflow: elide;

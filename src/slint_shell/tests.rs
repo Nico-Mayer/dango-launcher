@@ -18,8 +18,12 @@ use crate::protocol::{
 use crate::shell::TrayStatus;
 use crate::ui::{Context, Effect, Event, Input, Intent, Launcher, ResultItem, TemplateInspection};
 
-const LIST_TOP: f32 = 56.0 + 6.0;
-const LIST_BOTTOM: f32 = 480.0 - 40.0 - 6.0;
+const SEARCH_BAR: f32 = 64.0;
+const ACTION_BAR: f32 = 44.0;
+const LIST_PADDING: f32 = 8.0;
+const ROW: f32 = 44.0;
+const LIST_TOP: f32 = SEARCH_BAR + LIST_PADDING;
+const LIST_BOTTOM: f32 = 480.0 - ACTION_BAR - LIST_PADDING;
 
 struct Harness {
     ui: LauncherWindow,
@@ -79,6 +83,7 @@ impl Harness {
         harness.event(Event::Activated {
             held: false,
             probe: None,
+            asked: false,
         });
         harness
     }
@@ -93,9 +98,31 @@ impl Harness {
         harness
     }
 
+    /// Lets the busy marks' next wait pass, as the shell's timer would.
+    fn wake_busy(&self) {
+        let pending = self
+            .effects
+            .borrow()
+            .iter()
+            .rev()
+            .find_map(|effect| match effect {
+                Effect::WakeBusyMarks { id, .. } => Some(*id),
+                _ => None,
+            });
+        if let Some(id) = pending {
+            self.event(Event::BusyMarksWoke { id });
+        }
+    }
+
     fn event(&self, event: Event) {
-        self.launcher.borrow_mut().apply(Input::Event(event));
+        let fx = self.launcher.borrow_mut().apply(Input::Event(event));
+        self.effects.borrow_mut().extend(fx);
         let snapshot = self.launcher.borrow().snapshot();
+        self.publish(snapshot);
+    }
+
+    /// Draws a snapshot the state machine could not make on its own.
+    fn publish(&self, snapshot: crate::ui::Snapshot) {
         render::publish(
             &mut self.renderer.borrow_mut(),
             &self.ui,
@@ -215,6 +242,8 @@ fn result(n: usize) -> ResultItem {
         match_positions: Vec::new(),
         suggested: false,
         pinned: false,
+        answer: false,
+        hotkey: None,
     }
 }
 
@@ -246,13 +275,25 @@ mod theme {
 
         palette.set_color_scheme(ColorScheme::Dark);
         assert!(theme.get_dark());
-        assert_eq!(theme.get_surface(), Color::from_rgb_u8(0x1e, 0x1e, 0x21));
-        assert_eq!(theme.get_muted(), Color::from_rgb_u8(0x9a, 0x9a, 0xa2));
+        assert_eq!(theme.get_popover(), Color::from_rgb_u8(0x1f, 0x20, 0x24));
+        assert_eq!(theme.get_foreground(), Color::from_rgb_u8(0xec, 0xec, 0xee));
+        assert_eq!(theme.get_accent(), Color::from_rgb_u8(0xa7, 0xb4, 0xc6));
 
         palette.set_color_scheme(ColorScheme::Light);
         assert!(!theme.get_dark());
-        assert_eq!(theme.get_surface(), Color::from_rgb_u8(0xff, 0xff, 0xff));
-        assert_eq!(theme.get_muted(), Color::from_rgb_u8(0x6b, 0x6b, 0x72));
+        assert_eq!(theme.get_popover(), Color::from_rgb_u8(0xff, 0xff, 0xff));
+        assert_eq!(theme.get_foreground(), Color::from_rgb_u8(0x1c, 0x1c, 0x1f));
+        assert_eq!(theme.get_accent(), Color::from_rgb_u8(0x5b, 0x6b, 0x82));
+    }
+
+    #[test]
+    fn selected_rows_and_selected_text_differ() {
+        let h = Harness::new();
+        let theme = h.ui.global::<Theme>();
+        for scheme in [ColorScheme::Dark, ColorScheme::Light] {
+            h.ui.global::<StdPalette>().set_color_scheme(scheme);
+            assert_ne!(theme.get_selected(), theme.get_selection());
+        }
     }
 }
 
@@ -267,12 +308,83 @@ mod atoms {
         let gallery = AtomGallery::new().unwrap();
         gallery.set_chord(keys::panel_label().into());
         gallery.show().unwrap();
-        for label in ["Icon", "Link", "2m", "Busy", keys::panel_label().as_str()] {
+        for label in [
+            "Icon",
+            "Link",
+            "2m",
+            "Working",
+            keys::panel_label().as_str(),
+        ] {
             assert!(
                 ElementHandle::find_by_accessible_label(&gallery, label)
                     .next()
                     .is_some(),
                 "{label} is drawn"
+            );
+        }
+    }
+
+    fn gallery() -> AtomGallery {
+        i_slint_backend_testing::init_no_event_loop();
+        let gallery = AtomGallery::new().unwrap();
+        gallery.set_chord(keys::panel_label().into());
+        gallery.show().unwrap();
+        gallery
+    }
+
+    fn described(gallery: &AtomGallery, description: &str) -> ElementHandle {
+        let wanted = description.to_string();
+        i_slint_backend_testing::ElementQuery::from_root(gallery)
+            .match_descendants()
+            .match_predicate(move |element| {
+                element.accessible_description().as_deref() == Some(wanted.as_str())
+            })
+            .find_first()
+            .unwrap_or_else(|| panic!("{description} is drawn"))
+    }
+
+    #[test]
+    fn a_determinate_ring_reports_its_value() {
+        let gallery = gallery();
+        assert_eq!(
+            described(&gallery, "Part done")
+                .accessible_value()
+                .as_deref(),
+            Some("42")
+        );
+        assert_eq!(
+            described(&gallery, "All done")
+                .accessible_value()
+                .as_deref(),
+            Some("100")
+        );
+        assert_eq!(
+            described(&gallery, "Bar").accessible_value().as_deref(),
+            Some("62")
+        );
+    }
+
+    #[test]
+    fn an_indeterminate_ring_says_it_is_working() {
+        let gallery = gallery();
+        let ring = ElementHandle::find_by_accessible_label(&gallery, "Working")
+            .find(|element| {
+                element.accessible_role()
+                    == Some(i_slint_backend_testing::AccessibleRole::ProgressIndicator)
+            })
+            .expect("the indeterminate ring");
+        assert_eq!(ring.accessible_value().as_deref(), Some(""));
+    }
+
+    #[test]
+    fn an_announced_dot_names_its_state() {
+        let gallery = gallery();
+        for label in ["Working", "Needs input", "Done", "Failed", "Queued"] {
+            assert!(
+                ElementHandle::find_by_accessible_label(&gallery, label)
+                    .any(|element| element.accessible_role()
+                        == Some(i_slint_backend_testing::AccessibleRole::Image)),
+                "a dot is labelled {label}"
             );
         }
     }
@@ -316,7 +428,7 @@ mod atoms {
         gallery.set_chord(keys::panel_label().into());
         gallery.show().unwrap();
         let expected = if cfg!(target_os = "macos") {
-            "⌘ K"
+            "⌘K"
         } else {
             "Ctrl K"
         };
@@ -383,6 +495,7 @@ mod search_bar {
             detail.loading = true;
         }
         h.view(tree);
+        h.wake_busy();
         let bar = ElementHandle::find_by_accessible_label(&h.ui, "Loading…").find(|element| {
             element.accessible_role()
                 == Some(i_slint_backend_testing::AccessibleRole::ProgressIndicator)
@@ -398,8 +511,9 @@ mod search_bar {
             detail.loading = true;
         }
         h.view(tree);
+        h.wake_busy();
         let sweep_x = || {
-            ElementHandle::find_by_element_id(&h.ui, "SearchBar::sweep")
+            ElementHandle::find_by_element_id(&h.ui, "Progress::sweep")
                 .next()
                 .map(|sweep| sweep.absolute_position().x)
         };
@@ -408,6 +522,8 @@ mod search_bar {
         assert_ne!(sweep_x(), Some(before));
 
         h.view(detail_tree("Done"));
+        assert!(sweep_x().is_some(), "the bar stays its minimum time");
+        h.wake_busy();
         assert!(sweep_x().is_none());
     }
 
@@ -506,11 +622,17 @@ mod toast {
             "
 ",
         );
+        h.wake_busy();
         assert_eq!(
             h.shell().get_toast_style(),
             super::super::generated::ToastStyle::Busy
         );
         assert!(h.find("Running Clipboard History…").is_some());
+        let spinner = h.find("Working").expect("the busy toast's spinner");
+        assert_eq!(
+            spinner.accessible_role(),
+            Some(i_slint_backend_testing::AccessibleRole::ProgressIndicator)
+        );
     }
 
     #[test]
@@ -836,9 +958,9 @@ mod list_view {
     }
 
     #[test]
-    fn a_row_is_forty_pixels_high() {
+    fn a_row_is_forty_four_pixels_high() {
         let h = Harness::root(results(3));
-        assert_eq!(h.row("Result 1").size().height, 40.0);
+        assert_eq!(h.row("Result 1").size().height, ROW);
     }
 
     #[test]
@@ -860,6 +982,105 @@ mod list_view {
         assert!(h.find("Accessory 4").is_none());
     }
 
+    fn progress_values(h: &Harness) -> Vec<String> {
+        i_slint_backend_testing::ElementQuery::from_root(&h.ui)
+            .match_descendants()
+            .match_accessible_role(i_slint_backend_testing::AccessibleRole::ProgressIndicator)
+            .find_all()
+            .iter()
+            .filter_map(|ring| ring.accessible_value().map(|value| value.to_string()))
+            .collect()
+    }
+
+    #[test]
+    fn progress_and_status_accessories_are_shown() {
+        let h = Harness::root(results(1));
+        h.view(tree(
+            vec![ListItem {
+                accessories: vec![
+                    Accessory::Progress { value: Some(0.42) },
+                    Accessory::Status {
+                        status: crate::protocol::Status::Working,
+                    },
+                ],
+                ..item(1)
+            }],
+            false,
+        ));
+        assert!(progress_values(&h).contains(&"42".to_string()));
+        assert!(h.find("Working").is_some());
+    }
+
+    #[test]
+    fn a_progress_value_out_of_range_is_clamped() {
+        let h = Harness::root(results(1));
+        h.view(tree(
+            vec![ListItem {
+                accessories: vec![Accessory::Progress { value: Some(1.5) }],
+                ..item(1)
+            }],
+            false,
+        ));
+        assert!(progress_values(&h).contains(&"100".to_string()));
+        assert!(h.find("Item 1").is_some());
+    }
+
+    fn loading(items: Vec<ListItem>) -> ViewTree {
+        ViewTree::new(View::List(ListView {
+            loading: true,
+            items,
+            ..Default::default()
+        }))
+    }
+
+    fn skeleton_shown(h: &Harness) -> bool {
+        h.ui.global::<ListData>().get_skeleton()
+            && ElementHandle::find_by_element_type_name(&h.ui, "Skeleton")
+                .next()
+                .is_some()
+    }
+
+    #[test]
+    fn a_cold_loading_list_shows_skeleton_rows_at_full_height() {
+        let h = Harness::root(results(1));
+        h.view(loading(Vec::new()));
+        assert!(skeleton_shown(&h));
+        assert_eq!(h.shell().get_screen(), ScreenKind::List);
+        assert_eq!(h.height(), 480.0);
+    }
+
+    #[test]
+    fn the_skeleton_keeps_to_the_list_beside_a_detail_pane() {
+        let h = Harness::root(results(1));
+        h.view(ViewTree::new(View::List(ListView {
+            loading: true,
+            detail_pane: true,
+            ..Default::default()
+        })));
+        let skeleton = ElementHandle::find_by_element_type_name(&h.ui, "Skeleton")
+            .next()
+            .expect("the skeleton");
+        assert!(skeleton.size().width <= 720.0 * 2.0 / 5.0 + 0.5);
+    }
+
+    #[test]
+    fn arriving_items_replace_the_skeleton() {
+        let h = Harness::root(results(1));
+        h.view(loading(Vec::new()));
+        h.view(loading(vec![item(1)]));
+        assert!(!skeleton_shown(&h));
+        assert!(h.find("Item 1").is_some());
+    }
+
+    #[test]
+    fn a_refreshing_list_filtered_to_nothing_shows_no_skeleton() {
+        let h = Harness::root(results(1));
+        h.view(loading(vec![item(1)]));
+        h.type_text("zzz");
+        assert!(h.find("Item 1").is_none());
+        assert!(!skeleton_shown(&h));
+    }
+
     #[test]
     fn a_pushed_list_of_five_hundred_renders_fifty_rows() {
         let h = Harness::root(results(1));
@@ -870,12 +1091,12 @@ mod list_view {
     }
 
     #[test]
-    fn hover_is_weaker_than_selection() {
+    fn hover_is_weaker_than_selected() {
         let h = Harness::new();
         let theme = h.ui.global::<Theme>();
         for scheme in [ColorScheme::Dark, ColorScheme::Light] {
             h.ui.global::<StdPalette>().set_color_scheme(scheme);
-            assert!(theme.get_hover().alpha() < theme.get_selection().alpha());
+            assert!(theme.get_hover().alpha() < theme.get_selected().alpha());
         }
     }
 
@@ -938,7 +1159,7 @@ mod detail {
         let value = h.find("Terminal").expect("the metadata is drawn");
         (
             value.absolute_position().y + value.size().height,
-            LIST_BOTTOM + 6.0,
+            480.0 - ACTION_BAR,
         )
     }
 
@@ -948,7 +1169,7 @@ mod detail {
         let (bottom, detail_bottom) = metadata_bottom(&h, "One line");
         let body = h.find("One line").unwrap();
         assert!(
-            bottom > detail_bottom - 40.0,
+            bottom > detail_bottom - ACTION_BAR,
             "{bottom} near {detail_bottom}"
         );
         assert!(bottom - body.absolute_position().y > 200.0);
@@ -960,7 +1181,7 @@ mod detail {
         let long = (1..=200).map(|n| format!("line {n}\n")).collect::<String>();
         let (bottom, detail_bottom) = metadata_bottom(&h, &long);
         assert!(bottom <= detail_bottom, "{bottom} within {detail_bottom}");
-        assert!(bottom > detail_bottom - 40.0);
+        assert!(bottom > detail_bottom - ACTION_BAR);
     }
 
     #[test]
@@ -1276,10 +1497,13 @@ mod grid {
         let h = Harness::root(results(1));
         h.view(grid_tree(7));
         let content = h.ui.global::<GridData>().get_content_height();
-        assert!((h.height() - (56.0 + content + 40.0)).abs() < 0.01);
+        assert!((h.height() - (SEARCH_BAR + content + ACTION_BAR)).abs() < 0.01);
         let last = h.row("Tile 7");
         let bottom = last.absolute_position().y + last.size().height;
-        assert!(bottom <= h.height() - 40.0, "the last row is not cut off");
+        assert!(
+            bottom <= h.height() - ACTION_BAR,
+            "the last row is not cut off"
+        );
     }
 }
 
@@ -1410,7 +1634,10 @@ mod window_height {
     #[test]
     fn three_results_make_a_short_window() {
         let h = Harness::root(results(3));
-        assert_eq!(h.height(), 56.0 + 6.0 + 3.0 * 40.0 + 6.0 + 40.0);
+        assert_eq!(
+            h.height(),
+            SEARCH_BAR + LIST_PADDING + 3.0 * ROW + LIST_PADDING + ACTION_BAR
+        );
     }
 
     #[test]
@@ -1435,13 +1662,19 @@ mod window_height {
             items: results(8),
             complete: false,
         });
-        assert_eq!(h.height(), 56.0 + 6.0 + 8.0 * 40.0 + 6.0 + 40.0);
+        assert_eq!(
+            h.height(),
+            SEARCH_BAR + LIST_PADDING + 8.0 * ROW + LIST_PADDING + ACTION_BAR
+        );
         h.event(Event::Results {
             query: "re".into(),
             items: results(2),
             complete: true,
         });
-        assert_eq!(h.height(), 56.0 + 6.0 + 2.0 * 40.0 + 6.0 + 40.0);
+        assert_eq!(
+            h.height(),
+            SEARCH_BAR + LIST_PADDING + 2.0 * ROW + LIST_PADDING + ACTION_BAR
+        );
     }
 
     #[test]
@@ -1551,7 +1784,7 @@ mod action_panel {
                 element.accessible_role() == Some(i_slint_backend_testing::AccessibleRole::List)
             })
             .expect("the action panel");
-        assert_eq!(h.height(), panel.size().height + 40.0 + 2.0 * 8.0);
+        assert_eq!(h.height(), panel.size().height + ACTION_BAR + 2.0 * 8.0);
     }
 
     #[test]
@@ -1772,5 +2005,226 @@ mod hud {
         }
         write(&ui, &"Too long ".repeat(20));
         assert!(ui.get_cut(), "the measure sees a cut");
+    }
+}
+
+mod progress_view {
+    use super::*;
+    use crate::protocol::{ProgressView, Status, Step};
+
+    fn tree(value: Option<f32>) -> ViewTree {
+        ViewTree::new(View::Progress(ProgressView {
+            title: "Dango 0.5.0".into(),
+            subtitle: "You have 0.4.2".into(),
+            value,
+            detail: "18.4 MB of 29.6 MB".into(),
+            steps: [
+                ("Download", Status::Working),
+                ("Verify signature", Status::Queued),
+                ("Restart", Status::Queued),
+            ]
+            .into_iter()
+            .map(|(title, status)| Step {
+                title: title.into(),
+                status,
+            })
+            .collect(),
+            actions: Vec::new(),
+        }))
+    }
+
+    fn bar(h: &Harness) -> ElementHandle {
+        i_slint_backend_testing::ElementQuery::from_root(&h.ui)
+            .match_descendants()
+            .match_predicate(|element| {
+                element.accessible_description().as_deref() == Some("Dango 0.5.0")
+            })
+            .find_first()
+            .expect("the progress bar")
+    }
+
+    #[test]
+    fn a_progress_view_shows_its_bar_title_and_steps() {
+        let h = Harness::root(results(1));
+        h.view(tree(Some(0.62)));
+        assert_eq!(bar(&h).accessible_value().as_deref(), Some("62"));
+        assert!(h.find("Download, working").is_some());
+        assert!(h.find("Verify signature, queued").is_some());
+        assert!(h.find("Restart, queued").is_some());
+        assert!(h.find("You have 0.4.2").is_some());
+        assert!(h.find("18.4 MB of 29.6 MB").is_some());
+    }
+
+    #[test]
+    fn a_progress_view_without_a_value_is_indeterminate() {
+        let h = Harness::root(results(1));
+        h.view(tree(None));
+        let bar = bar(&h);
+        assert_eq!(bar.accessible_value().as_deref(), Some(""));
+        assert_eq!(bar.accessible_label().as_deref(), Some("Working"));
+    }
+}
+
+mod toast_action {
+    use super::super::keys;
+    use super::*;
+    use crate::protocol::{Modifier, Shortcut};
+    use crate::ui::{ActionRequest, Origin, ToastAction};
+
+    #[test]
+    fn a_toast_chord_is_as_wide_as_its_keys() {
+        let h = Harness::root(results(3));
+        h.event(Event::Failed("Couldn't download the update.".into()));
+        let mut snapshot = h.launcher.borrow().snapshot();
+        let retry = Shortcut {
+            key: "r".into(),
+            modifiers: vec![Modifier::Cmd],
+        };
+        if let Some(toast) = snapshot.toast.as_mut() {
+            toast.action = Some(ToastAction {
+                title: "Retry".into(),
+                shortcut: retry.clone(),
+                request: ActionRequest {
+                    origin: Origin::Root,
+                    extension_id: "dango.updates".into(),
+                    item_id: "update".into(),
+                    action_id: "install".into(),
+                    values: None,
+                    query: None,
+                },
+            });
+        }
+        h.publish(snapshot);
+        let keys = keys::shortcut_label(&retry);
+        let in_toast = ElementHandle::find_by_element_type_name(&h.ui, "Kbd")
+            .find(|kbd| kbd.accessible_label().as_deref() == Some(keys.as_str()))
+            .expect("the toast's chord")
+            .size()
+            .width;
+        let gallery = super::super::generated::AtomGallery::new().unwrap();
+        gallery.set_chord(keys.as_str().into());
+        gallery.show().unwrap();
+        let alone = ElementHandle::find_by_accessible_label(&gallery, &keys)
+            .next()
+            .expect("the chord on its own")
+            .size()
+            .width;
+        assert_eq!(in_toast, alone);
+    }
+
+    #[test]
+    fn a_failure_toast_shows_its_action_and_chord() {
+        let h = Harness::root(results(3));
+        h.event(Event::Failed("Couldn't download the update.".into()));
+        let mut snapshot = h.launcher.borrow().snapshot();
+        let shortcut = Shortcut {
+            key: "r".into(),
+            modifiers: vec![Modifier::Cmd],
+        };
+        if let Some(toast) = snapshot.toast.as_mut() {
+            toast.action = Some(ToastAction {
+                title: "Retry".into(),
+                shortcut: shortcut.clone(),
+                request: ActionRequest {
+                    origin: Origin::Root,
+                    extension_id: "dango.updates".into(),
+                    item_id: "update".into(),
+                    action_id: "install".into(),
+                    values: None,
+                    query: None,
+                },
+            });
+        }
+        h.publish(snapshot);
+        let chord = keys::shortcut_label(&shortcut);
+        assert_eq!(h.shell().get_toast_action_label(), "Retry");
+        assert_eq!(h.shell().get_toast_action_keys(), chord.as_str());
+        let toast = h.find("Couldn't download the update.").expect("the toast");
+        assert_eq!(
+            toast.accessible_description().as_deref(),
+            Some(format!("Failed. Retry, {chord}").as_str())
+        );
+    }
+}
+
+mod inline_answer {
+    use super::*;
+
+    fn answer() -> ResultItem {
+        ResultItem {
+            extension_id: "dango.calculator".into(),
+            id: "4".into(),
+            title: "4".into(),
+            answer: true,
+            ..result(0)
+        }
+    }
+
+    fn answered(rows: Vec<ResultItem>) -> Harness {
+        let h = Harness::new();
+        h.type_text("2+2");
+        let mut items = vec![answer()];
+        items.extend(rows);
+        h.event(Event::Results {
+            query: "2+2".into(),
+            items,
+            complete: true,
+        });
+        h
+    }
+
+    #[test]
+    fn the_card_shows_and_is_selected() {
+        let h = answered(results(2));
+        let card = h.find("2+2 = 4").expect("the answer card");
+        assert_eq!(card.accessible_item_selected(), Some(true));
+        assert_eq!(h.row("Result 1").accessible_item_selected(), Some(false));
+    }
+
+    #[test]
+    fn the_card_adds_its_height() {
+        let h = Harness::new();
+        h.type_text("2+2");
+        h.event(Event::Results {
+            query: "2+2".into(),
+            items: results(2),
+            complete: true,
+        });
+        let without = h.height();
+        let mut items = vec![answer()];
+        items.extend(results(2));
+        h.event(Event::Results {
+            query: "2+2".into(),
+            items,
+            complete: true,
+        });
+        assert_eq!(h.height(), without + 64.0);
+    }
+
+    #[test]
+    fn an_answer_alone_shows_no_empty_view() {
+        let h = answered(Vec::new());
+        assert!(h.find("2+2 = 4").is_some());
+        assert!(h.find("No results for “2+2”").is_none());
+    }
+}
+
+mod root_hotkey {
+    use super::*;
+    use global_hotkey::hotkey::{Code, HotKey, Modifiers};
+
+    #[test]
+    fn a_root_row_shows_its_hotkey() {
+        let chord = HotKey::new(Some(Modifiers::CONTROL | Modifiers::ALT), Code::KeyV);
+        let label = super::super::keys::hotkey_label(&chord);
+        let h = Harness::root(vec![
+            ResultItem {
+                hotkey: Some(chord),
+                ..result(1)
+            },
+            result(2),
+        ]);
+        let shown: Vec<_> = ElementHandle::find_by_accessible_label(&h.ui, &label).collect();
+        assert_eq!(shown.len(), 1, "{label} is drawn once");
     }
 }

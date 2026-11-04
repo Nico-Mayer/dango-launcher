@@ -2,6 +2,7 @@ import { ScrollView } from "std-widgets.slint";
 import { Theme } from "../theme.slint";
 import { Icon } from "../atoms/icon.slint";
 import { Accessory } from "../atoms/accessory.slint";
+import { Skeleton } from "../atoms/skeleton.slint";
 import { Intents, ListData, RowData, Shell } from "../globals.slint";
 import { Detail } from "detail.slint";
 
@@ -47,7 +48,7 @@ component Row inherits Rectangle {
         x: 6px;
         width: parent.width - 6px - root.right-inset;
         border-radius: Theme.radius;
-        background: root.data.selected ? Theme.selection
+        background: root.data.selected ? Theme.selected
             : touch.has-hover && !Shell.pointer-resting ? Theme.hover : transparent;
 
         HorizontalLayout {
@@ -72,7 +73,7 @@ component Row inherits Rectangle {
                         x: 0;
                         width: parent.width;
                         text: root.data.title;
-                        default-color: Theme.text;
+                        default-color: Theme.foreground;
                         default-font-size: Theme.text-body;
                         max-lines: 1;
                         vertical-alignment: center;
@@ -142,6 +143,13 @@ export component List inherits Rectangle {
                 }
             }
         }
+    }
+
+    if ListData.skeleton: Skeleton {
+        x: 0;
+        y: Theme.list-padding;
+        width: ListData.detail-pane ? parent.width * 2 / 5 : parent.width;
+        height: parent.height - 2 * Theme.list-padding;
     }
 
     if ListData.detail-pane: Rectangle {

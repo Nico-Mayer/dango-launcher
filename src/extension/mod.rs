@@ -37,6 +37,9 @@ pub enum ActionOutcome {
     /// The action succeeded and the launcher stays open, saying so in one line.
     Toast(String),
     Failed(String),
+    /// Leave the view the action ran in, as Escape does, while the work it
+    /// shows goes on elsewhere.
+    Back,
 }
 
 /// A native built-in. Its manifest is data; its behaviour is Rust. Third-party

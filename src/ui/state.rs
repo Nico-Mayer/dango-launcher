@@ -6,9 +6,10 @@ use crate::protocol::{
     Section, Shortcut, View, ViewTree, FILTER_ACTION, GRID_COLUMNS, PROTOCOL_VERSION,
 };
 
-use super::effect::{ActionRequest, Effect, Origin};
+use super::effect::{ActionRequest, BusyStage, Effect, Origin};
 use super::input::{Chord, Context, Event, Input, Intent, ResultItem, TemplateInspection};
 use crate::ranking::fuzzy;
+use crate::tasks::{TaskState, TaskStatus};
 
 /// All interaction state of the launcher. A pure reducer: input goes in,
 /// effects for the shell come out, and `snapshot` says what to draw.
@@ -46,6 +47,11 @@ pub struct Launcher {
     /// A tree that cannot be drawn, shown in place of a view until Escape.
     pub(super) view_error: Option<ViewError>,
     pub(super) toast: Option<HeldToast>,
+    pub(super) busy_marks: BusyMarks,
+    /// The last report of every task that has not ended.
+    pub(super) tasks: Vec<TaskState>,
+    /// A task's result that came while the launcher was hidden.
+    pending_result: Option<TaskState>,
     /// What the launcher reports while it is off screen. Set while it is still
     /// visible, it waits for the hide.
     pub(super) hud: Option<HeldToast>,
@@ -59,6 +65,34 @@ pub(super) struct HeldToast {
     pub(super) id: u64,
     pub(super) style: ToastStyle,
     pub(super) text: String,
+    pub(super) action: Option<ToastAction>,
+}
+
+/// One action a toast offers, run by its chord while the toast shows.
+#[derive(Clone, Debug, PartialEq)]
+pub struct ToastAction {
+    pub title: String,
+    pub shortcut: Shortcut,
+    pub request: ActionRequest,
+}
+
+/// The loading bar and busy toast wait a moment before they appear and, once
+/// shown, stay a moment, so fast work never blinks them.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub(super) enum BusyMarks {
+    #[default]
+    Hidden,
+    Pending {
+        id: u64,
+    },
+    Shown {
+        id: u64,
+        held: bool,
+        text: String,
+        /// Shown for a background task, which draws no loading bar. Kept while
+        /// the marks linger after the work ends.
+        task: bool,
+    },
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -178,6 +212,7 @@ impl Launcher {
             Input::Intent(intent) => self.intent(intent, &mut effects),
             Input::Event(event) => self.event(event, &mut effects),
         }
+        self.settle_busy_marks(&mut effects);
         if self.panel.is_some() && self.available_actions().is_empty() {
             self.panel = None;
         }
@@ -185,6 +220,16 @@ impl Launcher {
     }
 
     fn intent(&mut self, intent: Intent, fx: &mut Vec<Effect>) {
+        if let Intent::Key { chord } = &intent {
+            if let Some(action) = self
+                .toast_action()
+                .filter(|action| Chord::from(&action.shortcut) == *chord)
+            {
+                fx.push(Effect::RunAction(action.request.clone()));
+                self.toast = None;
+                return;
+            }
+        }
         if matches!(
             intent,
             Intent::QueryChanged { .. }
@@ -195,7 +240,7 @@ impl Launcher {
                 | Intent::ClosePanel
                 | Intent::PanelFilterChanged { .. }
         ) {
-            self.clear_failure();
+            self.clear_lasting();
         }
         match intent {
             Intent::Ready => fx.push(Effect::Search(self.query.clone())),
@@ -255,6 +300,7 @@ impl Launcher {
             Event::Failed(message) => {
                 self.show_failure(message, fx);
                 self.working = None;
+                self.busy_marks = BusyMarks::Hidden;
             }
             Event::HotkeyFailed(message) => self.show_failure(message, fx),
             Event::TemplateInspected {
@@ -268,13 +314,22 @@ impl Launcher {
                     }
                 }
             }
-            Event::Activated { held, probe } => {
+            Event::Activated { held, probe, asked } => {
                 self.visible = true;
-                self.hud = None;
+                let jump = self.hud.take().and_then(|hud| hud.action);
                 self.activations += 1;
                 self.probe = probe;
                 if held {
                     fx.push(Effect::Search(self.query.clone()));
+                }
+                if let Some(result) = self.pending_result.take() {
+                    let in_its_view = (held && self.shows_view_of(&result))
+                        || self.shows_progress_of(&result.owner);
+                    match jump.filter(|_| asked) {
+                        _ if in_its_view => {}
+                        Some(jump) => fx.push(Effect::RunAction(jump.request)),
+                        None => self.show_task_result(result, fx),
+                    }
                 }
             }
             Event::Reset => self.reset(fx),
@@ -286,7 +341,7 @@ impl Launcher {
                     .toast
                     .take_if(|toast| toast.style == ToastStyle::Failure)
                 {
-                    self.show_hud(ToastStyle::Failure, toast.text, fx);
+                    self.show_hud(ToastStyle::Failure, toast.text, None, fx);
                     return;
                 }
                 if let Some(hud) = &self.hud {
@@ -296,6 +351,8 @@ impl Launcher {
                     });
                 }
             }
+            Event::BusyMarksWoke { id } => self.busy_marks_woke(id, fx),
+            Event::Task(state) => self.task_changed(*state, fx),
             Event::ToastExpired { id } => {
                 if self.toast.as_ref().is_some_and(|toast| toast.id == id) {
                     self.toast = None;
@@ -323,7 +380,178 @@ impl Launcher {
         self.view_error = None;
         self.working = None;
         self.toast = None;
+        self.busy_marks = BusyMarks::Hidden;
         fx.push(Effect::Search(String::new()));
+    }
+
+    /// What the busy toast says while Dango is busy, and nothing otherwise.
+    pub(super) fn busy_text(&self) -> Option<String> {
+        if let Some(title) = &self.working {
+            return Some(format!("Running {title}…"));
+        }
+        if self.top_loading() {
+            return Some("Loading…".to_string());
+        }
+        self.busy_task().map(|task| task.line.clone())
+    }
+
+    pub(super) fn top_loading(&self) -> bool {
+        self.stack
+            .last()
+            .is_some_and(|view| is_loading(&view.tree.view))
+    }
+
+    /// The oldest running task the user can't see in its own view.
+    fn busy_task(&self) -> Option<&TaskState> {
+        self.tasks
+            .iter()
+            .find(|task| task.status == TaskStatus::Running && !self.shows_progress_of(&task.owner))
+    }
+
+    /// The view the task itself streamed into, which a held launcher comes
+    /// back to with the result already in it.
+    fn shows_view_of(&self, task: &TaskState) -> bool {
+        self.owner.as_deref() == Some(task.owner.as_str())
+            && self
+                .stack
+                .last()
+                .is_some_and(|view| view.context.title == task.title)
+    }
+
+    /// Whether the view on top is a progress view the task's owner pushed.
+    fn shows_progress_of(&self, owner: &str) -> bool {
+        matches!(
+            self.stack.last().map(|view| &view.tree.view),
+            Some(View::Progress(_))
+        ) && self.owner.as_deref() == Some(owner)
+    }
+
+    fn task_changed(&mut self, state: TaskState, fx: &mut Vec<Effect>) {
+        let known = self.tasks.iter().position(|task| task.id == state.id);
+        let was = known.map(|index| self.tasks[index].status.clone());
+        match known {
+            Some(index) if state.status.ended() => {
+                self.tasks.remove(index);
+            }
+            Some(index) => self.tasks[index] = state.clone(),
+            None if !state.status.ended() => self.tasks.push(state.clone()),
+            None => {}
+        }
+        let arrived = match &state.status {
+            TaskStatus::NeedsInput { .. } => !matches!(was, Some(TaskStatus::NeedsInput { .. })),
+            TaskStatus::Done { .. } | TaskStatus::Failed { .. } => true,
+            TaskStatus::Running | TaskStatus::Cancelled => false,
+        };
+        if !arrived {
+            return;
+        }
+        if !self.visible {
+            match &state.status {
+                TaskStatus::Failed { sentence } => {
+                    self.show_hud(ToastStyle::Failure, sentence.clone(), None, fx)
+                }
+                TaskStatus::Done { sentence } | TaskStatus::NeedsInput { sentence } => {
+                    let action = show_answer(&state);
+                    self.show_hud(ToastStyle::Success, sentence.clone(), action, fx)
+                }
+                TaskStatus::Running | TaskStatus::Cancelled => {}
+            }
+            self.pending_result = Some(state);
+        } else if !self.shows_progress_of(&state.owner) {
+            self.show_task_result(state, fx);
+        }
+    }
+
+    fn show_task_result(&mut self, state: TaskState, fx: &mut Vec<Effect>) {
+        match &state.status {
+            TaskStatus::NeedsInput { sentence } | TaskStatus::Done { sentence } => {
+                let action = show_answer(&state);
+                self.show_success(sentence.clone(), action, fx);
+            }
+            TaskStatus::Failed { sentence } => {
+                let id = self.next_revision();
+                self.toast = Some(HeldToast {
+                    id,
+                    style: ToastStyle::Failure,
+                    text: sentence.clone(),
+                    action: state
+                        .retry
+                        .as_deref()
+                        .map(|retry| task_action(&state, "Retry", "r", retry)),
+                });
+            }
+            TaskStatus::Running | TaskStatus::Cancelled => {}
+        }
+    }
+
+    /// Whether the busy marks are there for a task rather than for a command
+    /// or a loading view, which also draw the SearchBar's bar.
+    pub(super) fn busy_shows_task(&self) -> bool {
+        matches!(self.busy_marks, BusyMarks::Shown { task: true, .. })
+    }
+
+    /// Whether a background task is what makes Dango busy right now.
+    fn busy_source_is_task(&self) -> bool {
+        self.working.is_none() && !self.top_loading() && self.busy_task().is_some()
+    }
+
+    /// The running task's Cancel, while the busy toast is showing that task.
+    pub(super) fn busy_cancel(&self) -> Option<ToastAction> {
+        if !self.busy_shows_task() {
+            return None;
+        }
+        let task = self.busy_task()?;
+        let cancel = task.cancel.as_deref()?;
+        Some(task_action(task, "Cancel", ".", cancel))
+    }
+
+    fn settle_busy_marks(&mut self, fx: &mut Vec<Effect>) {
+        let busy = self.busy_text();
+        let for_task = self.busy_source_is_task();
+        match (&mut self.busy_marks, busy) {
+            (BusyMarks::Hidden, Some(_)) => {
+                let id = self.next_revision();
+                self.busy_marks = BusyMarks::Pending { id };
+                fx.push(Effect::WakeBusyMarks {
+                    id,
+                    stage: BusyStage::Delay,
+                });
+            }
+            (BusyMarks::Pending { .. }, None) | (BusyMarks::Shown { held: true, .. }, None) => {
+                self.busy_marks = BusyMarks::Hidden;
+            }
+            (BusyMarks::Shown { text, task, .. }, Some(busy)) => {
+                *text = busy;
+                *task = for_task;
+            }
+            _ => {}
+        }
+    }
+
+    fn busy_marks_woke(&mut self, woke: u64, fx: &mut Vec<Effect>) {
+        match &mut self.busy_marks {
+            BusyMarks::Pending { id } if *id == woke => {
+                self.busy_marks = BusyMarks::Shown {
+                    id: woke,
+                    held: false,
+                    text: self.busy_text().unwrap_or_default(),
+                    task: self.busy_source_is_task(),
+                };
+                fx.push(Effect::WakeBusyMarks {
+                    id: woke,
+                    stage: BusyStage::Hold,
+                });
+            }
+            BusyMarks::Shown { id, held, .. } if *id == woke && !*held => *held = true,
+            _ => {}
+        }
+    }
+
+    pub(super) fn busy_marks_shown(&self) -> Option<&str> {
+        match &self.busy_marks {
+            BusyMarks::Shown { text, .. } => Some(text),
+            _ => None,
+        }
     }
 
     fn rendered(
@@ -344,6 +572,11 @@ impl Launcher {
         self.working = None;
         if self.refused(&tree) {
             return;
+        }
+        // The stack has one owner, who gets its actions: a view from another
+        // extension, such as an update retried from a toast, starts afresh.
+        if self.owner.as_deref() != Some(owner.as_str()) {
+            self.stack.clear();
         }
         self.owner = Some(owner);
         if self.shown_invocation == Some(invocation) && !self.stack.is_empty() {
@@ -369,7 +602,7 @@ impl Launcher {
                     fx.push(Effect::CopyText(text));
                 }
                 fx.push(Effect::Dismiss);
-                self.show_hud(ToastStyle::Success, "Copied to clipboard".into(), fx);
+                self.show_hud(ToastStyle::Success, "Copied to clipboard".into(), None, fx);
             }
             // A root action that produces a view opens it. A snippet needing
             // arguments has to ask before it can do anything.
@@ -404,7 +637,13 @@ impl Launcher {
                     self.replace_top(*tree, fx);
                 }
             }
-            (ActionOutcome::Toast(text), _) => self.show_success(text, fx),
+            (ActionOutcome::Back, Origin::View) => {
+                if !self.stack.is_empty() {
+                    self.escape(fx);
+                }
+            }
+            (ActionOutcome::Back, Origin::Root) => {}
+            (ActionOutcome::Toast(text), _) => self.show_success(text, None, fx),
             (ActionOutcome::Failed(message), _) => self.show_failure(message, fx),
         }
     }
@@ -421,7 +660,7 @@ impl Launcher {
     /// activation, so the HUD says it instead.
     fn show_failure(&mut self, text: String, fx: &mut Vec<Effect>) {
         if !self.visible {
-            self.show_hud(ToastStyle::Failure, text, fx);
+            self.show_hud(ToastStyle::Failure, text, None, fx);
             return;
         }
         let id = self.next_revision();
@@ -429,38 +668,69 @@ impl Launcher {
             id,
             style: ToastStyle::Failure,
             text,
+            action: None,
         });
     }
 
-    /// A failure stays until the next key press or click.
-    fn clear_failure(&mut self) {
+    /// The toast's action, while the toast shows and the panel does not own
+    /// the keyboard.
+    pub(super) fn toast_action(&self) -> Option<ToastAction> {
+        if self.panel.is_some() {
+            return None;
+        }
+        match &self.toast {
+            Some(toast) => toast.action.clone(),
+            None => self.busy_cancel(),
+        }
+    }
+
+    /// A toast that waits for the user, because it failed or offers an
+    /// action, goes with their next key press or click.
+    fn clear_lasting(&mut self) {
         if self
             .toast
             .as_ref()
-            .is_some_and(|toast| toast.style == ToastStyle::Failure)
+            .is_some_and(|toast| toast.style == ToastStyle::Failure || toast.action.is_some())
         {
             self.toast = None;
         }
     }
 
-    fn show_success(&mut self, text: String, fx: &mut Vec<Effect>) {
+    fn show_success(&mut self, text: String, action: Option<ToastAction>, fx: &mut Vec<Effect>) {
         let id = self.next_revision();
+        let lasts = action.is_some();
         self.toast = Some(HeldToast {
             id,
             style: ToastStyle::Success,
             text,
+            action,
         });
-        fx.push(Effect::ExpireToast {
-            id,
-            style: ToastStyle::Success,
-        });
+        if !lasts {
+            fx.push(Effect::ExpireToast {
+                id,
+                style: ToastStyle::Success,
+            });
+        }
     }
 
     /// The time runs from when the HUD can be seen, so one set while the
     /// launcher is still on screen starts its time at the hide.
-    fn show_hud(&mut self, style: ToastStyle, text: String, fx: &mut Vec<Effect>) {
+    /// An action on the HUD is not drawn: opening the launcher while it
+    /// shows runs it.
+    fn show_hud(
+        &mut self,
+        style: ToastStyle,
+        text: String,
+        action: Option<ToastAction>,
+        fx: &mut Vec<Effect>,
+    ) {
         let id = self.next_revision();
-        self.hud = Some(HeldToast { id, style, text });
+        self.hud = Some(HeldToast {
+            id,
+            style,
+            text,
+            action,
+        });
         if !self.visible {
             fx.push(Effect::ExpireToast { id, style });
         }
@@ -527,7 +797,7 @@ impl Launcher {
                 self.query = text.clone();
                 self.results_complete = false;
                 self.picked = None;
-                self.clear_failure();
+                self.clear_lasting();
                 fx.push(Effect::Search(text));
             }
             Some(view) => {
@@ -633,7 +903,7 @@ impl Launcher {
     }
 
     fn escape(&mut self, fx: &mut Vec<Effect>) {
-        self.clear_failure();
+        self.clear_lasting();
         if !self.stack.is_empty() {
             // A command may still be working behind this view, and the user has
             // left it: stop it rather than paying for an answer nobody reads.
@@ -641,6 +911,7 @@ impl Launcher {
             self.abandoned_invocation = self.last_invocation;
             self.shown_invocation = None;
             self.stack.pop();
+            self.busy_marks = BusyMarks::Hidden;
             let revision = self.next_revision();
             match self.stack.last_mut() {
                 Some(view) => view.query_revision = revision,
@@ -670,7 +941,7 @@ impl Launcher {
                 match item.actions.first() {
                     Some(action) => self.run_root_action(&item, &action.id, fx),
                     None => {
-                        self.clear_failure();
+                        self.clear_lasting();
                         self.panel = None;
                         self.working = Some(item.title.clone());
                         fx.push(Effect::InvokeCommand {
@@ -787,7 +1058,7 @@ impl Launcher {
     }
 
     fn run_root_action(&mut self, item: &ResultItem, action: &str, fx: &mut Vec<Effect>) {
-        self.clear_failure();
+        self.clear_lasting();
         self.panel = None;
         fx.push(Effect::RunAction(ActionRequest {
             origin: Origin::Root,
@@ -811,7 +1082,7 @@ impl Launcher {
         let Some(owner) = self.owner.clone() else {
             return;
         };
-        self.clear_failure();
+        self.clear_lasting();
         self.panel = None;
         fx.push(Effect::RunAction(ActionRequest {
             origin: Origin::View,
@@ -839,24 +1110,20 @@ impl Launcher {
             None => Mode::Root,
             Some(View::List(_)) => Mode::List,
             Some(View::Grid(_)) => Mode::Grid,
-            Some(View::Detail(_)) => Mode::Detail,
+            Some(View::Detail(_) | View::Progress(_)) => Mode::Detail,
             Some(View::Form(_)) => Mode::Form,
         }
     }
 
-    /// Root results in the order they are drawn: pinned, then suggestions,
-    /// then everything else.
+    /// Root results in the order they are drawn: the answer, pinned, then
+    /// suggestions, then everything else.
     pub(super) fn root_order(&self) -> impl Iterator<Item = &ResultItem> {
-        let pinned = self.results.iter().filter(|item| item.pinned);
-        let suggested = self
-            .results
-            .iter()
-            .filter(|item| !item.pinned && item.suggested);
-        let rest = self
-            .results
-            .iter()
-            .filter(|item| !item.pinned && !item.suggested);
-        pinned.chain(suggested).chain(rest)
+        let answer = self.results.iter().filter(|item| item.answer);
+        let rows = || self.results.iter().filter(|item| !item.answer);
+        let pinned = rows().filter(|item| item.pinned);
+        let suggested = rows().filter(|item| !item.pinned && item.suggested);
+        let rest = rows().filter(|item| !item.pinned && !item.suggested);
+        answer.chain(pinned).chain(suggested).chain(rest)
     }
 
     pub(super) fn root_selected(&self) -> Option<&ResultItem> {
@@ -963,6 +1230,7 @@ impl Launcher {
     fn view_actions(&self) -> &[Action] {
         match self.stack.last().map(|view| &view.tree.view) {
             Some(View::Detail(detail)) => &detail.actions,
+            Some(View::Progress(progress)) => &progress.actions,
             Some(View::Form(form)) => &form.actions,
             Some(View::List(_) | View::Grid(_)) | None => &[],
         }
@@ -1079,7 +1347,7 @@ impl Launcher {
                 self.entry_selected().map(|entry| entry.id().to_string())
             }
             Some(View::Form(form)) => form.item_id.clone(),
-            Some(View::Detail(_)) | None => None,
+            Some(View::Detail(_) | View::Progress(_)) | None => None,
         }
     }
 }
@@ -1177,6 +1445,7 @@ fn tree_actions(view: &View) -> Vec<&Action> {
             .chain(grid.empty_state.iter().flat_map(|state| &state.actions))
             .collect(),
         View::Detail(detail) => detail.actions.iter().collect(),
+        View::Progress(progress) => progress.actions.iter().collect(),
         View::Form(form) => form.actions.iter().collect(),
     }
 }
@@ -1238,4 +1507,39 @@ fn step<'a>(
         (Some(i), false) => i.saturating_sub(1),
     };
     ids.get(next).map(|id| id.to_string())
+}
+
+fn is_loading(view: &View) -> bool {
+    match view {
+        View::List(list) => list.loading,
+        View::Grid(grid) => grid.loading,
+        View::Detail(detail) => detail.loading,
+        View::Form(_) | View::Progress(_) => false,
+    }
+}
+
+fn show_answer(task: &TaskState) -> Option<ToastAction> {
+    task.show
+        .as_deref()
+        .map(|show| task_action(task, "Show answer", "Enter", show))
+}
+
+/// An action of a task's owner, offered on a toast with the platform's
+/// command key.
+fn task_action(task: &TaskState, title: &str, key: &str, action_id: &str) -> ToastAction {
+    ToastAction {
+        title: title.into(),
+        shortcut: Shortcut {
+            key: key.into(),
+            modifiers: vec![Modifier::Cmd],
+        },
+        request: ActionRequest {
+            origin: Origin::Root,
+            extension_id: task.owner.clone(),
+            item_id: task.item_id.clone(),
+            action_id: action_id.into(),
+            values: None,
+            query: None,
+        },
+    }
 }

@@ -3,6 +3,7 @@
 //! when to move focus or scroll. Each area of the launcher has a global, and
 //! each global has one writer here.
 
+mod answer;
 mod detail;
 mod empty;
 mod form;
@@ -11,6 +12,7 @@ mod height;
 pub mod hud;
 mod list;
 mod panel;
+mod progress;
 mod shell;
 
 use std::cell::RefCell;
@@ -101,6 +103,7 @@ impl Renderer {
             Screen::Root(root) => {
                 self.write_query(ui, true, &root.query.text, root.query.revision);
                 self.list.root(ui, root, &self.icons);
+                answer::write(ui, Some(root), &self.icons);
                 if let Some(text) = &root.empty {
                     empty::write(ui, text, &self.icons);
                 }
@@ -131,8 +134,14 @@ impl Renderer {
                     detail = true;
                 }
                 ViewBody::Form(body) => self.form.write(body),
+                ViewBody::Progress(body) => progress::write(ui, body),
             },
         }
+        let root = match &snapshot.screen {
+            Screen::Root(root) => Some(root),
+            _ => None,
+        };
+        answer::write(ui, root, &self.icons);
         if !typing(&snapshot.screen) {
             self.query = None;
         }
@@ -234,6 +243,7 @@ fn screen_kind(screen: &Screen) -> ScreenKind {
             ViewBody::Grid(_) => ScreenKind::Grid,
             ViewBody::Detail(_) => ScreenKind::Detail,
             ViewBody::Form(_) => ScreenKind::Form,
+            ViewBody::Progress(_) => ScreenKind::Progress,
         },
     }
 }

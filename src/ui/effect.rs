@@ -26,6 +26,18 @@ pub enum Effect {
         id: u64,
         style: ToastStyle,
     },
+    /// Answered with `Event::BusyMarksWoke` once the stage's time is up.
+    WakeBusyMarks {
+        id: u64,
+        stage: BusyStage,
+    },
+}
+
+/// How long the busy marks wait: before they appear, or before they may go.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum BusyStage {
+    Delay,
+    Hold,
 }
 
 #[derive(Clone, Debug, PartialEq)]

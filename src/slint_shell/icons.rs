@@ -113,6 +113,8 @@ fn named(name: &str) -> Option<&'static IconData> {
     Some(match name {
         "app-window" => lu::LuAppWindow,
         "arrow-left" => lu::LuArrowLeft,
+        "arrow-right" => lu::LuArrowRight,
+        "calculator" => lu::LuCalculator,
         "check" => lu::LuCheck,
         "circle-alert" => lu::LuCircleAlert,
         "circle-arrow-down" => lu::LuCircleArrowDown,
@@ -151,9 +153,11 @@ fn named(name: &str) -> Option<&'static IconData> {
 mod tests {
     use super::*;
 
-    const REGISTRY: [&str; 32] = [
+    const REGISTRY: [&str; 34] = [
         "app-window",
         "arrow-left",
+        "arrow-right",
+        "calculator",
         "check",
         "circle-alert",
         "circle-arrow-down",

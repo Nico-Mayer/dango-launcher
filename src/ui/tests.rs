@@ -5,6 +5,7 @@ use crate::protocol::{
 };
 
 use super::snapshot::{DetailBody, Focus, ListBody, RootScreen, Screen, ViewBody};
+use super::state::BusyMarks;
 use super::*;
 
 fn actions() -> Vec<Action> {
@@ -42,6 +43,8 @@ fn result(n: usize) -> ResultItem {
         match_positions: Vec::new(),
         suggested: false,
         pinned: false,
+        answer: false,
+        hotkey: None,
     }
 }
 
@@ -123,6 +126,7 @@ impl Harness {
         launcher.apply(Input::Event(Event::Activated {
             held: false,
             probe: None,
+            asked: false,
         }));
         Self {
             launcher,
@@ -192,6 +196,19 @@ impl Harness {
 
     fn finish(&mut self, request: ActionRequest, outcome: ActionOutcome) -> Vec<Effect> {
         self.event(Event::ActionFinished { request, outcome })
+    }
+
+    /// Lets the busy marks' next wait pass, as the shell's timer would.
+    fn wake_busy(&mut self) {
+        match self.launcher.busy_marks {
+            BusyMarks::Pending { id }
+            | BusyMarks::Shown {
+                id, held: false, ..
+            } => {
+                self.event(Event::BusyMarksWoke { id });
+            }
+            _ => {}
+        }
     }
 
     fn snapshot(&self) -> Snapshot {
@@ -832,6 +849,7 @@ fn enter_on_an_empty_view_runs_its_first_action() {
 fn enter_in_a_detail_view_runs_the_view_s_primary_action_on_no_item() {
     let mut h = Harness::view(detail_tree("Working…"));
     assert_eq!(h.snapshot().focus, Focus::Detail);
+    h.wake_busy();
     assert_eq!(h.status(), "Loading…");
     h.press("Enter");
     let runs = h.runs();
@@ -1647,6 +1665,7 @@ fn a_reset_while_the_panel_is_open_closes_it_and_the_next_open_starts_fresh() {
         h.event(Event::Activated {
             held: false,
             probe: None,
+            asked: false,
         });
         let snapshot = h.snapshot();
         assert!(!snapshot.panel.open);
@@ -1781,6 +1800,7 @@ fn a_failure_around_a_hide_goes_to_the_hud_either_way_round() {
         h.event(Event::Activated {
             held: false,
             probe: None,
+            asked: false,
         });
         assert!(h.failure().is_none(), "{before_hide}");
         assert_eq!(hud_text(&h), None);
@@ -1799,6 +1819,7 @@ fn a_failure_while_held_goes_to_the_hud_and_not_into_the_held_view() {
     h.event(Event::Activated {
         held: true,
         probe: None,
+        asked: false,
     });
     assert!(h.failure().is_none());
     assert!(matches!(h.view_body(), ViewBody::Detail(_)));
@@ -1813,18 +1834,19 @@ fn a_running_command_shows_a_busy_toast_until_it_fails_or_resets() {
     h.results("", vec![command]);
     let effects = h.press("Enter");
     assert_eq!(
-        effects,
-        vec![Effect::InvokeCommand {
+        effects[0],
+        Effect::InvokeCommand {
             command_id: "result-1".into(),
             query: String::new(),
-        }]
+        }
     );
+    h.wake_busy();
     assert_eq!(h.status(), "Running Clipboard History…");
-    assert!(h.root_screen().busy);
     h.event(Event::Failed("Couldn't paste".into()));
     assert_eq!(h.status(), "");
     assert!(h.failure().is_some());
     h.press("Enter");
+    h.wake_busy();
     assert_eq!(h.status(), "Running Clipboard History…");
     h.event(Event::Reset);
     assert_eq!(h.status(), "");
@@ -1846,7 +1868,9 @@ fn a_hotkey_failure_while_held_keeps_the_running_status() {
     h.event(Event::Activated {
         held: true,
         probe: None,
+        asked: false,
     });
+    h.wake_busy();
     assert_eq!(h.status(), "Running Clipboard History…");
 }
 
@@ -1996,6 +2020,7 @@ fn held_activation_keeps_query_and_selection_and_refreshes_results() {
     h.event(Event::Activated {
         held: true,
         probe: None,
+        asked: false,
     });
     assert_eq!(h.searches("Result 1"), before + 1);
     let snapshot = h.snapshot();
@@ -2015,6 +2040,7 @@ fn held_activation_leaves_a_pushed_view_in_place() {
     h.event(Event::Activated {
         held: true,
         probe: Some(3),
+        asked: false,
     });
     let snapshot = h.snapshot();
     assert_eq!(snapshot.focus, Focus::Form);
@@ -2033,6 +2059,7 @@ fn a_reset_starts_at_an_empty_prompt() {
     h.event(Event::Activated {
         held: false,
         probe: None,
+        asked: false,
     });
     let snapshot = h.snapshot();
     assert_eq!(snapshot.focus, Focus::RootInput);
@@ -2108,6 +2135,7 @@ fn a_stale_expiry_leaves_a_newer_hud() {
     h.event(Event::Activated {
         held: false,
         probe: None,
+        asked: false,
     });
     copy_from_root(&mut h);
     let second = hud_expiry(&h.event(Event::Hidden));
@@ -2136,8 +2164,868 @@ fn showing_the_launcher_removes_the_hud() {
     h.event(Event::Activated {
         held: false,
         probe: None,
+        asked: false,
     });
     assert_eq!(hud_text(&h), None);
     h.event(Event::Hidden);
     assert_eq!(hud_text(&h), None);
+}
+
+fn running(h: &mut Harness) {
+    let mut command = result(1);
+    command.title = "Clipboard History".into();
+    command.actions.clear();
+    h.results("", vec![command]);
+    h.press("Enter");
+}
+
+fn done_tree() -> ViewTree {
+    ViewTree::new(View::Detail(DetailView {
+        markdown: "Done".into(),
+        actions: actions(),
+        ..Default::default()
+    }))
+}
+
+fn marks_id(h: &Harness) -> Option<u64> {
+    match h.launcher.busy_marks {
+        BusyMarks::Pending { id } | BusyMarks::Shown { id, .. } => Some(id),
+        BusyMarks::Hidden => None,
+    }
+}
+
+#[test]
+fn a_fast_command_shows_no_busy_toast() {
+    let mut h = Harness::new();
+    running(&mut h);
+    assert_eq!(h.status(), "", "nothing before the delay");
+    let late = marks_id(&h).unwrap();
+    h.render(3, done_tree());
+    assert_eq!(h.launcher.busy_marks, BusyMarks::Hidden);
+    h.event(Event::BusyMarksWoke { id: late });
+    assert_eq!(h.status(), "");
+}
+
+#[test]
+fn running_passes_to_loading_without_a_gap() {
+    let mut h = Harness::new();
+    running(&mut h);
+    h.wake_busy();
+    assert_eq!(h.status(), "Running Clipboard History…");
+    let id = marks_id(&h);
+    h.render(3, detail_tree("Working"));
+    assert_eq!(h.status(), "Loading…");
+    assert_eq!(marks_id(&h), id, "the same marks carry on");
+}
+
+#[test]
+fn busy_marks_stay_until_their_hold_passes() {
+    let mut h = Harness::view(detail_tree("Working"));
+    h.wake_busy();
+    assert_eq!(h.status(), "Loading…");
+    h.render(1, done_tree());
+    assert_eq!(h.status(), "Loading…", "shown its minimum time");
+    h.wake_busy();
+    assert_eq!(h.status(), "");
+    assert_eq!(h.launcher.busy_marks, BusyMarks::Hidden);
+}
+
+#[test]
+fn a_hold_that_passes_while_busy_keeps_the_marks() {
+    let mut h = Harness::view(detail_tree("Working"));
+    h.wake_busy();
+    h.wake_busy();
+    assert_eq!(h.status(), "Loading…");
+    h.render(1, done_tree());
+    assert_eq!(h.status(), "");
+}
+
+#[test]
+fn a_streamed_view_keeps_its_busy_marks() {
+    let mut h = Harness::view(detail_tree("Work"));
+    h.wake_busy();
+    let shown = h.launcher.busy_marks.clone();
+    for text in ["Worki", "Workin", "Working"] {
+        let effects = h.event(Event::Rendered {
+            owner: "fixture".into(),
+            context: Context {
+                title: "Fixture Command".into(),
+                icon: None,
+            },
+            invocation: 1,
+            tree: Box::new(detail_tree(text)),
+        });
+        assert!(!effects
+            .iter()
+            .any(|effect| matches!(effect, Effect::WakeBusyMarks { .. })));
+    }
+    assert_eq!(h.launcher.busy_marks, shown);
+}
+
+#[test]
+fn leaving_a_view_clears_its_busy_marks_at_once() {
+    let mut h = Harness::view(detail_tree("Working"));
+    h.wake_busy();
+    assert_eq!(h.status(), "Loading…");
+    h.press("Escape");
+    assert_eq!(h.status(), "");
+    assert_eq!(h.launcher.busy_marks, BusyMarks::Hidden);
+}
+
+#[test]
+fn a_stale_wake_is_ignored() {
+    let mut h = Harness::view(detail_tree("Working"));
+    let pending = h.launcher.busy_marks.clone();
+    let id = marks_id(&h).unwrap();
+    h.event(Event::BusyMarksWoke { id: id + 1 });
+    assert_eq!(h.launcher.busy_marks, pending);
+    assert_eq!(h.status(), "");
+}
+
+#[test]
+fn every_wait_for_busy_marks_takes_a_new_id() {
+    let mut h = Harness::view(detail_tree("Working"));
+    let first = marks_id(&h).unwrap();
+    h.render(1, done_tree());
+    h.render(1, detail_tree("Again"));
+    let second = marks_id(&h).unwrap();
+    assert_ne!(first, second);
+    h.event(Event::BusyMarksWoke { id: first });
+    assert_eq!(h.status(), "", "the old wake does not show the new marks");
+}
+
+#[test]
+fn a_reset_clears_the_busy_marks_at_once() {
+    let mut h = Harness::view(detail_tree("Working"));
+    h.wake_busy();
+    assert_eq!(h.status(), "Loading…");
+    h.event(Event::Reset);
+    assert_eq!(h.launcher.busy_marks, BusyMarks::Hidden);
+    assert_eq!(h.status(), "");
+}
+
+#[test]
+fn a_failed_command_does_not_come_back_as_running() {
+    let mut h = Harness::new();
+    running(&mut h);
+    h.wake_busy();
+    assert_eq!(h.status(), "Running Clipboard History…");
+    h.event(Event::Failed("Couldn't paste".into()));
+    h.typed("R");
+    assert_eq!(h.status(), "");
+}
+
+fn progress_tree() -> ViewTree {
+    use crate::protocol::{ProgressView, Status, Step};
+    ViewTree::new(View::Progress(ProgressView {
+        title: "Dango 0.5.0".into(),
+        subtitle: "You have 0.4.2".into(),
+        value: Some(0.62),
+        detail: "18.4 MB of 29.6 MB".into(),
+        steps: vec![
+            Step {
+                title: "Download".into(),
+                status: Status::Working,
+            },
+            Step {
+                title: "Restart".into(),
+                status: Status::Queued,
+            },
+        ],
+        actions: actions(),
+    }))
+}
+
+#[test]
+fn enter_on_a_progress_view_runs_its_primary_action() {
+    let mut h = Harness::view(progress_tree());
+    assert_eq!(h.snapshot().focus, Focus::Detail);
+    h.press("Enter");
+    let runs = h.runs();
+    assert_eq!(runs.len(), 1);
+    assert_eq!(runs[0].action_id, "open");
+}
+
+#[test]
+fn escape_leaves_a_progress_view() {
+    let mut h = Harness::view(progress_tree());
+    h.press("Escape");
+    assert!(matches!(h.snapshot().screen, Screen::Root(_)));
+}
+
+#[test]
+fn an_action_answering_back_leaves_the_view() {
+    let mut h = Harness::new();
+    h.results("", results(3));
+    h.render(1, progress_tree());
+    let request = ActionRequest {
+        origin: Origin::View,
+        extension_id: "fixture".into(),
+        item_id: String::new(),
+        action_id: "open".into(),
+        values: None,
+        query: None,
+    };
+    let effects = h.finish(request, ActionOutcome::Back);
+    assert!(effects.contains(&Effect::CancelInvocation));
+    assert!(matches!(h.snapshot().screen, Screen::Root(_)));
+    h.render(1, progress_tree());
+    assert!(
+        matches!(h.snapshot().screen, Screen::Root(_)),
+        "a later render from the left view is dropped"
+    );
+}
+
+fn retry_request() -> ActionRequest {
+    ActionRequest {
+        origin: Origin::Root,
+        extension_id: "dango.updates".into(),
+        item_id: "update".into(),
+        action_id: "install".into(),
+        values: None,
+        query: None,
+    }
+}
+
+fn retry_toast(h: &mut Harness) {
+    h.launcher.toast = Some(super::state::HeldToast {
+        id: 9_000,
+        style: ToastStyle::Failure,
+        text: "Couldn't download the update. Check your connection and try again.".into(),
+        action: Some(ToastAction {
+            title: "Retry".into(),
+            shortcut: Shortcut {
+                key: "r".into(),
+                modifiers: vec![Modifier::Cmd],
+            },
+            request: retry_request(),
+        }),
+    });
+}
+
+#[test]
+fn a_toast_chord_runs_its_action_once_and_clears_it() {
+    let mut h = Harness::root(3);
+    retry_toast(&mut h);
+    let effects = h.command("r");
+    assert_eq!(effects, vec![Effect::RunAction(retry_request())]);
+    assert!(h.failure().is_none());
+    let again = h.command("r");
+    assert!(!again.iter().any(
+        |effect| matches!(effect, Effect::RunAction(request) if request.action_id == "install")
+    ));
+}
+
+#[test]
+fn another_key_clears_a_toast_without_running_its_action() {
+    let mut h = Harness::root(3);
+    retry_toast(&mut h);
+    let effects = h.press("ArrowDown");
+    assert!(h.failure().is_none());
+    assert!(!effects
+        .iter()
+        .any(|effect| matches!(effect, Effect::RunAction(_))));
+}
+
+#[test]
+fn a_toast_chord_beats_an_item_action_with_the_same_chord() {
+    let mut h = Harness::new();
+    let mut item = result(1);
+    item.actions.push(Action {
+        id: "reveal".into(),
+        title: "Show in Explorer".into(),
+        shortcut: Some(Shortcut {
+            key: "r".into(),
+            modifiers: vec![Modifier::Cmd],
+        }),
+        ..Default::default()
+    });
+    h.results("", vec![item]);
+    retry_toast(&mut h);
+    assert!(h
+        .snapshot()
+        .bindings
+        .iter()
+        .any(|binding| binding.chord == Chord::command("r")));
+    let effects = h.command("r");
+    assert_eq!(effects, vec![Effect::RunAction(retry_request())]);
+}
+
+#[test]
+fn the_panel_keeps_a_toast_chord_from_running() {
+    let mut h = Harness::root(3);
+    h.command("k");
+    retry_toast(&mut h);
+    assert!(h.launcher.toast_action().is_none());
+    let effects = h.command("r");
+    assert!(!effects.contains(&Effect::RunAction(retry_request())));
+}
+
+fn task(id: u64, status: crate::tasks::TaskStatus) -> crate::tasks::TaskState {
+    crate::tasks::TaskState {
+        id,
+        owner: "dango.updates".into(),
+        title: "Dango 0.5.0".into(),
+        line: format!("Downloading Dango 0.5.{id} · 42%"),
+        status,
+        progress: Some(0.42),
+        steps: Vec::new(),
+        subtitle: String::new(),
+        detail: String::new(),
+        cancel: Some("cancel".into()),
+        retry: Some("install".into()),
+        show: None,
+        item_id: "update".into(),
+    }
+}
+
+fn report(h: &mut Harness, state: crate::tasks::TaskState) {
+    h.event(Event::Task(Box::new(state)));
+}
+
+fn running_task() -> crate::tasks::TaskStatus {
+    crate::tasks::TaskStatus::Running
+}
+
+fn failed_task() -> crate::tasks::TaskStatus {
+    crate::tasks::TaskStatus::Failed {
+        sentence: "Couldn't download the update. Check your connection and try again.".into(),
+    }
+}
+
+fn ready_task() -> crate::tasks::TaskStatus {
+    crate::tasks::TaskStatus::NeedsInput {
+        sentence: "Dango 0.5.0 is ready to restart".into(),
+    }
+}
+
+#[test]
+fn a_running_task_shows_in_the_busy_toast_at_root() {
+    let mut h = Harness::root(3);
+    report(&mut h, task(1, running_task()));
+    assert_eq!(h.status(), "", "the busy-mark delay applies");
+    h.wake_busy();
+    assert_eq!(h.status(), "Downloading Dango 0.5.1 · 42%");
+}
+
+#[test]
+fn the_oldest_running_task_leads_the_busy_toast() {
+    let mut h = Harness::root(3);
+    report(&mut h, task(1, running_task()));
+    report(&mut h, task(2, running_task()));
+    h.wake_busy();
+    assert_eq!(h.status(), "Downloading Dango 0.5.1 · 42%");
+}
+
+#[test]
+fn a_task_waiting_for_input_shows_no_busy_toast() {
+    let mut h = Harness::root(3);
+    report(&mut h, task(1, running_task()));
+    report(&mut h, task(1, ready_task()));
+    h.wake_busy();
+    assert_eq!(h.status(), "");
+}
+
+#[test]
+fn the_cancel_chord_runs_the_owner_s_cancel_action() {
+    let mut h = Harness::root(3);
+    report(&mut h, task(1, running_task()));
+    h.wake_busy();
+    let toast = h.snapshot().toast.unwrap();
+    assert_eq!(toast.action.as_ref().unwrap().title, "Cancel");
+    let effects = h.command(".");
+    let Some(Effect::RunAction(request)) = effects.first() else {
+        panic!("expected the cancel action, got {effects:?}");
+    };
+    assert_eq!(
+        (request.extension_id.as_str(), request.action_id.as_str()),
+        ("dango.updates", "cancel")
+    );
+}
+
+#[test]
+fn a_running_task_draws_no_loading_bar_in_another_view() {
+    let mut h = Harness::view(done_tree());
+    report(&mut h, task(1, running_task()));
+    h.wake_busy();
+    assert_eq!(h.status(), "Downloading Dango 0.5.1 · 42%");
+    let Screen::View(view) = h.snapshot().screen else {
+        panic!("expected a view");
+    };
+    assert!(!view.busy);
+}
+
+#[test]
+fn a_task_failing_while_hidden_shows_in_the_hud_and_on_the_next_open() {
+    let mut h = Harness::root(3);
+    report(&mut h, task(1, running_task()));
+    h.event(Event::Hidden);
+    report(&mut h, task(1, failed_task()));
+    assert!(hud_text(&h).is_some_and(|text| text.starts_with("Couldn't download")));
+    h.event(Event::Activated {
+        held: false,
+        probe: None,
+        asked: false,
+    });
+    let toast = h.snapshot().toast.unwrap();
+    assert_eq!(toast.style, ToastStyle::Failure);
+    assert_eq!(toast.action.unwrap().title, "Retry");
+}
+
+#[test]
+fn a_task_ready_while_hidden_shows_a_success_toast_on_the_next_open() {
+    let mut h = Harness::root(3);
+    report(&mut h, task(1, running_task()));
+    h.event(Event::Hidden);
+    report(&mut h, task(1, ready_task()));
+    assert_eq!(
+        hud_text(&h).as_deref(),
+        Some("Dango 0.5.0 is ready to restart")
+    );
+    h.event(Event::Activated {
+        held: false,
+        probe: None,
+        asked: false,
+    });
+    assert_eq!(
+        h.toast(ToastStyle::Success).as_deref(),
+        Some("Dango 0.5.0 is ready to restart")
+    );
+}
+
+#[test]
+fn reopening_onto_the_task_s_own_view_shows_no_result_toast() {
+    let mut h = Harness::view(progress_tree());
+    let own = |status| crate::tasks::TaskState {
+        owner: "fixture".into(),
+        ..task(1, status)
+    };
+    report(&mut h, own(running_task()));
+    h.event(Event::Hidden);
+    report(&mut h, own(failed_task()));
+    h.event(Event::Activated {
+        held: true,
+        probe: None,
+        asked: false,
+    });
+    assert!(h.failure().is_none());
+}
+
+#[test]
+fn a_task_ready_while_at_root_shows_a_toast_at_once() {
+    let mut h = Harness::root(3);
+    report(&mut h, task(1, running_task()));
+    report(&mut h, task(1, ready_task()));
+    assert_eq!(
+        h.toast(ToastStyle::Success).as_deref(),
+        Some("Dango 0.5.0 is ready to restart")
+    );
+}
+
+#[test]
+fn a_view_from_another_extension_starts_its_own_stack() {
+    let mut h = Harness::view(list_tree(vec![list_item(1)]));
+    h.event(Event::Rendered {
+        owner: "dango.updates".into(),
+        context: Context::default(),
+        invocation: 7,
+        tree: Box::new(progress_tree()),
+    });
+    assert_eq!(h.launcher.stack.len(), 1);
+    h.press("Escape");
+    assert!(matches!(h.snapshot().screen, Screen::Root(_)));
+}
+
+#[test]
+fn a_task_s_lingering_marks_draw_no_loading_bar() {
+    let mut h = Harness::view(done_tree());
+    report(&mut h, task(1, running_task()));
+    h.wake_busy();
+    report(&mut h, task(1, crate::tasks::TaskStatus::Cancelled));
+    assert!(h.launcher.busy_marks_shown().is_some(), "the marks linger");
+    let Screen::View(view) = h.snapshot().screen else {
+        panic!("expected a view");
+    };
+    assert!(!view.busy);
+    assert!(h.snapshot().toast.unwrap().action.is_none());
+}
+
+fn answer_item() -> ResultItem {
+    ResultItem {
+        extension_id: "dango.calculator".into(),
+        context: Context {
+            title: "Calculator".into(),
+            icon: None,
+        },
+        id: "4".into(),
+        title: "4".into(),
+        subtitle: None,
+        icon: None,
+        actions: vec![
+            Action {
+                id: "copy".into(),
+                title: "Copy answer".into(),
+                ..Default::default()
+            },
+            Action {
+                id: "paste".into(),
+                title: "Paste answer".into(),
+                ..Default::default()
+            },
+        ],
+        match_positions: Vec::new(),
+        suggested: false,
+        pinned: false,
+        answer: true,
+        hotkey: None,
+    }
+}
+
+fn answered(results: Vec<ResultItem>) -> Harness {
+    let mut h = Harness::new();
+    h.typed("2+2");
+    let mut items = vec![answer_item()];
+    items.extend(results);
+    h.event(Event::Results {
+        query: "2+2".into(),
+        items,
+        complete: true,
+    });
+    h
+}
+
+#[test]
+fn a_query_with_an_answer_selects_the_card() {
+    let h = answered(results(2));
+    let root = h.root_screen();
+    let card = root.answer.expect("the answer card");
+    assert_eq!(
+        (card.expression.as_str(), card.answer.as_str()),
+        ("2+2", "4")
+    );
+    assert!(card.selected);
+    assert!(root
+        .sections
+        .iter()
+        .all(|section| section.items.iter().all(|item| !item.answer)));
+    assert_eq!(root.selected.as_deref(), Some("4"));
+}
+
+#[test]
+fn arrows_move_between_the_card_and_the_results() {
+    let mut h = answered(results(2));
+    h.press("ArrowDown");
+    assert_eq!(h.root_screen().selected.as_deref(), Some("result-1"));
+    h.press("ArrowUp");
+    assert_eq!(h.root_screen().selected.as_deref(), Some("4"));
+    h.press("ArrowUp");
+    assert_eq!(h.root_screen().selected.as_deref(), Some("4"));
+}
+
+#[test]
+fn enter_on_the_card_copies_the_answer() {
+    let mut h = answered(results(2));
+    let snapshot = h.snapshot();
+    assert_eq!(snapshot.footer.context.title, "Calculator");
+    assert_eq!(
+        snapshot.footer.primary_label.as_deref(),
+        Some("Copy answer")
+    );
+    h.press("Enter");
+    let runs = h.runs();
+    assert_eq!(runs.len(), 1);
+    assert_eq!(
+        (
+            runs[0].extension_id.as_str(),
+            runs[0].item_id.as_str(),
+            runs[0].action_id.as_str()
+        ),
+        ("dango.calculator", "4", "copy")
+    );
+}
+
+#[test]
+fn the_panel_offers_copy_and_paste() {
+    let mut h = answered(results(2));
+    h.command("k");
+    let titles: Vec<String> = h
+        .snapshot()
+        .panel
+        .actions
+        .iter()
+        .map(|action| action.title.clone())
+        .collect();
+    assert_eq!(titles, ["Copy answer", "Paste answer"]);
+}
+
+#[test]
+fn an_answer_alone_shows_no_empty_view() {
+    let h = answered(Vec::new());
+    let root = h.root_screen();
+    assert!(root.answer.is_some());
+    assert!(root.empty.is_none());
+}
+
+#[test]
+fn a_finished_task_offers_to_show_what_it_kept() {
+    let mut h = Harness::root(3);
+    report(&mut h, task(1, running_task()));
+    report(
+        &mut h,
+        crate::tasks::TaskState {
+            show: Some("show".into()),
+            ..task(
+                1,
+                crate::tasks::TaskStatus::Done {
+                    sentence: "Answer ready: Summarize".into(),
+                },
+            )
+        },
+    );
+    let toast = h.snapshot().toast.unwrap();
+    assert_eq!(toast.text, "Answer ready: Summarize");
+    let action = toast.action.expect("Show answer");
+    assert_eq!(action.title, "Show answer");
+    let effects = h.command("Enter");
+    let Some(Effect::RunAction(request)) = effects.first() else {
+        panic!("expected the show action, got {effects:?}");
+    };
+    assert_eq!(request.action_id, "show");
+}
+
+fn answer_ready(id: u64) -> crate::tasks::TaskState {
+    crate::tasks::TaskState {
+        owner: "dango.ai".into(),
+        show: Some("show".into()),
+        ..task(
+            id,
+            crate::tasks::TaskStatus::Done {
+                sentence: "Answer ready: Summarize".into(),
+            },
+        )
+    }
+}
+
+fn expires(effects: &[Effect]) -> bool {
+    effects
+        .iter()
+        .any(|effect| matches!(effect, Effect::ExpireToast { .. }))
+}
+
+#[test]
+fn a_toast_with_an_action_waits_for_the_user() {
+    let mut h = Harness::root(3);
+    report(&mut h, task(1, running_task()));
+    let effects = h.event(Event::Task(Box::new(answer_ready(1))));
+    assert!(!expires(&effects), "no timer on a toast you may act on");
+
+    let effects = h.press("ArrowDown");
+    assert!(
+        !effects
+            .iter()
+            .any(|effect| matches!(effect, Effect::RunAction(_))),
+        "another key does not run the action"
+    );
+    assert!(h.snapshot().toast.is_none(), "but it clears the toast");
+}
+
+#[test]
+fn a_toast_without_an_action_still_expires() {
+    let mut h = Harness::root(3);
+    report(&mut h, task(1, running_task()));
+    let effects = h.event(Event::Task(Box::new(task(
+        1,
+        crate::tasks::TaskStatus::Done {
+            sentence: "Dango 0.5.0 is ready to restart".into(),
+        },
+    ))));
+    assert!(expires(&effects));
+}
+
+#[test]
+fn a_task_finishing_while_hidden_shows_a_success_hud() {
+    let mut h = Harness::root(3);
+    report(&mut h, task(1, running_task()));
+    h.event(Event::Hidden);
+    report(&mut h, answer_ready(1));
+    let hud = h.snapshot().hud.expect("a HUD");
+    assert_eq!(hud.style, ToastStyle::Success);
+    assert_eq!(hud.text, "Answer ready: Summarize");
+}
+
+#[test]
+fn a_task_finishing_in_view_shows_no_hud() {
+    let mut h = Harness::root(3);
+    report(&mut h, task(1, running_task()));
+    report(&mut h, answer_ready(1));
+    assert!(hud_text(&h).is_none());
+}
+
+#[test]
+fn needing_input_again_shows_the_hud_once() {
+    let mut h = Harness::root(3);
+    report(&mut h, task(1, running_task()));
+    h.event(Event::Hidden);
+    let first = h.event(Event::Task(Box::new(task(1, ready_task()))));
+    let again = h.event(Event::Task(Box::new(task(1, ready_task()))));
+    assert!(expires(&first), "the HUD shows and times out");
+    assert!(!expires(&again), "a repeated report shows nothing new");
+}
+
+fn open(h: &mut Harness, held: bool, asked: bool) -> Vec<Effect> {
+    h.event(Event::Activated {
+        held,
+        probe: None,
+        asked,
+    })
+}
+
+fn hidden_answer(h: &mut Harness) {
+    report(h, answer_ready(1));
+}
+
+fn ran_show(effects: &[Effect]) -> usize {
+    effects
+        .iter()
+        .filter(
+            |effect| matches!(effect, Effect::RunAction(request) if request.action_id == "show"),
+        )
+        .count()
+}
+
+#[test]
+fn opening_during_an_answer_s_hud_opens_the_answer() {
+    let mut h = Harness::root(3);
+    h.event(Event::Hidden);
+    hidden_answer(&mut h);
+    let effects = open(&mut h, false, true);
+    assert_eq!(ran_show(&effects), 1);
+    assert!(h.snapshot().toast.is_none());
+    assert!(h.snapshot().hud.is_none());
+}
+
+#[test]
+fn opening_after_an_answer_s_hud_shows_the_toast() {
+    let mut h = Harness::root(3);
+    h.event(Event::Hidden);
+    let shown = h.event(Event::Task(Box::new(answer_ready(1))));
+    h.event(Event::ToastExpired {
+        id: hud_expiry(&shown),
+    });
+    let effects = open(&mut h, false, true);
+    assert_eq!(ran_show(&effects), 0);
+    let toast = h.snapshot().toast.expect("the toast");
+    assert_eq!(toast.action.unwrap().title, "Show answer");
+}
+
+#[test]
+fn a_command_showing_the_launcher_does_not_open_the_answer() {
+    let mut h = Harness::root(3);
+    h.event(Event::Hidden);
+    hidden_answer(&mut h);
+    let effects = open(&mut h, false, false);
+    assert_eq!(ran_show(&effects), 0);
+    assert_eq!(
+        h.toast(ToastStyle::Success).as_deref(),
+        Some("Answer ready: Summarize")
+    );
+}
+
+#[test]
+fn a_newer_hud_takes_the_answer_s_place() {
+    let mut h = Harness::root(3);
+    h.event(Event::Hidden);
+    hidden_answer(&mut h);
+    h.event(Event::Failed("Couldn't paste".into()));
+    let effects = open(&mut h, false, true);
+    assert_eq!(ran_show(&effects), 0);
+}
+
+#[test]
+fn a_failure_never_opens_anything() {
+    let mut h = Harness::root(3);
+    report(&mut h, task(1, running_task()));
+    h.event(Event::Hidden);
+    report(&mut h, task(1, failed_task()));
+    let effects = open(&mut h, false, true);
+    assert!(!effects
+        .iter()
+        .any(|effect| matches!(effect, Effect::RunAction(_))));
+    assert!(h.failure().is_some());
+}
+
+fn held_answer_view() -> Harness {
+    let mut h = Harness::view(detail_tree("Better."));
+    h.event(Event::Hidden);
+    report(
+        &mut h,
+        crate::tasks::TaskState {
+            owner: "fixture".into(),
+            title: "Fixture Command".into(),
+            ..answer_ready(1)
+        },
+    );
+    h
+}
+
+#[test]
+fn reopening_held_onto_the_answer_s_own_view_shows_nothing_more() {
+    let mut h = held_answer_view();
+    let effects = open(&mut h, true, true);
+    assert_eq!(ran_show(&effects), 0, "its HUD still shows, yet no jump");
+    assert!(h.snapshot().toast.is_none());
+}
+
+#[test]
+fn after_a_reset_the_answer_is_offered_again() {
+    let mut h = held_answer_view();
+    h.event(Event::Reset);
+    let shown = h.snapshot().hud.is_some();
+    assert!(shown);
+    let effects = open(&mut h, false, false);
+    assert_eq!(ran_show(&effects), 0);
+    let toast = h.snapshot().toast.expect("the toast");
+    assert_eq!(toast.action.unwrap().title, "Show answer");
+}
+
+#[test]
+fn another_view_of_the_same_extension_still_gets_the_toast() {
+    let mut h = Harness::view(detail_tree("A form"));
+    h.event(Event::Hidden);
+    report(
+        &mut h,
+        crate::tasks::TaskState {
+            owner: "fixture".into(),
+            title: "Another Command".into(),
+            ..answer_ready(1)
+        },
+    );
+    open(&mut h, true, false);
+    assert_eq!(
+        h.toast(ToastStyle::Success).as_deref(),
+        Some("Answer ready: Summarize")
+    );
+}
+
+#[test]
+fn leaving_a_running_task_s_view_shows_its_busy_toast() {
+    let mut tree = detail_tree("Bet");
+    if let crate::protocol::View::Detail(detail) = &mut tree.view {
+        detail.loading = true;
+    }
+    let mut h = Harness::view(tree);
+    report(
+        &mut h,
+        crate::tasks::TaskState {
+            owner: "fixture".into(),
+            line: "Running Fixture Command…".into(),
+            ..task(1, running_task())
+        },
+    );
+    h.press("Escape");
+    h.wake_busy();
+    assert_eq!(
+        h.toast(ToastStyle::Busy).as_deref(),
+        Some("Running Fixture Command…")
+    );
 }

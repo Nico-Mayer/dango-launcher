@@ -52,6 +52,17 @@ pub fn write(
             shell.set_toast_shown(true);
             shell.set_toast_text(toast.text.as_str().into());
             shell.set_toast_style(toast_style(toast.style));
+            let (label, keys) = toast
+                .action
+                .as_ref()
+                .map_or_else(Default::default, |action| {
+                    (
+                        action.title.as_str().into(),
+                        keys::shortcut_label(&action.shortcut).into(),
+                    )
+                });
+            shell.set_toast_action_label(label);
+            shell.set_toast_action_keys(keys);
         }
         None => shell.set_toast_shown(false),
     }

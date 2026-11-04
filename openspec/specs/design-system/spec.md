@@ -9,37 +9,62 @@ is one shell around one view and reads like every other.
 
 ### Requirement: The theme follows the operating system
 
-Dango SHALL have a dark and a light theme and SHALL show the one that matches
-the operating system's appearance setting. When the setting changes, the
-launcher SHALL use the new theme the next time it is painted, without a
-restart. Dango SHALL NOT read or create a theme file, and SHALL NOT offer a
-theme picker.
+Dango SHALL have two themes, Graphite, which is dark, and Paper, which is light,
+and SHALL show the one that matches the operating system's appearance setting.
+When the setting changes, the launcher SHALL use the new theme the next time it
+is painted, without a restart. Dango SHALL NOT read or create a theme file, and
+SHALL NOT offer a theme picker.
 
 #### Scenario: Dark appearance on Windows
 
 - **WHEN** Windows is set to the dark app mode and the launcher is shown
-- **THEN** the launcher uses the dark theme
+- **THEN** the launcher uses the Graphite theme
 
 #### Scenario: Light appearance on Windows
 
 - **WHEN** Windows is set to the light app mode and the launcher is shown
-- **THEN** the launcher uses the light theme
+- **THEN** the launcher uses the Paper theme
 
 #### Scenario: Dark appearance on macOS
 
 - **WHEN** macOS is set to the dark appearance and the launcher is shown
-- **THEN** the launcher uses the dark theme
+- **THEN** the launcher uses the Graphite theme
 
 #### Scenario: Light appearance on macOS
 
 - **WHEN** macOS is set to the light appearance and the launcher is shown
-- **THEN** the launcher uses the light theme
+- **THEN** the launcher uses the Paper theme
 
 #### Scenario: The setting changes while Dango runs
 
 - **WHEN** the operating system's appearance changes while Dango is running and
   the user then shows the launcher
 - **THEN** the launcher uses the matching theme without Dango being restarted
+
+### Requirement: Dango's own colours come from the active theme
+
+Every colour Dango draws itself, its surfaces, text, lines, and marks, SHALL
+come from the active theme. Content brings its own colours and keeps them:
+application icons, favicons, image previews, and colour tiles a command
+declares. The two themes SHALL differ only in colour, never in the size or
+position of any part.
+
+#### Scenario: Switching theme changes Dango's colours
+
+- **WHEN** the operating system's appearance changes from dark to light and the
+  launcher is shown
+- **THEN** the launcher's surfaces, text, and selection use the light theme
+
+#### Scenario: Content keeps its colours
+
+- **WHEN** a grid shows a colour tile declared as `#ff0000` in either theme
+- **THEN** the tile is drawn in `#ff0000`
+
+#### Scenario: Switching theme keeps the layout
+
+- **WHEN** the same results are shown once in the dark theme and once in the
+  light theme
+- **THEN** every part has the same size and position in both
 
 ### Requirement: Text uses the bundled type faces
 
@@ -61,11 +86,14 @@ a system face rather than show as a missing glyph.
 ### Requirement: Every screen is one shell around one view
 
 The launcher SHALL show, from top to bottom, the SearchBar, exactly one view,
-and the ActionBar. The view is a list, a grid, a detail, a form, or an empty
-view. Overlays SHALL float above these regions and SHALL NOT move them.
+and the ActionBar. The view is a list, a grid, a detail, a form, a progress
+view, or an empty view. In root search, an answer card MAY sit between the
+SearchBar and the results; when no result matches, the card alone stands in
+for the empty view. Overlays SHALL float above these regions and SHALL NOT
+move them.
 
-The launcher SHALL be 720 logical pixels wide. The SearchBar SHALL be 56
-logical pixels high, the ActionBar 40, and a list row 40.
+The launcher SHALL be 720 logical pixels wide. The SearchBar SHALL be 64
+logical pixels high, the ActionBar 44, and a list row 44.
 
 #### Scenario: Root search
 
@@ -75,19 +103,25 @@ logical pixels high, the ActionBar 40, and a list row 40.
 #### Scenario: Sizes at default text scale
 
 - **WHEN** root search is shown at the default text scale
-- **THEN** the launcher is 720 logical pixels wide, the SearchBar is 56 high,
-  each result row is 40 high, and the ActionBar is 40 high
+- **THEN** the launcher is 720 logical pixels wide, the SearchBar is 64 high,
+  each result row is 44 high, and the ActionBar is 44 high
+
+#### Scenario: Root search with an answer
+
+- **WHEN** the user types "2+2" at root
+- **THEN** the launcher shows the SearchBar, the answer card, the results, and
+  the ActionBar, from top to bottom
 
 ### Requirement: The SearchBar holds the query and shows where the user is
 
 The SearchBar SHALL hold the query for a list or grid, with a placeholder the
 view sets. When a view has been pushed, it SHALL show a back control before
-the query; activating it SHALL go back one view, as Escape does. While the view
-is loading, it SHALL show a thin bar along its bottom edge in which a short
-segment in the accent role sweeps from one end to the other, again and again,
-at a steady pace. When the view declares a filter dropdown, the SearchBar SHALL
-show it at its right end. For a detail or form view, the SearchBar SHALL show
-the command's title in place of the query.
+the query; activating it SHALL go back one view, as Escape does. While the busy
+marks are shown, it SHALL show an indeterminate progress bar along its bottom
+edge: a thin bar in which a short segment in the accent role sweeps from one
+end to the other, again and again, at a steady pace. When the view declares a
+filter dropdown, the SearchBar SHALL show it at its right end. For a detail or
+form view, the SearchBar SHALL show the command's title in place of the query.
 
 #### Scenario: Root shows no back control
 
@@ -106,13 +140,13 @@ the command's title in place of the query.
 
 #### Scenario: A loading view
 
-- **WHEN** the view is marked loading
+- **WHEN** the busy marks are shown for a view marked loading
 - **THEN** the loading bar is shown under the SearchBar with its segment
   sweeping along it
 
 #### Scenario: Loading ends
 
-- **WHEN** the view stops being marked loading, or the user leaves it
+- **WHEN** the busy marks are removed, or the user leaves the view
 - **THEN** the loading bar and its motion are gone in the same frame
 
 #### Scenario: A form shows its title
@@ -154,24 +188,31 @@ SHALL open the action panel.
 ### Requirement: A toast reports status in the ActionBar
 
 A toast SHALL replace the ActionBar's context while it shows. A toast has a
-style and one line of text. A busy toast SHALL show a muted dot and stay while
-its work runs. A success toast SHALL show an accent dot and disappear after
-about two seconds. A failure toast SHALL show a danger dot and stay until the
-next key press or click. The dot SHALL NOT move. Assistive technology SHALL be
-told the toast's text and whether it reports a failure. Showing a toast SHALL
-NOT take focus.
+style and one line of text. A busy toast SHALL show a spinner in the working
+role and stay while its work runs, following the busy-mark timing. A success
+toast SHALL show a dot in the done role and disappear after about two seconds.
+A failure toast SHALL show a dot in the danger role and stay until the next key
+press or click. The success and failure dots SHALL NOT move. Assistive
+technology SHALL be told the toast's text and whether it reports a failure.
+Showing a toast SHALL NOT take focus.
 
 #### Scenario: A success toast
 
 - **WHEN** an action that keeps the launcher open reports success with a toast
-- **THEN** the toast shows with an accent dot and is gone after about two
-  seconds, and the context returns
+- **THEN** the toast shows with a dot in the done role and is gone after about
+  two seconds, and the context returns
 
 #### Scenario: A failure toast stays
 
 - **WHEN** an action fails
-- **THEN** a failure toast shows its sentence with a danger dot
+- **THEN** a failure toast shows its sentence with a dot in the danger role
 - **AND** it stays until the user presses a key or clicks
+
+#### Scenario: A busy toast
+
+- **WHEN** the busy marks are shown
+- **THEN** the busy toast shows a spinner in the working role, turning while
+  the work runs
 
 #### Scenario: Typing is not interrupted
 
@@ -188,10 +229,11 @@ The launcher SHALL build every surface from the same small parts:
   border.
 - A key chord is drawn as keys in Geist Mono, using the platform's names as the
   view protocol requires.
-- A tag is short text in a rounded outline coloured by the accent, muted, or
-  danger role.
-- An accessory is text, an icon, a tag, or a key chord. A row shows at most
-  three, right-aligned.
+- A tag is short text in its role's colour on a rounded, faint fill of the same
+  role. Its role is accent, muted, or danger.
+- A progress ring as an accessory is 16 logical pixels.
+- An accessory is text, an icon, a tag, a key chord, a progress ring, or a
+  status dot. A row shows at most three, right-aligned.
 
 #### Scenario: Icons keep their meaning
 
@@ -204,6 +246,12 @@ The launcher SHALL build every surface from the same small parts:
 
 - **WHEN** an item declares four accessories
 - **THEN** the row shows the first three
+
+#### Scenario: A tag in the accent role
+
+- **WHEN** an item declares the tag "Link" in the accent role
+- **THEN** "Link" is drawn in the accent colour on a faint accent fill, with no
+  outline
 
 ### Requirement: Each view kind has one layout
 
@@ -223,6 +271,10 @@ The launcher SHALL build every surface from the same small parts:
 - A form SHALL show a label column and a control column. A field's error SHALL
   be shown under the field in the danger role and be its accessible
   description.
+- A progress view SHALL show, from top to bottom, its title with its subtitle
+  in the muted role, a 4 logical pixel progress bar, its detail line in the
+  muted role, and its steps, one per row, each with a status dot before its
+  title. Queued steps' titles SHALL be in the muted role.
 - An empty view SHALL show one icon, one title, and at most one line of hint,
   centred in the view.
 
@@ -260,20 +312,28 @@ The launcher SHALL build every surface from the same small parts:
 - **THEN** its message shows under that field in the danger role and is exposed
   as the field's description, and the field can still be edited
 
+#### Scenario: A progress view
+
+- **WHEN** a progress view declares a title, a subtitle, a value, a detail, and
+  four steps
+- **THEN** the title and subtitle are at the top, the bar below them, then the
+  detail line, then the four steps with their status dots
+
 #### Scenario: No results
 
-- **WHEN** a query matches nothing
+- **WHEN** a query matches nothing and gets no answer
 - **THEN** the empty view shows its icon, "No results for" followed by the
   query, and its hint when one is declared
 
 ### Requirement: Selection, hover, and focus are told apart
 
-The selected row, tile, or action SHALL be filled with the selection role. A
+The selected row, tile, or action SHALL be filled with the selected role. A
 hovered one SHALL be filled with the hover role, which SHALL be clearly weaker
-than selection, following the list-navigation requirements. A focused form
-control SHALL show a border in the accent role. A surface that keeps focus in
-its input and moves a selection SHALL show that selection, not a focus ring
-around the surface.
+than selected, following the list-navigation requirements. Selected text in an
+input SHALL be filled with the selection role. A focused form control SHALL
+show a border in the accent role. A surface that keeps focus in its input and
+moves a selection SHALL show that selection, not a focus ring around the
+surface.
 
 #### Scenario: Hovering another row
 
@@ -285,6 +345,12 @@ around the surface.
 - **WHEN** the user presses Tab in a form
 - **THEN** the next control shows the accent border and the previous one loses
   it
+
+#### Scenario: Selecting text in the SearchBar
+
+- **WHEN** the user selects the query text in the SearchBar
+- **THEN** the selected text is filled with the selection role, not the
+  selected role
 
 ### Requirement: Overlays own the keyboard until they close
 
@@ -318,44 +384,6 @@ act on the view below or dismiss the launcher.
 - **WHEN** the panel closes over a detail view
 - **THEN** the detail view's shortcuts work again
 
-### Requirement: Nothing animates
-
-Dango SHALL NOT animate its interface, except for the loading bar's sweep.
-Showing the launcher, moving the selection, hovering, opening and closing the
-action panel, showing and removing a toast, changing results, and replacing a
-view SHALL each change in one frame. Busy states SHALL be shown by the loading
-bar and by static marks next to text. How fast the launcher appears is in
-launcher-shell, and how a streamed view keeps its selection is in
-view-protocol.
-
-#### Scenario: Activation on Windows
-
-- **WHEN** the launcher is shown on Windows, first or again
-- **THEN** it appears without an entrance effect
-
-#### Scenario: Activation on macOS
-
-- **WHEN** the launcher is shown on macOS, first or again
-- **THEN** it appears without an entrance effect
-
-#### Scenario: A streamed view stays stable
-
-- **WHEN** a command replaces one view many times a second
-- **THEN** each replacement shows in one frame, with no transition between the
-  old and the new content
-- **AND** the loading bar's sweep continues without restarting
-
-#### Scenario: Busy without motion
-
-- **WHEN** work is in progress
-- **THEN** the loading bar's segment is the only thing that moves
-- **AND** the busy toast's dot stays still
-
-#### Scenario: Idle without motion
-
-- **WHEN** no view is loading
-- **THEN** no animation runs on any surface
-
 ### Requirement: Content fits the launcher
 
 Content and overlays SHALL fit inside the launcher at every supported display
@@ -379,3 +407,111 @@ list SHALL scroll and keep the selected action in view.
 - **WHEN** the launcher is shown at 200 percent scaling on either platform
 - **THEN** corners, icons, text, and focus marks are sharp and not clipped by
   the window edge
+
+### Requirement: Progress marks are honest
+
+A progress mark SHALL be a bar or a ring, filled in the working role on a track
+in the raised role. It SHALL be determinate, filled to its value from 0 to 1,
+only when the total is known. Otherwise it SHALL be indeterminate and move
+without claiming an amount. A spinner is a small indeterminate ring. The
+SearchBar's loading bar is the one exception to these colours (see its
+requirement). A mark SHALL tell assistive technology that it is busy and, when
+determinate, its value in percent.
+
+#### Scenario: A determinate ring
+
+- **WHEN** an item declares a progress ring at 0.42
+- **THEN** the ring is filled to 42 percent and does not move
+- **AND** assistive technology is told the value 42 percent
+
+#### Scenario: A full ring
+
+- **WHEN** an item declares a progress ring at 1
+- **THEN** the ring is drawn as a full circle
+
+#### Scenario: An indeterminate ring
+
+- **WHEN** an item declares a progress ring with no value
+- **THEN** the ring turns without showing an amount
+
+### Requirement: Status dots name a state
+
+A status dot SHALL show one of five states, each in its own role: working in
+the working role, needs input in the blocked role, done in the done role,
+failed in the danger role, and queued in the idle role. A status dot SHALL NOT
+move. A status dot shown as an item's accessory SHALL tell assistive
+technology its state as "Working", "Needs input", "Done", "Failed", or
+"Queued".
+
+#### Scenario: A failed item
+
+- **WHEN** an item declares the status failed
+- **THEN** its row shows a dot in the danger role
+- **AND** assistive technology is told "Failed"
+
+### Requirement: A cold list shows skeleton rows
+
+A list whose view is loading and declares no items SHALL show skeleton rows in
+its body: rows of the normal row height, with a shape in the raised role where
+the icon and title would be, as many as fit the launcher at its maximum height.
+Skeleton rows SHALL NOT be selectable, SHALL NOT be read out one by one to
+assistive technology, and SHALL be replaced by the items in the same frame they
+arrive. A list whose items are all filtered out by the query SHALL NOT show
+skeleton rows.
+
+#### Scenario: Opening a slow list
+
+- **WHEN** a command shows a list marked loading with no items
+- **THEN** the launcher takes its maximum height and the body shows skeleton
+  rows and no empty state
+
+#### Scenario: Items arrive
+
+- **WHEN** the first items of that list arrive
+- **THEN** the skeleton rows are gone and the items are shown in the same frame
+
+#### Scenario: A refreshing list filtered to nothing
+
+- **WHEN** a list marked loading has items and the query matches none of them
+- **THEN** no skeleton rows are shown
+
+### Requirement: Busy marks do not blink
+
+The busy marks, the SearchBar's loading bar and the busy toast, SHALL appear
+only once Dango has been busy for about 150 milliseconds. Dango is busy while a
+command invoked from root search has not finished or shown a view, or while
+the top view is marked loading. Once shown, the marks SHALL stay for at least
+about 400 milliseconds, even if the work ends sooner. While Dango stays busy,
+replacing the view SHALL NOT restart the marks. Leaving the view or a reset
+SHALL remove them at once.
+
+#### Scenario: A fast command
+
+- **WHEN** a command invoked from root search finishes within about 150
+  milliseconds
+- **THEN** no busy toast is shown
+
+#### Scenario: A slow command shows a view that loads
+
+- **WHEN** a command takes a second to show a view marked loading, and the
+  view loads for another second
+- **THEN** the busy toast appears after a short moment reading "Running"
+  followed by the command's title, then reads "Loading…" without disappearing
+  in between
+
+#### Scenario: Busy marks stay a moment
+
+- **WHEN** the busy marks have just appeared and the work then ends
+- **THEN** the marks stay until they have been shown for about 400
+  milliseconds, and are then removed
+
+#### Scenario: A streamed view keeps its marks steady
+
+- **WHEN** a command replaces a view marked loading many times a second
+- **THEN** the busy marks stay shown and the loading bar's sweep continues
+  without restarting
+
+#### Scenario: Leaving clears at once
+
+- **WHEN** the user leaves a view while its busy marks are shown
+- **THEN** the marks are gone in the same frame

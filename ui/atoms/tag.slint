@@ -7,8 +7,7 @@ export component Tag inherits Rectangle {
     in property <TagRole> role;
     property <color> tone: root.role == TagRole.accent ? Theme.accent
         : root.role == TagRole.danger ? Theme.danger : Theme.muted;
-    border-width: 1px;
-    border-color: root.tone;
+    background: root.tone.with-alpha(0.18);
     border-radius: Theme.radius / 2;
     accessible-role: AccessibleRole.text;
     accessible-label: root.text;

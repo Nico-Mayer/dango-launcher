@@ -1,0 +1,25 @@
+import { Theme } from "../theme.slint";
+
+/// Rows standing in for a list that has nothing yet, as many as fit.
+export component Skeleton inherits Rectangle {
+    property <int> rows: floor(self.height / Theme.row-height);
+    accessible-role: none;
+    for index in root.rows: Rectangle {
+        y: index * Theme.row-height;
+        height: Theme.row-height;
+        Rectangle {
+            x: 10px;
+            width: Theme.icon-size;
+            height: Theme.icon-size;
+            border-radius: Theme.radius / 2;
+            background: Theme.raised;
+        }
+        Rectangle {
+            x: 10px + Theme.icon-size + 12px;
+            width: (parent.width - self.x) * (mod(index, 3) == 0 ? 0.5 : mod(index, 3) == 1 ? 0.35 : 0.42);
+            height: 10px;
+            border-radius: 5px;
+            background: Theme.raised;
+        }
+    }
+}

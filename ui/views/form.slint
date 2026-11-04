@@ -95,7 +95,7 @@ export component Form inherits Rectangle {
                         }
                         if field.error == "" && field.help != "": Text {
                             text: field.help;
-                            color: field.help-emphasized ? Theme.text : Theme.muted;
+                            color: field.help-emphasized ? Theme.foreground : Theme.muted;
                             font-size: Theme.text-small;
                             wrap: word-wrap;
                         }

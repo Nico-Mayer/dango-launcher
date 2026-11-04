@@ -30,6 +30,7 @@ protocol_types! {
         Grid(GridView),
         Detail(DetailView),
         Form(FormView),
+        Progress(ProgressView),
     }
 
     #[derive(Default)]
@@ -174,6 +175,21 @@ protocol_types! {
             role: TagRole,
         },
         Kbd { shortcut: Shortcut },
+        Progress {
+            #[serde(default)]
+            value: Option<f32>,
+        },
+        Status { status: Status },
+    }
+
+    #[derive(Copy, Eq)]
+    #[serde(rename_all = "camelCase")]
+    pub enum Status {
+        Working,
+        NeedsInput,
+        Done,
+        Failed,
+        Queued,
     }
 
     #[derive(Default)]
@@ -201,6 +217,30 @@ protocol_types! {
         pub loading: bool,
         #[serde(default)]
         pub actions: Vec<Action>,
+    }
+
+    /// One long job: how far it is and its named steps.
+    #[derive(Default)]
+    #[serde(rename_all = "camelCase")]
+    pub struct ProgressView {
+        pub title: String,
+        #[serde(default)]
+        pub subtitle: String,
+        /// From 0 to 1. Without one, the bar claims no amount.
+        #[serde(default)]
+        pub value: Option<f32>,
+        #[serde(default)]
+        pub detail: String,
+        #[serde(default)]
+        pub steps: Vec<Step>,
+        #[serde(default)]
+        pub actions: Vec<Action>,
+    }
+
+    #[serde(rename_all = "camelCase")]
+    pub struct Step {
+        pub title: String,
+        pub status: Status,
     }
 
     #[serde(rename_all = "camelCase")]
@@ -349,5 +389,44 @@ mod tests {
         let view: DetailView = serde_json::from_str(r#"{"markdown":"Hi"}"#).unwrap();
         assert_eq!(view.image, None);
         assert_eq!(view.text, None);
+    }
+
+    #[test]
+    fn a_progress_view_without_a_value_reads() {
+        let json = r#"{"protocolVersion":2,"view":{"kind":"progress","title":"Dango 0.5.0","steps":[{"title":"Download","status":"working"}]}}"#;
+        let tree: ViewTree = serde_json::from_str(json).unwrap();
+        let View::Progress(progress) = &tree.view else {
+            panic!("expected a progress view");
+        };
+        assert_eq!(progress.value, None);
+        assert_eq!(progress.steps[0].status, Status::Working);
+        let again: ViewTree = serde_json::from_str(&serde_json::to_string(&tree).unwrap()).unwrap();
+        assert_eq!(again, tree);
+    }
+
+    #[test]
+    fn progress_and_status_accessories_round_trip() {
+        for (json, accessory) in [
+            (
+                r#"{"kind":"progress","value":0.42}"#,
+                Accessory::Progress { value: Some(0.42) },
+            ),
+            (
+                r#"{"kind":"progress"}"#,
+                Accessory::Progress { value: None },
+            ),
+            (
+                r#"{"kind":"status","status":"needsInput"}"#,
+                Accessory::Status {
+                    status: Status::NeedsInput,
+                },
+            ),
+        ] {
+            let read: Accessory = serde_json::from_str(json).unwrap();
+            assert_eq!(read, accessory);
+            let written: Accessory =
+                serde_json::from_str(&serde_json::to_string(&accessory).unwrap()).unwrap();
+            assert_eq!(written, accessory);
+        }
     }
 }

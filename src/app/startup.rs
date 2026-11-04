@@ -153,6 +153,7 @@ fn build_services(
     core: &Weak<Core>,
     notices: &mut Vec<String>,
 ) -> Services {
+    let tasks = super::tasks_for(core.clone());
     let store: Option<Arc<Store>> = match open_store() {
         Ok(Opened {
             store,
@@ -273,6 +274,11 @@ fn build_services(
     ));
     register(&mut host, "permissions", permissions);
 
+    let calculator = Arc::new(extensions::calculator::CalculatorExtension::new(
+        exchange.clone(),
+    ));
+    register(&mut host, "calculator", calculator);
+
     // Registered after permissions, so a permission warning leads the update item.
     let updates = Arc::new(UpdatesExtension::new(
         startup.updates.clone(),
@@ -283,6 +289,7 @@ fn build_services(
             core: core.clone(),
             owner: updates::EXTENSION_ID,
         })),
+        tasks.clone(),
     ));
     register(&mut host, "updates", updates);
 
@@ -306,16 +313,24 @@ fn build_services(
         clipboard: clipboard
             .as_ref()
             .map(|clipboard| clipboard.clone() as Arc<dyn ClipboardSource>),
-        runner: Arc::new(ViewRunner {
+        runner: Some(Arc::new(ViewRunner {
             core: core.clone(),
             owner: extensions::ai::EXTENSION_ID,
-        }),
+        })),
+        tasks: tasks.clone(),
+        visible: {
+            let core = core.clone();
+            Arc::new(move || {
+                core.upgrade()
+                    .is_some_and(|core| core.visible.load(std::sync::atomic::Ordering::SeqCst))
+            })
+        },
     };
     {
         let (extension, problems) = {
             let config = file_config.shared();
             let config = config.read().unwrap();
-            ai.build(&config)
+            super::build_ai(&ai, &config)
         };
         for problem in &problems {
             crate::log::append(problem);
@@ -385,6 +400,7 @@ fn build_services(
         clipboard: clipboard.map(|clipboard| clipboard as Arc<dyn ClipboardSource>),
         hotkeys,
         hyperkey,
+        tasks,
     }
 }
 

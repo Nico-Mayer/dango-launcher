@@ -6,10 +6,11 @@ use crate::ui::snapshot::{Screen, Snapshot, ViewBody};
 
 pub const MAX: f32 = crate::platform::LAUNCHER_MAX_HEIGHT as f32;
 pub const WIDTH: f32 = 720.0;
-const SEARCH_BAR: f32 = 56.0;
-const ACTION_BAR: f32 = 40.0;
-const LIST_PADDING: f32 = 6.0;
-pub const ROW: f32 = 40.0;
+const SEARCH_BAR: f32 = 64.0;
+const ACTION_BAR: f32 = 44.0;
+const LIST_PADDING: f32 = 8.0;
+pub const ROW: f32 = 44.0;
+const ANSWER: f32 = 64.0;
 pub const HEADING: f32 = 28.0;
 pub const PANEL_ROW: f32 = 32.0;
 pub const PANEL_PADDING: f32 = 6.0;
@@ -27,10 +28,13 @@ pub fn height(snapshot: &Snapshot) -> f32 {
         Screen::Root(root) if root.empty.is_none() => {
             let headings = root.sections.iter().filter(|s| s.heading.is_some()).count();
             let rows: usize = root.sections.iter().map(|s| s.items.len()).sum();
-            list(headings, rows)
+            let answer = if root.answer.is_some() { ANSWER } else { 0.0 };
+            answer + list(headings, rows)
         }
         Screen::View(view) => match &view.body {
-            ViewBody::List(body) if body.empty.is_none() && body.pane.is_none() => {
+            ViewBody::List(body)
+                if body.empty.is_none() && body.pane.is_none() && !body.skeleton =>
+            {
                 let headings = body.sections.iter().filter(|s| s.title.is_some()).count();
                 let rows: usize = body.sections.iter().map(|s| s.items.len()).sum();
                 list(headings, rows)

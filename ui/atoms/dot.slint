@@ -1,16 +1,23 @@
 import { Theme } from "../theme.slint";
 
-export enum ToastStyle { busy, success, failure }
+export enum Status { working, needs-input, done, failed, queued }
 
-/// Static: a busy state is shown, never animated.
+/// Still in every state. Only an accessory dot announces its state; a toast's
+/// text already says it.
 export component Dot inherits Rectangle {
-    in property <ToastStyle> style;
-    in property <string> label;
+    in property <Status> status;
+    in property <bool> announce;
     width: 6px;
     height: 6px;
     border-radius: 3px;
     accessible-role: image;
-    accessible-label: root.label;
-    background: root.style == ToastStyle.failure ? Theme.danger
-        : root.style == ToastStyle.success ? Theme.accent : Theme.muted;
+    accessible-label: !root.announce ? ""
+        : root.status == Status.working ? "Working"
+        : root.status == Status.needs-input ? "Needs input"
+        : root.status == Status.done ? "Done"
+        : root.status == Status.failed ? "Failed" : "Queued";
+    background: root.status == Status.working ? Theme.working
+        : root.status == Status.needs-input ? Theme.blocked
+        : root.status == Status.done ? Theme.done
+        : root.status == Status.failed ? Theme.danger : Theme.idle;
 }

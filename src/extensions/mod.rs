@@ -1,5 +1,6 @@
 pub mod ai;
 pub mod applications;
+pub mod calculator;
 pub mod clipboard;
 pub mod games;
 pub mod permissions;
@@ -18,6 +19,7 @@ pub fn builtin_manifests() -> Vec<Manifest> {
     let shipped_ai = ai::commands::build(&crate::config::Config::default()).commands;
     vec![
         applications::manifest(),
+        calculator::manifest(),
         clipboard::manifest(),
         games::manifest(),
         permissions::manifest(),

@@ -1,0 +1,67 @@
+import { Theme } from "../theme.slint";
+import { Progress, ProgressKind } from "../atoms/progress.slint";
+import { Dot, Status } from "../atoms/dot.slint";
+import { ProgressData } from "../globals.slint";
+
+/// One long job: its title, how far it is, and its named steps.
+export component ProgressView inherits Rectangle {
+    VerticalLayout {
+        padding: 24px;
+        spacing: 12px;
+        alignment: start;
+        VerticalLayout {
+            spacing: 2px;
+            Text {
+                text: ProgressData.title;
+                color: Theme.foreground;
+                font-size: Theme.text-large;
+                font-weight: 600;
+                overflow: elide;
+            }
+            if ProgressData.subtitle != "": Text {
+                text: ProgressData.subtitle;
+                color: Theme.muted;
+                font-size: Theme.text-small;
+                overflow: elide;
+            }
+        }
+        Progress {
+            kind: ProgressKind.bar;
+            value: ProgressData.value;
+            height: 4px;
+            accessible-description: ProgressData.title;
+        }
+        if ProgressData.detail != "": Text {
+            text: ProgressData.detail;
+            color: Theme.muted;
+            font-size: Theme.text-small;
+            overflow: elide;
+        }
+        VerticalLayout {
+            spacing: 4px;
+            for step in ProgressData.steps: HorizontalLayout {
+                height: 28px;
+                spacing: 10px;
+                accessible-role: AccessibleRole.text;
+                accessible-label: step.title + ", " + (step.status == Status.working ? "working"
+                    : step.status == Status.needs-input ? "needs input"
+                    : step.status == Status.done ? "done"
+                    : step.status == Status.failed ? "failed" : "queued");
+                VerticalLayout {
+                    alignment: center;
+                    Dot {
+                        status: step.status;
+                    }
+                }
+                Text {
+                    text: step.title;
+                    color: step.status == Status.queued ? Theme.muted : Theme.foreground;
+                    font-size: Theme.text-body;
+                    vertical-alignment: center;
+                    overflow: elide;
+                    accessible-role: none;
+                }
+            }
+        }
+    }
+}

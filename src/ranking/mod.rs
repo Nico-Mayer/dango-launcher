@@ -13,7 +13,7 @@ pub use frecency::{now_millis, FrecencyPersistence, FrecencyTable};
 pub use fuzzy::{Match, Query};
 pub use input_history::{InputHistory, InputHistoryPersistence};
 
-use crate::search::{Candidate, Ranker};
+use crate::search::{Candidate, Ranker, Source};
 
 /// How much a candidate's frecency counts relative to raw match quality. Tuned
 /// by feel; isolated here so it can change without touching the pipeline.
@@ -43,6 +43,25 @@ impl DangoRanker {
 
 impl Ranker for DangoRanker {
     fn rank(&self, query: &str, candidates: Vec<Candidate>, limit: usize) -> Vec<Candidate> {
+        // An answer is never matched against the query it answers: it leads.
+        let (answers, candidates): (Vec<Candidate>, Vec<Candidate>) = candidates
+            .into_iter()
+            .partition(|candidate| candidate.source == Source::Answer);
+        answers
+            .into_iter()
+            .chain(self.rank_results(query, candidates, limit))
+            .take(limit)
+            .collect()
+    }
+}
+
+impl DangoRanker {
+    fn rank_results(
+        &self,
+        query: &str,
+        candidates: Vec<Candidate>,
+        limit: usize,
+    ) -> Vec<Candidate> {
         let now = frecency::now_millis();
         let query = query.trim();
         if query.is_empty() {
@@ -422,6 +441,21 @@ mod tests {
         assert_eq!(ranked[7].id, "used7");
         assert!(!ranked[6].suggested && !ranked[7].suggested);
         assert_eq!(ranked[8].id, "aaa");
+    }
+
+    #[test]
+    fn an_answer_leads_the_results_unranked() {
+        let mut pinned = candidate("pin", "Accessibility is off");
+        pinned.pinned = true;
+        let mut answer = candidate("4", "4");
+        answer.source = Source::Answer;
+        let ranked = ranker().rank(
+            "2+2",
+            vec![candidate("calc", "2+2 notes"), pinned, answer],
+            10,
+        );
+        assert_eq!(ranked[0].id, "4");
+        assert_eq!(ranked[0].source, Source::Answer);
     }
 
     #[test]

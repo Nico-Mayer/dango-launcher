@@ -1,9 +1,11 @@
 import { IconKind } from "atoms/icon.slint";
 import { AccessoryData } from "atoms/accessory.slint";
-import { ToastStyle } from "atoms/dot.slint";
 import { OptionData } from "atoms/dropdown.slint";
+import { Status } from "atoms/dot.slint";
 
-export enum ScreenKind { root, list, grid, detail, form, empty }
+export enum ToastStyle { busy, success, failure }
+
+export enum ScreenKind { root, list, grid, detail, form, progress, empty }
 
 /// A non-empty heading makes this a section heading rather than an item.
 export struct RowData {
@@ -87,6 +89,9 @@ export global Shell {
     in property <bool> toast-shown;
     in property <ToastStyle> toast-style;
     in property <string> toast-text;
+    /// The toast's action and its chord, empty when it has none.
+    in property <string> toast-action-label;
+    in property <string> toast-action-keys;
     in property <string> primary-label;
     in property <string> confirm-key;
     in property <string> panel-key;
@@ -113,6 +118,7 @@ export global Search {
 export global ListData {
     in property <[RowData]> rows;
     in property <bool> detail-pane;
+    in property <bool> skeleton;
 }
 
 export global GridData {
@@ -125,6 +131,29 @@ export global EmptyData {
     in property <IconKind> icon-kind;
     in property <string> title;
     in property <string> hint;
+}
+
+export struct StepData {
+    title: string,
+    status: Status,
+}
+
+export global ProgressData {
+    in property <string> title;
+    in property <string> subtitle;
+    /// Below 0 is indeterminate.
+    in property <float> value: -1;
+    in property <string> detail;
+    in property <[StepData]> steps;
+}
+
+export global AnswerData {
+    in property <bool> shown;
+    in property <string> id;
+    in property <string> expression;
+    in property <string> answer;
+    in property <bool> selected;
+    in property <image> arrow;
 }
 
 export global DetailData {
