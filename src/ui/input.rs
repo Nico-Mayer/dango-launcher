@@ -122,6 +122,8 @@ pub enum Event {
     Activated {
         held: bool,
         probe: Option<u64>,
+        /// The user opened it, rather than a command bringing it back.
+        asked: bool,
     },
     Reset,
     /// The launcher is off screen, for whatever reason it was hidden.

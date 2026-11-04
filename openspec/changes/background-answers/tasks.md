@@ -13,12 +13,12 @@
 ## 3. The HUD and the jump
 
 - [x] 3.1 In `task_changed`, a `Done` or newly arrived `NeedsInput` while hidden shows a success HUD with its sentence, carrying "Show answer" when the result has `show`. Verify with reducer tests: a hidden `Done` sets a success HUD and still toasts on the next open; a visible `Done` shows no HUD; a hidden `NeedsInput` reported twice shows the HUD once.
-- [ ] 3.2 `Event::Activated` gains `asked`, set only by `Core::toggle`. When `asked` and the HUD on screen carries an action, the reducer pushes `Effect::RunAction` with it and shows no toast. Verify with reducer tests: an asked open during the HUD runs the action once and shows no toast; an open after `ToastExpired` shows the toast; an open that is not asked (a command hotkey) does not jump; a newer copy HUD in between means no jump; a failure never jumps. Verify `toggle` sets `asked` and `dispatch_command` does not with app tests in `src/app/tests.rs`.
-- [ ] 3.3 In `Activated`, when `held` and the top view belongs to the result's owner, show no toast and do not jump (`shows_progress_of` becomes "shows its own view"). Verify with reducer tests: reopening held onto an AI detail from the result's owner shows no toast; the same while its HUD still shows does not jump; after a reset the toast shows with "Show answer"; the update's progress view keeps its rule.
+- [x] 3.2 `Event::Activated` gains `asked`, set only by `Core::toggle`. When `asked` and the HUD on screen carries an action, the reducer pushes `Effect::RunAction` with it and shows no toast. Verify with reducer tests: an asked open during the HUD runs the action once and shows no toast; an open after `ToastExpired` shows the toast; an open that is not asked (a command hotkey) does not jump; a newer copy HUD in between means no jump; a failure never jumps. Verify `toggle` sets `asked` and `dispatch_command` does not with app tests in `src/app/tests.rs`.
+- [x] 3.3 In `Activated`, when `held` and the top view belongs to the result's owner, show no toast and do not jump (`shows_progress_of` becomes "shows its own view"). Verify with reducer tests: reopening held onto an AI detail from the result's owner shows no toast; the same while its HUD still shows does not jump; after a reset the toast shows with "Show answer"; the update's progress view keeps its rule.
 
 ## 4. Checks and review
 
-- [ ] 4.1 Run `mise run check` and `cargo test`. Verify both pass.
+- [x] 4.1 Run `mise run check` and `cargo test`. Verify both pass.
 - [ ] 4.2 Windows hand check through `dango-ui`, `mise run keys`, and `mise run shot`: run "Fix Spelling and Grammar" on a Notepad selection and switch to Notepad before it finishes.
   - The HUD reads "Answer ready: Fix Spelling and Grammar".
   - Opening the launcher with its hotkey while the HUD shows lands on the answer.

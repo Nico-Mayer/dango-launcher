@@ -126,6 +126,7 @@ impl Harness {
         launcher.apply(Input::Event(Event::Activated {
             held: false,
             probe: None,
+            asked: false,
         }));
         Self {
             launcher,
@@ -1664,6 +1665,7 @@ fn a_reset_while_the_panel_is_open_closes_it_and_the_next_open_starts_fresh() {
         h.event(Event::Activated {
             held: false,
             probe: None,
+            asked: false,
         });
         let snapshot = h.snapshot();
         assert!(!snapshot.panel.open);
@@ -1798,6 +1800,7 @@ fn a_failure_around_a_hide_goes_to_the_hud_either_way_round() {
         h.event(Event::Activated {
             held: false,
             probe: None,
+            asked: false,
         });
         assert!(h.failure().is_none(), "{before_hide}");
         assert_eq!(hud_text(&h), None);
@@ -1816,6 +1819,7 @@ fn a_failure_while_held_goes_to_the_hud_and_not_into_the_held_view() {
     h.event(Event::Activated {
         held: true,
         probe: None,
+        asked: false,
     });
     assert!(h.failure().is_none());
     assert!(matches!(h.view_body(), ViewBody::Detail(_)));
@@ -1864,6 +1868,7 @@ fn a_hotkey_failure_while_held_keeps_the_running_status() {
     h.event(Event::Activated {
         held: true,
         probe: None,
+        asked: false,
     });
     h.wake_busy();
     assert_eq!(h.status(), "Running Clipboard History…");
@@ -2015,6 +2020,7 @@ fn held_activation_keeps_query_and_selection_and_refreshes_results() {
     h.event(Event::Activated {
         held: true,
         probe: None,
+        asked: false,
     });
     assert_eq!(h.searches("Result 1"), before + 1);
     let snapshot = h.snapshot();
@@ -2034,6 +2040,7 @@ fn held_activation_leaves_a_pushed_view_in_place() {
     h.event(Event::Activated {
         held: true,
         probe: Some(3),
+        asked: false,
     });
     let snapshot = h.snapshot();
     assert_eq!(snapshot.focus, Focus::Form);
@@ -2052,6 +2059,7 @@ fn a_reset_starts_at_an_empty_prompt() {
     h.event(Event::Activated {
         held: false,
         probe: None,
+        asked: false,
     });
     let snapshot = h.snapshot();
     assert_eq!(snapshot.focus, Focus::RootInput);
@@ -2127,6 +2135,7 @@ fn a_stale_expiry_leaves_a_newer_hud() {
     h.event(Event::Activated {
         held: false,
         probe: None,
+        asked: false,
     });
     copy_from_root(&mut h);
     let second = hud_expiry(&h.event(Event::Hidden));
@@ -2155,6 +2164,7 @@ fn showing_the_launcher_removes_the_hud() {
     h.event(Event::Activated {
         held: false,
         probe: None,
+        asked: false,
     });
     assert_eq!(hud_text(&h), None);
     h.event(Event::Hidden);
@@ -2555,6 +2565,7 @@ fn a_task_failing_while_hidden_shows_in_the_hud_and_on_the_next_open() {
     h.event(Event::Activated {
         held: false,
         probe: None,
+        asked: false,
     });
     let toast = h.snapshot().toast.unwrap();
     assert_eq!(toast.style, ToastStyle::Failure);
@@ -2574,6 +2585,7 @@ fn a_task_ready_while_hidden_shows_a_success_toast_on_the_next_open() {
     h.event(Event::Activated {
         held: false,
         probe: None,
+        asked: false,
     });
     assert_eq!(
         h.toast(ToastStyle::Success).as_deref(),
@@ -2594,6 +2606,7 @@ fn reopening_onto_the_task_s_own_view_shows_no_result_toast() {
     h.event(Event::Activated {
         held: true,
         probe: None,
+        asked: false,
     });
     assert!(h.failure().is_none());
 }
@@ -2857,4 +2870,139 @@ fn needing_input_again_shows_the_hud_once() {
     let again = h.event(Event::Task(Box::new(task(1, ready_task()))));
     assert!(expires(&first), "the HUD shows and times out");
     assert!(!expires(&again), "a repeated report shows nothing new");
+}
+
+fn open(h: &mut Harness, held: bool, asked: bool) -> Vec<Effect> {
+    h.event(Event::Activated {
+        held,
+        probe: None,
+        asked,
+    })
+}
+
+fn hidden_answer(h: &mut Harness) {
+    report(h, answer_ready(1));
+}
+
+fn ran_show(effects: &[Effect]) -> usize {
+    effects
+        .iter()
+        .filter(
+            |effect| matches!(effect, Effect::RunAction(request) if request.action_id == "show"),
+        )
+        .count()
+}
+
+#[test]
+fn opening_during_an_answer_s_hud_opens_the_answer() {
+    let mut h = Harness::root(3);
+    h.event(Event::Hidden);
+    hidden_answer(&mut h);
+    let effects = open(&mut h, false, true);
+    assert_eq!(ran_show(&effects), 1);
+    assert!(h.snapshot().toast.is_none());
+    assert!(h.snapshot().hud.is_none());
+}
+
+#[test]
+fn opening_after_an_answer_s_hud_shows_the_toast() {
+    let mut h = Harness::root(3);
+    h.event(Event::Hidden);
+    let shown = h.event(Event::Task(Box::new(answer_ready(1))));
+    h.event(Event::ToastExpired {
+        id: hud_expiry(&shown),
+    });
+    let effects = open(&mut h, false, true);
+    assert_eq!(ran_show(&effects), 0);
+    let toast = h.snapshot().toast.expect("the toast");
+    assert_eq!(toast.action.unwrap().title, "Show answer");
+}
+
+#[test]
+fn a_command_showing_the_launcher_does_not_open_the_answer() {
+    let mut h = Harness::root(3);
+    h.event(Event::Hidden);
+    hidden_answer(&mut h);
+    let effects = open(&mut h, false, false);
+    assert_eq!(ran_show(&effects), 0);
+    assert_eq!(
+        h.toast(ToastStyle::Success).as_deref(),
+        Some("Answer ready: Summarize")
+    );
+}
+
+#[test]
+fn a_newer_hud_takes_the_answer_s_place() {
+    let mut h = Harness::root(3);
+    h.event(Event::Hidden);
+    hidden_answer(&mut h);
+    h.event(Event::Failed("Couldn't paste".into()));
+    let effects = open(&mut h, false, true);
+    assert_eq!(ran_show(&effects), 0);
+}
+
+#[test]
+fn a_failure_never_opens_anything() {
+    let mut h = Harness::root(3);
+    report(&mut h, task(1, running_task()));
+    h.event(Event::Hidden);
+    report(&mut h, task(1, failed_task()));
+    let effects = open(&mut h, false, true);
+    assert!(!effects
+        .iter()
+        .any(|effect| matches!(effect, Effect::RunAction(_))));
+    assert!(h.failure().is_some());
+}
+
+fn held_answer_view() -> Harness {
+    let mut h = Harness::view(detail_tree("Better."));
+    h.event(Event::Hidden);
+    report(
+        &mut h,
+        crate::tasks::TaskState {
+            owner: "fixture".into(),
+            title: "Fixture Command".into(),
+            ..answer_ready(1)
+        },
+    );
+    h
+}
+
+#[test]
+fn reopening_held_onto_the_answer_s_own_view_shows_nothing_more() {
+    let mut h = held_answer_view();
+    let effects = open(&mut h, true, true);
+    assert_eq!(ran_show(&effects), 0, "its HUD still shows, yet no jump");
+    assert!(h.snapshot().toast.is_none());
+}
+
+#[test]
+fn after_a_reset_the_answer_is_offered_again() {
+    let mut h = held_answer_view();
+    h.event(Event::Reset);
+    let shown = h.snapshot().hud.is_some();
+    assert!(shown);
+    let effects = open(&mut h, false, false);
+    assert_eq!(ran_show(&effects), 0);
+    let toast = h.snapshot().toast.expect("the toast");
+    assert_eq!(toast.action.unwrap().title, "Show answer");
+}
+
+#[test]
+fn another_view_of_the_same_extension_still_gets_the_toast() {
+    let mut h = Harness::view(detail_tree("A form"));
+    h.event(Event::Hidden);
+    report(
+        &mut h,
+        crate::tasks::TaskState {
+            owner: "fixture".into(),
+            title: "Another Command".into(),
+            ..answer_ready(1)
+        },
+    );
+    open(&mut h, true, false);
+    assert_eq!(
+        h.toast(ToastStyle::Success).as_deref(),
+        Some("Answer ready: Summarize")
+    );
 }

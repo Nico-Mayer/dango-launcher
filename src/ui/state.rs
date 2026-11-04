@@ -314,17 +314,21 @@ impl Launcher {
                     }
                 }
             }
-            Event::Activated { held, probe } => {
+            Event::Activated { held, probe, asked } => {
                 self.visible = true;
-                self.hud = None;
+                let jump = self.hud.take().and_then(|hud| hud.action);
                 self.activations += 1;
                 self.probe = probe;
                 if held {
                     fx.push(Effect::Search(self.query.clone()));
                 }
                 if let Some(result) = self.pending_result.take() {
-                    if !self.shows_progress_of(&result.owner) {
-                        self.show_task_result(result, fx);
+                    let in_its_view = (held && self.shows_view_of(&result))
+                        || self.shows_progress_of(&result.owner);
+                    match jump.filter(|_| asked) {
+                        _ if in_its_view => {}
+                        Some(jump) => fx.push(Effect::RunAction(jump.request)),
+                        None => self.show_task_result(result, fx),
                     }
                 }
             }
@@ -405,6 +409,16 @@ impl Launcher {
     }
 
     /// Whether the view on top is a progress view the task's owner pushed.
+    /// The view the task itself streamed into, which a held launcher comes
+    /// back to with the result already in it.
+    fn shows_view_of(&self, task: &TaskState) -> bool {
+        self.owner.as_deref() == Some(task.owner.as_str())
+            && self
+                .stack
+                .last()
+                .is_some_and(|view| view.context.title == task.title)
+    }
+
     fn shows_progress_of(&self, owner: &str) -> bool {
         matches!(
             self.stack.last().map(|view| &view.tree.view),

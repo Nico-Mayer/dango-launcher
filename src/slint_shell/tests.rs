@@ -83,6 +83,7 @@ impl Harness {
         harness.event(Event::Activated {
             held: false,
             probe: None,
+            asked: false,
         });
         harness
     }

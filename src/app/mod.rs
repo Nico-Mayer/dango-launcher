@@ -319,12 +319,14 @@ impl Core {
                 core.hide(HideReason::Interrupted);
             } else {
                 let probe = core.latency.start();
-                core.show(probe);
+                core.show(probe, true);
             }
         });
     }
 
-    pub fn show(self: &Arc<Self>, probe: Option<u64>) {
+    /// `asked` when the user opened it: only then may it jump into an answer
+    /// whose HUD is showing.
+    pub fn show(self: &Arc<Self>, probe: Option<u64>, asked: bool) {
         let core = self.clone();
         self.on_main_thread(move || {
             let held = core.clear_hold();
@@ -333,7 +335,11 @@ impl Core {
             if !core.visible.swap(true, Ordering::SeqCst) {
                 core.shell.show();
             }
-            core.apply(ui::Input::Event(ui::Event::Activated { held, probe }));
+            core.apply(ui::Input::Event(ui::Event::Activated {
+                held,
+                probe,
+                asked,
+            }));
         });
     }
 
@@ -578,7 +584,7 @@ impl Core {
                         // can see. A held launcher is different: the user closed
                         // it and will find the output when they come back.
                         if !core.visible.load(Ordering::SeqCst) && !core.holding() {
-                            core.show(None);
+                            core.show(None, false);
                         }
                         core.apply(ui::Input::Event(ui::Event::Rendered {
                             owner: owner.clone(),
@@ -627,7 +633,7 @@ impl Core {
             .unwrap_or(false);
 
         if shows_view {
-            self.show(None);
+            self.show(None, false);
         } else {
             // The launcher never showed to record the window the press acts on.
             platform::note_insertion_target();

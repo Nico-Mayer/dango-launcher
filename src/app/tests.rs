@@ -333,7 +333,7 @@ async fn a_hide_for_work_while_hidden_keeps_the_held_query() {
 async fn showing_a_visible_launcher_does_not_show_it_again() {
     let (core, shell) = core("");
     core.toggle();
-    core.show(None);
+    core.show(None, true);
     assert_eq!(shell.calls(), [Call::Show]);
 }
 
@@ -1013,4 +1013,51 @@ hotkey = "ctrl+alt+v""#,
         ..x_candidate(crate::search::Source::Command, false)
     };
     assert_eq!(core.result_item(candidate).hotkey, None);
+}
+
+fn answer_ready() -> crate::tasks::TaskState {
+    crate::tasks::TaskState {
+        id: 1,
+        owner: "x".into(),
+        title: "Summarize".into(),
+        line: String::new(),
+        status: crate::tasks::TaskStatus::Done {
+            sentence: "Answer ready: Summarize".into(),
+        },
+        progress: None,
+        steps: Vec::new(),
+        subtitle: String::new(),
+        detail: String::new(),
+        cancel: None,
+        retry: None,
+        show: Some("show".into()),
+        item_id: "summarize".into(),
+    }
+}
+
+fn answer_toast(shell: &RecordingShell) -> bool {
+    shell
+        .last_snapshot()
+        .toast
+        .is_some_and(|toast| toast.text == "Answer ready: Summarize")
+}
+
+/// Only an open the user asked for may run the answer's "Show answer".
+#[tokio::test]
+async fn the_launcher_hotkey_opens_an_answer_but_a_command_hotkey_does_not() {
+    let (core, shell) = core_with("", FakeGrab::default(), vec![two_commands()]);
+    core.apply(crate::ui::Input::Event(crate::ui::Event::Task(Box::new(
+        answer_ready(),
+    ))));
+    core.toggle();
+    settle().await;
+    assert!(!answer_toast(&shell), "the answer opened instead");
+
+    let (core, shell) = core_with("", FakeGrab::default(), vec![two_commands()]);
+    core.apply(crate::ui::Input::Event(crate::ui::Event::Task(Box::new(
+        answer_ready(),
+    ))));
+    core.dispatch_command("x.keep");
+    settle().await;
+    assert!(answer_toast(&shell), "the toast offers it instead");
 }
