@@ -143,11 +143,15 @@ fn escape(core: &Arc<Core>) {
 }
 
 fn start_work(core: &Arc<Core>) -> Arc<InvocationContext> {
+    start_titled(core, None)
+}
+
+fn start_titled(core: &Arc<Core>, title: Option<&str>) -> Arc<InvocationContext> {
     ViewRunner {
         core: Arc::downgrade(core),
         owner: "test",
     }
-    .start()
+    .start(title)
     .unwrap()
 }
 
@@ -371,7 +375,7 @@ impl crate::extensions::ai::Completions for StopCounter {
 struct NoRunner;
 
 impl Runner for NoRunner {
-    fn start(&self) -> Option<Arc<InvocationContext>> {
+    fn start(&self, _title: Option<&str>) -> Option<Arc<InvocationContext>> {
         None
     }
 }
@@ -1060,4 +1064,13 @@ async fn the_launcher_hotkey_opens_an_answer_but_a_command_hotkey_does_not() {
     core.dispatch_command("x.keep");
     settle().await;
     assert!(answer_toast(&shell), "the toast offers it instead");
+}
+
+#[tokio::test]
+async fn work_started_for_a_command_is_named_after_it() {
+    let (core, shell) = core("");
+    core.toggle();
+    start_titled(&core, Some("Summarize")).push_view(a_view());
+    settle().await;
+    assert_eq!(shell.last_snapshot().footer.context.title, "Summarize");
 }

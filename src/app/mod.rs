@@ -898,10 +898,14 @@ struct ViewRunner {
 }
 
 impl invocation::Runner for ViewRunner {
-    fn start(&self) -> Option<Arc<InvocationContext>> {
+    fn start(&self, title: Option<&str>) -> Option<Arc<InvocationContext>> {
         let core = self.core.upgrade()?;
         let (ctx, running) = core.services.invoker.detached(self.owner);
-        core.pump(self.owner.to_string(), core.context(self.owner), running);
+        let mut context = core.context(self.owner);
+        if let Some(title) = title {
+            context.title = title.to_string();
+        }
+        core.pump(self.owner.to_string(), context, running);
         Some(Arc::new(ctx))
     }
 }

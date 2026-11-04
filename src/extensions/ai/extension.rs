@@ -168,7 +168,8 @@ impl Inner {
         let Some(runner) = &self.runner else {
             return ActionOutcome::Failed("This command can't run right now".into());
         };
-        let Some(ctx) = runner.start() else {
+        let title = self.find(command_id).map(|command| command.title.as_str());
+        let Some(ctx) = runner.start(title) else {
             return ActionOutcome::Failed("This command can't run right now".into());
         };
         let inner = self.clone();
@@ -358,7 +359,8 @@ impl Inner {
         let Some(answer) = self.kept.lock().unwrap().remove(command_id) else {
             return ActionOutcome::Failed(NO_ANSWER.into());
         };
-        let Some(ctx) = self.runner.as_ref().and_then(|runner| runner.start()) else {
+        let title = self.find(command_id).map(|command| command.title.as_str());
+        let Some(ctx) = self.runner.as_ref().and_then(|runner| runner.start(title)) else {
             self.kept
                 .lock()
                 .unwrap()
@@ -1173,12 +1175,14 @@ mod tests {
         reports: Arc<Mutex<Vec<crate::tasks::TaskState>>>,
         visible: Arc<std::sync::atomic::AtomicBool>,
         shown: Arc<Recorded>,
+        titled: Arc<Mutex<Option<String>>>,
     }
 
-    struct ShowRunner(Arc<Recorded>);
+    struct ShowRunner(Arc<Recorded>, Arc<Mutex<Option<String>>>);
 
     impl Runner for ShowRunner {
-        fn start(&self) -> Option<Arc<InvocationContext>> {
+        fn start(&self, title: Option<&str>) -> Option<Arc<InvocationContext>> {
+            *self.1.lock().unwrap() = title.map(str::to_string);
             Some(Arc::new(InvocationContext::for_test(
                 EXTENSION_ID,
                 self.0.clone(),
@@ -1192,6 +1196,7 @@ mod tests {
         let text = Arc::new(selected("text"));
         let clipboard = Arc::new(FakeClipboard::default());
         let shown = Arc::new(Recorded::default());
+        let titled = Arc::new(Mutex::new(None));
         let reports = Arc::new(Mutex::new(Vec::new()));
         let sink = reports.clone();
         let visible = Arc::new(std::sync::atomic::AtomicBool::new(true));
@@ -1203,7 +1208,7 @@ mod tests {
                 client: client.clone(),
                 text: Some(text.clone()),
                 clipboard: Some(clipboard.clone()),
-                runner: Some(Arc::new(ShowRunner(shown.clone()))),
+                runner: Some(Arc::new(ShowRunner(shown.clone(), titled.clone()))),
                 tasks: crate::tasks::Tasks::new(move |state| sink.lock().unwrap().push(state)),
                 visible: Arc::new(move || probe.load(std::sync::atomic::Ordering::SeqCst)),
             },
@@ -1218,6 +1223,7 @@ mod tests {
             reports,
             visible,
             shown,
+            titled,
         }
     }
 
@@ -1281,6 +1287,11 @@ mod tests {
         assert_eq!(
             b.shown.markdown().last().map(String::as_str),
             Some("Better.")
+        );
+        assert_eq!(
+            b.titled.lock().unwrap().as_deref(),
+            Some("Improve Writing"),
+            "the view is named after the command, not the extension"
         );
     }
 

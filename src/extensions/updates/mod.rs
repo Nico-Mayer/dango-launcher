@@ -250,7 +250,7 @@ impl Inner {
             .unwrap()
             .clone()
             .filter(|ctx| !ctx.is_cancelled());
-        let Some(ctx) = live.or_else(|| self.runner.as_ref().and_then(|runner| runner.start()))
+        let Some(ctx) = live.or_else(|| self.runner.as_ref().and_then(|runner| runner.start(None)))
         else {
             return ActionOutcome::Failed("The update can't start right now".into());
         };
@@ -549,7 +549,7 @@ mod tests {
     }
 
     impl Runner for FixedRunner {
-        fn start(&self) -> Option<Arc<InvocationContext>> {
+        fn start(&self, _title: Option<&str>) -> Option<Arc<InvocationContext>> {
             self.starts.fetch_add(1, Ordering::SeqCst);
             Some(Arc::new(InvocationContext::for_test(
                 EXTENSION_ID,
@@ -745,7 +745,7 @@ mod tests {
         }
         struct DismissedRunner;
         impl Runner for DismissedRunner {
-            fn start(&self) -> Option<Arc<InvocationContext>> {
+            fn start(&self, _title: Option<&str>) -> Option<Arc<InvocationContext>> {
                 Some(Arc::new(InvocationContext::for_test(
                     EXTENSION_ID,
                     Arc::new(Dismissed),
