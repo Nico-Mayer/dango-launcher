@@ -2567,7 +2567,10 @@ fn a_task_ready_while_hidden_shows_a_success_toast_on_the_next_open() {
     report(&mut h, task(1, running_task()));
     h.event(Event::Hidden);
     report(&mut h, task(1, ready_task()));
-    assert!(hud_text(&h).is_none());
+    assert_eq!(
+        hud_text(&h).as_deref(),
+        Some("Dango 0.5.0 is ready to restart")
+    );
     h.event(Event::Activated {
         held: false,
         probe: None,
@@ -2824,4 +2827,34 @@ fn a_toast_without_an_action_still_expires() {
         },
     ))));
     assert!(expires(&effects));
+}
+
+#[test]
+fn a_task_finishing_while_hidden_shows_a_success_hud() {
+    let mut h = Harness::root(3);
+    report(&mut h, task(1, running_task()));
+    h.event(Event::Hidden);
+    report(&mut h, answer_ready(1));
+    let hud = h.snapshot().hud.expect("a HUD");
+    assert_eq!(hud.style, ToastStyle::Success);
+    assert_eq!(hud.text, "Answer ready: Summarize");
+}
+
+#[test]
+fn a_task_finishing_in_view_shows_no_hud() {
+    let mut h = Harness::root(3);
+    report(&mut h, task(1, running_task()));
+    report(&mut h, answer_ready(1));
+    assert!(hud_text(&h).is_none());
+}
+
+#[test]
+fn needing_input_again_shows_the_hud_once() {
+    let mut h = Harness::root(3);
+    report(&mut h, task(1, running_task()));
+    h.event(Event::Hidden);
+    let first = h.event(Event::Task(Box::new(task(1, ready_task()))));
+    let again = h.event(Event::Task(Box::new(task(1, ready_task()))));
+    assert!(expires(&first), "the HUD shows and times out");
+    assert!(!expires(&again), "a repeated report shows nothing new");
 }

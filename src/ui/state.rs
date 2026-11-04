@@ -337,7 +337,7 @@ impl Launcher {
                     .toast
                     .take_if(|toast| toast.style == ToastStyle::Failure)
                 {
-                    self.show_hud(ToastStyle::Failure, toast.text, fx);
+                    self.show_hud(ToastStyle::Failure, toast.text, None, fx);
                     return;
                 }
                 if let Some(hud) = &self.hud {
@@ -432,8 +432,15 @@ impl Launcher {
             return;
         }
         if !self.visible {
-            if let TaskStatus::Failed { sentence } = &state.status {
-                self.show_hud(ToastStyle::Failure, sentence.clone(), fx);
+            match &state.status {
+                TaskStatus::Failed { sentence } => {
+                    self.show_hud(ToastStyle::Failure, sentence.clone(), None, fx)
+                }
+                TaskStatus::Done { sentence } | TaskStatus::NeedsInput { sentence } => {
+                    let action = show_answer(&state);
+                    self.show_hud(ToastStyle::Success, sentence.clone(), action, fx)
+                }
+                TaskStatus::Running | TaskStatus::Cancelled => {}
             }
             self.pending_result = Some(state);
         } else if !self.shows_progress_of(&state.owner) {
@@ -444,10 +451,7 @@ impl Launcher {
     fn show_task_result(&mut self, state: TaskState, fx: &mut Vec<Effect>) {
         match &state.status {
             TaskStatus::NeedsInput { sentence } | TaskStatus::Done { sentence } => {
-                let action = state
-                    .show
-                    .as_deref()
-                    .map(|show| task_action(&state, "Show answer", "Enter", show));
+                let action = show_answer(&state);
                 self.show_success(sentence.clone(), action, fx);
             }
             TaskStatus::Failed { sentence } => {
@@ -584,7 +588,7 @@ impl Launcher {
                     fx.push(Effect::CopyText(text));
                 }
                 fx.push(Effect::Dismiss);
-                self.show_hud(ToastStyle::Success, "Copied to clipboard".into(), fx);
+                self.show_hud(ToastStyle::Success, "Copied to clipboard".into(), None, fx);
             }
             // A root action that produces a view opens it. A snippet needing
             // arguments has to ask before it can do anything.
@@ -642,7 +646,7 @@ impl Launcher {
     /// activation, so the HUD says it instead.
     fn show_failure(&mut self, text: String, fx: &mut Vec<Effect>) {
         if !self.visible {
-            self.show_hud(ToastStyle::Failure, text, fx);
+            self.show_hud(ToastStyle::Failure, text, None, fx);
             return;
         }
         let id = self.next_revision();
@@ -698,13 +702,21 @@ impl Launcher {
 
     /// The time runs from when the HUD can be seen, so one set while the
     /// launcher is still on screen starts its time at the hide.
-    fn show_hud(&mut self, style: ToastStyle, text: String, fx: &mut Vec<Effect>) {
+    /// An action on the HUD is not drawn: opening the launcher while it
+    /// shows runs it.
+    fn show_hud(
+        &mut self,
+        style: ToastStyle,
+        text: String,
+        action: Option<ToastAction>,
+        fx: &mut Vec<Effect>,
+    ) {
         let id = self.next_revision();
         self.hud = Some(HeldToast {
             id,
             style,
             text,
-            action: None,
+            action,
         });
         if !self.visible {
             fx.push(Effect::ExpireToast { id, style });
@@ -1495,6 +1507,12 @@ fn is_loading(view: &View) -> bool {
 
 /// An action of a task's owner, offered on a toast with the platform's
 /// command key.
+fn show_answer(task: &TaskState) -> Option<ToastAction> {
+    task.show
+        .as_deref()
+        .map(|show| task_action(task, "Show answer", "Enter", show))
+}
+
 fn task_action(task: &TaskState, title: &str, key: &str, action_id: &str) -> ToastAction {
     ToastAction {
         title: title.into(),
