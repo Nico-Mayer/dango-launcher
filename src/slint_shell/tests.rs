@@ -1643,6 +1643,84 @@ mod filter_dropdown {
     }
 }
 
+mod bare_pill {
+    use super::*;
+
+    fn bare() -> Harness {
+        let h = Harness::new();
+        h.event(Event::Results {
+            query: String::new(),
+            items: results(5),
+            complete: true,
+        });
+        h
+    }
+
+    #[test]
+    fn the_launcher_opens_as_the_pill_alone() {
+        let h = bare();
+        assert!(!h.shell().get_card_shown());
+        assert_eq!(h.height(), 52.0);
+        assert!(h.find("Result 1").is_none());
+        assert!(h.find("Actions").is_none());
+    }
+
+    #[test]
+    fn the_first_keystroke_opens_the_card() {
+        let h = bare();
+        h.type_text("r");
+        h.event(Event::Results {
+            query: "r".into(),
+            items: results(3),
+            complete: true,
+        });
+        assert!(h.shell().get_card_shown());
+        assert_eq!(
+            h.height(),
+            PILL + LIST_PADDING + 3.0 * ROW + LIST_PADDING + ACTION_BAR
+        );
+        assert!(h.find("Result 1").is_some());
+    }
+
+    #[test]
+    fn a_toast_shows_at_the_pills_end_without_resizing() {
+        let h = bare();
+        h.event(Event::Failed("Couldn't paste".into()));
+        let toast = h.find("Couldn't paste").expect("the toast on the pill");
+        let pill = h.find("Search bar").expect("the pill");
+        assert!(toast.absolute_position().y < pill.size().height);
+        assert_eq!(toast.accessible_description().as_deref(), Some("Failed"));
+        assert_eq!(h.height(), 52.0);
+    }
+
+    #[test]
+    fn opening_the_card_moves_the_toast_into_the_action_bar() {
+        let h = bare();
+        h.event(Event::Task(Box::new(crate::tasks::TaskState {
+            id: 1,
+            owner: "dango.updates".into(),
+            title: "Dango 0.5.0".into(),
+            line: "Downloading Dango 0.5.1".into(),
+            status: crate::tasks::TaskStatus::Running,
+            progress: None,
+            steps: Vec::new(),
+            subtitle: String::new(),
+            detail: String::new(),
+            cancel: None,
+            retry: None,
+            show: None,
+            item_id: "update".into(),
+        })));
+        h.wake_busy();
+        let pill = h.find("Search bar").expect("the pill").size().height;
+        let on_pill = h.find("Downloading Dango 0.5.1").expect("the toast");
+        assert!(on_pill.absolute_position().y < pill);
+        h.arrow_down();
+        let in_bar = h.find("Downloading Dango 0.5.1").expect("the toast");
+        assert!(in_bar.absolute_position().y > pill);
+    }
+}
+
 mod window_height {
     use super::*;
 

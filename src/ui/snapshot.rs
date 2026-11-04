@@ -71,6 +71,9 @@ snapshot_types! {
         pub empty: Option<EmptyText>,
         /// More results may still arrive for the query.
         pub settling: bool,
+        /// Only the SearchBar shows: the query is empty, the list closed, and
+        /// nothing pinned.
+        pub bare: bool,
     }
 
     pub struct AnswerCard {
@@ -400,6 +403,7 @@ impl Launcher {
                     truncate: true,
                 }),
             settling: !self.results_complete,
+            bare: self.root_closed() && self.root_order().next().is_none(),
         }
     }
 

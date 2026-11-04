@@ -109,6 +109,8 @@ export global Shell {
     /// The pill, gap, and card together, on every platform. Only Windows sizes
     /// the window to it.
     in property <length> launcher-height: 480px;
+    /// False while the launcher is the SearchBar pill alone.
+    in property <bool> card-shown: true;
 }
 
 export global Search {

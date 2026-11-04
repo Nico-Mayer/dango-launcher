@@ -31,6 +31,7 @@ pub fn write(
     let shell = ui.global::<Shell>();
     shell.set_screen(kind);
     shell.set_launcher_height(launcher_height);
+    shell.set_card_shown(!matches!(&snapshot.screen, Screen::Root(root) if root.bare));
     // The textarea's focus handler may not run when its form is torn down.
     if kind != ScreenKind::Form {
         shell.set_multiline_focused(false);

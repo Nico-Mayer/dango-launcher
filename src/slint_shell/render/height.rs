@@ -25,6 +25,9 @@ pub const TILE_TITLE: f32 = 24.0;
 /// else, and an empty view, takes the maximum. An open panel keeps the room
 /// it needs above the ActionBar.
 pub fn height(snapshot: &Snapshot) -> f32 {
+    if matches!(&snapshot.screen, Screen::Root(root) if root.bare) {
+        return SEARCH_BAR;
+    }
     let body = match &snapshot.screen {
         Screen::Root(root) if root.empty.is_none() => {
             let headings = root.sections.iter().filter(|s| s.heading.is_some()).count();
