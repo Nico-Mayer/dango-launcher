@@ -4,6 +4,7 @@ use crate::config::LauncherDisplay;
 
 pub use raw_window_handle::RawWindowHandle;
 
+mod brightness;
 #[cfg(target_os = "macos")]
 mod macos;
 #[cfg(target_os = "windows")]
@@ -255,6 +256,38 @@ pub fn system_control() -> std::sync::Arc<dyn SystemControl> {
     return std::sync::Arc::new(windows::WindowsSystemControl);
     #[cfg(target_os = "macos")]
     return std::sync::Arc::new(macos::MacSystemControl);
+}
+
+/// A monitor's brightness as it reports it, on its own scale.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Level {
+    pub value: u16,
+    pub maximum: u16,
+}
+
+/// The library's own text, for the log only.
+#[derive(Debug, thiserror::Error)]
+#[error("{0}")]
+pub struct MonitorError(pub String);
+
+/// An external monitor reached over DDC/CI. Not `Send`: both platforms' handles
+/// belong to the thread that enumerated them.
+pub trait Monitor {
+    fn name(&self) -> &str;
+    fn brightness(&mut self) -> Result<Level, MonitorError>;
+    fn set_brightness(&mut self, value: u16) -> Result<(), MonitorError>;
+}
+
+pub trait BrightnessMonitors: Send + Sync {
+    /// Enumerated fresh on every call, so a monitor plugged in since counts.
+    fn external(&self) -> Vec<Box<dyn Monitor>>;
+}
+
+pub fn brightness_monitors() -> std::sync::Arc<dyn BrightnessMonitors> {
+    #[cfg(target_os = "windows")]
+    return std::sync::Arc::new(windows::WindowsBrightness);
+    #[cfg(target_os = "macos")]
+    return std::sync::Arc::new(macos::MacBrightness);
 }
 
 /// Which physical key acts as the hyperkey. CapsLock is the only one.

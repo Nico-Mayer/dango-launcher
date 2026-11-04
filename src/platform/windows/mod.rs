@@ -1,5 +1,6 @@
 mod agent;
 mod apps;
+mod brightness;
 mod browser;
 mod clipboard;
 mod hyperkey;
@@ -15,6 +16,7 @@ mod window;
 pub use agent::process_alive;
 pub use agent::{agent_known_dirs, contained_command};
 pub use apps::{icon_for, WindowsAppIndexer};
+pub use brightness::WindowsBrightness;
 pub use browser::{browser_app, browser_target};
 pub use clipboard::{
     clipboard_holds_anything, clipboard_holds_image, clipboard_holds_text, WindowsAttribution,

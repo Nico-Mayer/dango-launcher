@@ -93,6 +93,7 @@ email_address = { version = "0.2.9", default-features = false }
 steamlocate = "2.1"
 toml_edit = "0.25"
 slug = "0.1.6"
+ddc = "0.2"
 
 [dev-dependencies]
 base64 = "0.22"
@@ -140,6 +141,7 @@ windows = { version = "0.62", features = [
   "Win32_UI_WindowsAndMessaging",
 ] }
 windows-registry = "0.6"
+ddc-winapi = "0.2"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 objc2 = "0.6"
@@ -191,6 +193,7 @@ objc2-application-services = { version = "0.3", default-features = false, featur
   "HIServices",
   "libc",
 ] }
+ddc-macos = "0.2"
 
 
 # Keeps file and line in backtraces at a fraction of full debug info.

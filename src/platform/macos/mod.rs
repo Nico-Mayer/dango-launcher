@@ -1,5 +1,6 @@
 mod agent;
 mod apps;
+mod brightness;
 mod browser;
 mod clipboard;
 mod eventtap;
@@ -15,6 +16,7 @@ mod window;
 
 pub use agent::{agent_known_dirs, contained_command, login_shell_env};
 pub use apps::MacAppIndexer;
+pub use brightness::MacBrightness;
 pub use browser::{browser_app, browser_target};
 pub use clipboard::MacAttribution;
 pub use hyperkey::MacHyperkey;
