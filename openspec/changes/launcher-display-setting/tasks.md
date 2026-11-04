@@ -13,7 +13,7 @@
 ## 3. Windows
 
 - [x] 3.1 In `src/platform/windows/mod.rs`, pick the monitor by `LauncherDisplay` (`MonitorFromPoint` at (0, 0) with `MONITOR_DEFAULTTOPRIMARY` for `Primary`) for both launcher and notice; verify `mise run check` passes
-- [ ] 3.2 Hand check on Windows with two monitors, debug build via `dango-ui`, `mise run keys` and `mise run shot`: with `display = "primary"` and the pointer on the secondary monitor, the launcher and a notice appear on the primary monitor; switching to `"pointer"` without restart moves the next show to the pointer's monitor; with mixed DPI the launcher has correct size
+- [x] 3.2 Hand check on Windows with two monitors, debug build via `dango-ui`, `mise run keys` and `mise run shot`: with `display = "primary"` and the pointer on the secondary monitor, the launcher and a notice appear on the primary monitor; switching to `"pointer"` without restart moves the next show to the pointer's monitor; with mixed DPI the launcher has correct size
 
 ## 4. macOS
 
