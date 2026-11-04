@@ -111,17 +111,19 @@ was hidden.
 
 A deliberate hide SHALL reset at once. Deliberate hides are an action that has
 finished its work and hidden the launcher, and Escape pressed on an empty root
-prompt. The next activation SHALL present the launcher as if it had just
-started.
+prompt with the list closed. The next activation SHALL present the launcher as
+if it had just started.
 
 An interrupting hide SHALL hold the launcher's state for a grace period.
 Interrupting hides are the global shortcut pressed while the launcher is
-visible, focus lost to another application, and a click outside the launcher.
+visible, focus lost to another application, and a click outside the launcher
+or on a transparent part of its window.
 An activation within the period SHALL show the launcher as it was: the prompt
 text, the pushed views, and the selected row intact, with the results for the
 current prompt refreshed. When the period ends with the launcher still hidden,
 the launcher SHALL reset so that the next activation presents it as if it had
-just started, with the first frame already showing the root results.
+just started, with the first frame already showing the closed root view (see
+root-search).
 
 A command still running at an interrupting hide SHALL keep running until the
 period ends. Output it produces while hidden SHALL be shown when the launcher
@@ -181,7 +183,7 @@ of hide, nor the grace period running out, SHALL cancel it.
 - **WHEN** the launcher is hidden by an interrupting hide and the user activates
   it after the grace period has passed
 - **THEN** the prompt is empty, no view is pushed, and the first painted frame
-  shows the root results
+  shows the closed root view
 
 #### Scenario: A running command survives an interrupting hide
 
@@ -245,10 +247,14 @@ of hide, nor the grace period running out, SHALL cancel it.
 The launcher SHALL hide when it loses focus to another application and when the
 global shortcut is pressed while it is visible. Both of these are interrupting
 hides and SHALL hold the launcher's state as the reset requirement describes.
+A click on a transparent part of the launcher window, such as the gap between
+the pill and the card, SHALL count as a click outside the launcher.
 
-At the root prompt, Escape SHALL act in two stages. With text in the prompt,
+At the root prompt, Escape SHALL act in stages. With text in the prompt,
 Escape SHALL clear the prompt and leave the launcher open. With an empty
-prompt, Escape SHALL hide the launcher. This is a deliberate hide. In a pushed
+prompt and the empty-query list open (see root-search), Escape SHALL close
+that list and leave the launcher open. With an empty prompt and the list
+closed, Escape SHALL hide the launcher. This is a deliberate hide. In a pushed
 view, Escape SHALL pop that view, whether or not the prompt holds text, as the
 view stack in view-protocol describes.
 
@@ -256,13 +262,27 @@ view stack in view-protocol describes.
 
 - **WHEN** the launcher shows the root prompt with text in it and the user presses Escape
 - **THEN** the prompt is cleared
+- **AND** the launcher stays visible, showing the closed root view
+
+#### Scenario: Escape closes the empty-query list
+
+- **WHEN** the user has opened the empty-query list with Arrow Down and
+  presses Escape
+- **THEN** the list closes and the launcher shows the closed root view
 - **AND** the launcher stays visible
 
 #### Scenario: Escape on an empty prompt dismisses
 
-- **WHEN** the launcher shows the root prompt, empty, and the user presses Escape
+- **WHEN** the launcher shows the root prompt, empty, with the list closed,
+  and the user presses Escape
 - **THEN** the launcher hides
 - **AND** focus returns to the application that was in the foreground beforehand
+
+#### Scenario: Escape with only pinned items shown dismisses
+
+- **WHEN** the launcher shows the closed root view with the "Needs attention"
+  card and the user presses Escape
+- **THEN** the launcher hides
 
 #### Scenario: Escape in a pushed view pops it
 
@@ -273,6 +293,13 @@ view stack in view-protocol describes.
 #### Scenario: Clicking away dismisses
 
 - **WHEN** the launcher is visible and the user clicks another application
+- **THEN** the launcher hides
+- **AND** its state is held for the grace period
+
+#### Scenario: Clicking the gap dismisses
+
+- **WHEN** the launcher shows the pill and the card and the user clicks in the
+  gap between them
 - **THEN** the launcher hides
 - **AND** its state is held for the grace period
 
@@ -345,17 +372,22 @@ work that could have run earlier.
 The launcher window SHALL be borderless, without a title bar, with a transparent
 background, always on top of other windows, and non-resizable by the user.
 
-On Windows, its height SHALL follow its content: a list or grid SHALL make the
-window as tall as the SearchBar, an answer card when root search shows one,
-its rows, and the ActionBar, up to 480 logical
-pixels, and scroll beyond that. An empty view, a detail, and a form SHALL use
-the full 480 logical pixels. A height change SHALL NOT flicker or show the
-window at an old and a new size in the same frame. While root search is still
-receiving results for a query, the window SHALL grow with them but SHALL NOT
-shrink until every provider has answered.
+On both platforms, the card SHALL be as tall as its content: a list or grid
+SHALL make it as tall as an answer card when root search shows one, its rows,
+and the ActionBar, so that the pill, the gap, and the card together are at most
+480 logical pixels, and the list SHALL scroll beyond that. An empty view, a
+detail, and a form SHALL make the launcher the full 480 logical pixels. With
+the root view closed, only the pill, or the pill and the "Needs attention"
+card, SHALL be shown.
 
-On macOS, the window SHALL stay 480 logical pixels tall for every view, and a
-list or grid SHALL scroll beyond that.
+On Windows, the window's height SHALL follow the visible launcher. A height
+change SHALL NOT flicker or show the window at an old and a new size in the
+same frame. While root search is still receiving results for a query, the
+window SHALL grow with them but SHALL NOT shrink until every provider has
+answered.
+
+On macOS, the window SHALL stay 480 logical pixels tall for every view, and
+the area below the visible launcher SHALL be transparent.
 
 On both platforms, "No results" SHALL NOT show while root search is still
 receiving results for a query, until every provider has answered.
@@ -381,16 +413,30 @@ receiving results for a query, until every provider has answered.
 - **WHEN** the user presses the shortcut while a maximized application is in the foreground
 - **THEN** the launcher appears over that application
 
+#### Scenario: The bare pill on Windows
+
+- **WHEN** the launcher opens on Windows with an empty query and no item is
+  pinned
+- **THEN** the window is as tall as the pill
+
+#### Scenario: The bare pill on macOS
+
+- **WHEN** the launcher opens on macOS with an empty query and no item is
+  pinned
+- **THEN** the window stays 480 logical pixels tall and everything below the
+  pill is transparent
+
 #### Scenario: Few results make a short window on Windows
 
 - **WHEN** a query on Windows leaves three results
-- **THEN** the window is as tall as the SearchBar, three rows, and the
+- **THEN** the window is as tall as the pill, the gap, three rows, and the
   ActionBar
 
 #### Scenario: Few results keep the full height on macOS
 
 - **WHEN** a query on macOS leaves three results
-- **THEN** the window stays 480 logical pixels tall
+- **THEN** the window stays 480 logical pixels tall, the card is as tall as
+  three rows and the ActionBar, and the area below the card is transparent
 
 #### Scenario: A partial answer does not shrink the window on Windows
 
@@ -402,7 +448,7 @@ receiving results for a query, until every provider has answered.
 #### Scenario: Many results stop at the maximum
 
 - **WHEN** a query leaves forty results
-- **THEN** the window is 480 logical pixels tall and the list scrolls
+- **THEN** the launcher is 480 logical pixels tall and the list scrolls
 
 #### Scenario: Typing changes the height without flicker on Windows
 
