@@ -30,8 +30,14 @@
   - Pill-end toast: covered by UI tests only, not seen on screen.
   - SearchBar position: not compared by hand; it relies on the unchanged top-edge resize.
   - Renderer: most likely software. The debug build loads `opengl32.dll` but no AMD OpenGL driver (machine has a Radeon RX 9070), so femtovg probably failed its OpenGL 2 probe. Shadows would not show here.
-- [ ] 5.2 macOS: check bare pill over another app, card as tall as its content with a transparent area below, whether a click there reaches the app behind (both outcomes must hide the launcher), placement centred on the full frame
-- [ ] 5.3 Add any platform trap found in 5.1 or 5.2 to `AGENTS.md`
+- [x] 5.2 macOS: check bare pill over another app, card as tall as its content with a transparent area below, whether a click there reaches the app behind (both outcomes must hide the launcher), placement centred on the full frame
+  - Checked by hand with `dango-ui`, Slint's `take_screenshot` (pixel alpha read from the PNG) and CGEvent key and mouse events: global hotkey shows the bare pill over Finder, Finder stays frontmost, everything below the pill has alpha 0. Typing shows the card as tall as its rows plus the ActionBar, with rounded bottom corners, a transparent gap and a transparent area below. A long list fills the card to 480. Window frame and pill do not move while the list grows and shrinks. Escape clears the query, Down opens "Suggestions" with the top row selected, Escape closes it, Escape hides. Hotkey and Escape hides keep Finder frontmost.
+  - Click below the card: macOS does not pass it to the app behind. The launcher window gets the press (Slint event recording shows `pointerPressed` at the click point), its TouchArea hides the launcher, state is held.
+  - Placement: window 720 wide at x 396 on a 1512 wide full frame, so centred; its centre (y 374) is above the frame's centre (491). Only one display connected, so the display under the pointer was not checked across displays.
+  - Not checked: the pill-end toast on screen (UI tests only).
+  - Bug found, not fixed (pre-existing, platform code, outside this change): any click on the launcher, gap or pill alike, activates Dango although the panel is non-activating. After the hide Dango stays the active app, so focus does not go back to the app behind; `restore_previous_focus` does nothing on macOS. The installed release build does the same.
+- [x] 5.3 Add any platform trap found in 5.1 or 5.2 to `AGENTS.md`
+  - Added from 5.2: clicks on transparent pixels reach the launcher on macOS, a click activates Dango despite the non-activating panel, and screenshots without Screen Recording. 5.1 found none.
 
 ## 6. Review
 
