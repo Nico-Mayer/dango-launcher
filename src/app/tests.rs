@@ -231,7 +231,7 @@ async fn a_click_outside_hides_and_holds_the_query() {
     assert_eq!(
         shell.calls().last(),
         Some(&Call::Hide {
-            restore_focus: false
+            restore_focus: true
         })
     );
     core.toggle();

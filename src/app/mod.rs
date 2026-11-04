@@ -216,7 +216,12 @@ impl Core {
                     }
                 });
             }
-            ui::Effect::HideAndHold => self.hide_on_focus_loss(),
+            ui::Effect::HideAndHold => {
+                let core = self.clone();
+                self.on_main_thread(move || {
+                    core.hide(HideReason::Interrupted);
+                });
+            }
             ui::Effect::CopyText(text) => match self.services.clipboard.clone() {
                 Some(clipboard) => {
                     self.runtime

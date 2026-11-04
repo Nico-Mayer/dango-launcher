@@ -130,11 +130,16 @@ Rejected:
 ### Click in the gap
 
 A `TouchArea` behind the pill and card, covering the window, sends a new
-intent that `Core` routes into the existing focus-loss path
-(`hide_on_focus_loss`, an interrupting hide). On macOS the window server
-likely passes clicks on fully transparent pixels to the app behind; that app
-then takes focus and the same focus-loss hide fires. Either way the result is
-the same, so no platform code. The macOS behaviour is a hand check.
+intent that `Core` handles as an interrupting hide that gives focus back,
+as the hotkey does. Dango still holds the foreground after the click, so
+leaving the choice to Windows could activate an always-on-top window instead
+of the app the user came from. On macOS the window server likely passes
+clicks on fully transparent pixels to the app behind; that app then takes
+focus and the focus-loss hide fires. Either way the launcher hides and holds,
+so no platform code. The macOS behaviour is a hand check.
+
+Rejected: **reuse `hide_on_focus_loss`**. It skips the focus restore, which
+is right only when another app already has the foreground.
 
 ### Toast at the pill's end
 

@@ -14,7 +14,7 @@ pub enum Effect {
     },
     CancelInvocation,
     Dismiss,
-    /// Hide and hold the state, as when another application takes focus.
+    /// Hide and hold the state, as the hotkey does.
     HideAndHold,
     CopyText(String),
     InspectTemplate {
