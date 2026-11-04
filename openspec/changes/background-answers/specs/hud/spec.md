@@ -57,9 +57,10 @@ and the HUD SHALL NOT show.
 
 A success HUD SHALL disappear after about two seconds and a failure HUD after
 about four. A new HUD SHALL replace the one showing and start its own time.
-Showing the launcher SHALL remove the HUD at once. When the HUD showing at that
-moment reports a result that offers "Show answer", the launcher SHALL open on
-that answer instead. The HUD SHALL NOT wait for a key press or a click.
+Showing the launcher SHALL remove the HUD at once. When the user opens the
+launcher, with its hotkey or the tray menu, while the HUD reports a result that
+offers "Show answer", the launcher SHALL open on that answer. The HUD SHALL NOT
+wait for a key press or a click.
 
 #### Scenario: A success HUD times out
 
@@ -78,12 +79,19 @@ that answer instead. The HUD SHALL NOT wait for a key press or a click.
 
 #### Scenario: The launcher opens over a HUD
 
-- **WHEN** a HUD is showing and the user opens the launcher
+- **WHEN** a HUD that offers no answer is showing and the user opens the
+  launcher
 - **THEN** the HUD is gone and the launcher shows without the HUD's message
 
 #### Scenario: The launcher opens over an answer's HUD
 
 - **WHEN** the HUD reads "Answer ready: Summarize" and the user opens the
   launcher before it is gone
-- **THEN** the HUD is gone and the launcher opens on the answer, with actions
-  to paste or copy it and no toast
+- **THEN** the HUD is gone and the answer's view opens, with actions to paste
+  or copy it and no toast
+
+#### Scenario: A command hotkey during an answer's HUD
+
+- **WHEN** the HUD reads "Answer ready: Summarize" and the user presses the
+  hotkey of a command that shows the launcher
+- **THEN** that command runs and the answer does not open

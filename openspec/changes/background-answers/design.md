@@ -31,27 +31,33 @@ stay `{ key, modifiers }`, only their drawing changes.
 
 `task_changed`, when hidden, calls `show_hud(Success, sentence)` for `Done` and
 for a newly arrived `NeedsInput`, as it does for `Failed`. `pending_result`
-stays as it is, so the toast on the next open is unchanged.
-
-`pending_result` gains the id of the HUD it showed (`hud: u64`), so the jump
-below can tell that the HUD on screen is this result's and not a newer one,
-such as a copy that replaced it.
+stays as it is, so the toast on the next open is unchanged. When the result has
+`show`, the HUD carries the "Show answer" `ToastAction` (`HeldToast.action`,
+which the HUD renderer already ignores).
 
 ### Opening during the HUD opens the answer
 
-In `Event::Activated`, before `self.hud = None`: when the pending result has
-`show`, and the HUD still showing has that result's id, the reducer pushes
-`Effect::RunAction` with the same request "Show answer" carries
-(`task_action`), and shows no toast. The AI extension's `show` takes the kept
-answer and pushes its view through `runner.start()`, as the toast action does
-today. Otherwise the pending result shows as a toast, as today.
+`Event::Activated` gains `asked: bool`. `Core::toggle` sets it; the other
+callers of `Core::show` do not: `dispatch_command` for a view command's hotkey,
+and `pump` bringing back a hidden command that pushes a view. The tray's "Show
+or hide Dango" already goes through `toggle`.
 
-A failure or a copy has no `show`, so it never jumps.
+In `Activated`, `let jump = self.hud.take().and_then(|hud| hud.action)`. When
+`asked` and there is a jump, the reducer pushes `Effect::RunAction(jump.request)`,
+drops `pending_result`, and shows no toast. The AI extension's `show` takes the
+kept answer and pushes its view through `runner.start()`, as the toast action
+does today. Otherwise the pending result shows as a toast, as today.
 
+A newer HUD (a copy, a failure, another task) replaces `self.hud`, so a jump
+only ever runs the action of the HUD on screen. A failure or a copy carries no
+action, so it never jumps.
+
+- **Rejected: an id on `pending_result`** naming its HUD. The HUD's own action
+  says the same with no new field and no comparison.
 - **Rejected: a time window after the result** (open within N seconds and you
   land in it). The user cannot see the window. Tying the jump to the HUD makes
   it visible: if the pill is there, opening goes to it.
-- **Rejected: an action on the HUD.** The HUD never takes focus or input
+- **Rejected: an action on the HUD itself.** The HUD never takes focus or input
   (`hud` spec, and the platform traps for its non-activating window).
 
 ### A toast with an action stays
@@ -67,16 +73,25 @@ end the same way.
   a failure toast already sets the rule that a toast you may act on waits for
   you.
 
-### A held answer is shown, not kept
+### No toast over the answer's own held view
 
-An AI request that ends while its view is held behind a hide is still away,
-but its view comes back on the next open. `adopt-components` already pushes the
-answer into that view. Keeping it as well and offering "Show answer" would push
-the same answer a second time. In `Inner::run`, the kept answer is stored only
-when the view's context is cancelled (left, superseded, or hold expired), and
-`finish_away` reports `Done` without `show` when the view is held. The HUD
-still shows "Answer ready: <title>"; opening goes to the held view, which shows
-the answer.
+An AI request that ends while its view is held behind a hide already pushes
+the answer into that view (`adopt-components`). The extension still keeps the
+answer and reports `show`, because the hold can expire (60 s by default,
+`start_hold` in `src/app/mod.rs`) and drop the view; then the toast's "Show
+answer" is the only way back.
+
+The decision moves to the open. In `Activated`, when `held` and the top view
+belongs to the result's owner (`self.owner`), the result is reported by the view
+itself: no jump and no toast. This widens `shows_progress_of` to "shows its own
+view", for any view kind. After the hold expired, `held` is false and the toast
+with "Show answer" shows.
+
+- **Rejected: keeping nothing for a held view** (an earlier draft). An expired
+  hold then loses the answer silently.
+- **Limit:** the kept copy stays after the held view showed it, so running the
+  same command again opens that answer once more before a new request starts.
+  The same happens today.
 
 ### One chord format
 
@@ -92,9 +107,10 @@ the answer.
 ### The toast's chord fits its text
 
 The toast's chip sits in a `HorizontalLayout` with `horizontal-stretch: 0`,
-yet takes extra width. The fix keeps the chip at its preferred width, as the
-footer's chips are. The exact cause is found at apply time; the UI test pins
-the result.
+yet takes extra width. That layout is inside the inner layout that stretches,
+so the `VerticalLayout` around `Kbd` takes the extra width, which the footer's
+top-level chips never get. The likely fix is `horizontal-stretch: 0` on that
+`VerticalLayout`. The UI test must fail before the fix.
 
 ## Components
 
@@ -123,3 +139,9 @@ No new strings. These are reused:
   this rule.
 - **The jump runs an action on open.** It only runs `show`, which pushes a view
   and changes nothing else, so an accidental open costs one Escape.
+- **Root search may flash.** After a full hide the launcher resets, and the
+  answer's view arrives a moment after the open, so root search can show for a
+  frame first.
+- **A lasting toast hides the busy toast.** A toast that stays wins over the
+  busy toast, so another task's "Running…" with Cancel waits for the next key
+  press. A failure toast already behaves this way.

@@ -20,13 +20,13 @@ back to:
   failure already does. The toast on the next open stays.
 - **Opening during that HUD lands in the result.** When the HUD reports a
   result that offers "Show answer" and the user opens the launcher before it
-  is gone, the launcher opens on the answer itself, with no toast.
+  is gone, with the launcher hotkey or the tray menu, the launcher opens on the
+  answer itself, with no toast. A command that shows the launcher never jumps.
 - **A toast with an action stays.** A success toast that carries an action
   stays until the next key press or click, as a failure toast does. A success
   toast without an action still goes after about two seconds.
-- **A held answer is not kept twice.** An AI request that finishes while its
-  view is held behind a hide already shows the answer in that view, so it
-  offers no "Show answer" and keeps no copy.
+- **No toast over a held answer.** When the launcher reopens onto the answer's
+  own view, held behind a hide, that view is the result: no toast and no jump.
 - **One chord format.** Every key chord is drawn as its keys with a space
   between them on Windows ("Ctrl K", "Ctrl ↵", "Ctrl Alt V") and joined with
   no space on macOS ("⌘K", "⌘↵", "⌃⌥V"), as macOS does today.
@@ -64,17 +64,18 @@ None.
   press or click; one key chord format per platform.
 - `view-protocol`: the Windows footer scenario names the chord "Ctrl K".
 - `root-search`: the Windows hotkey scenario reads "Ctrl Alt V".
-- `ai-commands`: a request that finishes while its view is held offers no
-  "Show answer".
+- `ai-commands`: a request that finishes while its view is held shows no
+  toast over that view when the launcher reopens.
 
 ## Impact
 
-- `src/ui/state.rs`: the success HUD in `task_changed`, the jump in
-  `Event::Activated`, and no expiry for a success toast with an action.
-- `src/extensions/ai/extension.rs`: a held ending reports no `show` and keeps
-  nothing.
+- `src/ui/state.rs`: the success HUD in `task_changed`, the jump and the
+  held-view rule in `Event::Activated`, and no expiry for a success toast with
+  an action. `src/app/mod.rs`: `toggle` marks the open as the user's.
 - `src/platform/mod.rs` (`ChordSeparator`) and `src/slint_shell/keys.rs`
   (`confirm_label`, `panel_label`): one format.
 - `ui/shell/action-bar.slint`: the toast's key chord sizes to its text.
-- Tests in each area. Stacked on `adopt-components`; its `root-search`,
-  `ai-commands`, and `background-tasks` deltas must be archived first.
+- Tests in each area. Stacked on `adopt-components`. Archive after it and after
+  `task-registry`: the `root-search`, `ai-commands`, and `background-tasks`
+  deltas build on `adopt-components`, and the `design-system` toast delta on
+  `task-registry`.

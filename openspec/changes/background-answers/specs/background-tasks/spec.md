@@ -9,8 +9,8 @@ hidden SHALL show that in the HUD at once, as a success or a failure, and as a
 toast the next time the launcher opens: a success toast when it finished or
 needs input, and a failure toast with its failure sentence when it failed.
 When the next open shows the task's own view, the view reports it and no toast
-is shown. When the result offers "Show answer" and its HUD still shows as the
-launcher opens, the launcher SHALL open on the answer and no toast is shown.
+is shown. When the result offers "Show answer" and the user opens the launcher
+while its HUD still shows, the answer's view SHALL open and no toast is shown.
 
 #### Scenario: A download fails while hidden
 
