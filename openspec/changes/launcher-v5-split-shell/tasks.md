@@ -25,7 +25,11 @@
 
 ## 5. Hand checks
 
-- [ ] 5.1 Windows: with `dango-ui` and `mise run shot`, check bare pill, gap showing the app behind, click in gap hides, pill-end toast, SearchBar stays put while typing; record in this task whether the machine runs femtovg or the software renderer
+- [x] 5.1 Windows: with `dango-ui` and `mise run shot`, check bare pill, gap showing the app behind, click in gap hides, pill-end toast, SearchBar stays put while typing; record in this task whether the machine runs femtovg or the software renderer
+  - Checked by hand: bare pill on open, first keystroke opens the card, gap shows the app behind, a real mouse click in the gap hides, Escape clears then closes the list, Down opens it with the top suggestion selected.
+  - Pill-end toast: covered by UI tests only, not seen on screen.
+  - SearchBar position: not compared by hand; it relies on the unchanged top-edge resize.
+  - Renderer: most likely software. The debug build loads `opengl32.dll` but no AMD OpenGL driver (machine has a Radeon RX 9070), so femtovg probably failed its OpenGL 2 probe. Shadows would not show here.
 - [ ] 5.2 macOS: check bare pill over another app, card as tall as its content with a transparent area below, whether a click there reaches the app behind (both outcomes must hide the launcher), placement centred on the full frame
 - [ ] 5.3 Add any platform trap found in 5.1 or 5.2 to `AGENTS.md`
 
