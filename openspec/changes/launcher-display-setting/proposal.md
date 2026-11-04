@@ -19,7 +19,7 @@ primary display fixes this.
 - The key appears in the generated schema and in `docs/config.md`.
 
 Platforms: Windows and macOS. "Primary" is the display Windows calls primary
-and, on macOS, the display with the menu bar.
+and, on macOS, the main display set in System Settings > Displays.
 
 ## Non-goals
 
@@ -44,7 +44,7 @@ None.
 
 ## Impact
 
-- `src/config/mod.rs`: new `Display` enum and `launcher.display` field.
+- `src/config/mod.rs`: new `LauncherDisplay` enum and `launcher.display` field.
 - `src/shell.rs`, `src/slint_shell/`, `src/app/`: the chosen display reaches
   launcher and notice placement.
 - `src/platform/windows/mod.rs`, `src/platform/macos/mod.rs`: pick the work

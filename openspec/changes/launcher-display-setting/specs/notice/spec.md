@@ -1,6 +1,11 @@
+## RENAMED Requirements
+
+- FROM: `### Requirement: The notice sits at the bottom of the active screen`
+- TO: `### Requirement: The notice sits at the bottom of the launcher's display`
+
 ## MODIFIED Requirements
 
-### Requirement: The notice sits at the bottom of the active screen
+### Requirement: The notice sits at the bottom of the launcher's display
 
 The notice SHALL show centred horizontally near the bottom of the work area of
 the display the launcher would open on, as chosen by `launcher.display`, above
@@ -32,8 +37,8 @@ fullscreen applications.
 
 - **WHEN** the notice shows on macOS with the mouse pointer on a second display
   and `launcher.display` is `"primary"`
-- **THEN** it is centred near the bottom of the visible frame of the display
-  that holds the menu bar, above the Dock
+- **THEN** it is centred near the bottom of the visible frame of the main
+  display set in System Settings > Displays, above the Dock
 
 #### Scenario: Over a fullscreen application on Windows
 

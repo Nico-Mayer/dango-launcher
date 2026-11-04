@@ -28,7 +28,8 @@ where it is and move only its bottom edge.
 
 - **WHEN** `launcher.display` is `"primary"`, the mouse pointer is on a
   secondary display, and the user presses the shortcut on macOS
-- **THEN** the launcher appears on the display that holds the menu bar
+- **THEN** the launcher appears on the main display set in System Settings >
+  Displays
 
 #### Scenario: Display configuration changes between invocations
 

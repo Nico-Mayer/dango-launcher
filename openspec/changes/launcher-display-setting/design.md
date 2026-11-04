@@ -48,8 +48,9 @@ later would then need a rename. An enum takes one more value.
 
 ### Core pushes the value to the shell
 
-New `Shell::set_display(LauncherDisplay)`. Core calls it once after start
-(next to `set_tray`) and in `apply_config_reload` after the config is
+New `Shell::set_display(LauncherDisplay)`. Core calls it once at start,
+before the hotkey handler is registered (`set_event_handler` in
+`app/startup.rs`), and in `apply_config_reload` after the config is
 replaced. `SlintShell` stores it (atomic or `Mutex`, called from any thread),
 and passes it to `position_on_active_display(handle, display)` and
 `NoticeWindow::place(handle, display)`. The recording fake in tests records
@@ -70,14 +71,17 @@ Rejected alternatives:
 - Windows: `MonitorFromPoint(POINT { x: 0, y: 0 }, MONITOR_DEFAULTTOPRIMARY)`.
   The primary monitor always has its top-left at (0, 0) in virtual-screen
   coordinates. Same DPI and work-area code as today.
-- macOS: `NSScreen::screens()` index 0, the screen with the menu bar, whose
-  frame origin is (0, 0).
+- macOS: `NSScreen::screens()` index 0, the main display set in System
+  Settings > Displays, whose frame origin is (0, 0). One `primary_screen()`
+  helper returns it.
 
 Rejected on macOS: `NSScreen::mainScreen`. It is the screen holding the key
-window, not the menu-bar screen, so it can move with focus.
+window, not the main display, so it can move with focus.
 
-The pointer path stays as it is, including its fallback to the primary
-display when no display is under the pointer.
+With no display under the pointer, the pointer path falls back to the primary
+display. On Windows `MONITOR_DEFAULTTOPRIMARY` already does this. On macOS
+`screen_under_cursor` falls back to `mainScreen` today; it changes to
+`primary_screen()`, so both platforms fall back the same way.
 
 No crate needed: the choice is one system call per platform, beside code that
 already calls these APIs.
@@ -85,8 +89,8 @@ already calls these APIs.
 ## Risks / Trade-offs
 
 - [The notice shows before Core has called `set_display`] -> `SlintShell`
-  starts with `Pointer`, today's behaviour, and `set_display` runs right after
-  Core is built, before any hotkey can fire.
+  starts with `Pointer`, today's behaviour, and `set_display` runs before the
+  hotkey handler is registered, so no hotkey can show the launcher first.
 - [Primary display changes while running] -> nothing cached: the display is
   looked up on every show.
 
