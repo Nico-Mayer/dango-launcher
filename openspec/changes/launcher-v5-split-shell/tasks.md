@@ -42,4 +42,4 @@
 
 - Archive with `/opsx:archive` only after both platforms' hand checks are done.
 - Follow-up change: shadows with a window margin, if 5.1 shows femtovg.
-- Follow-up change: rename "toast" and "HUD".
+- Follow-up change: rename "toast" to "status" and "HUD" to "notice" in specs, code and UI.
