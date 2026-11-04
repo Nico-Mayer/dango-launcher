@@ -75,7 +75,17 @@ that Core hands the AI extension, reading its own shown state.
 | Where | Show / Paste | Copy | Failure |
 |---|---|---|---|
 | In view | as today (`deliver`); task ends `Cancelled`, which posts no toast | as today | `ctx.fail` as today; task ends `Cancelled` |
-| Away | answer kept per command in `Inner.answers`; task ends `Done { "Answer ready: <title>" }` with `show` | copied; task ends `Done { "Copied to clipboard" }` | task ends `Failed { sentence }` (HUD and toast per background-tasks) |
+| Away | answer kept per command in `Inner.kept`; task ends `Done { "Answer ready: <title>" }` with `show` | copied; task ends `Done { "Copied to clipboard" }` | task ends `Failed { sentence }` (HUD and toast per background-tasks) |
+
+Away but held (hidden, context still live), the view is also replaced by the
+finished answer, or by a non-loading detail on failure, so the next open never
+shows a dead loading view.
+
+The answer is kept under the `Inner.live` lock, in the same step that ends the
+run. Running the same command again checks the live run and then the kept
+answer under that lock, so it finds one of them and never starts a second
+request in between. A kept answer opens once, from the toast or from running
+the command again, and is then dropped.
 
 An in-view run ends without a result, so no stray or delayed toast appears.
 Pasting in view already hides the launcher.
@@ -84,7 +94,7 @@ Pasting in view already hides the launcher.
 - **Running view:** "Continue in background" (`background`, primary, returns
   `Back`) and "Cancel" (`cancel`, shortcut ⌘. / Ctrl+.). From the view, `cancel`
   returns `Back`; from the toast, nothing pops, as the update does.
-- **`show`:** pushes the kept answer as the finished detail
+- **`show`:** takes the kept answer and pushes it as the finished detail
   (`detail_tree(answer, false, true)`) through `runner.start()`.
 
 **`TaskState.show: Option<String>`:** the reducer attaches it to a success

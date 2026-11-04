@@ -413,14 +413,14 @@ async fn a_failed_selection_read_shows_in_the_launcher_at_once() {
         client: Arc::new(StopCounter::default()),
         text: Some(Arc::new(NothingSelected)),
         clipboard: None,
-        runner: Arc::new(NoRunner),
+        runner: Some(Arc::new(NoRunner)),
         tasks: crate::tasks::Tasks::new(|_| {}),
         visible: Arc::new(|| true),
     };
     let config = r#"
         ai = { providers = { local = { kind = "ollama", model = "qwen3:8b" } } }
     "#;
-    let (extension, _) = ai.build(&Config::parse(config).unwrap());
+    let (extension, _) = super::build_ai(&ai, &Config::parse(config).unwrap());
     let (core, shell) = core_with_ai(config, FakeGrab::default(), vec![extension], Some(ai));
     core.toggle();
     core.run_command("dango.ai.improve-writing").unwrap();
@@ -452,7 +452,7 @@ async fn quitting_stops_running_agent_programs() {
         client: client.clone(),
         text: None,
         clipboard: None,
-        runner: Arc::new(NoRunner),
+        runner: Some(Arc::new(NoRunner)),
         tasks: crate::tasks::Tasks::new(|_| {}),
         visible: Arc::new(|| true),
     };

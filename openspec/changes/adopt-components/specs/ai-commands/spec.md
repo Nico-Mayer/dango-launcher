@@ -51,9 +51,10 @@ running another AI command SHALL cancel it once that command's prompt is ready.
 A request finishes away when its view was left or the launcher is hidden. Then
 an answer to show or paste SHALL NOT be pasted: it SHALL be kept, and a success
 toast SHALL read "Answer ready: " and the title, offering "Show answer" with
-Ctrl+Enter on Windows and Cmd+Enter on macOS. An answer to copy SHALL be copied,
-with the toast "Copied to clipboard". A failure SHALL be reported as
-background-tasks says.
+Ctrl+Enter on Windows and Cmd+Enter on macOS. An answer to copy SHALL be
+copied, with the toast "Copied to clipboard". A failure SHALL be reported as
+background-tasks says. A view held while the launcher is hidden SHALL stop
+loading when the request ends.
 
 #### Scenario: A paste command finishes after Escape
 
@@ -66,7 +67,8 @@ background-tasks says.
 
 - **WHEN** a paste command runs, the user clicks into another application, and
   the answer finishes within the grace period
-- **THEN** nothing is pasted and the toast shows when the launcher next opens
+- **THEN** nothing is pasted, and when the launcher next opens the toast shows
+  over the finished answer
 
 #### Scenario: Showing the answer on Windows
 
@@ -91,6 +93,22 @@ background-tasks says.
 - **WHEN** a paste command started from its hotkey finishes while its view is
   still on screen
 - **THEN** the launcher hides and the answer is inserted, as before
+
+### Requirement: A kept answer opens once
+
+Running a command whose answer was kept SHALL open that answer instead of
+starting a new request. A kept answer SHALL be dropped once shown, from the
+toast or by running the command again.
+
+#### Scenario: Running the command again after it finished away
+
+- **WHEN** an answer was kept and the user runs that command again
+- **THEN** the kept answer's view opens and no new request starts
+
+#### Scenario: Running it once more
+
+- **WHEN** the kept answer was shown and the user runs that command again
+- **THEN** a new request starts
 
 ## REMOVED Requirements
 

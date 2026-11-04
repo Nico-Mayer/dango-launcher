@@ -26,7 +26,9 @@
   - another command cancels it only once its prompt is ready, so a form or a missing selection doesn't;
   - away endings for show, paste (nothing inserted), and copy (clipboard set), including while hidden but held;
   - an in-view paste still inserts and posts no task result;
-  - `show` pushes the kept answer;
+  - `show` pushes the kept answer and drops it;
+  - running the command again opens a kept answer instead of a new request;
+  - a held view stops loading when the run ends away;
   - Enter on the running view is "Continue in background".
 
 ## 3. Checks and review

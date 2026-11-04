@@ -313,10 +313,10 @@ fn build_services(
         clipboard: clipboard
             .as_ref()
             .map(|clipboard| clipboard.clone() as Arc<dyn ClipboardSource>),
-        runner: Arc::new(ViewRunner {
+        runner: Some(Arc::new(ViewRunner {
             core: core.clone(),
             owner: extensions::ai::EXTENSION_ID,
-        }),
+        })),
         tasks: tasks.clone(),
         visible: {
             let core = core.clone();
@@ -330,7 +330,7 @@ fn build_services(
         let (extension, problems) = {
             let config = file_config.shared();
             let config = config.read().unwrap();
-            ai.build(&config)
+            super::build_ai(&ai, &config)
         };
         for problem in &problems {
             crate::log::append(problem);

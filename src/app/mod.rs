@@ -122,32 +122,11 @@ enum HideReason {
     ForWork,
 }
 
-/// What the AI extension needs besides the configuration. Kept so a config
-/// reload can build the extension again: its commands come from the file, so an
-/// edit means a new instance rather than a mutated one.
-pub struct AiParts {
-    pub keys: Arc<dyn extensions::ai::Keys>,
-    pub client: Arc<dyn extensions::ai::Completions>,
-    pub text: Option<Arc<dyn text::TextTarget>>,
-    pub clipboard: Option<Arc<dyn ClipboardSource>>,
-    pub runner: Arc<dyn invocation::Runner>,
-    pub tasks: Arc<Tasks>,
-    pub visible: Arc<dyn Fn() -> bool + Send + Sync>,
-}
+pub use extensions::ai::Parts as AiParts;
 
-impl AiParts {
-    fn build(&self, config: &config::Config) -> (Arc<AiExtension>, Vec<String>) {
-        let (extension, problems) = AiExtension::new(
-            config,
-            self.keys.clone(),
-            self.client.clone(),
-            self.text.clone(),
-            self.clipboard.clone(),
-            Some(self.runner.clone()),
-        );
-        let extension = extension.with_background(self.tasks.clone(), self.visible.clone());
-        (Arc::new(extension), problems)
-    }
+fn build_ai(parts: &AiParts, config: &config::Config) -> (Arc<AiExtension>, Vec<String>) {
+    let (extension, problems) = AiExtension::new(config, parts);
+    (Arc::new(extension), problems)
 }
 
 impl Core {
@@ -859,7 +838,7 @@ impl Core {
                 let (extension, problems) = {
                     let config = self.config.shared();
                     let config = config.read().unwrap();
-                    parts.build(&config)
+                    build_ai(parts, &config)
                 };
                 for problem in &problems {
                     crate::log::append(problem);

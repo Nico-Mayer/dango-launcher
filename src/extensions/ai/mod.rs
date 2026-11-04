@@ -16,5 +16,5 @@ pub use client::GenAiClient;
 pub use clients::Clients;
 pub use commands::EXTENSION_ID;
 pub(crate) use extension::manifest;
-pub use extension::AiExtension;
+pub use extension::{AiExtension, Parts};
 pub use provider::{AiError, Chunks, Completions, Next, ProviderKind, Request, Thinking};
