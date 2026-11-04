@@ -136,7 +136,11 @@ NOT hide the launcher at all (see `selection-and-paste`).
 
 A failure reported while the launcher is hidden SHALL NOT be kept for the next
 activation, whether the launcher was reset or held. The HUD shows it instead
-(see `hud`).
+(see `hud`). A background task is the one exception: its result is shown on
+the next activation as well (see `background-tasks`).
+
+A background task is not a running command for this requirement: neither kind
+of hide, nor the grace period running out, SHALL cancel it.
 
 #### Scenario: State does not leak between invocations
 
@@ -229,6 +233,12 @@ activation, whether the launcher was reset or held. The HUD shows it instead
   hide, and the user shows the launcher within the grace period
 - **THEN** the held view is back without a failure toast, because the HUD
   already showed the message
+
+#### Scenario: A background task survives the grace period
+
+- **WHEN** an update downloads, the launcher is hidden, and the grace period
+  passes
+- **THEN** the download keeps going and its view is dropped
 
 ### Requirement: Dismissal
 

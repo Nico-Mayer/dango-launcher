@@ -188,13 +188,15 @@ SHALL open the action panel.
 ### Requirement: A toast reports status in the ActionBar
 
 A toast SHALL replace the ActionBar's context while it shows. A toast has a
-style and one line of text. A busy toast SHALL show a spinner in the working
-role and stay while its work runs, following the busy-mark timing. A success
-toast SHALL show a dot in the done role and disappear after about two seconds.
-A failure toast SHALL show a dot in the danger role and stay until the next key
-press or click. The success and failure dots SHALL NOT move. Assistive
-technology SHALL be told the toast's text and whether it reports a failure.
-Showing a toast SHALL NOT take focus.
+style and one line of text, and MAY carry one action, shown after the text as
+its label and chord. Pressing that chord while the toast shows SHALL run the
+action and SHALL NOT also act on the view. A busy toast SHALL show a spinner in
+the working role and stay while its work runs, following the busy-mark timing.
+A success toast SHALL show a dot in the done role and disappear after about two
+seconds. A failure toast SHALL show a dot in the danger role and stay until the
+next key press or click. The success and failure dots SHALL NOT move. Assistive
+technology SHALL be told the toast's text, its action, and whether it reports
+a failure. Showing a toast SHALL NOT take focus.
 
 #### Scenario: A success toast
 
@@ -207,6 +209,16 @@ Showing a toast SHALL NOT take focus.
 - **WHEN** an action fails
 - **THEN** a failure toast shows its sentence with a dot in the danger role
 - **AND** it stays until the user presses a key or clicks
+
+#### Scenario: A failure toast with an action on Windows
+
+- **WHEN** a failure toast carries "Retry" and the user presses Ctrl+R
+- **THEN** the retry runs once and the toast is gone
+
+#### Scenario: A failure toast with an action on macOS
+
+- **WHEN** a failure toast carries "Retry" and the user presses Cmd+R
+- **THEN** the retry runs once and the toast is gone
 
 #### Scenario: A busy toast
 
@@ -321,7 +333,7 @@ The launcher SHALL build every surface from the same small parts:
 
 #### Scenario: No results
 
-- **WHEN** a query matches nothing and gets no answer
+- **WHEN** a query matches nothing
 - **THEN** the empty view shows its icon, "No results for" followed by the
   query, and its hint when one is declared
 
@@ -479,8 +491,10 @@ skeleton rows.
 
 The busy marks, the SearchBar's loading bar and the busy toast, SHALL appear
 only once Dango has been busy for about 150 milliseconds. Dango is busy while a
-command invoked from root search has not finished or shown a view, or while
-the top view is marked loading. Once shown, the marks SHALL stay for at least
+command invoked from root search has not finished or shown a view, while the
+top view is marked loading, or while a background task runs and its progress
+view is not shown. A running background task SHALL show only the busy toast,
+never the loading bar. Once shown, the marks SHALL stay for at least
 about 400 milliseconds, even if the work ends sooner. While Dango stays busy,
 replacing the view SHALL NOT restart the marks. Leaving the view or a reset
 SHALL remove them at once.
@@ -515,3 +529,9 @@ SHALL remove them at once.
 
 - **WHEN** the user leaves a view while its busy marks are shown
 - **THEN** the marks are gone in the same frame
+
+#### Scenario: A background task shows no loading bar
+
+- **WHEN** an update downloads and the user opens clipboard history
+- **THEN** the busy toast shows the download and the SearchBar shows no
+  loading bar

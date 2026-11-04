@@ -60,14 +60,28 @@ an update. Drafts and pre-releases do not.
 When an update is available, root search SHALL show one item naming the new
 version and the running version. On an empty query it SHALL be listed above
 every other result except the permission warnings. It SHALL be found by
-searching for "update" or "Dango". Its primary action SHALL be "Install and
-restart".
+searching for "update" or "Dango". Its primary action SHALL be "Install update"
+while nothing is downloading, "Show progress" while the update downloads, and
+"Restart now" once the update is ready to restart. Once ready, the item SHALL
+read "Dango 0.5.0 is ready to restart".
 
 #### Scenario: The update item on an empty query
 
 - **WHEN** version 0.5.0 is available, Dango 0.4.0 is running, and the user opens the launcher
 - **THEN** the first item reads "Dango 0.5.0 is available" with "You have 0.4.0" beneath it
-- **AND** its primary action is "Install and restart"
+- **AND** its primary action is "Install update"
+
+#### Scenario: The update item while it downloads
+
+- **WHEN** the update downloads and the user opens root search
+- **THEN** the update item's primary action is "Show progress", and confirming it
+  shows the update's progress view
+
+#### Scenario: The update item once ready
+
+- **WHEN** the update has downloaded and was left with "Install later"
+- **THEN** the item reads "Dango 0.5.0 is ready to restart" and its primary
+  action is "Restart now"
 
 #### Scenario: A permission warning and an update together on macOS
 
@@ -86,31 +100,45 @@ restart".
 
 ### Requirement: An update installs only after the user confirms
 
-Dango SHALL download and install an update only as the result of "Install and
-restart". While it downloads, the launcher SHALL show a view naming the version
-and the download's progress. Dango SHALL verify the
-download's signature against the key built into Dango and SHALL refuse an
-update whose signature does not match. After installing it SHALL restart into
-the new version.
+Dango SHALL download an update only as the result of "Install update", and SHALL
+install it only as the result of "Restart now". The update SHALL run as a task
+(see background-tasks) with three steps: "Download", "Verify signature", and
+"Restart". While it downloads, its progress
+view SHALL be titled "Dango" followed by the new version, name the running
+version in its subtitle, and show the bytes received and, when known, the total.
+Dango SHALL verify the download's signature against the key built into Dango
+and SHALL refuse an update whose signature does not match. Once verified, the
+update SHALL wait for the user: Enter SHALL run "Restart now", and "Install
+later" SHALL leave the progress view with the update kept ready. After
+installing, Dango SHALL restart into the new version.
 
-Dismissing the launcher SHALL NOT cancel a download. A failure while the
-launcher is hidden SHALL be recorded in `dango.log`, and the update item SHALL
-stay available.
+Dismissing the launcher SHALL NOT cancel a download. A failure SHALL be recorded
+in `dango.log`, and the update item SHALL stay available. A failure toast for a
+failed download or verification SHALL carry "Retry", which starts the download
+again.
 
 #### Scenario: Download progress
 
-- **WHEN** the user confirms "Install and restart"
-- **THEN** the launcher shows "Downloading Dango 0.5.0" with the progress so far
+- **WHEN** the user confirms "Install update"
+- **THEN** the launcher shows the progress view titled "Dango 0.5.0" with the
+  download step working and the bytes received so far
+
+#### Scenario: Ready to restart
+
+- **WHEN** the download is verified while its progress view is shown
+- **THEN** the "Restart" step needs input, the detail reads "Ready to
+  restart", and the ActionBar shows "Restart now" with the Enter key
+- **AND** nothing is installed until the user confirms
 
 #### Scenario: Installing on Windows
 
-- **WHEN** the download of an update completes on Windows
+- **WHEN** the user confirms "Restart now" on Windows
 - **THEN** Dango quits and the installer runs with a progress window and needs no input
 - **AND** Dango starts again as the new version, with the same config and stored data
 
 #### Scenario: Installing on macOS
 
-- **WHEN** the download of an update completes on macOS
+- **WHEN** the user confirms "Restart now" on macOS
 - **THEN** Dango quits and starts again as the new version, with the same config and stored data
 
 #### Scenario: The download does not match its signature
@@ -126,10 +154,16 @@ stay available.
 - **AND** the launcher shows "Couldn't download the update. Check your connection and try again."
 - **AND** the update item stays available
 
+#### Scenario: Retrying a failed download
+
+- **WHEN** a failure toast for the update carries "Retry" and the user runs it
+- **THEN** the download starts again and its progress view is shown
+
 #### Scenario: Dismissed during the download
 
 - **WHEN** the user dismisses the launcher while an update downloads
-- **THEN** the download continues and the install proceeds when it completes
+- **THEN** the download continues and, once verified, the update waits as ready
+  to restart
 
 #### Scenario: Nothing installs without confirmation
 
@@ -149,8 +183,8 @@ stay available.
 ### Requirement: The user can check for updates on demand
 
 A built-in "Check for Updates" command SHALL check at once and show the result
-in the launcher. If an update is found, the result SHALL offer "Install and
-restart", and the update item SHALL appear in root search.
+in the launcher. If an update is found, the result SHALL offer "Install
+update", and the update item SHALL appear in root search.
 
 #### Scenario: Checking
 
@@ -160,7 +194,7 @@ restart", and the update item SHALL appear in root search.
 #### Scenario: An update is found
 
 - **WHEN** the user runs "Check for Updates" and version 0.5.0 is available
-- **THEN** the launcher shows "Dango 0.5.0 is available" with "Install and restart" as the primary action
+- **THEN** the launcher shows "Dango 0.5.0 is available" with "Install update" as the primary action
 - **AND** the update item is at the top of root search the next time the launcher opens
 
 #### Scenario: Already up to date
