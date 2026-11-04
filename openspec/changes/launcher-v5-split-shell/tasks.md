@@ -39,8 +39,8 @@
 
 ## 7. Design files
 
-- [ ] 7.1 Update `Launcher Component System v5.dc.html` in `Downloads/Raycast-inspired launcher component system (2)/` to match the built app: sizes, split shell, bare pill, Arrow Down list, Escape stages, toast at the pill's end, no glass, no shadows (until the follow-up). Remove stale or false content, such as parts, themes, tokens or screens the app does not have. Verify by rendering it with headless Edge and comparing against `dango-ui` screenshots
-- [ ] 7.2 After the author confirms 7.1, delete the older design files (`Launcher Component System.dc.html` and `v2` to `v4`) from that folder
+- [ ] 7.1 Update `Launcher Component System v5.dc.html` in `.design/` (gitignored) to match the built app: sizes, split shell, bare pill, Arrow Down list, Escape stages, toast at the pill's end, no glass, no shadows (until the follow-up). Remove stale or false content, such as parts, themes, tokens or screens the app does not have. Verify by rendering it with headless Edge and comparing against `dango-ui` screenshots
+- [ ] 7.2 After the author confirms 7.1, delete the older design files (`Launcher Component System.dc.html` and `v2` to `v4`) from `.design/`
 
 ## Workflow follow-up
 

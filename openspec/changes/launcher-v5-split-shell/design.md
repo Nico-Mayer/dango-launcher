@@ -1,10 +1,9 @@
 ## Context
 
 See proposal.md for the why. The reference is design system v5,
-`Launcher Component System v5.dc.html`, kept outside the repo in the author's
-Downloads. It uses the same herdr colour roles, Geist faces and Graphite /
-Paper presets as `ui/theme.slint`, so this change is about shape and layout,
-not colour.
+`.design/Launcher Component System v5.dc.html` (gitignored). It uses the same
+herdr colour roles, Geist faces and Graphite / Paper presets as
+`ui/theme.slint`, so this change is about shape and layout, not colour.
 
 Current state:
 

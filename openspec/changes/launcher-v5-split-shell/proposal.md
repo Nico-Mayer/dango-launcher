@@ -79,5 +79,5 @@ None.
   Arrow Down), `src/slint_shell/render/` (height, shell), `src/app/` (click in
   the gap is an interrupting hide, like the hotkey).
 - Test helpers in `src/ui/tests.rs` and `src/slint_shell/tests.rs`.
-- The design files in the author's Downloads folder (outside the repo).
+- The design files in `.design/` (gitignored).
 - No dependency changes. No manifest or view protocol change. No platform code.
