@@ -272,6 +272,7 @@ impl Launcher {
                 }
                 _ => {}
             },
+            Intent::ClickedOutside => fx.push(Effect::HideAndHold),
         }
     }
 

@@ -188,6 +188,15 @@ impl Harness {
         self.key("\u{F701}");
     }
 
+    fn click_at(&self, x: f32, y: f32) {
+        let window = self.ui.window();
+        let position = LogicalPosition::new(x, y);
+        let button = PointerEventButton::Left;
+        window.dispatch_event(WindowEvent::PointerMoved { position });
+        window.dispatch_event(WindowEvent::PointerPressed { position, button });
+        window.dispatch_event(WindowEvent::PointerReleased { position, button });
+    }
+
     fn move_pointer_to(&self, element: &ElementHandle) {
         let position = element.absolute_position();
         let size = element.size();
@@ -1642,6 +1651,22 @@ mod window_height {
             card.absolute_position().y,
             pill.absolute_position().y + pill.size().height + 8.0
         );
+    }
+
+    #[test]
+    fn a_click_in_the_gap_is_a_click_outside() {
+        let h = Harness::root(results(3));
+        h.click_at(360.0, 52.0 + 4.0);
+        assert_eq!(h.intents(), [Intent::ClickedOutside]);
+    }
+
+    #[test]
+    fn a_click_on_the_pill_or_an_empty_part_of_the_card_stays_inside() {
+        let h = Harness::root(results(3));
+        h.click_at(360.0, 26.0);
+        let card = h.find("Results").expect("the card");
+        h.click_at(360.0, card.absolute_position().y + LIST_PADDING / 2.0);
+        assert!(!h.intents().contains(&Intent::ClickedOutside));
     }
 
     #[test]

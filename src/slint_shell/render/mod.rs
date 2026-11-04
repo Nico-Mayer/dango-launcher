@@ -307,6 +307,8 @@ pub fn connect(ui: &LauncherWindow, renderer: Rc<RefCell<Renderer>>, dispatch: R
     let send = dispatch.clone();
     intents.on_go_back(move || send(Intent::GoBack));
     let send = dispatch.clone();
+    intents.on_clicked_outside(move || send(Intent::ClickedOutside));
+    let send = dispatch.clone();
     intents.on_filter_chosen(move |id| send(Intent::FilterChosen { id: id.into() }));
     intents.on_panel_filter_edited(move |text| {
         dispatch(Intent::PanelFilterChanged { text: text.into() })

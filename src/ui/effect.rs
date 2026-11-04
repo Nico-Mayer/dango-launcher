@@ -14,6 +14,8 @@ pub enum Effect {
     },
     CancelInvocation,
     Dismiss,
+    /// Hide and hold the state, as when another application takes focus.
+    HideAndHold,
     CopyText(String),
     InspectTemplate {
         field: String,

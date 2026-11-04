@@ -65,6 +65,14 @@ export component LauncherWindow inherits Window {
             reject
         }
 
+        // Plain rectangles let a click through, so the pill and the card each
+        // hold an empty TouchArea that keeps their clicks from reaching this one.
+        TouchArea {
+            clicked => {
+                Intents.clicked-outside();
+            }
+        }
+
         pill := Rectangle {
             y: 0;
             height: Theme.search-height;
@@ -72,6 +80,8 @@ export component LauncherWindow inherits Window {
             border-radius: self.height / 2;
             accessible-role: groupbox;
             accessible-label: "Search bar";
+
+            TouchArea { }
 
             search := SearchBar { }
 
@@ -91,6 +101,8 @@ export component LauncherWindow inherits Window {
             accessible-role: groupbox;
             accessible-label: "Results";
             clip: true;
+
+            TouchArea { }
 
             property <length> body-height: self.height - Theme.action-bar-height;
             property <length> answer-room: AnswerData.shown ? Theme.answer-height : 0;

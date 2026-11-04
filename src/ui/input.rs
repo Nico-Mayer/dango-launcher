@@ -40,6 +40,9 @@ pub enum Intent {
     ClosePanel,
     /// The SearchBar's back control.
     GoBack,
+    /// A click on a transparent part of the window, such as the gap between
+    /// the pill and the card.
+    ClickedOutside,
     /// The action panel's own filter input.
     PanelFilterChanged {
         text: String,

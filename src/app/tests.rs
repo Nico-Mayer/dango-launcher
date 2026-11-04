@@ -222,6 +222,22 @@ async fn showing_within_the_hold_continues_where_the_user_left_off() {
     assert_eq!(query(&shell), "fire");
 }
 
+#[tokio::test(start_paused = true)]
+async fn a_click_outside_hides_and_holds_the_query() {
+    let (core, shell) = core(r#"launcher = { reset-after-seconds = 5 }"#);
+    core.toggle();
+    type_query(&core, "fire");
+    core.dispatch(Intent::ClickedOutside);
+    assert_eq!(
+        shell.calls().last(),
+        Some(&Call::Hide {
+            restore_focus: false
+        })
+    );
+    core.toggle();
+    assert_eq!(query(&shell), "fire");
+}
+
 #[tokio::test]
 async fn a_zero_hold_resets_at_once() {
     let (core, shell) = core(r#"launcher = { reset-after-seconds = 0 }"#);

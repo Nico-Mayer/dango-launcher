@@ -216,6 +216,7 @@ impl Core {
                     }
                 });
             }
+            ui::Effect::HideAndHold => self.hide_on_focus_loss(),
             ui::Effect::CopyText(text) => match self.services.clipboard.clone() {
                 Some(clipboard) => {
                     self.runtime
