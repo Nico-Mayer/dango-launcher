@@ -2464,6 +2464,7 @@ fn task(id: u64, status: crate::tasks::TaskStatus) -> crate::tasks::TaskState {
         detail: String::new(),
         cancel: Some("cancel".into()),
         retry: Some("install".into()),
+        show: None,
         item_id: "update".into(),
     }
 }
@@ -2747,4 +2748,31 @@ fn an_answer_alone_shows_no_empty_view() {
     let root = h.root_screen();
     assert!(root.answer.is_some());
     assert!(root.empty.is_none());
+}
+
+#[test]
+fn a_finished_task_offers_to_show_what_it_kept() {
+    let mut h = Harness::root(3);
+    report(&mut h, task(1, running_task()));
+    report(
+        &mut h,
+        crate::tasks::TaskState {
+            show: Some("show".into()),
+            ..task(
+                1,
+                crate::tasks::TaskStatus::Done {
+                    sentence: "Answer ready: Summarize".into(),
+                },
+            )
+        },
+    );
+    let toast = h.snapshot().toast.unwrap();
+    assert_eq!(toast.text, "Answer ready: Summarize");
+    let action = toast.action.expect("Show answer");
+    assert_eq!(action.title, "Show answer");
+    let effects = h.command("Enter");
+    let Some(Effect::RunAction(request)) = effects.first() else {
+        panic!("expected the show action, got {effects:?}");
+    };
+    assert_eq!(request.action_id, "show");
 }

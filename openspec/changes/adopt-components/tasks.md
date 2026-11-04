@@ -9,7 +9,7 @@
 
 ## 2. AI runs as background tasks
 
-- [ ] 2.1 Add `show: Option<String>` to `TaskState` (`src/tasks.rs`). In `src/ui/state.rs`, attach it to a success result toast as "Show answer" with `{ key: "Enter", modifiers: [Cmd] }`. Verify with reducer tests: a `Done` result with `show` gives a toast with that action, and its chord runs the owner's `show` action.
+- [x] 2.1 Add `show: Option<String>` to `TaskState` (`src/tasks.rs`). In `src/ui/state.rs`, attach it to a success result toast as "Show answer" with `{ key: "Enter", modifiers: [Cmd] }`. Verify with reducer tests: a `Done` result with `show` gives a toast with that action, and its chord runs the owner's `show` action.
 - [ ] 2.2 Give the AI extension a `visible` probe from Core (`src/app/startup.rs`, `src/app/mod.rs`). Verify with `cargo test`.
 - [ ] 2.3 In `src/extensions/ai/extension.rs`, run each request as a task, as design.md describes:
   - start the task after `prepare`, and cancel another command's task then;

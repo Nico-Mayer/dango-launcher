@@ -35,6 +35,8 @@ pub struct TaskState {
     /// The owner's action ids, run through the owner like any action.
     pub cancel: Option<String>,
     pub retry: Option<String>,
+    /// Shows what a finished task kept, offered on its success toast.
+    pub show: Option<String>,
     /// Which of the owner's items the actions apply to.
     pub item_id: String,
 }
@@ -87,6 +89,7 @@ impl Tasks {
             detail: String::new(),
             cancel: None,
             retry: None,
+            show: None,
             item_id: item_id.into(),
         };
         self.running.lock().unwrap().push(state.clone());

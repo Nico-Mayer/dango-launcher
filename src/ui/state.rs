@@ -445,6 +445,9 @@ impl Launcher {
         match &state.status {
             TaskStatus::NeedsInput { sentence } | TaskStatus::Done { sentence } => {
                 self.show_success(sentence.clone(), fx);
+                if let (Some(toast), Some(show)) = (self.toast.as_mut(), state.show.as_deref()) {
+                    toast.action = Some(task_action(&state, "Show answer", "Enter", show));
+                }
             }
             TaskStatus::Failed { sentence } => {
                 let id = self.next_revision();
