@@ -262,6 +262,15 @@ impl Registry {
         conflicts
     }
 
+    /// The chord registered for a target, if one is.
+    pub fn chord_for(&self, target: &Target) -> Option<HotKey> {
+        let table = self.bindings.lock().unwrap();
+        table
+            .iter()
+            .find(|(_, bound)| bound == target)
+            .map(|(chord, _)| *chord)
+    }
+
     /// Only a press counts. The release of the same chord would toggle twice.
     pub fn pressed(&self, id: u32, state: HotKeyState) -> Option<Pressed> {
         if state != HotKeyState::Pressed {

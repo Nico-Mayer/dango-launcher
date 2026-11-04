@@ -44,6 +44,7 @@ fn result(n: usize) -> ResultItem {
         suggested: false,
         pinned: false,
         answer: false,
+        hotkey: None,
     }
 }
 
@@ -2659,6 +2660,7 @@ fn answer_item() -> ResultItem {
         suggested: false,
         pinned: false,
         answer: true,
+        hotkey: None,
     }
 }
 

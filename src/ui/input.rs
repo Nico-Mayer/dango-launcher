@@ -151,6 +151,8 @@ pub struct ResultItem {
     pub pinned: bool,
     /// The calculator's answer to the query, drawn as the card above the rows.
     pub answer: bool,
+    /// The global hotkey that runs it, when one is registered.
+    pub hotkey: Option<global_hotkey::hotkey::HotKey>,
 }
 
 /// A name and icon the ActionBar shows for where the user is.

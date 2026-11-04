@@ -242,6 +242,7 @@ fn result(n: usize) -> ResultItem {
         suggested: false,
         pinned: false,
         answer: false,
+        hotkey: None,
     }
 }
 

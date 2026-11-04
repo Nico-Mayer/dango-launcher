@@ -975,3 +975,38 @@ async fn an_answer_is_never_learned() {
         0.0
     );
 }
+
+#[tokio::test]
+async fn a_command_shows_its_registered_hotkey() {
+    let (core, _) = core_with("", FakeGrab::default(), vec![two_commands()]);
+    let config = Config::parse(
+        r#"[extensions."x".commands.first]
+hotkey = "ctrl+alt+v""#,
+    )
+    .unwrap();
+    core.services.hotkeys.apply(&config);
+    let candidate = crate::search::Candidate {
+        id: "x.first".into(),
+        ..x_candidate(crate::search::Source::Command, false)
+    };
+    let item = core.result_item(candidate);
+    let chord = item.hotkey.expect("the registered hotkey");
+    assert!(chord.mods.contains(Modifiers::CONTROL | Modifiers::ALT));
+    assert_eq!(chord.key, Code::KeyV);
+
+    let refused = HotKey::new(Some(Modifiers::CONTROL | Modifiers::ALT), Code::KeyV);
+    let (core, _) = core_with(
+        "",
+        FakeGrab {
+            refused: vec![refused],
+            ..FakeGrab::default()
+        },
+        vec![two_commands()],
+    );
+    core.services.hotkeys.apply(&config);
+    let candidate = crate::search::Candidate {
+        id: "x.first".into(),
+        ..x_candidate(crate::search::Source::Command, false)
+    };
+    assert_eq!(core.result_item(candidate).hotkey, None);
+}

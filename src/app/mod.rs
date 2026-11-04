@@ -306,7 +306,16 @@ impl Core {
         } else {
             Some(context.title.clone())
         };
+        let target = if c.source == crate::search::Source::Command {
+            Some(hotkeys::Target::Command(c.id.clone()))
+        } else if c.extension_id == extensions::applications::EXTENSION_ID {
+            Some(hotkeys::Target::Application(c.title.clone()))
+        } else {
+            None
+        };
+        let hotkey = target.and_then(|target| self.services.hotkeys.chord_for(&target));
         ui::ResultItem {
+            hotkey,
             answer: c.source == crate::search::Source::Answer,
             context,
             extension_id: c.extension_id,
