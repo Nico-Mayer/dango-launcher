@@ -48,7 +48,7 @@ running.
 
 ### Requirement: Running tasks show in the ActionBar elsewhere
 
-While a task runs and its progress view is not shown, the ActionBar SHALL show
+While a task runs and its own view is not shown, the ActionBar SHALL show
 a busy toast with the task's status line. A task that waits for the user's
 input is not running and SHALL show no busy toast. A toast that an action raises SHALL
 take its place while it shows. The busy-mark timing (see design-system) SHALL
@@ -62,13 +62,13 @@ apply.
 
 #### Scenario: Two running tasks
 
-- **WHEN** two tasks run and neither progress view is shown
+- **WHEN** two tasks run and neither task's own view is shown
 - **THEN** the busy toast shows the task that started first
 
 ### Requirement: Every running task can be cancelled
 
 Every running task SHALL offer "Cancel" with the chord Ctrl+. on Windows and
-Cmd+. on macOS, in its progress view and in its busy toast. Cancelling SHALL end
+Cmd+. on macOS, in its own view and in its busy toast. Cancelling SHALL end
 the task at once for the user, discard what it produced, and leave Dango as it
 was before the task started.
 
@@ -90,7 +90,7 @@ A task that finishes, fails, or comes to need input while the launcher is
 hidden SHALL show that as a toast the next time the launcher opens: a success
 toast when it finished or needs input, and a failure toast with its failure
 sentence when it failed. A failure SHALL also show in the HUD at once. When the
-next open shows the task's own progress view, the view reports it and no toast
+next open shows the task's own view, the view reports it and no toast
 is shown.
 
 #### Scenario: A download fails while hidden
@@ -114,7 +114,7 @@ is shown.
 
 ### Requirement: A task's result while shown appears where the user is
 
-While the launcher is shown, a task's result SHALL appear in its progress view
+While the launcher is shown, a task's result SHALL appear in its own view
 when that view is on top, and as a toast otherwise: a success toast when the
 task finished or needs input, and a failure toast with its failure sentence
 when it failed.
