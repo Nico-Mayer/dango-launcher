@@ -2,6 +2,18 @@
 
 All notable changes to Dango. Generated from commit history at release time.
 
+## [6.3.1] - 2026-11-04
+
+### Fixes
+
+- **ui:** Draw a hotkey's named keys as symbols
+
+### Documentation
+
+- **tasks:** Check off the macos hand check
+- **tasks:** Archive task-registry and sync specs
+- **adopt:** Archive adopt-components and sync specs
+- **background:** Archive background-answers and sync specs
 ## [6.3.0] - 2026-11-04
 
 ### Features
