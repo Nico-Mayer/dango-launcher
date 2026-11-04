@@ -4,7 +4,7 @@
 
 - [x] 1.1 On Windows: `Label::ChordSeparator` becomes " ", and `panel_label` and `confirm_label` (`src/slint_shell/keys.rs`) join with it. Verify with `#[cfg(windows)]` unit tests: the panel chord reads "Ctrl K", the confirm chord "Ctrl ↵", a `{ key: "Enter", modifiers: [Cmd] }` shortcut "Ctrl ↵", and ctrl+alt+v "Ctrl Alt V". Update the existing Windows hotkey test.
 - [ ] 1.2 On macOS: the same joins give "⌘K", "⌘↵", and "⌃⌥V". Verify with `#[cfg(target_os = "macos")]` unit tests, and update `a_kbd_shows_the_platform_chord` in `src/slint_shell/tests.rs` from "⌘ K" to "⌘K". They run on the Mac.
-- [ ] 1.3 Make the toast's key chord in `ui/shell/action-bar.slint` keep its preferred width. Verify with a UI test in `src/slint_shell/tests.rs` that fails before the fix: the toast's chord chip is as wide as the footer's chip for the same text.
+- [x] 1.3 Make the toast's key chord in `ui/shell/action-bar.slint` keep its preferred width. Verify with a UI test in `src/slint_shell/tests.rs` that fails before the fix: the toast's chord chip is as wide as the footer's chip for the same text.
 
 ## 2. A toast with an action stays
 

@@ -2071,6 +2071,47 @@ mod toast_action {
     use crate::ui::{ActionRequest, Origin, ToastAction};
 
     #[test]
+    fn a_toast_chord_is_as_wide_as_its_keys() {
+        let h = Harness::root(results(3));
+        h.event(Event::Failed("Couldn't download the update.".into()));
+        let mut snapshot = h.launcher.borrow().snapshot();
+        let retry = Shortcut {
+            key: "r".into(),
+            modifiers: vec![Modifier::Cmd],
+        };
+        if let Some(toast) = snapshot.toast.as_mut() {
+            toast.action = Some(ToastAction {
+                title: "Retry".into(),
+                shortcut: retry.clone(),
+                request: ActionRequest {
+                    origin: Origin::Root,
+                    extension_id: "dango.updates".into(),
+                    item_id: "update".into(),
+                    action_id: "install".into(),
+                    values: None,
+                    query: None,
+                },
+            });
+        }
+        h.publish(snapshot);
+        let keys = keys::shortcut_label(&retry);
+        let in_toast = ElementHandle::find_by_element_type_name(&h.ui, "Kbd")
+            .find(|kbd| kbd.accessible_label().as_deref() == Some(keys.as_str()))
+            .expect("the toast's chord")
+            .size()
+            .width;
+        let gallery = super::super::generated::AtomGallery::new().unwrap();
+        gallery.set_chord(keys.as_str().into());
+        gallery.show().unwrap();
+        let alone = ElementHandle::find_by_accessible_label(&gallery, &keys)
+            .next()
+            .expect("the chord on its own")
+            .size()
+            .width;
+        assert_eq!(in_toast, alone);
+    }
+
+    #[test]
     fn a_failure_toast_shows_its_action_and_chord() {
         let h = Harness::root(results(3));
         h.event(Event::Failed("Couldn't download the update.".into()));

@@ -52,6 +52,7 @@ export component ActionBar inherits Rectangle {
             label := Text {
                 text: Shell.toast-shown ? Shell.toast-text : Shell.context;
                 color: Shell.toast-shown && Shell.toast-style == ToastStyle.failure ? Theme.foreground : Theme.muted;
+                horizontal-stretch: 1;
                 font-size: Theme.text-small;
                 vertical-alignment: center;
                 overflow: elide;
