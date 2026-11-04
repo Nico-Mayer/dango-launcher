@@ -118,7 +118,6 @@ pub struct TaskHandle {
 }
 
 impl TaskHandle {
-    #[cfg(test)]
     pub fn id(&self) -> u64 {
         self.id
     }

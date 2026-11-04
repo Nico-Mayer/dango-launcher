@@ -131,6 +131,8 @@ pub struct AiParts {
     pub text: Option<Arc<dyn text::TextTarget>>,
     pub clipboard: Option<Arc<dyn ClipboardSource>>,
     pub runner: Arc<dyn invocation::Runner>,
+    pub tasks: Arc<Tasks>,
+    pub visible: Arc<dyn Fn() -> bool + Send + Sync>,
 }
 
 impl AiParts {
@@ -143,6 +145,7 @@ impl AiParts {
             self.clipboard.clone(),
             Some(self.runner.clone()),
         );
+        let extension = extension.with_background(self.tasks.clone(), self.visible.clone());
         (Arc::new(extension), problems)
     }
 }

@@ -10,8 +10,8 @@
 ## 2. AI runs as background tasks
 
 - [x] 2.1 Add `show: Option<String>` to `TaskState` (`src/tasks.rs`). In `src/ui/state.rs`, attach it to a success result toast as "Show answer" with `{ key: "Enter", modifiers: [Cmd] }`. Verify with reducer tests: a `Done` result with `show` gives a toast with that action, and its chord runs the owner's `show` action.
-- [ ] 2.2 Give the AI extension a `visible` probe from Core (`src/app/startup.rs`, `src/app/mod.rs`). Verify with `cargo test`.
-- [ ] 2.3 In `src/extensions/ai/extension.rs`, run each request as a task, as design.md describes:
+- [x] 2.2 Give the AI extension a `visible` probe from Core (`src/app/startup.rs`, `src/app/mod.rs`). Verify with `cargo test`.
+- [x] 2.3 In `src/extensions/ai/extension.rs`, run each request as a task, as design.md describes:
   - start the task after `prepare`, and cancel another command's task then;
   - keep `Inner.live` and the last streamed text, and stop on the task's cancel signal;
   - running the same command again re-shows it;
@@ -31,7 +31,7 @@
 
 ## 3. Checks and review
 
-- [ ] 3.1 Run `mise run check` and `cargo test`. Verify both pass.
+- [x] 3.1 Run `mise run check` and `cargo test`. Verify both pass.
 - [ ] 3.2 Windows hand check with the real keyboard (`mise run keys`, `mise run shot`):
   - press an AI paste command's hotkey in a text field and wait: the answer is pasted there;
   - press it again, then click into another app before the answer arrives: nothing is pasted, and the next open shows "Answer ready" with "Show answer".

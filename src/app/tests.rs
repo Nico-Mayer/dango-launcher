@@ -414,6 +414,8 @@ async fn a_failed_selection_read_shows_in_the_launcher_at_once() {
         text: Some(Arc::new(NothingSelected)),
         clipboard: None,
         runner: Arc::new(NoRunner),
+        tasks: crate::tasks::Tasks::new(|_| {}),
+        visible: Arc::new(|| true),
     };
     let config = r#"
         ai = { providers = { local = { kind = "ollama", model = "qwen3:8b" } } }
@@ -451,6 +453,8 @@ async fn quitting_stops_running_agent_programs() {
         text: None,
         clipboard: None,
         runner: Arc::new(NoRunner),
+        tasks: crate::tasks::Tasks::new(|_| {}),
+        visible: Arc::new(|| true),
     };
     let (core, _) = core_with_ai("", FakeGrab::default(), Vec::new(), Some(ai));
     core.quit();

@@ -317,6 +317,14 @@ fn build_services(
             core: core.clone(),
             owner: extensions::ai::EXTENSION_ID,
         }),
+        tasks: tasks.clone(),
+        visible: {
+            let core = core.clone();
+            Arc::new(move || {
+                core.upgrade()
+                    .is_some_and(|core| core.visible.load(std::sync::atomic::Ordering::SeqCst))
+            })
+        },
     };
     {
         let (extension, problems) = {

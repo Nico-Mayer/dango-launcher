@@ -175,11 +175,15 @@ pub mod testing {
     use super::*;
     use std::sync::Mutex;
 
+    type Fragments = std::sync::mpsc::Sender<Result<String, AiError>>;
+
     /// A `Completions` that replays what it was given, and remembers the
     /// request it was asked for.
     pub struct Scripted {
         script: Mutex<Vec<Result<String, AiError>>>,
         pub seen: Mutex<Vec<Request>>,
+        /// Streams that stay open until `release`, for a run caught mid-way.
+        held: Option<Mutex<Vec<Fragments>>>,
     }
 
     impl Scripted {
@@ -187,6 +191,7 @@ pub mod testing {
             Self {
                 script: Mutex::new(fragments.iter().map(|text| Ok(text.to_string())).collect()),
                 seen: Mutex::new(Vec::new()),
+                held: None,
             }
         }
 
@@ -194,6 +199,21 @@ pub mod testing {
             Self {
                 script: Mutex::new(vec![Err(error)]),
                 seen: Mutex::new(Vec::new()),
+                held: None,
+            }
+        }
+
+        /// Sends the fragments, then keeps every stream open until `release`.
+        pub fn holding(fragments: &[&str]) -> Self {
+            Self {
+                held: Some(Mutex::new(Vec::new())),
+                ..Self::answering(fragments)
+            }
+        }
+
+        pub fn release(&self) {
+            if let Some(held) = &self.held {
+                held.lock().unwrap().clear();
             }
         }
 
@@ -208,6 +228,9 @@ pub mod testing {
             let (tx, rx) = std::sync::mpsc::channel();
             for item in self.script.lock().unwrap().iter() {
                 let _ = tx.send(item.clone());
+            }
+            if let Some(held) = &self.held {
+                held.lock().unwrap().push(tx);
             }
             Chunks::new(rx)
         }

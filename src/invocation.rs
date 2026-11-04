@@ -41,7 +41,9 @@ pub trait Sink: Send + Sync {
     }
 }
 
-/// Handed to a command for the length of one invocation.
+/// Handed to a command for the length of one invocation. A clone shares the
+/// invocation, so work that outlives the call can keep reporting into it.
+#[derive(Clone)]
 pub struct InvocationContext {
     pub command_id: String,
     sink: Arc<dyn Sink>,
