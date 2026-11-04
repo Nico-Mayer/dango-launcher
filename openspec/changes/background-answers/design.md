@@ -81,11 +81,17 @@ answer and reports `show`, because the hold can expire (60 s by default,
 `start_hold` in `src/app/mod.rs`) and drop the view; then the toast's "Show
 answer" is the only way back.
 
-The decision moves to the open. In `Activated`, when `held` and the top view
-belongs to the result's owner (`self.owner`), the result is reported by the view
-itself: no jump and no toast. This widens `shows_progress_of` to "shows its own
-view", for any view kind. After the hold expired, `held` is false and the toast
-with "Show answer" shows.
+The decision moves to the open. In `Activated`, when `held` and the top view is
+the run's own (`shows_view_of`: the result's owner is `self.owner`, and the top
+view's context title is the task's title, which is the command's title), the
+view reports the result itself: no jump and no toast. After the hold expired,
+`held` is false and the toast with "Show answer" shows. `shows_progress_of`
+keeps its rule for the update's progress view.
+
+- **Rejected: the owner alone.** Another view of the same extension, such as a
+  second AI command's argument form, would then swallow the toast. The reducer
+  knows a view's owner and title, not its command id, so the title pins it to
+  the run's own view.
 
 This rule comes before the jump: reopening held onto the answer's own view
 while its HUD still shows clears the HUD and runs nothing, so the answer is
