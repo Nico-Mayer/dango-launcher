@@ -166,7 +166,7 @@ own primary action.
 #### Scenario: The footer names the platform's chord on Windows
 
 - **WHEN** the launcher is open on Windows
-- **THEN** the ActionBar shows the action panel chord as Ctrl+K
+- **THEN** the ActionBar shows the action panel chord as "Ctrl K"
 - **AND** an action's shortcut in the panel is shown with Ctrl
 
 #### Scenario: The footer names the primary action of a list

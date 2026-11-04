@@ -267,8 +267,8 @@ an answer to show or paste SHALL NOT be pasted: it SHALL be kept, and a success
 toast SHALL read "Answer ready: " and the title, offering "Show answer" with
 Ctrl+Enter on Windows and Cmd+Enter on macOS. An answer to copy SHALL be
 copied, with the toast "Copied to clipboard". A failure SHALL be reported as
-background-tasks says. A view held while the launcher is hidden SHALL stop
-loading when the request ends.
+background-tasks says. When the request's view is held behind a hide, that
+view SHALL show the answer, and reopening onto it SHALL show no toast.
 
 #### Scenario: A paste command finishes after Escape
 
@@ -281,8 +281,8 @@ loading when the request ends.
 
 - **WHEN** a paste command runs, the user clicks into another application, and
   the answer finishes within the grace period
-- **THEN** nothing is pasted, and when the launcher next opens the toast shows
-  over the finished answer
+- **THEN** nothing is pasted, and when the launcher next opens it shows the
+  finished answer with no toast
 
 #### Scenario: Showing the answer on Windows
 

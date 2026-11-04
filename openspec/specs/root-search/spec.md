@@ -406,7 +406,7 @@ keys. A result without a working hotkey SHALL show none.
 
 - **WHEN** "Clipboard History" has the hotkey "ctrl+alt+v" on Windows and the
   user types "clip"
-- **THEN** its row shows "Ctrl+Alt+V" as a key chord
+- **THEN** its row shows "Ctrl Alt V" as a key chord
 
 #### Scenario: A command's hotkey on macOS
 

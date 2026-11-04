@@ -193,8 +193,10 @@ its label and chord. Pressing that chord while the toast shows SHALL run the
 action and SHALL NOT also act on the view. A busy toast SHALL show a spinner in
 the working role and stay while its work runs, following the busy-mark timing.
 A success toast SHALL show a dot in the done role and disappear after about two
-seconds. A failure toast SHALL show a dot in the danger role and stay until the
-next key press or click. The success and failure dots SHALL NOT move. Assistive
+seconds, unless it carries an action: then it SHALL stay until the next key
+press or click, so the action is still there when the user looks. A failure
+toast SHALL show a dot in the danger role and stay until the next key press or
+click. The success and failure dots SHALL NOT move. Assistive
 technology SHALL be told the toast's text, its action, and whether it reports
 a failure. Showing a toast SHALL NOT take focus.
 
@@ -203,6 +205,11 @@ a failure. Showing a toast SHALL NOT take focus.
 - **WHEN** an action that keeps the launcher open reports success with a toast
 - **THEN** the toast shows with a dot in the done role and is gone after about
   two seconds, and the context returns
+
+#### Scenario: A success toast with an action stays
+
+- **WHEN** a success toast reads "Answer ready: Summarize" with "Show answer"
+- **THEN** it stays until the user presses a key or clicks
 
 #### Scenario: A failure toast stays
 
@@ -240,7 +247,9 @@ The launcher SHALL build every surface from the same small parts:
   ratio. A content preview, such as a copied image, fills its frame and has a
   border.
 - A key chord is drawn as keys in Geist Mono, using the platform's names as the
-  view protocol requires.
+  view protocol requires, in a chip that fits its text. On Windows the keys are
+  separated by a space; on macOS they are joined with none. Every key chord
+  uses this one format: the footer, the action panel, toasts, and result rows.
 - A tag is short text in its role's colour on a rounded, faint fill of the same
   role. Its role is accent, muted, or danger.
 - A progress ring as an accessory is 16 logical pixels.
@@ -253,6 +262,18 @@ The launcher SHALL build every surface from the same small parts:
   previews
 - **THEN** named icons follow the theme, application icons and favicons keep
   their colours and are not stretched, and image previews are framed
+
+#### Scenario: Key chords on Windows
+
+- **WHEN** the launcher shows the action panel's chord, a toast's "Show answer"
+  chord, and a result's hotkey on Windows
+- **THEN** they read "Ctrl K", "Ctrl ↵", and "Ctrl Alt V"
+
+#### Scenario: Key chords on macOS
+
+- **WHEN** the launcher shows the action panel's chord, a toast's "Show answer"
+  chord, and a result's hotkey on macOS
+- **THEN** they read "⌘K", "⌘↵", and "⌃⌥V"
 
 #### Scenario: A fourth accessory
 
