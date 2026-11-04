@@ -83,23 +83,34 @@ export component ActionBar inherits Rectangle {
             }
         }
 
-        if Shell.primary-label != "": HorizontalLayout {
+        if Shell.primary-label != "": VerticalLayout {
             horizontal-stretch: 0;
-            spacing: Theme.gap;
-            Text {
-                text: Shell.primary-label;
-                color: Theme.foreground;
-                font-size: Theme.text-small;
-                vertical-alignment: center;
-                overflow: elide;
-                max-width: 200px;
-                accessible-role: AccessibleRole.text;
-                accessible-label: Shell.primary-label;
-            }
-            VerticalLayout {
-                alignment: center;
-                Kbd {
-                    keys: Shell.confirm-key;
+            alignment: center;
+            Rectangle {
+                height: 28px;
+                border-radius: self.height / 2;
+                background: Theme.hover;
+                HorizontalLayout {
+                    padding-left: 12px;
+                    padding-right: 6px;
+                    spacing: Theme.gap;
+                    Text {
+                        text: Shell.primary-label;
+                        color: Theme.foreground;
+                        font-size: Theme.text-small;
+                        font-weight: 500;
+                        vertical-alignment: center;
+                        overflow: elide;
+                        max-width: 200px;
+                        accessible-role: AccessibleRole.text;
+                        accessible-label: Shell.primary-label;
+                    }
+                    VerticalLayout {
+                        alignment: center;
+                        Kbd {
+                            keys: Shell.confirm-key;
+                        }
+                    }
                 }
             }
         }
