@@ -534,7 +534,7 @@ pub fn label(label: Label) -> &'static str {
         Label::AltKey => ("⌥", "Alt"),
         Label::ShiftKey => ("⇧", "Shift"),
         Label::SuperKey => ("⌘", "Win"),
-        Label::ChordSeparator => ("", "+"),
+        Label::ChordSeparator => ("", " "),
     };
     if cfg!(target_os = "macos") {
         macos

@@ -10,10 +10,14 @@ fn command_label() -> &'static str {
     platform::label(Label::CommandKey)
 }
 
+fn join_keys(keys: &[&str]) -> String {
+    keys.join(platform::label(Label::ChordSeparator))
+}
+
 /// The confirm key shown in the footer.
 pub fn confirm_label(with_command: bool) -> String {
     if with_command {
-        format!("{}↵", command_label())
+        join_keys(&[command_label(), "↵"])
     } else {
         "↵".to_string()
     }
@@ -21,7 +25,7 @@ pub fn confirm_label(with_command: bool) -> String {
 
 /// The chord shown on the Actions button.
 pub fn panel_label() -> String {
-    format!("{} K", command_label())
+    join_keys(&[command_label(), "K"])
 }
 
 pub fn shortcut_label(shortcut: &Shortcut) -> String {
@@ -181,7 +185,30 @@ mod tests {
     #[cfg(windows)]
     #[test]
     fn a_hotkey_reads_with_the_windows_names() {
-        assert_eq!(hotkey_label(&ctrl_alt_v()), "Ctrl+Alt+V");
+        assert_eq!(hotkey_label(&ctrl_alt_v()), "Ctrl Alt V");
+    }
+
+    fn command_enter() -> Shortcut {
+        Shortcut {
+            key: "Enter".into(),
+            modifiers: vec![Modifier::Cmd],
+        }
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn every_chord_reads_with_spaces_on_windows() {
+        assert_eq!(panel_label(), "Ctrl K");
+        assert_eq!(confirm_label(true), "Ctrl ↵");
+        assert_eq!(shortcut_label(&command_enter()), "Ctrl ↵");
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn every_chord_reads_joined_on_macos() {
+        assert_eq!(panel_label(), "⌘K");
+        assert_eq!(confirm_label(true), "⌘↵");
+        assert_eq!(shortcut_label(&command_enter()), "⌘↵");
     }
 
     #[test]

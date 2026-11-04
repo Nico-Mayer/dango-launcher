@@ -427,7 +427,7 @@ mod atoms {
         gallery.set_chord(keys::panel_label().into());
         gallery.show().unwrap();
         let expected = if cfg!(target_os = "macos") {
-            "⌘ K"
+            "⌘K"
         } else {
             "Ctrl K"
         };
