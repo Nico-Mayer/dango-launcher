@@ -25,7 +25,7 @@
   - A second run, opened after the HUD is gone, shows the toast with "Show answer" and "Ctrl ↵", and the toast stays until a key press.
 
   Verify with screenshots.
-- [ ] 4.3 macOS hand check of the same flow, with "⌘↵" on the toast. Leave open until a session on the Mac.
+- [x] 4.3 macOS hand check of the same flow, with "⌘↵" on the toast. Leave open until a session on the Mac.
 - [x] 4.4 Run the `ponytail-review` skill in a fresh subagent on this change's commits, without the apply context. Report the findings to the author.
 
 ## Workflow follow-up
