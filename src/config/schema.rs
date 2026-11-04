@@ -755,6 +755,8 @@ mod tests {
         assert!(!accepts(r#"clipboard = { primary-action = "speak" }"#));
         assert!(!accepts(r#"hyperkey = { key = "capslock" }"#));
         assert!(!accepts(r#"hyperkey = { tap = "lft" }"#));
+        assert!(!accepts(r#"launcher = { display = "secondary" }"#));
+        assert!(accepts(r#"launcher = { display = "primary" }"#));
     }
 
     #[test]

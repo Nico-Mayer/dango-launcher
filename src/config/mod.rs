@@ -167,12 +167,28 @@ pub struct Launcher {
     /// at once.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub reset_after_seconds: Option<u32>,
+    /// The display the launcher and its notice open on. "pointer" is the
+    /// display under the mouse pointer, "primary" is your main display.
+    /// Default "pointer".
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub display: Option<LauncherDisplay>,
 }
 
 impl Launcher {
     fn is_empty(&self) -> bool {
-        self.hotkey.is_none() && self.autostart.is_none() && self.reset_after_seconds.is_none()
+        self.hotkey.is_none()
+            && self.autostart.is_none()
+            && self.reset_after_seconds.is_none()
+            && self.display.is_none()
     }
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "lowercase")]
+pub enum LauncherDisplay {
+    #[default]
+    Pointer,
+    Primary,
 }
 
 /// One model service. The key it is stored under is the name a command uses to
@@ -406,6 +422,19 @@ mod tests {
             config.alias("dango.window-management", "left-half"),
             Some("lh".to_string())
         );
+    }
+
+    #[test]
+    fn the_launcher_display_parses_and_defaults_to_absent() {
+        let config = Config::parse(r#"launcher = { display = "primary" }"#).unwrap();
+        assert_eq!(config.launcher.display, Some(LauncherDisplay::Primary));
+        assert_eq!(Config::parse("").unwrap().launcher.display, None);
+    }
+
+    #[test]
+    fn an_unknown_launcher_display_names_the_setting() {
+        let error = Config::parse(r#"launcher = { display = "secondary" }"#).unwrap_err();
+        assert!(error.to_string().contains("display"), "{error}");
     }
 
     #[test]

@@ -2,8 +2,8 @@
 
 ## 1. Config key
 
-- [ ] 1.1 Add `LauncherDisplay { Pointer, Primary }` and `launcher.display` to `src/config/mod.rs` with the doc comment from design.md, and include it in `Launcher::is_empty`; verify with config unit tests that `display = "primary"` parses, an absent key is `None`, and `display = "secondary"` fails with an error naming the setting (`cargo test config`)
-- [ ] 1.2 Regenerate `docs/config.md` with `env DANGO_UPDATE_DOCS=1 cargo test the_settings_reference_is_current`; verify `the_settings_reference_is_current` passes and the schema test rejects `"secondary"` for `launcher.display`
+- [x] 1.1 Add `LauncherDisplay { Pointer, Primary }` and `launcher.display` to `src/config/mod.rs` with the doc comment from design.md, and include it in `Launcher::is_empty`; verify with config unit tests that `display = "primary"` parses, an absent key is `None`, and `display = "secondary"` fails with an error naming the setting (`cargo test config`)
+- [x] 1.2 Regenerate `docs/config.md` with `env DANGO_UPDATE_DOCS=1 cargo test the_settings_reference_is_current`; verify `the_settings_reference_is_current` passes and the schema test rejects `"secondary"` for `launcher.display`
 
 ## 2. Core pushes the display to the shell
 
