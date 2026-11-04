@@ -13,7 +13,6 @@
 
 # Agent worktrees
 .claude/worktrees/
-.design
 
 # Local audit reports
 /audit/
