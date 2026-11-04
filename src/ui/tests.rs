@@ -2776,3 +2776,52 @@ fn a_finished_task_offers_to_show_what_it_kept() {
     };
     assert_eq!(request.action_id, "show");
 }
+
+fn answer_ready(id: u64) -> crate::tasks::TaskState {
+    crate::tasks::TaskState {
+        owner: "dango.ai".into(),
+        show: Some("show".into()),
+        ..task(
+            id,
+            crate::tasks::TaskStatus::Done {
+                sentence: "Answer ready: Summarize".into(),
+            },
+        )
+    }
+}
+
+fn expires(effects: &[Effect]) -> bool {
+    effects
+        .iter()
+        .any(|effect| matches!(effect, Effect::ExpireToast { .. }))
+}
+
+#[test]
+fn a_toast_with_an_action_waits_for_the_user() {
+    let mut h = Harness::root(3);
+    report(&mut h, task(1, running_task()));
+    let effects = h.event(Event::Task(Box::new(answer_ready(1))));
+    assert!(!expires(&effects), "no timer on a toast you may act on");
+
+    let effects = h.press("ArrowDown");
+    assert!(
+        !effects
+            .iter()
+            .any(|effect| matches!(effect, Effect::RunAction(_))),
+        "another key does not run the action"
+    );
+    assert!(h.snapshot().toast.is_none(), "but it clears the toast");
+}
+
+#[test]
+fn a_toast_without_an_action_still_expires() {
+    let mut h = Harness::root(3);
+    report(&mut h, task(1, running_task()));
+    let effects = h.event(Event::Task(Box::new(task(
+        1,
+        crate::tasks::TaskStatus::Done {
+            sentence: "Dango 0.5.0 is ready to restart".into(),
+        },
+    ))));
+    assert!(expires(&effects));
+}

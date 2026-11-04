@@ -8,7 +8,7 @@
 
 ## 2. A toast with an action stays
 
-- [ ] 2.1 In `src/ui/state.rs`, `show_success` takes the toast's action and schedules no expiry when there is one; `show_task_result` passes "Show answer" in. `clear_failure` becomes `clear_lasting` and also clears a toast with an action. Verify with reducer tests in `src/ui/tests.rs`: a `Done` result with `show` schedules no `ExpireToast`; a key press clears it without running the action; a success toast without an action still expires.
+- [x] 2.1 In `src/ui/state.rs`, `show_success` takes the toast's action and schedules no expiry when there is one; `show_task_result` passes "Show answer" in. `clear_failure` becomes `clear_lasting` and also clears a toast with an action. Verify with reducer tests in `src/ui/tests.rs`: a `Done` result with `show` schedules no `ExpireToast`; a key press clears it without running the action; a success toast without an action still expires.
 
 ## 3. The HUD and the jump
 

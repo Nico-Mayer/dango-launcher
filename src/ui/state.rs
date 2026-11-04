@@ -240,7 +240,7 @@ impl Launcher {
                 | Intent::ClosePanel
                 | Intent::PanelFilterChanged { .. }
         ) {
-            self.clear_failure();
+            self.clear_lasting();
         }
         match intent {
             Intent::Ready => fx.push(Effect::Search(self.query.clone())),
@@ -444,10 +444,11 @@ impl Launcher {
     fn show_task_result(&mut self, state: TaskState, fx: &mut Vec<Effect>) {
         match &state.status {
             TaskStatus::NeedsInput { sentence } | TaskStatus::Done { sentence } => {
-                self.show_success(sentence.clone(), fx);
-                if let (Some(toast), Some(show)) = (self.toast.as_mut(), state.show.as_deref()) {
-                    toast.action = Some(task_action(&state, "Show answer", "Enter", show));
-                }
+                let action = state
+                    .show
+                    .as_deref()
+                    .map(|show| task_action(&state, "Show answer", "Enter", show));
+                self.show_success(sentence.clone(), action, fx);
             }
             TaskStatus::Failed { sentence } => {
                 let id = self.next_revision();
@@ -624,7 +625,7 @@ impl Launcher {
                 }
             }
             (ActionOutcome::Back, Origin::Root) => {}
-            (ActionOutcome::Toast(text), _) => self.show_success(text, fx),
+            (ActionOutcome::Toast(text), _) => self.show_success(text, None, fx),
             (ActionOutcome::Failed(message), _) => self.show_failure(message, fx),
         }
     }
@@ -666,28 +667,33 @@ impl Launcher {
     }
 
     /// A failure stays until the next key press or click.
-    fn clear_failure(&mut self) {
+    /// A toast that waits for the user, because it failed or offers an
+    /// action, goes with their next key press or click.
+    fn clear_lasting(&mut self) {
         if self
             .toast
             .as_ref()
-            .is_some_and(|toast| toast.style == ToastStyle::Failure)
+            .is_some_and(|toast| toast.style == ToastStyle::Failure || toast.action.is_some())
         {
             self.toast = None;
         }
     }
 
-    fn show_success(&mut self, text: String, fx: &mut Vec<Effect>) {
+    fn show_success(&mut self, text: String, action: Option<ToastAction>, fx: &mut Vec<Effect>) {
         let id = self.next_revision();
+        let lasts = action.is_some();
         self.toast = Some(HeldToast {
             id,
             style: ToastStyle::Success,
             text,
-            action: None,
+            action,
         });
-        fx.push(Effect::ExpireToast {
-            id,
-            style: ToastStyle::Success,
-        });
+        if !lasts {
+            fx.push(Effect::ExpireToast {
+                id,
+                style: ToastStyle::Success,
+            });
+        }
     }
 
     /// The time runs from when the HUD can be seen, so one set while the
@@ -766,7 +772,7 @@ impl Launcher {
                 self.query = text.clone();
                 self.results_complete = false;
                 self.picked = None;
-                self.clear_failure();
+                self.clear_lasting();
                 fx.push(Effect::Search(text));
             }
             Some(view) => {
@@ -872,7 +878,7 @@ impl Launcher {
     }
 
     fn escape(&mut self, fx: &mut Vec<Effect>) {
-        self.clear_failure();
+        self.clear_lasting();
         if !self.stack.is_empty() {
             // A command may still be working behind this view, and the user has
             // left it: stop it rather than paying for an answer nobody reads.
@@ -910,7 +916,7 @@ impl Launcher {
                 match item.actions.first() {
                     Some(action) => self.run_root_action(&item, &action.id, fx),
                     None => {
-                        self.clear_failure();
+                        self.clear_lasting();
                         self.panel = None;
                         self.working = Some(item.title.clone());
                         fx.push(Effect::InvokeCommand {
@@ -1027,7 +1033,7 @@ impl Launcher {
     }
 
     fn run_root_action(&mut self, item: &ResultItem, action: &str, fx: &mut Vec<Effect>) {
-        self.clear_failure();
+        self.clear_lasting();
         self.panel = None;
         fx.push(Effect::RunAction(ActionRequest {
             origin: Origin::Root,
@@ -1051,7 +1057,7 @@ impl Launcher {
         let Some(owner) = self.owner.clone() else {
             return;
         };
-        self.clear_failure();
+        self.clear_lasting();
         self.panel = None;
         fx.push(Effect::RunAction(ActionRequest {
             origin: Origin::View,
