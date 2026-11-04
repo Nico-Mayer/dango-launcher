@@ -1,9 +1,8 @@
 import { Theme } from "../theme.slint";
 import { Progress, ProgressKind } from "../atoms/progress.slint";
 import { Icon, IconKind } from "../atoms/icon.slint";
-import { Kbd } from "../atoms/kbd.slint";
-import { Dot, Status } from "../atoms/dot.slint";
-import { Intents, Search, Shell, ToastStyle } from "../globals.slint";
+import { Intents, Search, Shell } from "../globals.slint";
+import { Toast } from "toast.slint";
 
 /// The query for a list, or the command's title for a detail or form.
 export component SearchBar inherits Rectangle {
@@ -113,48 +112,9 @@ export component SearchBar inherits Rectangle {
             }
         }
 
-        // With the card hidden, the toast has no ActionBar to sit in.
-        if !Shell.card-shown && Shell.toast-shown: HorizontalLayout {
+        if !Shell.card-shown && Shell.toast-shown: Toast {
             horizontal-stretch: 0;
             max-width: root.width / 2;
-            spacing: Theme.gap;
-            VerticalLayout {
-                alignment: center;
-                if Shell.toast-style == ToastStyle.busy: Progress {
-                    kind: ProgressKind.ring;
-                    width: 12px;
-                    height: 12px;
-                }
-                if Shell.toast-style != ToastStyle.busy: Dot {
-                    status: Shell.toast-style == ToastStyle.failure ? Status.failed : Status.done;
-                }
-            }
-            Text {
-                text: Shell.toast-text;
-                color: Shell.toast-style == ToastStyle.failure ? Theme.foreground : Theme.muted;
-                font-size: Theme.text-small;
-                vertical-alignment: center;
-                overflow: elide;
-                accessible-role: AccessibleRole.text;
-                accessible-label: self.text;
-                accessible-description: (Shell.toast-style == ToastStyle.failure ? "Failed" : "")
-                    + (Shell.toast-style == ToastStyle.failure && Shell.toast-action-label != "" ? ". " : "")
-                    + (Shell.toast-action-label != "" ? Shell.toast-action-label + ", " + Shell.toast-action-keys : "");
-            }
-            if Shell.toast-action-label != "": Text {
-                text: Shell.toast-action-label;
-                color: Theme.foreground;
-                font-size: Theme.text-small;
-                vertical-alignment: center;
-                accessible-role: none;
-            }
-            if Shell.toast-action-label != "": VerticalLayout {
-                alignment: center;
-                Kbd {
-                    keys: Shell.toast-action-keys;
-                    accessible-role: none;
-                }
-            }
         }
 
         if Shell.typing && Search.filter-shown: VerticalLayout {

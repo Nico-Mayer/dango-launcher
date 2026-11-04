@@ -169,9 +169,9 @@ tests stay untouched. Tests of the closed view itself seed without it.
 | Card | `ui/shell/launcher-window.slint` | new Rectangle, no new component |
 | Primary action chip | `ui/shell/action-bar.slint` + `ui/atoms/kbd.slint` | restyled |
 
-The pill-end toast shares its look with the ActionBar's toast. If the two
-copies differ by more than position, the shared part moves to
-`ui/shell/toast.slint`.
+The toast's mark, text and action live in one `Toast` component in
+`ui/shell/toast.slint`, used by both the ActionBar and the pill, so the two
+places cannot drift.
 
 ### Text
 
