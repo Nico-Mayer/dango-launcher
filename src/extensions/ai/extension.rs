@@ -691,7 +691,7 @@ mod tests {
         }
 
         fn succeeded(&self) -> bool {
-            matches!(*self.outcome.lock().unwrap(), Some(Outcome::Success))
+            matches!(*self.outcome.lock().unwrap(), Some(Outcome::Success(_)))
         }
     }
 

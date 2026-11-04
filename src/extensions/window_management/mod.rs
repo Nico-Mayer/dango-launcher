@@ -440,7 +440,10 @@ mod tests {
             sink.clone(),
         ));
         assert_eq!(manager.placed(), vec![Region::LeftHalf.rect(AREA)]);
-        assert_eq!(sink.outcome.lock().unwrap().clone(), Some(Outcome::Success));
+        assert_eq!(
+            sink.outcome.lock().unwrap().clone(),
+            Some(Outcome::Success(None))
+        );
     }
 
     #[test]
@@ -475,7 +478,10 @@ mod tests {
                 sink.clone(),
             ));
         assert!(manager.placed().is_empty());
-        assert_eq!(sink.outcome.lock().unwrap().clone(), Some(Outcome::Success));
+        assert_eq!(
+            sink.outcome.lock().unwrap().clone(),
+            Some(Outcome::Success(None))
+        );
     }
 
     #[test]

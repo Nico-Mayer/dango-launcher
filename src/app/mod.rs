@@ -609,7 +609,7 @@ impl Core {
                             tree: Box::new(tree),
                         }));
                     }
-                    Output::Finished(Outcome::Success) => {
+                    Output::Finished(Outcome::Success(_)) => {
                         core.hide_after_launch();
                         break;
                     }

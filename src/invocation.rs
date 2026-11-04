@@ -17,7 +17,8 @@ use crate::protocol::ViewTree;
 /// What a no-view command produced.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Outcome {
-    Success,
+    /// The message, if any, is shown in the notice once the launcher hides.
+    Success(Option<String>),
     Failure(String),
 }
 
@@ -65,7 +66,11 @@ impl InvocationContext {
     }
 
     pub fn succeed(&self) {
-        self.sink.finish(Outcome::Success);
+        self.sink.finish(Outcome::Success(None));
+    }
+
+    pub fn succeed_with(&self, message: impl Into<String>) {
+        self.sink.finish(Outcome::Success(Some(message.into())));
     }
 
     pub fn fail(&self, message: impl Into<String>) {
@@ -330,7 +335,7 @@ mod tests {
         let mut rx = invoker.invoke("sys.lock").unwrap().output;
         assert!(matches!(
             rx.recv().await,
-            Some(Output::Finished(Outcome::Success))
+            Some(Output::Finished(Outcome::Success(None)))
         ));
     }
 
@@ -443,7 +448,7 @@ mod tests {
         let mut quick = invoker.invoke("sys.quick").unwrap().output;
         assert!(matches!(
             quick.recv().await,
-            Some(Output::Finished(Outcome::Success))
+            Some(Output::Finished(Outcome::Success(None)))
         ));
 
         *release.lock().unwrap() = true;

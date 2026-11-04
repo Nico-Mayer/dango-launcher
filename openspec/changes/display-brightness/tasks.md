@@ -2,7 +2,7 @@
 
 ## 1. No-view success with a message
 
-- [ ] 1.1 Change `Outcome::Success` to carry `Option<String>` and add `InvocationContext::succeed_with`; update every existing `Outcome::Success` match and test. Verify: `cargo test` passes with no behaviour change
+- [x] 1.1 Change `Outcome::Success` to carry `Option<String>` and add `InvocationContext::succeed_with`; update every existing `Outcome::Success` match and test. Verify: `cargo test` passes with no behaviour change
 - [ ] 1.2 In `src/app/mod.rs`, success with a message hides the launcher as today, then shows a success notice through a new `ui::Event` that calls `show_notice(TickerStyle::Success, ...)`. Verify: new tests in `src/ui/tests.rs` and `src/app/tests.rs` cover the `view-protocol` scenario "No-view command succeeds with a message" (from root search and from a hotkey: launcher hidden, notice text set) and that a plain success still shows no notice
 
 ## 2. Monitor access

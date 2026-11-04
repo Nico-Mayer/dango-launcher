@@ -441,7 +441,7 @@ pub mod tests {
         assert_eq!(*control.calls.lock().unwrap(), ["lock"]);
         assert!(matches!(
             output.as_slice(),
-            [Output::Finished(Outcome::Success)]
+            [Output::Finished(Outcome::Success(None))]
         ));
     }
 
@@ -490,7 +490,7 @@ pub mod tests {
         assert!(control.calls.lock().unwrap().is_empty());
         assert!(matches!(
             output.as_slice(),
-            [Output::Finished(Outcome::Success)]
+            [Output::Finished(Outcome::Success(None))]
         ));
     }
 
@@ -589,7 +589,7 @@ pub mod tests {
         assert_eq!(*opener.opened.lock().unwrap(), std::slice::from_ref(&path));
         assert!(matches!(
             output.as_slice(),
-            [Output::Finished(Outcome::Success)]
+            [Output::Finished(Outcome::Success(None))]
         ));
         let _ = std::fs::remove_dir_all(path.parent().unwrap());
     }
@@ -606,7 +606,7 @@ pub mod tests {
         assert_eq!(*opener.opened.lock().unwrap(), std::slice::from_ref(&path));
         assert!(matches!(
             output.as_slice(),
-            [Output::Finished(Outcome::Success)]
+            [Output::Finished(Outcome::Success(None))]
         ));
         let _ = std::fs::remove_dir_all(path.parent().unwrap());
     }
