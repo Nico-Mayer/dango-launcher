@@ -74,7 +74,7 @@
 ## 5. Checks and review
 
 - [x] 5.1 Run `mise run check` and `cargo test`. Verify both pass.
-- [ ] 5.2 macOS hand check with the real keyboard, since winit delivers Cmd+. through `cancelOperation:` and `dango-ui` `press` skips winit: while an update downloads in a release build, press Cmd+. on its busy toast and on its progress view, and confirm the download is cancelled; press Cmd+R on a Retry toast and confirm the download restarts. Leave open until a session on the Mac with an update to install.
+- [x] 5.2 macOS hand check with the real keyboard, since winit delivers Cmd+. through `cancelOperation:` and `dango-ui` `press` skips winit: while an update downloads in a release build, press Cmd+. on its busy toast and on its progress view, and confirm the download is cancelled; press Cmd+R on a Retry toast and confirm the download restarts. Leave open until a session on the Mac with an update to install.
 - [x] 5.3 Run the `ponytail-review` skill in a fresh subagent on this change's commits, without the apply context. Report the findings to the author. Verify that the findings are listed in the session.
 
 ## Workflow follow-up
