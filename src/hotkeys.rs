@@ -262,12 +262,18 @@ impl Registry {
         conflicts
     }
 
-    /// The chord registered for a target, if one is.
+    /// The chord registered for a target, if one is. Application names match
+    /// ignoring case, as launching one by its hotkey does.
     pub fn chord_for(&self, target: &Target) -> Option<HotKey> {
         let table = self.bindings.lock().unwrap();
         table
             .iter()
-            .find(|(_, bound)| bound == target)
+            .find(|(_, bound)| match (bound, target) {
+                (Target::Application(bound), Target::Application(name)) => {
+                    bound.eq_ignore_ascii_case(name)
+                }
+                _ => bound == target,
+            })
             .map(|(chord, _)| *chord)
     }
 
@@ -641,6 +647,18 @@ mod tests {
             registry.pressed(chord.id(), HotKeyState::Pressed),
             Some(Pressed::Target(Target::Command("x.a".into())))
         );
+    }
+
+    #[test]
+    fn an_application_chord_is_found_ignoring_case() {
+        let (registry, _) =
+            registry(r#"applications = { hotkeys = { safari = { hotkey = "ctrl+alt+b" } } }"#);
+        let chord = HotKey::new(Some(Modifiers::CONTROL | Modifiers::ALT), Code::KeyB);
+        assert_eq!(
+            registry.chord_for(&Target::Application("Safari".into())),
+            Some(chord)
+        );
+        assert_eq!(registry.chord_for(&Target::Command("safari".into())), None);
     }
 
     #[test]
