@@ -2,6 +2,22 @@
 
 All notable changes to Dango. Generated from commit history at release time.
 
+## [6.5.0] - 2026-11-04
+
+### Features
+
+- **config:** Add launcher.display setting
+- **shell:** Pass launcher display to placement
+- **windows:** Open launcher on primary monitor
+- **macos:** Place launcher on chosen display
+
+### Refactoring
+
+- **shell:** Keep one launcher display value
+
+### Documentation
+
+- Archive launcher-display-setting
 ## [6.4.0] - 2026-11-04
 
 ### Features
