@@ -87,6 +87,10 @@ itself: no jump and no toast. This widens `shows_progress_of` to "shows its own
 view", for any view kind. After the hold expired, `held` is false and the toast
 with "Show answer" shows.
 
+This rule comes before the jump: reopening held onto the answer's own view
+while its HUD still shows clears the HUD and runs nothing, so the answer is
+never pushed twice.
+
 - **Rejected: keeping nothing for a held view** (an earlier draft). An expired
   hold then loses the answer silently.
 - **Limit:** the kept copy stays after the held view showed it, so running the
