@@ -408,7 +408,6 @@ impl Launcher {
             .find(|task| task.status == TaskStatus::Running && !self.shows_progress_of(&task.owner))
     }
 
-    /// Whether the view on top is a progress view the task's owner pushed.
     /// The view the task itself streamed into, which a held launcher comes
     /// back to with the result already in it.
     fn shows_view_of(&self, task: &TaskState) -> bool {
@@ -419,6 +418,7 @@ impl Launcher {
                 .is_some_and(|view| view.context.title == task.title)
     }
 
+    /// Whether the view on top is a progress view the task's owner pushed.
     fn shows_progress_of(&self, owner: &str) -> bool {
         matches!(
             self.stack.last().map(|view| &view.tree.view),
