@@ -95,10 +95,16 @@ fn key_name(key: global_hotkey::hotkey::Code) -> String {
         Code::Quote => "'",
         Code::Semicolon => ";",
         Code::Slash => "/",
-        Code::ArrowUp => "↑",
-        Code::ArrowDown => "↓",
-        Code::ArrowLeft => "←",
-        Code::ArrowRight => "→",
+        Code::Enter | Code::NumpadEnter => return shortcut_key("enter"),
+        Code::Escape => return shortcut_key("escape"),
+        Code::Backspace => return shortcut_key("backspace"),
+        Code::Delete => return shortcut_key("delete"),
+        Code::Space => return shortcut_key("space"),
+        Code::Tab => return shortcut_key("tab"),
+        Code::ArrowUp => return shortcut_key("arrowup"),
+        Code::ArrowDown => return shortcut_key("arrowdown"),
+        Code::ArrowLeft => return shortcut_key("arrowleft"),
+        Code::ArrowRight => return shortcut_key("arrowright"),
         _ => {
             let code = format!("{key:?}");
             return code
@@ -226,6 +232,22 @@ mod tests {
         assert_eq!(key_name(Code::ArrowUp), "↑");
         assert_eq!(key_name(Code::Digit5), "5");
         assert_eq!(key_name(Code::F5), "F5");
+    }
+
+    #[test]
+    fn a_hotkey_draws_named_keys_as_a_shortcut_does() {
+        use global_hotkey::hotkey::Code;
+        for (code, web) in [
+            (Code::Enter, "enter"),
+            (Code::NumpadEnter, "enter"),
+            (Code::Escape, "escape"),
+            (Code::Backspace, "backspace"),
+            (Code::Delete, "delete"),
+            (Code::Space, "space"),
+            (Code::Tab, "tab"),
+        ] {
+            assert_eq!(key_name(code), shortcut_key(web));
+        }
     }
 
     #[test]
