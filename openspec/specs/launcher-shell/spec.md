@@ -137,8 +137,8 @@ command, whose next view brings the launcher back. Reading a selection SHALL
 NOT hide the launcher at all (see `selection-and-paste`).
 
 A failure reported while the launcher is hidden SHALL NOT be kept for the next
-activation, whether the launcher was reset or held. The HUD shows it instead
-(see `hud`). A background task is the one exception: its result is shown on
+activation, whether the launcher was reset or held. The notice shows it instead
+(see `notice`). A background task is the one exception: its result is shown on
 the next activation as well (see `background-tasks`).
 
 A background task is not a running command for this requirement: neither kind
@@ -226,14 +226,14 @@ of hide, nor the grace period running out, SHALL cancel it.
 #### Scenario: A failure from a dismissing action is shown afterwards
 
 - **WHEN** an action hides the launcher and then fails
-- **THEN** the HUD shows that failure's message at once
-- **AND** the next activation shows no failure toast
+- **THEN** the notice shows that failure's message at once
+- **AND** the next activation shows no failure ticker
 
 #### Scenario: The user clears a carried failure
 
 - **WHEN** a failure was reported while the launcher was held by an interrupting
   hide, and the user shows the launcher within the grace period
-- **THEN** the held view is back without a failure toast, because the HUD
+- **THEN** the held view is back without a failure ticker, because the notice
   already showed the message
 
 #### Scenario: A background task survives the grace period

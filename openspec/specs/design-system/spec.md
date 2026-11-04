@@ -210,72 +210,72 @@ Clicking "Actions" SHALL open the action panel.
 - **WHEN** a list is empty and its empty view declares no action
 - **THEN** the ActionBar shows only its context
 
-### Requirement: A toast reports status in the ActionBar
+### Requirement: A ticker reports status in the ActionBar
 
-A toast SHALL replace the ActionBar's context while it shows. When the card is
-hidden and only the pill shows, the toast SHALL instead show at the pill's
+A ticker SHALL replace the ActionBar's context while it shows. When the card is
+hidden and only the pill shows, the ticker SHALL instead show at the pill's
 right end, with the same style, text, and action, cut off with an ellipsis
-before it reaches the query. A toast
+before it reaches the query. A ticker
 has a style and one line of text, and MAY carry one action, shown after the
-text as its label and chord. Pressing that chord while the toast shows SHALL
-run the action and SHALL NOT also act on the view. A busy toast SHALL show a
+text as its label and chord. Pressing that chord while the ticker shows SHALL
+run the action and SHALL NOT also act on the view. A busy ticker SHALL show a
 spinner in the working role and stay while its work runs, following the
-busy-mark timing. A success toast SHALL show a dot in the done role and
+busy-mark timing. A success ticker SHALL show a dot in the done role and
 disappear after about two seconds, unless it carries an action: then it SHALL
 stay until the next key press or click, so the action is still there when the
-user looks. A failure toast SHALL show a dot in the danger role and stay until
+user looks. A failure ticker SHALL show a dot in the danger role and stay until
 the next key press or click. The success and failure dots SHALL NOT move.
-Assistive technology SHALL be told the toast's text, its action, and whether
-it reports a failure. Showing a toast SHALL NOT take focus.
+Assistive technology SHALL be told the ticker's text, its action, and whether
+it reports a failure. Showing a ticker SHALL NOT take focus.
 
-#### Scenario: A success toast
+#### Scenario: A success ticker
 
-- **WHEN** an action that keeps the launcher open reports success with a toast
-- **THEN** the toast shows with a dot in the done role and is gone after about
+- **WHEN** an action that keeps the launcher open reports success with a ticker
+- **THEN** the ticker shows with a dot in the done role and is gone after about
   two seconds, and the context returns
 
-#### Scenario: A toast on the bare pill
+#### Scenario: A ticker on the bare pill
 
-- **WHEN** a toast shows while the launcher is the pill alone
+- **WHEN** a ticker shows while the launcher is the pill alone
 - **THEN** it shows at the pill's right end, the card stays hidden, and the
   launcher does not change size
 
-#### Scenario: The card opens while a toast shows on the pill
+#### Scenario: The card opens while a ticker shows on the pill
 
-- **WHEN** a toast shows at the pill's end and the user types a character
-- **THEN** the card opens and the toast, if it is still showing, moves into
+- **WHEN** a ticker shows at the pill's end and the user types a character
+- **THEN** the card opens and the ticker, if it is still showing, moves into
   the ActionBar's context
 
-#### Scenario: A success toast with an action stays
+#### Scenario: A success ticker with an action stays
 
-- **WHEN** a success toast reads "Answer ready: Summarize" with "Show answer"
+- **WHEN** a success ticker reads "Answer ready: Summarize" with "Show answer"
 - **THEN** it stays until the user presses a key or clicks
 
-#### Scenario: A failure toast stays
+#### Scenario: A failure ticker stays
 
 - **WHEN** an action fails
-- **THEN** a failure toast shows its sentence with a dot in the danger role
+- **THEN** a failure ticker shows its sentence with a dot in the danger role
 - **AND** it stays until the user presses a key or clicks
 
-#### Scenario: A failure toast with an action on Windows
+#### Scenario: A failure ticker with an action on Windows
 
-- **WHEN** a failure toast carries "Retry" and the user presses Ctrl+R
-- **THEN** the retry runs once and the toast is gone
+- **WHEN** a failure ticker carries "Retry" and the user presses Ctrl+R
+- **THEN** the retry runs once and the ticker is gone
 
-#### Scenario: A failure toast with an action on macOS
+#### Scenario: A failure ticker with an action on macOS
 
-- **WHEN** a failure toast carries "Retry" and the user presses Cmd+R
-- **THEN** the retry runs once and the toast is gone
+- **WHEN** a failure ticker carries "Retry" and the user presses Cmd+R
+- **THEN** the retry runs once and the ticker is gone
 
-#### Scenario: A busy toast
+#### Scenario: A busy ticker
 
 - **WHEN** the busy marks are shown
-- **THEN** the busy toast shows a spinner in the working role, turning while
+- **THEN** the busy ticker shows a spinner in the working role, turning while
   the work runs
 
 #### Scenario: Typing is not interrupted
 
-- **WHEN** a toast appears while the user types in the SearchBar
+- **WHEN** a ticker appears while the user types in the SearchBar
 - **THEN** every character still reaches the SearchBar
 
 ### Requirement: Small parts look the same everywhere
@@ -289,7 +289,7 @@ The launcher SHALL build every surface from the same small parts:
 - A key chord is drawn as keys in Geist Mono, using the platform's names as the
   view protocol requires, in a chip that fits its text. On Windows the keys are
   separated by a space; on macOS they are joined with none. Every key chord
-  uses this one format: the footer, the action panel, toasts, and result rows.
+  uses this one format: the footer, the action panel, tickers, and result rows.
 - A tag is short text in its role's colour on a rounded, faint fill of the same
   role. Its role is accent, muted, or danger.
 - A progress ring as an accessory is 16 logical pixels.
@@ -305,13 +305,13 @@ The launcher SHALL build every surface from the same small parts:
 
 #### Scenario: Key chords on Windows
 
-- **WHEN** the launcher shows the action panel's chord, a toast's "Show answer"
+- **WHEN** the launcher shows the action panel's chord, a ticker's "Show answer"
   chord, and a result's hotkey on Windows
 - **THEN** they read "Ctrl K", "Ctrl ↵", and "Ctrl Alt V"
 
 #### Scenario: Key chords on macOS
 
-- **WHEN** the launcher shows the action panel's chord, a toast's "Show answer"
+- **WHEN** the launcher shows the action panel's chord, a ticker's "Show answer"
   chord, and a result's hotkey on macOS
 - **THEN** they read "⌘K", "⌘↵", and "⌃⌥V"
 
@@ -466,7 +466,7 @@ list SHALL scroll and keep the selected action in view.
 
 #### Scenario: Long titles and labels
 
-- **WHEN** results, actions, toasts, and form help are longer than their space
+- **WHEN** results, actions, tickers, and form help are longer than their space
 - **THEN** they are cut off or wrapped, the ActionBar stays in view, and nothing
   scrolls sideways
 
@@ -550,11 +550,11 @@ skeleton rows.
 
 ### Requirement: Busy marks do not blink
 
-The busy marks, the SearchBar's loading bar and the busy toast, SHALL appear
+The busy marks, the SearchBar's loading bar and the busy ticker, SHALL appear
 only once Dango has been busy for about 150 milliseconds. Dango is busy while a
 command invoked from root search has not finished or shown a view, while the
 top view is marked loading, or while a background task runs and its progress
-view is not shown. A running background task SHALL show only the busy toast,
+view is not shown. A running background task SHALL show only the busy ticker,
 never the loading bar. Once shown, the marks SHALL stay for at least
 about 400 milliseconds, even if the work ends sooner. While Dango stays busy,
 replacing the view SHALL NOT restart the marks. Leaving the view or a reset
@@ -564,13 +564,13 @@ SHALL remove them at once.
 
 - **WHEN** a command invoked from root search finishes within about 150
   milliseconds
-- **THEN** no busy toast is shown
+- **THEN** no busy ticker is shown
 
 #### Scenario: A slow command shows a view that loads
 
 - **WHEN** a command takes a second to show a view marked loading, and the
   view loads for another second
-- **THEN** the busy toast appears after a short moment reading "Running"
+- **THEN** the busy ticker appears after a short moment reading "Running"
   followed by the command's title, then reads "Loading…" without disappearing
   in between
 
@@ -594,5 +594,5 @@ SHALL remove them at once.
 #### Scenario: A background task shows no loading bar
 
 - **WHEN** an update downloads and the user opens clipboard history
-- **THEN** the busy toast shows the download and the SearchBar shows no
+- **THEN** the busy ticker shows the download and the SearchBar shows no
   loading bar

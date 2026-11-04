@@ -6,7 +6,7 @@
 
 ## 2. Specs and docs
 
-- [ ] 2.1 In one commit: `git mv openspec/specs/hud openspec/specs/notice` (H1 included), apply the substring rules and the prose pass from design.md to every main spec, every file of `openspec/changes/launcher-v5-split-shell`, and AGENTS.md. Check: `rg -i "toast|hud" openspec/specs openspec/changes/launcher-v5-split-shell AGENTS.md` finds nothing; every `### Requirement:` title under `## MODIFIED Requirements` in the v5 deltas is found with `rg -F` in `openspec/specs/<capability>/spec.md`; `openspec validate --specs` passes with no new strict warnings (69 old ones on `main`), and `openspec validate launcher-v5-split-shell --strict` passes
+- [x] 2.1 In one commit: `git mv openspec/specs/hud openspec/specs/notice` (H1 included), apply the substring rules and the prose pass from design.md to every main spec, every file of `openspec/changes/launcher-v5-split-shell`, and AGENTS.md. Check: `rg -i "toast|hud" openspec/specs openspec/changes/launcher-v5-split-shell AGENTS.md` finds nothing; every `### Requirement:` title under `## MODIFIED Requirements` in the v5 deltas is found with `rg -F` in `openspec/specs/<capability>/spec.md`; `openspec validate --specs` passes with no new strict warnings (69 old ones on `main`), and `openspec validate launcher-v5-split-shell --strict` passes
 
 ## 3. Code
 
