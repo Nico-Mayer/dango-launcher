@@ -931,7 +931,12 @@ mod list_view {
     impl crate::platform::LauncherWindow for NoPlatform {
         fn will_show(&mut self) {}
         fn did_show(&mut self, _window: crate::platform::RawWindowHandle) {}
-        fn position_on_active_display(&self, _window: crate::platform::RawWindowHandle) {}
+        fn position_on_active_display(
+            &self,
+            _window: crate::platform::RawWindowHandle,
+            _display: crate::config::LauncherDisplay,
+        ) {
+        }
         fn restore_previous_focus(&mut self) {}
     }
 
@@ -950,7 +955,9 @@ mod list_view {
                     super::notice::NoPlatform,
                 ))),
                 attached: Default::default(),
+                display: Default::default(),
             },
+            display: Default::default(),
         };
         shell.hide(false);
         super::super::RENDERER.with(|slot| *slot.borrow_mut() = None);
@@ -2094,7 +2101,12 @@ mod notice {
     pub(super) struct NoPlatform;
 
     impl crate::platform::NoticeWindow for NoPlatform {
-        fn place(&self, _window: crate::platform::RawWindowHandle) {}
+        fn place(
+            &self,
+            _window: crate::platform::RawWindowHandle,
+            _display: crate::config::LauncherDisplay,
+        ) {
+        }
     }
 
     #[test]
@@ -2105,6 +2117,7 @@ mod notice {
             window: ui.as_weak(),
             platform: std::sync::Arc::new(std::sync::Mutex::new(Box::new(NoPlatform))),
             attached: Default::default(),
+            display: Default::default(),
         };
         let copied = Notice {
             id: 7,

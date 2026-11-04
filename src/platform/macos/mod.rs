@@ -40,6 +40,7 @@ use objc2_foundation::{MainThreadMarker, NSPoint};
 use raw_window_handle::RawWindowHandle;
 
 use super::{LauncherWindow, NoticeWindow, RunningApp, SystemControl, SystemError};
+use crate::config::LauncherDisplay;
 
 /// Whether the Accessibility permission has been granted. macOS gates every
 /// route into another application behind it: key synthesis, reading the
@@ -170,7 +171,7 @@ impl LauncherWindow for MacLauncherWindow {
 
     /// Centred on the display under the cursor, in AppKit's points, whose
     /// origin is the bottom-left of the primary display.
-    fn position_on_active_display(&self, window: RawWindowHandle) {
+    fn position_on_active_display(&self, window: RawWindowHandle, _display: LauncherDisplay) {
         let (Some(ns_window), Some(screen)) = (ns_window(window), screen_under_cursor()) else {
             return;
         };
@@ -217,7 +218,7 @@ impl NoticeWindow for MacNoticeWindow {
 
     /// In AppKit's points, whose origin is the bottom-left of the primary
     /// display, so the margin is measured up from the visible frame's bottom.
-    fn place(&self, window: RawWindowHandle) {
+    fn place(&self, window: RawWindowHandle, _display: LauncherDisplay) {
         let (Some(ns_window), Some(screen)) = (ns_window(window), screen_under_cursor()) else {
             return;
         };

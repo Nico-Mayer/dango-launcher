@@ -54,6 +54,7 @@ use windows_sys::Win32::UI::WindowsAndMessaging::{
 };
 
 use super::{LauncherWindow, NoticeWindow, RunningApp, SystemControl, SystemError};
+use crate::config::LauncherDisplay;
 
 #[derive(Default)]
 pub struct WindowsLauncherWindow {
@@ -83,7 +84,7 @@ impl LauncherWindow for WindowsLauncherWindow {
     /// size is projected to the target display's DPI before centring. Going
     /// through logical coordinates would scale by the display the window is
     /// leaving, not the one it is moving to.
-    fn position_on_active_display(&self, window: RawWindowHandle) {
+    fn position_on_active_display(&self, window: RawWindowHandle, _display: LauncherDisplay) {
         let Some(hwnd) = hwnd(window) else {
             return;
         };
@@ -164,7 +165,7 @@ pub struct WindowsNoticeWindow;
 
 impl NoticeWindow for WindowsNoticeWindow {
     /// In physical pixels at the target display's DPI, as the launcher is.
-    fn place(&self, window: RawWindowHandle) {
+    fn place(&self, window: RawWindowHandle, _display: LauncherDisplay) {
         let Some(hwnd) = hwnd(window) else {
             return;
         };

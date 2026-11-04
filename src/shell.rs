@@ -1,6 +1,7 @@
 //! What the core asks of whatever draws the launcher. The core owns every rule;
 //! a shell only puts pixels on screen, moves the window, and runs the tray.
 
+use crate::config::LauncherDisplay;
 use crate::platform::Permission;
 use crate::ui::Snapshot;
 
@@ -13,6 +14,9 @@ pub trait Shell: Send + Sync {
     /// `restore_focus` hands the foreground back to the window that had it
     /// before the launcher. Main thread only.
     fn hide(&self, restore_focus: bool);
+    /// Which display the launcher and the notice open on from now on. Called
+    /// from any thread.
+    fn set_display(&self, display: LauncherDisplay);
     fn on_main_thread(&self, work: Box<dyn FnOnce() + Send>);
     /// Called from any thread.
     fn set_tray(&self, tray: &TrayStatus);
@@ -87,6 +91,7 @@ pub mod testing {
     pub struct RecordingShell {
         pub calls: Mutex<Vec<Call>>,
         pub published: Mutex<Vec<Snapshot>>,
+        pub display: Mutex<Option<LauncherDisplay>>,
         queued: Mutex<Option<Vec<Work>>>,
     }
 
@@ -136,6 +141,9 @@ pub mod testing {
                 .lock()
                 .unwrap()
                 .push(Call::Hide { restore_focus });
+        }
+        fn set_display(&self, display: LauncherDisplay) {
+            *self.display.lock().unwrap() = Some(display);
         }
         fn on_main_thread(&self, work: Box<dyn FnOnce() + Send>) {
             let mut queued = self.queued.lock().unwrap();

@@ -31,6 +31,7 @@ use slint::winit_030::{winit, EventResult, WinitWindowAccessor};
 use slint::{ComponentHandle, ModelRc, SharedString, VecModel};
 
 use crate::app::{self, Core, Startup};
+use crate::config::LauncherDisplay;
 use crate::extensions::updates;
 use crate::platform::{self, LauncherWindow as PlatformWindow, Permission, RawWindowHandle};
 use crate::shell::{Shell, TrayCommand, TrayStatus};
@@ -57,6 +58,7 @@ struct SlintShell {
     platform: Platform,
     attached: AtomicBool,
     notice: Notice,
+    display: Arc<Mutex<LauncherDisplay>>,
 }
 
 #[derive(Clone)]
@@ -64,6 +66,7 @@ struct Notice {
     window: slint::Weak<NoticeWindow>,
     platform: Arc<Mutex<Box<dyn platform::NoticeWindow>>>,
     attached: Arc<AtomicBool>,
+    display: Arc<Mutex<LauncherDisplay>>,
 }
 
 impl SlintShell {
@@ -105,7 +108,7 @@ impl Notice {
         let existing = handle(window.window());
         if let Some(handle) = existing {
             self.attach_once(platform.as_mut(), handle);
-            platform.place(handle);
+            platform.place(handle, *self.display.lock().unwrap());
         }
         if let Err(error) = window.show() {
             eprintln!("[dango] could not show the notice: {error}");
@@ -119,7 +122,7 @@ impl Notice {
         };
         if existing.is_none() {
             self.attach_once(platform.as_mut(), handle);
-            platform.place(handle);
+            platform.place(handle, *self.display.lock().unwrap());
         }
         platform.did_show(handle);
         true
@@ -163,7 +166,7 @@ impl Shell for SlintShell {
         let existing = handle(window.window());
         if let Some(handle) = existing {
             self.attach_once(platform.as_mut(), handle);
-            platform.position_on_active_display(handle);
+            platform.position_on_active_display(handle, *self.display.lock().unwrap());
         }
         if let Err(error) = window.show() {
             eprintln!("[dango] could not show the launcher: {error}");
@@ -174,7 +177,7 @@ impl Shell for SlintShell {
         };
         if existing.is_none() {
             self.attach_once(platform.as_mut(), handle);
-            platform.position_on_active_display(handle);
+            platform.position_on_active_display(handle, *self.display.lock().unwrap());
         }
         platform.did_show(handle);
     }
@@ -191,6 +194,10 @@ impl Shell for SlintShell {
         if restore_focus {
             self.platform.lock().unwrap().restore_previous_focus();
         }
+    }
+
+    fn set_display(&self, display: LauncherDisplay) {
+        *self.display.lock().unwrap() = display;
     }
 
     fn on_main_thread(&self, work: Box<dyn FnOnce() + Send>) {
@@ -290,6 +297,7 @@ pub fn run() {
     let renderer = Rc::new(RefCell::new(Renderer::new(&window)));
     RENDERER.with(|slot| *slot.borrow_mut() = Some(renderer.clone()));
 
+    let display = Arc::new(Mutex::new(LauncherDisplay::default()));
     let shell = Arc::new(SlintShell {
         window: window.as_weak(),
         tray: tray.as_weak(),
@@ -299,7 +307,9 @@ pub fn run() {
             window: notice.as_weak(),
             platform: Arc::new(Mutex::new(platform::notice_window())),
             attached: Arc::new(AtomicBool::new(false)),
+            display: display.clone(),
         },
+        display,
     });
 
     // The hotkeys and the tray need the event loop running on this thread.

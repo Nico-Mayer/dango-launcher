@@ -5,7 +5,7 @@ use global_hotkey::hotkey::{Code, HotKey, Modifiers};
 use tokio::runtime::Handle;
 
 use super::{Core, Services, ViewRunner, RESULT_LIMIT};
-use crate::config::{Config, FileConfig};
+use crate::config::{Config, FileConfig, LauncherDisplay};
 use crate::extension::{Extension, ExtensionHost, HostResolver};
 use crate::extensions::applications::{AppIndex, ApplicationsExtension, FakeIndexer};
 use crate::hotkeys::{self, testing::FakeGrab, Registry};
@@ -523,6 +523,25 @@ async fn an_application_hotkey_without_its_application_is_reported_in_the_notice
         Some("Can't open Visual Studio Code")
     );
     assert!(!core.tray().config_error);
+}
+
+#[tokio::test]
+async fn the_launcher_opens_under_the_pointer_by_default() {
+    let (_, shell) = core("");
+    assert_eq!(
+        *shell.display.lock().unwrap(),
+        Some(LauncherDisplay::Pointer)
+    );
+}
+
+#[tokio::test]
+async fn a_reload_moves_the_launcher_to_the_primary_display() {
+    let (core, shell) = core("");
+    core.apply_config_reload(Config::parse(r#"launcher = { display = "primary" }"#));
+    assert_eq!(
+        *shell.display.lock().unwrap(),
+        Some(LauncherDisplay::Primary)
+    );
 }
 
 #[tokio::test]

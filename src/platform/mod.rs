@@ -1,5 +1,7 @@
 use std::borrow::Cow;
 
+use crate::config::LauncherDisplay;
+
 pub use raw_window_handle::RawWindowHandle;
 
 #[cfg(target_os = "macos")]
@@ -31,7 +33,7 @@ pub trait LauncherWindow: Send {
     fn did_show(&mut self, window: RawWindowHandle);
     /// Centres the launcher as if it were `LAUNCHER_MAX_HEIGHT` tall, so a
     /// short launcher sits where a full one would.
-    fn position_on_active_display(&self, window: RawWindowHandle);
+    fn position_on_active_display(&self, window: RawWindowHandle, display: LauncherDisplay);
     fn restore_previous_focus(&mut self);
     /// Whether `set_height` keeps the top edge. Where it cannot yet, the
     /// window stays at `LAUNCHER_MAX_HEIGHT`.
@@ -51,8 +53,8 @@ pub const LAUNCHER_MAX_HEIGHT: f64 = 480.0;
 pub trait NoticeWindow: Send {
     /// Once, on the first show that has a native window.
     fn attach(&mut self, _window: RawWindowHandle) {}
-    /// Centres the window near the bottom of the display under the pointer.
-    fn place(&self, window: RawWindowHandle);
+    /// Centres the window near the bottom of the chosen display.
+    fn place(&self, window: RawWindowHandle, display: LauncherDisplay);
     /// After the shell has shown the window.
     fn did_show(&self, _window: RawWindowHandle) {}
 }

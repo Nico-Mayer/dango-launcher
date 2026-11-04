@@ -129,6 +129,15 @@ fn build_ai(parts: &AiParts, config: &config::Config) -> (Arc<AiExtension>, Vec<
     (Arc::new(extension), problems)
 }
 
+fn launcher_display(config: &FileConfig) -> config::LauncherDisplay {
+    config
+        .shared()
+        .read()
+        .ok()
+        .and_then(|config| config.launcher.display)
+        .unwrap_or_default()
+}
+
 impl Core {
     fn new(
         shell: Arc<dyn Shell>,
@@ -137,6 +146,7 @@ impl Core {
         tray: TrayStatus,
         services: Services,
     ) -> Self {
+        shell.set_display(launcher_display(&config));
         Self {
             shell,
             runtime,
@@ -832,6 +842,7 @@ impl Core {
             previous.launcher.autostart.unwrap_or(false) != autostart
         };
         self.config.replace(config);
+        self.shell.set_display(launcher_display(&self.config));
 
         let mut conflicts: Vec<String> = launcher_problem.into_iter().collect();
         if let Err(error) = self.services.hotkeys.replace_launcher(launcher) {

@@ -7,8 +7,8 @@
 
 ## 2. Core pushes the display to the shell
 
-- [ ] 2.1 Add `Shell::set_display(LauncherDisplay)`, implement it in `RecordingShell`, and call it from Core at start before `set_event_handler` and in `apply_config_reload`; verify with app tests that start records `Pointer` when the key is absent and that a reload setting `"primary"` records `Primary` (`cargo test app`)
-- [ ] 2.2 Store the value in `SlintShell` (default `Pointer`) and pass it to `position_on_active_display` and `NoticeWindow::place`, updating the test fakes in `src/slint_shell/tests.rs` (the `LauncherWindow` fake and `NoPlatform`); both platform impls ignore it for now, so behaviour is unchanged; verify `cargo test` and `mise run check` pass
+- [x] 2.1 Add `Shell::set_display(LauncherDisplay)`, implement it in `RecordingShell`, and call it from Core at start before `set_event_handler` and in `apply_config_reload`; verify with app tests that start records `Pointer` when the key is absent and that a reload setting `"primary"` records `Primary` (`cargo test app`)
+- [x] 2.2 Store the value in `SlintShell` (default `Pointer`) and pass it to `position_on_active_display` and `NoticeWindow::place`, updating the test fakes in `src/slint_shell/tests.rs` (the `LauncherWindow` fake and `NoPlatform`); both platform impls ignore it for now, so behaviour is unchanged; verify `cargo test` and `mise run check` pass
 
 ## 3. Windows
 
