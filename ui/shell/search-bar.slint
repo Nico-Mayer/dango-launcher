@@ -23,8 +23,8 @@ export component SearchBar inherits Rectangle {
     }
 
     HorizontalLayout {
-        padding-left: 16px;
-        padding-right: 16px;
+        padding-left: Shell.can-go-back ? 12px : 18px;
+        padding-right: 12px;
         spacing: 12px;
 
         if Shell.can-go-back: VerticalLayout {
@@ -32,8 +32,8 @@ export component SearchBar inherits Rectangle {
             Rectangle {
                 width: Theme.icon-size + 8px;
                 height: Theme.icon-size + 8px;
-                border-radius: Theme.radius / 2;
-                background: back-touch.has-hover ? Theme.hover : transparent;
+                border-radius: self.height / 2;
+                background: back-touch.has-hover ? Theme.selected : Theme.hover;
                 accessible-role: button;
                 accessible-label: "Go back";
                 accessible-action-default => {
@@ -116,10 +116,8 @@ export component SearchBar inherits Rectangle {
             horizontal-stretch: 0;
             Rectangle {
                 height: 28px;
-                border-radius: Theme.radius / 2;
-                border-width: 1px;
-                border-color: Theme.border;
-                background: filter-touch.has-hover ? Theme.hover : transparent;
+                border-radius: self.height / 2;
+                background: filter-touch.has-hover ? Theme.selected : Theme.hover;
                 accessible-role: combobox;
                 accessible-label: "Filter results";
                 accessible-value: Search.filter-options[Search.filter-current].title;
@@ -127,8 +125,8 @@ export component SearchBar inherits Rectangle {
                     filter-popup.show();
                 }
                 HorizontalLayout {
-                    padding-left: 10px;
-                    padding-right: 10px;
+                    padding-left: 12px;
+                    padding-right: 12px;
                     spacing: 6px;
                     Text {
                         text: Search.filter-options[Search.filter-current].title;
