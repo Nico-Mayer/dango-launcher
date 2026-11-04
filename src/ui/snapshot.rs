@@ -403,7 +403,9 @@ impl Launcher {
             answer,
             sections,
             selected,
-            bare: empty.is_none() && self.root_order().next().is_none(),
+            bare: empty.is_none()
+                && self.root_order().next().is_none()
+                && (self.query.is_empty() || !self.typed_card),
             empty,
             settling: !self.results_complete,
         }

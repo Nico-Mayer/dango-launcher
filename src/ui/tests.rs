@@ -423,6 +423,19 @@ fn the_first_keystroke_drops_the_empty_query_list() {
 }
 
 #[test]
+fn the_card_stays_while_a_query_without_results_grows() {
+    let mut h = bare_pill(5);
+    h.typed("x");
+    h.results("x", Vec::new());
+    assert!(h.root_screen().empty.is_some());
+    h.typed("xy");
+    assert!(
+        !h.root_screen().bare,
+        "the next key must not drop to the pill"
+    );
+}
+
+#[test]
 fn clearing_the_query_closes_the_list() {
     let mut h = bare_pill(5);
     h.press("ArrowDown");

@@ -1680,6 +1680,21 @@ mod bare_pill {
     }
 
     #[test]
+    fn typing_on_after_no_results_keeps_the_full_height() {
+        let h = bare();
+        h.type_text("x");
+        h.event(Event::Results {
+            query: "x".into(),
+            items: Vec::new(),
+            complete: true,
+        });
+        assert_eq!(h.height(), 480.0);
+        h.type_text("y");
+        assert_eq!(h.height(), 480.0);
+        assert!(h.shell().get_card_shown());
+    }
+
+    #[test]
     fn the_first_keystroke_opens_the_card() {
         let h = bare();
         h.type_text("r");

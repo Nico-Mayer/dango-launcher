@@ -44,6 +44,10 @@ pub struct Launcher {
     /// The empty-query list was opened with Arrow Down. Without it an empty
     /// query shows only pinned items.
     root_open: bool,
+    /// The typed query has shown the card, rows or "No results". From then on
+    /// the card stays while later keystrokes search, so it does not drop to
+    /// the pill and back on every key.
+    pub(super) typed_card: bool,
     /// The title of a command invoked from root that has neither finished nor
     /// shown a view yet.
     pub(super) working: Option<String>,
@@ -288,6 +292,9 @@ impl Launcher {
             } => {
                 // A late answer for an older query was cancelled and must not show.
                 if query == self.query {
+                    if !query.is_empty() && (complete || !items.is_empty()) {
+                        self.typed_card = true;
+                    }
                     self.results = items;
                     self.results_complete = complete;
                 }
@@ -375,6 +382,7 @@ impl Launcher {
         self.results_complete = false;
         self.picked = None;
         self.root_open = false;
+        self.typed_card = false;
         self.stack.clear();
         self.owner = None;
         // Deliberately not abandoning: a hide for work resets through here too,
@@ -806,6 +814,7 @@ impl Launcher {
                 // nor the other way round.
                 if self.query.is_empty() != text.is_empty() {
                     self.results.clear();
+                    self.typed_card = false;
                 }
                 self.query = text.clone();
                 self.results_complete = false;
