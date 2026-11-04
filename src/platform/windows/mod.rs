@@ -84,12 +84,12 @@ impl LauncherWindow for WindowsLauncherWindow {
     /// size is projected to the target display's DPI before centring. Going
     /// through logical coordinates would scale by the display the window is
     /// leaving, not the one it is moving to.
-    fn position_on_active_display(&self, window: RawWindowHandle, _display: LauncherDisplay) {
+    fn position_on_active_display(&self, window: RawWindowHandle, display: LauncherDisplay) {
         let Some(hwnd) = hwnd(window) else {
             return;
         };
         unsafe {
-            let Some((area, target_dpi)) = cursor_work_area() else {
+            let Some((area, target_dpi)) = work_area(display) else {
                 return;
             };
             let window_dpi = GetDpiForWindow(hwnd);
@@ -165,12 +165,12 @@ pub struct WindowsNoticeWindow;
 
 impl NoticeWindow for WindowsNoticeWindow {
     /// In physical pixels at the target display's DPI, as the launcher is.
-    fn place(&self, window: RawWindowHandle, _display: LauncherDisplay) {
+    fn place(&self, window: RawWindowHandle, display: LauncherDisplay) {
         let Some(hwnd) = hwnd(window) else {
             return;
         };
         unsafe {
-            let Some((area, target_dpi)) = cursor_work_area() else {
+            let Some((area, target_dpi)) = work_area(display) else {
                 return;
             };
             let window_dpi = GetDpiForWindow(hwnd);
@@ -212,12 +212,15 @@ impl NoticeWindow for WindowsNoticeWindow {
     }
 }
 
-/// The work area and DPI of the display under the cursor, the most reliable
-/// signal for the display the user is looking at.
-unsafe fn cursor_work_area() -> Option<(RECT, u32)> {
-    let mut cursor = POINT { x: 0, y: 0 };
-    GetCursorPos(&mut cursor);
-    let monitor = MonitorFromPoint(cursor, MONITOR_DEFAULTTOPRIMARY);
+/// The work area and DPI of the chosen display. The cursor is the most
+/// reliable signal for the display the user is looking at; the primary monitor
+/// always has its top-left corner at (0, 0).
+unsafe fn work_area(display: LauncherDisplay) -> Option<(RECT, u32)> {
+    let mut point = POINT { x: 0, y: 0 };
+    if display == LauncherDisplay::Pointer {
+        GetCursorPos(&mut point);
+    }
+    let monitor = MonitorFromPoint(point, MONITOR_DEFAULTTOPRIMARY);
     let mut info: MONITORINFO = std::mem::zeroed();
     info.cbSize = std::mem::size_of::<MONITORINFO>() as u32;
     if GetMonitorInfoW(monitor, &mut info) == 0 {
