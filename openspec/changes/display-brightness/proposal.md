@@ -35,7 +35,7 @@ External monitors are dimmed and brightened with their own menu buttons, which i
 
 ## Impact
 
-- New dependencies: `ddc` 0.2, `ddc-winapi` 0.2 (Windows only), `ddc-macos` 0.2 (macOS only). `ddc-winapi` pulls in `winapi` 0.3.
+- New dependencies: `ddc` 0.2, `ddc-winapi` 0.2 (Windows only), `ddc-macos` 0.2 (macOS only).
 - New platform trait for monitor brightness in `src/platform/`, implemented in `platform/windows` and `platform/macos`.
 - New `src/extensions/display/`, registered in `src/extensions/mod.rs` and `src/app/startup.rs`.
 - `src/invocation.rs` `Outcome::Success` gains an optional message; `src/app/mod.rs` shows it in the notice.

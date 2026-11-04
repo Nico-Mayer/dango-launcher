@@ -26,14 +26,14 @@ See `proposal.md` for why and `specs/display-brightness/spec.md` for behaviour.
 
 Both implement `ddc::Ddc` (`get_vcp_feature`, `set_vcp_feature`) for a `Monitor` type with `Monitor::enumerate()`. The returned value carries the current level and the monitor's maximum, so the step uses each monitor's real range.
 
-- `ddc-winapi` 0.2.2 (2024-07): wraps the Dxva2 monitor configuration API (`GetPhysicalMonitorsFromHMONITOR`, `GetVCPFeatureAndVCPFeatureReply`, `SetVCPFeature`). Brings in `winapi` 0.3 next to the `windows` crate Dango already uses.
+- `ddc-winapi` 0.2.2 (2024-07): wraps the Dxva2 monitor configuration API (`GetPhysicalMonitorsFromHMONITOR`, `GetVCPFeatureAndVCPFeatureReply`, `SetVCPFeature`). Built on `winapi` 0.3, which is already in `Cargo.lock` (0.3.9), so it adds no new crate besides itself.
 - `ddc-macos` 0.2.2 (2024-11): Intel path through IOKit I2C, Apple Silicon path through the private `IOAVService` read/write calls (`src/arm.rs`).
 - Both depend on `ddc` 0.2, so Dango pins `ddc` 0.2 (not the newer 0.3) to share one trait.
 
 Rejected:
 
 - `ddc-hi` 0.4.1: last release 2021-11. Pulls `nvapi`, `ddc-i2c`, `edid`, `mccs-caps`, `mccs-db` for capability parsing and EDID names Dango does not need. Its only gain is one enumerate call over both backends, which a ten-line `cfg` pair in `platform/` gives too.
-- Own Dxva2 code on the `windows` crate (what rusty-twinkle-tray does): would avoid `winapi` 0.3, but `ddc-winapi` does the job, so the project rule says use it.
+- Own Dxva2 code on the `windows` crate (what rusty-twinkle-tray does): `ddc-winapi` does the job, so the project rule says use it.
 - `ddc-winapi` 0.3.0-alpha.2: pre-release, and moves to `ddc` 0.3, which `ddc-macos` does not use.
 
 ### Platform trait returns monitors; the extension does the stepping
@@ -44,14 +44,18 @@ New trait in `src/platform/mod.rs`, next to `SystemControl`:
 trait BrightnessMonitors: Send + Sync {
     fn external(&self) -> Vec<Box<dyn Monitor>>;
 }
-trait Monitor: Send {
-    fn name(&self) -> String;
+trait Monitor {
+    fn name(&self) -> &str;
     fn brightness(&mut self) -> Result<Level, MonitorError>;   // value + maximum
     fn set_brightness(&mut self, value: u16) -> Result<(), MonitorError>;
 }
 ```
 
-One adapter generic over `ddc::Ddc` implements `Monitor` for both crates, so the per-platform code is only the `external()` constructor: `ddc_winapi::Monitor::enumerate()` on Windows, `ddc_macos::Monitor::enumerate()` on macOS. On macOS, `external()` skips displays where `CGDisplayIsBuiltin` is true. On Windows, a laptop panel enumerates too but does not answer DDC/CI, so it falls out as a monitor that "does not answer".
+One adapter generic over `ddc::Ddc` implements `Monitor` for both crates, so the per-platform code is only the `external()` constructor: `ddc_winapi::Monitor::enumerate()` on Windows, `ddc_macos::Monitor::enumerate()` on macOS. `description()` is an inherent method on each crate's `Monitor`, not part of `ddc::Ddc`, so `external()` reads it and passes the name into the adapter.
+
+`Monitor` has no `Send` bound: both crates' monitor types wrap raw OS handles (`PHYSICAL_MONITOR` on Windows, `IOAVService` as `CFTypeRef` on macOS) and are not `Send`. Monitors are enumerated, used, and dropped on the thread that runs one step.
+
+Built-in panels: `ddc-macos` already skips displays where `is_builtin()` is true (`arm.rs`, `intel.rs`). On Windows, a laptop panel enumerates too but does not answer DDC/CI, so it falls out as a monitor that "does not answer".
 
 `src/extensions/display/` holds the manifest, the two commands, and a pure `step(levels, direction) -> plan` function plus the message builder, tested without hardware.
 
@@ -59,21 +63,23 @@ Rejected: a trait method `step(direction)` per platform. It would duplicate clam
 
 ### Step size and percentages
 
-Step = one tenth of the monitor's maximum, rounded, at least 1. New value = current plus or minus step, clamped to `0..=maximum`. Shown percentage = new value times 100 divided by maximum, rounded. A monitor with maximum 100 (the common case) moves exactly 10%.
+Step = one tenth of the monitor's maximum, rounded, at least 1. New value = current plus or minus step, clamped to `0..=maximum`. Shown percentage = new value times 100 divided by maximum, rounded. A monitor with maximum 100 (the common case) moves exactly 10%. A monitor that reports a maximum of 0 counts as one that does not answer, so the percentage never divides by zero.
 
-### Repeated presses: queue on one worker thread, ignore superseding
+### Repeated presses: one lock per step, ignore superseding
 
-The spec requires every press to count, in order. Two facts decide this:
+The spec requires every press to count and no two steps to overlap. Two facts decide this:
 
 - A second press supersedes the first run, so the first run's result is dropped. If the first run gave up on `is_cancelled`, quick presses would be lost.
 - Two runs talking to the same monitor at once interleave I2C messages, which many monitors answer with garbage or not at all.
 
-So the extension owns one worker thread, started on first use, fed by a channel. Each command run sends its direction and waits for the reply; the worker handles jobs one at a time, in arrival order, each reading fresh levels. The command does not check `is_cancelled`. A superseded run's notice is dropped by the existing sink, so after three quick presses only the last run's message shows, and it reports the final level.
+So each command run takes one `static Mutex<()>` in the extension and holds it for the whole step: enumerate, read, write. The command does not check `is_cancelled`. Each step reads fresh levels, so same-direction presses give the same result in any order. A superseded run's notice is dropped by the existing sink, so after quick presses only the last run's message shows.
+
+Trade-off: `std::sync::Mutex` is not FIFO. An up press and a down press within one DDC round trip may apply in swapped order. The end level is the same unless a clamp sits between them, which is not worth more machinery.
 
 Rejected:
 
 - Drop presses while one is running: loses presses, breaks "each counts".
-- A `std::sync::Mutex` around the monitors: not FIFO, so order is not guaranteed.
+- A worker thread fed by a channel: strict order, but a thread, a channel, and a reply path for an ordering difference no one will notice.
 - Coalescing queued presses into one step of `n` tenths: fewer bus round trips, but more state for a gain only noticeable with many presses. Revisit if holding a hotkey feels slow.
 
 ### Success with a message
@@ -111,7 +117,3 @@ Library errors go to `dango.log` with the monitor's name, never into the ticker.
 - [`ddc-winapi` is passively maintained on `winapi` 0.3] → The API it wraps has been stable since Windows Vista. If it falls behind, swap it for own code on the `windows` crate behind the same trait.
 - [Enumerating monitors on every run costs time] → Keeps hot-plugging correct without any watcher. Revisit only if a step feels slow.
 - [The macOS hardened runtime or a permission might block `IOAVService` access] → Unknown until tried on a signed build; covered by a manual task.
-
-## Open Questions
-
-- Whether `ddc-macos` already excludes the built-in panel itself. The `CGDisplayIsBuiltin` filter makes the answer not matter.

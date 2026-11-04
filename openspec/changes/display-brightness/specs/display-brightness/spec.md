@@ -56,34 +56,15 @@ A brightness command SHALL change every external monitor that answers DDC/CI. Ea
 - **THEN** the external monitor dims
 - **AND** the laptop's own screen does not change
 
-#### Scenario: Monitors on Windows
-
-- **WHEN** a brightness command runs on Windows
-- **THEN** every external monitor that answers DDC/CI changes, whichever graphics output it is connected to
-
-#### Scenario: Monitors on macOS
-
-- **WHEN** a brightness command runs on macOS, on an Intel or an Apple Silicon Mac
-- **THEN** every external monitor that answers DDC/CI through its connection changes
-
 ### Requirement: Repeated presses each count
 
-Each run of a brightness command SHALL take effect, also when the user runs it again before the previous run has finished. Runs SHALL apply in the order they were made, each from the level the previous one left.
+Each run of a brightness command SHALL take effect, also when the user runs it again before the previous run has finished. No two runs SHALL change monitors at the same time; each SHALL step from the level the previous one left.
 
 #### Scenario: Three quick presses
 
 - **GIVEN** a monitor at 50%
 - **WHEN** the user presses the `Increase Brightness` hotkey three times in quick succession
 - **THEN** the monitor ends at 80%
-
-### Requirement: Brightness changes never block the launcher
-
-Monitors answer DDC/CI slowly. While a brightness command talks to monitors, the launcher, its hotkey, and other hotkeys SHALL stay responsive.
-
-#### Scenario: Opening the launcher during a change
-
-- **WHEN** the user presses the launcher hotkey while a brightness change is still in progress
-- **THEN** the launcher opens without visible delay
 
 ### Requirement: The new level is reported
 
@@ -98,12 +79,6 @@ On success the command SHALL report the new level in the notice. When every chan
 
 - **WHEN** `Increase Brightness` leaves one monitor at 40% and another at 70%
 - **THEN** the notice reads "Brightness set to 40% and 70%"
-
-#### Scenario: Run from root search
-
-- **WHEN** the user runs a brightness command from root search and it succeeds
-- **THEN** the launcher hides
-- **AND** the notice reports the new level
 
 ### Requirement: Failures say what to do
 
