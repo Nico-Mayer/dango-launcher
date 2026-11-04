@@ -129,6 +129,16 @@ fn result_row(item: &ResultItem, selected: Option<&str>, icons: &Icons) -> RowDa
         icon,
         icon_kind,
         selected: selected == Some(item.id.as_str()),
+        accessories: ModelRc::from(Rc::new(VecModel::from(
+            item.hotkey
+                .iter()
+                .map(|hotkey| AccessoryData {
+                    kind: AccessoryKind::Kbd,
+                    text: keys::hotkey_label(hotkey).into(),
+                    ..Default::default()
+                })
+                .collect::<Vec<_>>(),
+        ))),
         ..Default::default()
     }
 }

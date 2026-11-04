@@ -2166,3 +2166,23 @@ mod inline_answer {
         assert!(h.find("No results for “2+2”").is_none());
     }
 }
+
+mod root_hotkey {
+    use super::*;
+    use global_hotkey::hotkey::{Code, HotKey, Modifiers};
+
+    #[test]
+    fn a_root_row_shows_its_hotkey() {
+        let chord = HotKey::new(Some(Modifiers::CONTROL | Modifiers::ALT), Code::KeyV);
+        let label = super::super::keys::hotkey_label(&chord);
+        let h = Harness::root(vec![
+            ResultItem {
+                hotkey: Some(chord),
+                ..result(1)
+            },
+            result(2),
+        ]);
+        let shown: Vec<_> = ElementHandle::find_by_accessible_label(&h.ui, &label).collect();
+        assert_eq!(shown.len(), 1, "{label} is drawn once");
+    }
+}
