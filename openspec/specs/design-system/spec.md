@@ -101,6 +101,25 @@ The pill and the card SHALL each be 720 logical pixels wide. The pill SHALL be
 52 logical pixels high and fully rounded at its ends, the gap 8, the ActionBar
 44, and a list row 44.
 
+The pill and the card SHALL each cast the same shadow as the action panel, in
+the theme's shadow colour, drawn in full and not cut off by the window edge.
+Where the platform falls back to software rendering (Windows without OpenGL
+2), no shadow SHALL be drawn and nothing else SHALL change: that renderer
+cannot draw shadows.
+
+#### Scenario: Pill and card cast a shadow
+
+- **WHEN** root search shows the pill and the card on a machine with GPU
+  rendering, on Windows or macOS
+- **THEN** each casts a soft shadow, offset downwards, that fades out before
+  the window edge
+
+#### Scenario: No shadow under software rendering on Windows
+
+- **WHEN** the launcher is shown on Windows without OpenGL 2
+- **THEN** the pill and the card are drawn without a shadow, at the same size
+  and place
+
 #### Scenario: Root search
 
 - **WHEN** the user types a query at root
@@ -116,7 +135,8 @@ The pill and the card SHALL each be 720 logical pixels wide. The pill SHALL be
 #### Scenario: The gap shows what is behind
 
 - **WHEN** the launcher shows the pill and the card over another application
-- **THEN** that application is visible through the gap between them
+- **THEN** that application is visible through the gap between them, shaded
+  only by the pill's shadow
 
 #### Scenario: Root search with an answer
 

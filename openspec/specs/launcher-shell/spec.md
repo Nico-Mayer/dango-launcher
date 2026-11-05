@@ -420,6 +420,10 @@ work that could have run earlier.
 
 The launcher window SHALL be borderless, without a title bar, with a transparent
 background, always on top of other windows, and non-resizable by the user.
+It SHALL hold the visible launcher inside a transparent margin, the same on
+every side, wide enough for the shadows design-system describes. The margin
+SHALL NOT change where the pill and the card appear on screen. A click on the
+margin is a click on a transparent part of the window (see Dismissal).
 
 On both platforms, the card SHALL be as tall as its content: a list or grid
 SHALL make it as tall as an answer card when root search shows one, its rows,
@@ -429,14 +433,16 @@ detail, and a form SHALL make the launcher the full 480 logical pixels. With
 the root view closed, only the pill, or the pill and the "Needs attention"
 card, SHALL be shown.
 
-On Windows, the window's height SHALL follow the visible launcher. A height
+On Windows, the window's height SHALL follow the visible launcher plus the
+margin above and below it. A height
 change SHALL NOT flicker or show the window at an old and a new size in the
 same frame. While root search is still receiving results for a query, the
 window SHALL grow with them but SHALL NOT shrink until every provider has
 answered.
 
-On macOS, the window SHALL stay 480 logical pixels tall for every view, and
-the area below the visible launcher SHALL be transparent.
+On macOS, the window SHALL keep the same height for every view, with room for
+the full 480 logical pixel launcher, and the area below the visible launcher
+SHALL be transparent.
 
 On both platforms, "No results" SHALL NOT show while root search is still
 receiving results for a query, until every provider has answered.
@@ -466,26 +472,40 @@ receiving results for a query, until every provider has answered.
 
 - **WHEN** the launcher opens on Windows with an empty query and no item is
   pinned
-- **THEN** the window is as tall as the pill
+- **THEN** the window is as tall as the pill plus the margin above and below
 
 #### Scenario: The bare pill on macOS
 
 - **WHEN** the launcher opens on macOS with an empty query and no item is
   pinned
-- **THEN** the window stays 480 logical pixels tall and everything below the
-  pill is transparent
+- **THEN** the window keeps its full height and everything below the pill and
+  its shadow is transparent
 
 #### Scenario: Few results make a short window on Windows
 
 - **WHEN** a query on Windows leaves three results
-- **THEN** the window is as tall as the pill, the gap, three rows, and the
-  ActionBar
+- **THEN** the window is as tall as the pill, the gap, three rows, the
+  ActionBar, and the margin above and below
 
 #### Scenario: Few results keep the full height on macOS
 
 - **WHEN** a query on macOS leaves three results
-- **THEN** the window stays 480 logical pixels tall, the card is as tall as
-  three rows and the ActionBar, and the area below the card is transparent
+- **THEN** the window keeps its full height, the card
+  is as tall as three rows and the ActionBar, and the area below the card's
+  shadow is transparent
+
+#### Scenario: The margin keeps the launcher in place
+
+- **WHEN** the launcher is shown on either platform
+- **THEN** the pill and the card are where they would be without the margin:
+  centred horizontally and above the display's vertical centre, as Placement
+  describes
+
+#### Scenario: A click on the margin dismisses
+
+- **WHEN** the launcher is visible and the user clicks the margin beside the
+  card
+- **THEN** the launcher hides, as a click in the gap does
 
 #### Scenario: A partial answer does not shrink the window on Windows
 
@@ -510,7 +530,7 @@ receiving results for a query, until every provider has answered.
 
 - **WHEN** the user types on macOS and each keystroke changes the number of
   results
-- **THEN** the window stays 480 logical pixels tall
+- **THEN** the window keeps its full height
 
 ### Requirement: Quit from the tray menu
 
