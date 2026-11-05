@@ -183,7 +183,7 @@ All new strings, checked against `openspec/specs/interface-copy`:
 | Row primary action (ActionBar) | "Open" |
 | Row second action | "Copy" |
 | Form toggle label | "Use for web search" |
-| Form validation | "For web search, the URL must ask only for {{ query }}." |
+| Form validation | "For web search, the URL must ask only for {{ query }}" |
 
 "Open" and "Copy" match the existing quicklink actions and the verb rules.
 The row title is not a command title, so it uses sentence case with the

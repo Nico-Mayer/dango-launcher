@@ -43,14 +43,14 @@ themselves. A quicklink not marked SHALL NOT be a web search.
 - **WHEN** the user saves a quicklink with "Use for web search" on and a URL
   that does not use `query`
 - **THEN** nothing is stored
-- **AND** the form says "For web search, the URL must ask only for {{ query }}."
+- **AND** the form says "For web search, the URL must ask only for {{ query }}"
 
 #### Scenario: A web search asking for more is refused in the form
 
 - **WHEN** the user saves a quicklink with "Use for web search" on and a URL
   that uses `query` and another argument
 - **THEN** nothing is stored
-- **AND** the form says "For web search, the URL must ask only for {{ query }}."
+- **AND** the form says "For web search, the URL must ask only for {{ query }}"
 
 #### Scenario: An unusable web search in the file
 

@@ -57,6 +57,7 @@ const FIELD_NAME: &str = "name";
 const FIELD_BODY: &str = "body";
 const FIELD_KEYWORD: &str = "keyword";
 const FIELD_BROWSER: &str = "browser";
+const FIELD_FALLBACK: &str = "fallback";
 /// Prefix for the fields an argument form asks about, so an argument called
 /// "name" cannot collide with the snippet's own name field.
 const ARGUMENT_PREFIX: &str = "arg:";
@@ -252,8 +253,12 @@ impl Extension for SnippetsExtension {
                 let keyword = values.get(FIELD_KEYWORD).map(String::as_str);
                 // Absent for a snippet form, which has no browser field.
                 let browser = values.get(FIELD_BROWSER).map(String::as_str);
+                let fallback = values.get(FIELD_FALLBACK).map(|value| value == "true");
                 let id = (!item_id.is_empty()).then_some(item_id);
-                match self.records.save(id, name, body, keyword, browser, None) {
+                match self
+                    .records
+                    .save(id, name, body, keyword, browser, fallback)
+                {
                     Ok(_) => ActionOutcome::Replaced(Box::new(self.list_tree())),
                     Err(error) => ActionOutcome::Failed(error.to_string()),
                 }
@@ -484,6 +489,13 @@ fn form_tree(record: Option<&Record>, kind: Kind) -> ViewTree {
     }
     if kind == Kind::Quicklink {
         fields.push(browser_field(record));
+        fields.push(FormField {
+            id: FIELD_FALLBACK.into(),
+            label: "Use for web search".into(),
+            kind: FieldKind::Toggle,
+            value: Some(record.is_some_and(|record| record.fallback).to_string()),
+            ..Default::default()
+        });
     }
     ViewTree {
         protocol_version: PROTOCOL_VERSION,
@@ -1230,6 +1242,105 @@ mod tests {
     #[test]
     fn the_snippet_form_has_no_browser() {
         assert!(browser_field(&form_tree(None, Kind::Snippet)).is_none());
+    }
+
+    fn fallback_field(tree: &ViewTree) -> Option<FormField> {
+        fields(tree).into_iter().find(|f| f.id == FIELD_FALLBACK)
+    }
+
+    const SEARCH: &str = "https://duckduckgo.com/?q={{ query }}";
+
+    #[test]
+    fn the_quicklink_form_offers_web_search_off_by_default() {
+        let field = fallback_field(&form_tree(None, Kind::Quicklink)).unwrap();
+        assert_eq!(field.label, "Use for web search");
+        assert_eq!(field.kind, FieldKind::Toggle);
+        assert_eq!(field.value.as_deref(), Some("false"));
+        assert!(fallback_field(&form_tree(None, Kind::Snippet)).is_none());
+    }
+
+    #[test]
+    fn the_edit_form_shows_a_web_search_as_on() {
+        let f = fixture(Kind::Quicklink);
+        let id = f
+            .records
+            .save(None, "DuckDuckGo", SEARCH, None, None, Some(true))
+            .unwrap();
+
+        let ActionOutcome::Replaced(tree) =
+            f.extension.perform_action(&id, ACTION_EDIT, &no_values())
+        else {
+            panic!("expected the edit form");
+        };
+
+        assert_eq!(
+            fallback_field(&tree).unwrap().value.as_deref(),
+            Some("true")
+        );
+    }
+
+    #[test]
+    fn saving_the_form_turns_web_search_on_and_off() {
+        let f = fixture(Kind::Quicklink);
+        let save = |id: &str, on: &str| {
+            f.extension.perform_action(
+                id,
+                ACTION_SAVE,
+                &values(&[
+                    (FIELD_NAME, "DuckDuckGo"),
+                    (FIELD_BODY, SEARCH),
+                    (FIELD_FALLBACK, on),
+                ]),
+            )
+        };
+
+        save("", "true");
+        let id = f.records.all().unwrap()[0].id.clone();
+        assert!(f.records.get(&id).unwrap().fallback);
+
+        save(&id, "false");
+        assert!(!f.records.get(&id).unwrap().fallback);
+    }
+
+    #[test]
+    fn a_web_search_must_ask_only_for_the_query() {
+        let f = fixture(Kind::Quicklink);
+        for url in [
+            "https://example.com/docs",
+            "https://example.com/s?q={{ query }}&in={{ site }}",
+        ] {
+            let outcome = f.extension.perform_action(
+                "",
+                ACTION_SAVE,
+                &values(&[
+                    (FIELD_NAME, "Search"),
+                    (FIELD_BODY, url),
+                    (FIELD_FALLBACK, "true"),
+                ]),
+            );
+            assert_eq!(
+                outcome,
+                ActionOutcome::Failed(
+                    "For web search, the URL must ask only for {{ query }}".into()
+                ),
+                "{url}"
+            );
+        }
+        assert!(f.records.all().unwrap().is_empty());
+
+        f.extension.perform_action(
+            "",
+            ACTION_SAVE,
+            &values(&[
+                (FIELD_NAME, "Search"),
+                (
+                    FIELD_BODY,
+                    "https://example.com/s?q={{ query }}&ref={{ clipboard }}",
+                ),
+                (FIELD_FALLBACK, "true"),
+            ]),
+        );
+        assert!(f.records.all().unwrap()[0].is_web_search());
     }
 
     #[test]

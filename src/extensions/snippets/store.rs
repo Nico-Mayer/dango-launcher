@@ -55,6 +55,8 @@ pub enum RecordError {
     KeywordTaken(String),
     #[error("One keyword can't be the start of another, so choose a different keyword")]
     KeywordOverlaps(String),
+    #[error("For web search, the URL must ask only for {{{{ query }}}}")]
+    WebSearchNeedsQuery,
     #[error("Fix the error in {0} first")]
     FileBroken(&'static str),
     #[error("Couldn't save, check that {0} isn't read-only")]
@@ -77,6 +79,18 @@ pub struct Record {
     /// Whether a quicklink is offered as a web search. Always `false` for a
     /// snippet.
     pub fallback: bool,
+}
+
+impl Record {
+    /// Whether root search offers it under every query: marked, and asking
+    /// for the typed text and nothing else, so it never needs a form.
+    pub fn is_web_search(&self) -> bool {
+        self.fallback && asks_only_for_query(&self.body)
+    }
+}
+
+fn asks_only_for_query(body: &str) -> bool {
+    Template::parse(body).is_ok_and(|template| template.prompts() == ["query"])
 }
 
 /// A snippet, keyed by its id.
@@ -344,6 +358,9 @@ impl Records {
         self.writable()?;
         self.validate(name, body)?;
         let keyword = self.validate_keyword(keyword, body, id)?;
+        if fallback == Some(true) && !asks_only_for_query(body) {
+            return Err(RecordError::WebSearchNeedsQuery);
+        }
         let kind = self.kind;
         let mut saved = id.map(str::to_string);
         self.change(|doc| {
