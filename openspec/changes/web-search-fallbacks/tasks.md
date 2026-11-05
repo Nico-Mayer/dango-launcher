@@ -2,7 +2,7 @@
 
 ## 1. Web search flag on quicklinks
 
-- [ ] 1.1 Add `fallback` to `QuicklinkEntry` and `Record`, read it as a bool in `project()`, write it through `Records::save` with `toml_edit` (removed when false), and add a file-order accessor to `Records`. Verify: store tests in `src/extensions/snippets/store.rs` cover reading `fallback = true`, an entry without the key, `fallback = "yes"` reported with its line, saving with and without it (key removed on unmark), comments and order surviving the write, and the accessor returning file order; the `quicklinks.toml` schema test sees the new kebab-case key
+- [x] 1.1 Add `fallback` to `QuicklinkEntry` and `Record`, read it as a bool in `project()`, write it through `Records::save` with `toml_edit` (removed when false), and add a file-order accessor to `Records`. Verify: store tests in `src/extensions/snippets/store.rs` cover reading `fallback = true`, an entry without the key, `fallback = "yes"` reported with its line, saving with and without it (key removed on unmark), comments and order surviving the write, and the accessor returning file order; the `quicklinks.toml` schema test sees the new kebab-case key
 - [ ] 1.2 Add the helper deciding a usable web search (marked and `prompts()` exactly `["query"]`), the "Use for web search" toggle on the quicklink form (not the snippet form), and the save refusal "For web search, the URL must ask only for {{ query }}.". Verify: tests in `src/extensions/snippets/extension.rs` cover the toggle in the create and edit forms, saving it on and off, refusal for a URL without `query` and for one with another argument (nothing stored), a URL with `query` and `clipboard` accepted, and the snippet form having no toggle
 
 ## 2. Web search rows in root search

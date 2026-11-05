@@ -493,6 +493,7 @@ mod tests {
             body: body.into(),
             keyword: None,
             browser: None,
+            fallback: false,
         }
     }
 

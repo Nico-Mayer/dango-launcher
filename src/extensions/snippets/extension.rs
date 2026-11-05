@@ -253,7 +253,7 @@ impl Extension for SnippetsExtension {
                 // Absent for a snippet form, which has no browser field.
                 let browser = values.get(FIELD_BROWSER).map(String::as_str);
                 let id = (!item_id.is_empty()).then_some(item_id);
-                match self.records.save(id, name, body, keyword, browser) {
+                match self.records.save(id, name, body, keyword, browser, None) {
                     Ok(_) => ActionOutcome::Replaced(Box::new(self.list_tree())),
                     Err(error) => ActionOutcome::Failed(error.to_string()),
                 }
@@ -1117,6 +1117,7 @@ mod tests {
                 "https://example.com/docs",
                 None,
                 Some("firefox"),
+                None,
             )
             .unwrap();
 
@@ -1136,6 +1137,7 @@ mod tests {
                 "https://example.com/s?q={{ query }}",
                 None,
                 Some("brave"),
+                None,
             )
             .unwrap();
 
@@ -1193,6 +1195,7 @@ mod tests {
                 "https://example.com/docs",
                 None,
                 Some("safari"),
+                None,
             )
             .unwrap();
 
