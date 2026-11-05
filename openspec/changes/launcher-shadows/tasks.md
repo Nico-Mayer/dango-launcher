@@ -24,8 +24,13 @@
   - Real screen capture over a dark app: margin and gap transparent, app behind shows through the gap, shadow barely visible on the dark background as expected.
   - Shadow alpha from `take_screenshot`: fades to 0 before every window edge, light and dark theme (see 2.2).
   - Checked by the author by eye: shadow over a light app, no flicker while typing, a real click in the margin and in the gap hides the launcher.
-- [ ] 3.2 macOS: check pill and card shadows, placement centred on the full frame at the same place as before, window keeps its full height with the area below the card's shadow transparent, the card's bottom and shadow are not cut, a click in the margin hides the launcher
-- [ ] 3.3 Add any platform trap found in 3.1 or 3.2 to `AGENTS.md`
+- [x] 3.2 macOS: check pill and card shadows, placement centred on the full frame at the same place as before, window keeps its full height with the area below the card's shadow transparent, the card's bottom and shadow are not cut, a click in the margin hides the launcher
+  - Agent part done, femtovg, 1512×982 display at scale 2. Window at 364,102, 784×544 (`CGWindowListCopyWindowInfo`), so the pill sits at 396,134; the old formula with 720×480 gives 396,133.2. Same place.
+  - Shadow alpha from `take_screenshot`: fades to 0 before every window edge, light and dark theme. Long list (`se`): card bottom at 1016 of 1088 physical, shadow ends by 1064, not cut.
+  - Short list (`settings`): window stays 544 high, alpha 0 below the card's shadow.
+  - Real CGEvent click in the left margin beside the card hides the launcher.
+- [x] 3.3 Add any platform trap found in 3.1 or 3.2 to `AGENTS.md`
+  - None found on either platform.
 
 ## 4. Design file
 
