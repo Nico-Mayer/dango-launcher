@@ -25,7 +25,7 @@ use crate::text::{TextError, TextTarget};
 
 use super::favicons::{FaviconCache, FaviconService, FaviconSource, FaviconsEnabled};
 use super::service::{ExcludedApps, KeywordExpansion};
-use super::store::{Kind, Record, Records};
+use super::store::{Kind, Record, RecordError, Records};
 
 pub const SNIPPETS_ID: &str = "dango.snippets";
 pub const QUICKLINKS_ID: &str = "dango.quicklinks";
@@ -58,6 +58,9 @@ const FIELD_BODY: &str = "body";
 const FIELD_KEYWORD: &str = "keyword";
 const FIELD_BROWSER: &str = "browser";
 const FIELD_FALLBACK: &str = "fallback";
+/// Starts a web search row's id, which goes on to the record id and the typed
+/// query, so the row carries its query to the action.
+const WEB_SEARCH_PREFIX: &str = "web:";
 /// Prefix for the fields an argument form asks about, so an argument called
 /// "name" cannot collide with the snippet's own name field.
 const ARGUMENT_PREFIX: &str = "arg:";
@@ -175,6 +178,16 @@ impl SnippetsExtension {
             .map_err(|error| ActionOutcome::Failed(error.to_string()))
     }
 
+    fn render_url(&self, record: &Record, arguments: FormValues) -> Result<String, ActionOutcome> {
+        let template = Template::parse(&record.body)
+            .map_err(|error| ActionOutcome::Failed(error.to_string()))?;
+        let values = self.values(&template, arguments);
+        template
+            .render_url(&values)
+            .map(|rendered| rendered.text)
+            .map_err(|error| ActionOutcome::Failed(error.to_string()))
+    }
+
     fn insert(&self, record: &Record, arguments: FormValues) -> ActionOutcome {
         let rendered = match self.render(record, arguments) {
             Ok(rendered) => rendered,
@@ -192,14 +205,9 @@ impl SnippetsExtension {
     /// A quicklink's URL is rendered with every value encoded, so a query
     /// containing `&` or `?` cannot add a parameter or a fragment of its own.
     fn open(&self, record: &Record, arguments: FormValues) -> ActionOutcome {
-        let template = match Template::parse(&record.body) {
-            Ok(template) => template,
-            Err(error) => return ActionOutcome::Failed(error.to_string()),
-        };
-        let values = self.values(&template, arguments);
-        let url = match template.render_url(&values) {
-            Ok(rendered) => rendered.text,
-            Err(error) => return ActionOutcome::Failed(error.to_string()),
+        let url = match self.render_url(record, arguments) {
+            Ok(url) => url,
+            Err(outcome) => return outcome,
         };
         let Some(opener) = &self.opener else {
             return ActionOutcome::Failed("Dango can't open URLs on this platform".into());
@@ -207,6 +215,27 @@ impl SnippetsExtension {
         match opener.open_in(&url, record.browser.as_deref()) {
             Ok(()) => ActionOutcome::Done,
             Err(error) => ActionOutcome::Failed(error),
+        }
+    }
+
+    /// A web search asks for nothing but the query its id carries, so it goes
+    /// straight to opening or copying.
+    fn search(&self, web_search: &str, action_id: &str) -> ActionOutcome {
+        let Some((id, query)) = web_search.split_once(':') else {
+            return ActionOutcome::Failed(RecordError::Gone.to_string());
+        };
+        let record = match self.records.get(id) {
+            Ok(record) => record,
+            Err(error) => return ActionOutcome::Failed(error.to_string()),
+        };
+        let arguments = FormValues::from([("query".to_string(), query.to_string())]);
+        match action_id {
+            ACTION_INSERT => self.open(&record, arguments),
+            ACTION_COPY => match self.render_url(&record, arguments) {
+                Ok(url) => ActionOutcome::CopyToClipboard(url),
+                Err(outcome) => outcome,
+            },
+            _ => ActionOutcome::Failed("That action isn't available".into()),
         }
     }
 
@@ -245,6 +274,9 @@ impl Extension for SnippetsExtension {
     }
 
     fn perform_action(&self, item_id: &str, action_id: &str, values: &FormValues) -> ActionOutcome {
+        if let Some(web_search) = item_id.strip_prefix(WEB_SEARCH_PREFIX) {
+            return self.search(web_search, action_id);
+        }
         match action_id {
             ACTION_SAVE => {
                 let name = values.get(FIELD_NAME).map(String::as_str).unwrap_or("");
@@ -366,9 +398,10 @@ struct SnippetProvider {
 
 #[async_trait]
 impl RootProvider for SnippetProvider {
-    async fn items(&self, _query: String) -> Vec<Candidate> {
+    async fn items(&self, query: String) -> Vec<Candidate> {
         let sheet = self.icons.sheet(&self.records);
-        self.records
+        let mut candidates: Vec<Candidate> = self
+            .records
             .all()
             .unwrap_or_default()
             .into_iter()
@@ -386,8 +419,48 @@ impl RootProvider for SnippetProvider {
                 suggested: false,
                 pinned: false,
             })
-            .collect()
+            .collect();
+        let query = query.trim();
+        if self.kind == Kind::Quicklink && !query.is_empty() {
+            candidates.extend(web_searches(&self.records, &sheet, query));
+        }
+        candidates
     }
+}
+
+/// An id with `:` in it, possible only in a hand-written file, is left out:
+/// the row's id splits at the first `:` after the prefix.
+fn web_searches(records: &Records, sheet: &Sheet, query: &str) -> Vec<Candidate> {
+    records
+        .in_file_order()
+        .into_iter()
+        .filter(|record| record.is_web_search() && !record.id.contains(':'))
+        .map(|record| Candidate {
+            extension_id: QUICKLINKS_ID.into(),
+            id: format!("{WEB_SEARCH_PREFIX}{}:{query}", record.id),
+            title: format!("Search {} for “{query}”", record.name),
+            status: None,
+            icon: Some(sheet.of(&record)),
+            keywords: vec![],
+            alias: None,
+            source: Source::WebSearch,
+            actions: vec![
+                Action {
+                    id: ACTION_INSERT.into(),
+                    title: "Open".into(),
+                    ..Default::default()
+                },
+                Action {
+                    id: ACTION_COPY.into(),
+                    title: "Copy".into(),
+                    ..Default::default()
+                },
+            ],
+            match_positions: vec![],
+            suggested: false,
+            pinned: false,
+        })
+        .collect()
 }
 
 fn item_actions(kind: Kind) -> Vec<Action> {
@@ -816,6 +889,127 @@ mod tests {
             View::Form(form) => form.fields.clone(),
             _ => panic!("expected a form"),
         }
+    }
+
+    fn web_search_rows(items: &[Candidate]) -> Vec<&Candidate> {
+        items
+            .iter()
+            .filter(|c| c.source == Source::WebSearch)
+            .collect()
+    }
+
+    #[tokio::test]
+    async fn a_web_search_is_offered_for_a_typed_query() {
+        let (f, cache) = with_favicons(&["duckduckgo.com"], true);
+        f.records
+            .save(None, "DuckDuckGo", SEARCH, None, None, Some(true))
+            .unwrap();
+
+        let items = provider(&f.extension).items("rust traits".into()).await;
+
+        let rows = web_search_rows(&items);
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].title, "Search DuckDuckGo for “rust traits”");
+        assert_eq!(rows[0].icon, cache.path("duckduckgo.com"));
+        let actions: Vec<&str> = rows[0].actions.iter().map(|a| a.title.as_str()).collect();
+        assert_eq!(actions, ["Open", "Copy"]);
+        assert!(
+            items
+                .iter()
+                .any(|c| c.source == Source::RootItem && c.title == "DuckDuckGo"),
+            "the quicklink itself is still offered"
+        );
+    }
+
+    #[tokio::test]
+    async fn web_searches_follow_the_file_and_skip_what_cannot_be_one() {
+        let f = fixture(Kind::Quicklink);
+        f.records
+            .reload(&format!(
+                "[zeta]\nname = \"Zeta\"\nurl = \"{SEARCH}\"\nfallback = true\n\n\
+                 [alpha]\nname = \"Alpha\"\nurl = \"{SEARCH}\"\nfallback = true\n\n\
+                 [docs]\nname = \"Docs\"\nurl = \"https://example.com\"\nfallback = true\n\n\
+                 [\"a:b\"]\nname = \"Colon\"\nurl = \"{SEARCH}\"\nfallback = true\n\n\
+                 [plain]\nname = \"Plain\"\nurl = \"{SEARCH}\"\n"
+            ))
+            .unwrap();
+
+        let items = provider(&f.extension).items("x".into()).await;
+        let titles: Vec<&str> = web_search_rows(&items)
+            .iter()
+            .map(|c| c.title.as_str())
+            .collect();
+        assert_eq!(titles, ["Search Zeta for “x”", "Search Alpha for “x”"]);
+
+        let empty = provider(&f.extension).items("  ".into()).await;
+        assert!(web_search_rows(&empty).is_empty());
+    }
+
+    async fn web_search_id(f: &Fixture, query: &str) -> String {
+        let items = provider(&f.extension).items(query.into()).await;
+        web_search_rows(&items)[0].id.clone()
+    }
+
+    #[tokio::test]
+    async fn confirming_a_web_search_opens_it_with_the_query() {
+        let f = fixture(Kind::Quicklink);
+        f.records
+            .save(
+                None,
+                "Search",
+                "https://example.com/s?q={{ query }}&safe=1",
+                None,
+                Some("firefox"),
+                Some(true),
+            )
+            .unwrap();
+        let id = web_search_id(&f, "a&b?c").await;
+
+        let outcome = f.extension.perform_action(&id, ACTION_INSERT, &no_values());
+
+        assert_eq!(outcome, ActionOutcome::Done);
+        let opened = f.opener.opened();
+        assert!(opened[0].contains("a%26b%3Fc"), "{}", opened[0]);
+        assert!(opened[0].ends_with("&safe=1"), "{}", opened[0]);
+        assert_eq!(f.opener.browsers(), vec![Some("firefox".to_string())]);
+    }
+
+    #[tokio::test]
+    async fn a_web_search_fills_the_clipboard_without_a_form() {
+        let f = fixture(Kind::Quicklink);
+        f.records
+            .save(
+                None,
+                "Search",
+                "https://example.com/s?q={{ query }}&ref={{ clipboard }}",
+                None,
+                None,
+                Some(true),
+            )
+            .unwrap();
+        let id = web_search_id(&f, "dango").await;
+
+        let outcome = f.extension.perform_action(&id, ACTION_INSERT, &no_values());
+
+        assert_eq!(outcome, ActionOutcome::Done);
+        assert!(f.opener.opened()[0].starts_with("https://example.com/s?q=dango&ref="));
+    }
+
+    #[tokio::test]
+    async fn copying_a_web_search_copies_its_url() {
+        let f = fixture(Kind::Quicklink);
+        f.records
+            .save(None, "DuckDuckGo", SEARCH, None, None, Some(true))
+            .unwrap();
+        let id = web_search_id(&f, "rust traits").await;
+
+        let outcome = f.extension.perform_action(&id, ACTION_COPY, &no_values());
+
+        let ActionOutcome::CopyToClipboard(url) = outcome else {
+            panic!("expected a copy, got {outcome:?}");
+        };
+        assert!(url.starts_with("https://duckduckgo.com/?q=rust"), "{url}");
+        assert!(f.opener.opened().is_empty());
     }
 
     #[tokio::test]
