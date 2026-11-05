@@ -91,6 +91,20 @@ Every step reports its level as it lands (spec: "Every change is reported as it 
 
 Rejected: delivering a superseded `Finished` normally. It would hide the launcher and clear the busy state that belong to the newer command.
 
+### Holding a hotkey repeats the command
+
+Neither platform repeats a held chord: `global-hotkey` 0.8 registers every chord with `MOD_NOREPEAT` on Windows, and the Carbon hotkey API on macOS sends one press. Both report the release, though: on Windows the crate polls `GetAsyncKeyState` every 50 ms after a press and sends `Released`; on macOS Carbon sends `kEventHotKeyReleased`.
+
+So Dango repeats on its own. `CommandDecl` gains `repeats: bool`, set only by the two brightness commands. In `Core::on_hotkey`, every hotkey event first stops a running repeat (a release ends it, another press replaces it). A press on a repeating command dispatches it as today and starts a repeat task on the runtime: wait 350 ms, then dispatch again every 150 ms while the repeat's generation is still current. `show` and the config reload also stop it. Dispatches faster than the monitors go into the pending sum, so the notice still follows live and the range takes under two seconds.
+
+Contract note: this adds a field to `CommandDecl`, part of the extension manifest. Third-party manifests do not exist yet; when they do, the field is optional and defaults to off.
+
+Rejected:
+
+- Fork or patch `global-hotkey` to drop `MOD_NOREPEAT`: Windows only, macOS still would not repeat, and OS key repeat would hit every command.
+- Repeat every no-view command: holding a window-management hotkey would keep cycling the window.
+- Config settings for delay and rate: no user asked; constants are enough.
+
 ### Success with a message
 
 `Outcome::Success` becomes `Outcome::Success(Option<String>)`, with `InvocationContext::succeed_with(message)` next to `succeed()`. In `src/app/mod.rs`, success with a message hides the launcher as today, then applies a new `ui::Event` that calls the existing `show_notice(TickerStyle::Success, ...)`, as the copy path does. This works the same from root search and from a hotkey: either way the launcher is hidden when the notice shows.

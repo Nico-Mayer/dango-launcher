@@ -72,6 +72,22 @@ Each run of a brightness command SHALL take effect, also when the user runs it a
 - **WHEN** the user presses `Increase Brightness` and then `Decrease Brightness` before it ends
 - **THEN** the monitor ends where that change left it
 
+### Requirement: Holding a brightness hotkey keeps changing brightness
+
+Both brightness commands SHALL repeat while their hotkey is held (see `command-hotkeys`), so holding the key moves brightness smoothly until it is released or reaches the end of the range.
+
+#### Scenario: Holding to full brightness
+
+- **GIVEN** every monitor at 0%
+- **WHEN** the user holds the `Increase Brightness` hotkey until the notice reads "Brightness set to 100%"
+- **THEN** the notice showed rising levels on the way
+- **AND** the monitors stay at 100% while the key is still held
+
+#### Scenario: Releasing stops the change
+
+- **WHEN** the user holds the `Decrease Brightness` hotkey and releases it
+- **THEN** brightness stops changing soon after the release
+
 ### Requirement: Every change is reported as it lands
 
 During quick presses, each change SHALL report its level in the notice as soon as it lands, replacing the previous notice, also when a newer press has come in since. A failure SHALL be reported the same way, so it is never lost behind a later press.
