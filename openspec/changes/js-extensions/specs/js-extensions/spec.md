@@ -14,8 +14,8 @@ Dango SHALL load every folder in `extensions/` in the config directory,
 honouring `$DANGO_CONFIG_DIR`, that holds a `manifest.json` and a `main.js`.
 The folder name SHALL be the extension's id. Extensions SHALL load at startup.
 A missing `extensions` folder SHALL mean no such extensions and SHALL NOT be
-reported as a problem. A folder without both files SHALL be skipped and
-reported.
+reported as a problem. A folder holding only one of the two files SHALL be
+skipped and reported. A folder holding neither SHALL be ignored.
 
 #### Scenario: An extension folder is loaded
 
@@ -40,12 +40,18 @@ reported.
 - **THEN** that extension is not loaded
 - **AND** the tray shows "Extension <id> didn't load, see dango.log"
 
+#### Scenario: A folder that is not an extension
+
+- **WHEN** the `extensions` folder holds a `.git` folder
+- **THEN** it is ignored and nothing is reported
+
 ### Requirement: The manifest is a JSON file
 
 `manifest.json` SHALL carry the manifest that `extension-model` defines:
 `manifestVersion`, `id`, `name`, an optional `icon`, its `commands`, and an
 optional `rootItems` with an optional `refreshMinutes`. Keys SHALL be
-camelCase, as in the view protocol. A manifest that is not valid JSON, whose
+camelCase, as in the view protocol. An icon given as a relative path SHALL be
+read from the extension's folder. A manifest that is not valid JSON, whose
 `id` differs from the folder name, or that declares `services` SHALL NOT load
 and SHALL be reported.
 
@@ -54,6 +60,11 @@ and SHALL be reported.
 - **WHEN** a manifest declares version 1, id `gh-prs`, name "GitHub PRs", and
   one view command
 - **THEN** the extension loads with that name and command
+
+#### Scenario: A relative icon path
+
+- **WHEN** the manifest of `gh-prs` sets `icon` to `icon.png`
+- **THEN** the extension's icon is `extensions/gh-prs/icon.png`
 
 #### Scenario: The id does not match the folder
 
@@ -86,8 +97,8 @@ invoked or root items are built.
 `main.js` SHALL export one function per declared command, under the command's
 id. Invoking the command SHALL call that function. A declared command without
 an exported function SHALL still appear in root search, and invoking it SHALL
-show the failure ticker "This command can't run. Its extension has no code
-for it." while the extension's other commands keep working.
+show the failure ticker "This command's extension has no code for it" while
+the extension's other commands keep working.
 
 #### Scenario: Invoking calls the export
 
@@ -97,8 +108,8 @@ for it." while the extension's other commands keep working.
 #### Scenario: A command without code
 
 - **WHEN** the user runs a declared command that `main.js` does not export
-- **THEN** the launcher stays open with the failure ticker "This command can't
-  run. Its extension has no code for it."
+- **THEN** the launcher stays open with the failure ticker "This command's
+  extension has no code for it"
 
 ### Requirement: A view command shows the views it emits
 
@@ -173,7 +184,7 @@ launcher. A form submit SHALL deliver the field values to that code.
 ### Requirement: Root items are built once and cached
 
 An extension whose manifest declares `rootItems` SHALL have its root items
-built when it loads, when it is enabled, when it reloads, and, if
+built by calling the function `main.js` exports as `rootItems`, when it loads, when it is enabled, when it reloads, and, if
 `refreshMinutes` is set, every that many minutes while enabled. Dango SHALL
 keep the last rows and match them against each query itself. Building SHALL
 NOT delay root search: until rows exist, the extension adds none.
@@ -204,13 +215,15 @@ NOT delay root search: until rows exist, the extension adds none.
 
 A root item SHALL have an id and a title and MAY have a subtitle, an icon,
 keywords, and actions. Its first action SHALL run on Enter, and the action
-panel SHALL reach the rest. Running an action of a root item SHALL run the
-extension's code even when nothing of that extension is running.
+panel SHALL reach the rest. Running an action of a root item SHALL call the
+function `main.js` exports as `onAction` with the item's id and the action's
+id, even when nothing of that extension is running.
 
 #### Scenario: Enter on a root item
 
-- **WHEN** the user selects an extension's root item and presses Enter
-- **THEN** that item's first action runs
+- **WHEN** the user selects an extension's root item `repo-1` and presses
+  Enter, and its first action has the id `open`
+- **THEN** `onAction` is called with `repo-1` and `open`
 
 ### Requirement: Extensions can run programs
 
@@ -287,12 +300,53 @@ a restart: code that runs afterwards sees the new values.
 - **WHEN** the config file sets `user = "nico"` in `[extensions.gh-prs]`
 - **THEN** the extension's code reads `user` as "nico"
 
+### Requirement: Secrets come from auth.toml
+
+An extension SHALL be able to read a secret by name from its own
+`[extensions.<id>]` table in `auth.toml`, read when the code asks, so a change
+applies without a restart. A missing file, table, or name SHALL give the
+extension no value rather than an error. An unreadable file SHALL be an error
+the extension can handle, and Dango SHALL log only the file and line. An
+extension SHALL NOT read another extension's secrets or a provider key this
+way. Dango SHALL NOT write a secret anywhere itself.
+
+#### Scenario: A token reaches the extension
+
+- **WHEN** `auth.toml` sets `token = "glpat-123"` in `[extensions.gitlab]` and
+  the `gitlab` extension asks for `token`
+- **THEN** it receives "glpat-123"
+
+#### Scenario: No secret set
+
+- **WHEN** the `gitlab` extension asks for `token` and `auth.toml` has no
+  `[extensions.gitlab]` table
+- **THEN** it receives no value and can show its own message
+
+#### Scenario: Another extension's secret
+
+- **WHEN** the `jira` extension asks for a secret that only
+  `[extensions.gitlab]` holds
+- **THEN** it receives no value
+
+#### Scenario: A provider key is out of reach
+
+- **WHEN** `auth.toml` sets `anthropic = "sk-ant-secret"` and an extension
+  asks for `anthropic`
+- **THEN** it receives no value
+
+#### Scenario: A secret added while Dango runs
+
+- **WHEN** the user adds a secret to `auth.toml` while Dango runs and then
+  runs the extension's command
+- **THEN** the extension receives the new secret, without a restart
+
 ### Requirement: Extension code runs only while it has work
 
 An extension's code SHALL run only while one of its commands runs, one of its
 views is shown, or its root items are being built. When that work ends, its
-state, pending timers, and unfinished requests SHALL be dropped. A command
-whose launcher view is left SHALL be stopped.
+state, pending timers, and unfinished requests SHALL be dropped, and programs
+it started that still run SHALL be stopped. A command whose launcher view is
+left SHALL be stopped.
 
 #### Scenario: Leaving a view stops its code
 
@@ -305,13 +359,19 @@ whose launcher view is left SHALL be stopped.
 - **WHEN** an extension's command finished and its view was closed
 - **THEN** its pending timers do not fire
 
+#### Scenario: Leaving a view stops a running program
+
+- **WHEN** an extension's view waits on a program that runs for a minute, and
+  the user presses Escape
+- **THEN** the program is stopped
+
 ### Requirement: Runaway code does not freeze the launcher
 
 An extension that loops forever or blocks SHALL NOT make the launcher
 unresponsive. Leaving its view, hiding the launcher, or running another
 command SHALL stop it. Code that exceeds its memory limit SHALL be stopped
 with the failure ticker "This command used too much memory, so Dango stopped
-it."
+it".
 
 #### Scenario: An endless loop
 
@@ -323,7 +383,7 @@ it."
 - **WHEN** a command keeps allocating memory past its limit
 - **THEN** it is stopped
 - **AND** the failure ticker reads "This command used too much memory, so
-  Dango stopped it."
+  Dango stopped it"
 
 ### Requirement: Editing an extension reloads it
 
@@ -362,7 +422,7 @@ it.
 
 - **WHEN** the `extensions` folder exists and Dango starts
 - **THEN** `extensions/dango.d.ts` exists and describes the view protocol at
-  version 3
+  the version Dango supports
 
 #### Scenario: No folder, no file
 

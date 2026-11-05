@@ -2,55 +2,6 @@
 
 ## MODIFIED Requirements
 
-### Requirement: View kinds
-
-The protocol SHALL be at version 3 and SHALL support five view kinds: a list, a
-grid, a detail view rendering markdown, a form, and a progress view. A progress
-view SHALL declare a title and MAY declare a subtitle, a progress value from 0
-to 1, a one-line detail, and steps, each with a title and a status of working,
-needs input, done, failed, or queued. A progress view without a value SHALL show
-an indeterminate bar, and a value outside 0 to 1 SHALL be shown clamped. Any
-view kind SHALL be able to carry an action panel. A view tree at version 1 or 2
-SHALL be rejected as an unsupported version.
-
-#### Scenario: List renders items
-
-- **WHEN** a command emits a list view containing items
-- **THEN** each item's title, and its subtitle, icon, and accessories when
-  present, are rendered in order
-
-#### Scenario: Grid renders tiles
-
-- **WHEN** a command emits a grid view containing items
-- **THEN** each item is rendered as a tile with its content and title, in order,
-  in the declared number of columns
-
-#### Scenario: Detail renders markdown
-
-- **WHEN** a command emits a detail view
-- **THEN** its markdown content is rendered
-
-#### Scenario: Form collects input
-
-- **WHEN** a command emits a form view and the user submits it
-- **THEN** the entered values are delivered to the command
-
-#### Scenario: Progress view shows steps
-
-- **WHEN** a command emits a progress view with a value of 0.62 and four steps
-- **THEN** its bar is filled to 62 percent and its steps are listed in order
-  with their status
-
-#### Scenario: A version 1 tree
-
-- **WHEN** a command emits a view tree at protocol version 1
-- **THEN** an error is shown in place of the view
-
-#### Scenario: A version 2 tree
-
-- **WHEN** a command emits a view tree at protocol version 2
-- **THEN** an error is shown in place of the view
-
 ### Requirement: The launcher filters lists and grids
 
 The launcher SHALL narrow a list's or grid's items against the query as the
@@ -63,6 +14,52 @@ and SHALL NOT be invoked again because the query changed.
 - **WHEN** a list is showing and the user types
 - **THEN** the visible items are narrowed without the command being invoked
   again
+
+### Requirement: A list or grid shows at most 50 items
+
+A list or grid view SHALL show at most 50 items. The limit SHALL apply after
+the launcher has filtered the items against the query, or, for a view whose
+command searches, to the items in the order the command sent them. It SHALL
+count items in the order they are drawn, across all sections; a section left
+with no shown item SHALL NOT be drawn. A command MAY send more items than the
+limit; the view SHALL NOT be rejected for it. Items past the limit SHALL be
+reachable by typing a query that narrows the list. Selection, the action panel,
+and the selected item's detail SHALL only consider the items that are shown.
+
+#### Scenario: A long list shows the first 50 items
+
+- **WHEN** a command emits a list of 500 items and the query is empty
+- **THEN** the first 50 items, in their declared order, are shown
+- **AND** the rest are not shown
+
+#### Scenario: Filtering reaches an item past the limit
+
+- **WHEN** a list of 500 items is shown and the user types a query that only
+  the 300th item matches
+- **THEN** the 300th item is shown and can be selected
+
+#### Scenario: The limit counts across sections
+
+- **WHEN** a list has two sections of 40 items each and the query is empty
+- **THEN** all 40 items of the first section and the first 10 items of the
+  second section are shown
+
+#### Scenario: A grid is bounded too
+
+- **WHEN** a command emits a grid of 80 tiles and the query is empty
+- **THEN** the first 50 tiles are shown
+
+#### Scenario: Moving past the last shown item
+
+- **WHEN** a list of 500 items is shown, the 50th item is selected, and the
+  user moves the selection down
+- **THEN** the 50th item stays selected
+
+#### Scenario: A command that searches sends too many items
+
+- **WHEN** a view whose command searches is answered with 80 items for the
+  query "rust"
+- **THEN** the first 50 items, in the command's order, are shown
 
 ## ADDED Requirements
 
