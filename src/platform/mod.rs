@@ -37,7 +37,7 @@ pub trait LauncherWindow: Send {
     fn position_on_active_display(&self, window: RawWindowHandle, display: LauncherDisplay);
     fn restore_previous_focus(&mut self);
     /// Whether `set_height` keeps the top edge. Where it cannot yet, the
-    /// window stays at `LAUNCHER_MAX_HEIGHT`.
+    /// window stays at `LAUNCHER_MAX_HEIGHT` plus the shadow margin.
     fn keeps_top_edge(&self) -> bool {
         false
     }
