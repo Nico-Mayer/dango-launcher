@@ -3,7 +3,7 @@
 use std::sync::{Arc, Mutex, PoisonError};
 
 use crate::extension::{CommandDecl, Extension, InvocationMode, Manifest, NAMED_ICON};
-use crate::invocation::{Command, InvocationContext};
+use crate::invocation::{Command, InvocationContext, Outcome};
 use crate::platform::{BrightnessMonitors, Level, Monitor};
 
 pub const EXTENSION_ID: &str = "dango.display";
@@ -13,28 +13,35 @@ pub const COMMAND_DECREASE: &str = "decrease-brightness";
 pub const NO_MONITOR: &str = "Turn on DDC/CI in your monitor's menu to change brightness";
 pub const REFUSED: &str = "Couldn't change monitor brightness";
 
-/// Two steps talking to one monitor at once interleave their I2C messages,
-/// which monitors answer with garbage or not at all.
-static BUS: Mutex<()> = Mutex::new(());
-
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Direction {
     Up,
     Down,
 }
 
-/// The value one step moves to: a tenth of the monitor's own range, clamped.
-/// `None` for a monitor that reports no range, which counts as not answering.
-pub fn stepped(level: Level, direction: Direction) -> Option<u16> {
+/// What every press shares. One step takes about a quarter second over two
+/// monitors, so presses made meanwhile add up in `pending` and the next step
+/// applies them all at once.
+#[derive(Default)]
+pub struct Presses {
+    /// Two steps talking to one monitor at once interleave their I2C
+    /// messages, which monitors answer with garbage or not at all.
+    bus: Mutex<()>,
+    /// Signed tenths not yet applied.
+    pending: Mutex<i32>,
+}
+
+/// The value a step of `tenths` tenths of the monitor's own range moves to,
+/// clamped. `None` for a monitor that reports no range, which counts as not
+/// answering.
+pub fn stepped(level: Level, tenths: i32) -> Option<u16> {
     if level.maximum == 0 {
         return None;
     }
-    let step = level.maximum.div_ceil(10);
-    let current = level.value.min(level.maximum);
-    Some(match direction {
-        Direction::Up => current.saturating_add(step).min(level.maximum),
-        Direction::Down => current.saturating_sub(step),
-    })
+    let step = i64::from(level.maximum.div_ceil(10));
+    let current = i64::from(level.value.min(level.maximum));
+    let target = (current + step * i64::from(tenths)).clamp(0, i64::from(level.maximum));
+    u16::try_from(target).ok()
 }
 
 pub fn percent(value: u16, maximum: u16) -> u32 {
@@ -60,6 +67,7 @@ pub fn message(percents: &[u32]) -> String {
 pub struct DisplayExtension {
     manifest: Manifest,
     monitors: Arc<dyn BrightnessMonitors>,
+    presses: Arc<Presses>,
 }
 
 impl DisplayExtension {
@@ -67,6 +75,7 @@ impl DisplayExtension {
         Self {
             manifest: manifest(),
             monitors,
+            presses: Arc::default(),
         }
     }
 }
@@ -84,6 +93,7 @@ impl Extension for DisplayExtension {
         };
         Some(Arc::new(BrightnessStep {
             monitors: self.monitors.clone(),
+            presses: self.presses.clone(),
             direction,
         }))
     }
@@ -133,28 +143,43 @@ fn command(id: &str, title: &str, icon: &str, keywords: &[&str]) -> CommandDecl 
 }
 
 pub struct BrightnessStep {
-    pub monitors: Arc<dyn BrightnessMonitors>,
-    pub direction: Direction,
+    monitors: Arc<dyn BrightnessMonitors>,
+    presses: Arc<Presses>,
+    direction: Direction,
 }
 
 impl Command for BrightnessStep {
     /// Never checks `is_cancelled`: a quick second press supersedes this run,
-    /// and the press still has to count.
+    /// and the press still has to count and show its level.
     fn invoke(&self, ctx: &InvocationContext) {
-        let _bus = BUS.lock().unwrap_or_else(PoisonError::into_inner);
-        let outcome = step_all(self.monitors.external(), self.direction, &mut |line| {
+        let press = match self.direction {
+            Direction::Up => 1,
+            Direction::Down => -1,
+        };
+        *lock(&self.presses.pending) += press;
+        let _bus = lock(&self.presses.bus);
+        // An earlier press may already have applied this one along with its own.
+        let tenths = std::mem::take(&mut *lock(&self.presses.pending));
+        if tenths == 0 {
+            return ctx.report(Outcome::Success(None));
+        }
+        let outcome = step_all(self.monitors.external(), tenths, &mut |line| {
             crate::log::append(&line)
         });
-        match outcome {
-            Ok(message) => ctx.succeed_with(message),
-            Err(message) => ctx.fail(message),
-        }
+        ctx.report(match outcome {
+            Ok(message) => Outcome::Success(Some(message)),
+            Err(message) => Outcome::Failure(message.into()),
+        });
     }
+}
+
+fn lock<T>(mutex: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
+    mutex.lock().unwrap_or_else(PoisonError::into_inner)
 }
 
 fn step_all(
     monitors: Vec<Box<dyn Monitor>>,
-    direction: Direction,
+    tenths: i32,
     log: &mut dyn FnMut(String),
 ) -> Result<String, &'static str> {
     let mut answered = false;
@@ -170,7 +195,7 @@ fn step_all(
                 continue;
             }
         };
-        let Some(value) = stepped(level, direction) else {
+        let Some(value) = stepped(level, tenths) else {
             log(format!("brightness: {} reports no range", monitor.name()));
             continue;
         };
@@ -190,7 +215,7 @@ fn step_all(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::invocation::{Outcome, Sink};
+    use crate::invocation::Sink;
     use crate::platform::MonitorError;
     use std::time::Duration;
 
@@ -242,12 +267,15 @@ mod tests {
         }
     }
 
+    /// Superseded like every press but the last; keeps what `report` delivers
+    /// and drops what `finish` would.
     #[derive(Default)]
     struct SupersededSink(Mutex<Option<Outcome>>);
 
     impl Sink for SupersededSink {
         fn push_view(&self, _tree: crate::protocol::ViewTree) {}
-        fn finish(&self, outcome: Outcome) {
+        fn finish(&self, _outcome: Outcome) {}
+        fn report(&self, outcome: Outcome) {
             *self.0.lock().unwrap() = Some(outcome);
         }
         fn superseded(&self) -> bool {
@@ -256,9 +284,13 @@ mod tests {
     }
 
     fn run(answers: Vec<Answer>, direction: Direction) -> (Outcome, Vec<String>) {
+        let tenths = match direction {
+            Direction::Up => 1,
+            Direction::Down => -1,
+        };
         let mut lines = Vec::new();
         let monitors = FakeMonitors(answers).external();
-        let outcome = match step_all(monitors, direction, &mut |line| lines.push(line)) {
+        let outcome = match step_all(monitors, tenths, &mut |line| lines.push(line)) {
             Ok(message) => Outcome::Success(Some(message)),
             Err(message) => Outcome::Failure(message.into()),
         };
@@ -270,26 +302,94 @@ mod tests {
         (Answer::Level(level.clone()), level)
     }
 
+    fn press(
+        monitors: &Arc<dyn BrightnessMonitors>,
+        presses: &Arc<Presses>,
+        direction: Direction,
+    ) -> std::thread::JoinHandle<Option<Outcome>> {
+        let command = BrightnessStep {
+            monitors: monitors.clone(),
+            presses: presses.clone(),
+            direction,
+        };
+        std::thread::spawn(move || {
+            let sink = Arc::new(SupersededSink::default());
+            command.invoke(&InvocationContext::for_test("display.x", sink.clone()));
+            let outcome = sink.0.lock().unwrap().clone();
+            outcome
+        })
+    }
+
     #[test]
-    fn three_quick_presses_each_count() {
+    fn three_quick_presses_each_count_and_every_step_reports() {
         let (answer, level) = at(50);
         let monitors: Arc<dyn BrightnessMonitors> = Arc::new(FakeMonitors(vec![answer]));
-        let presses: Vec<_> = (0..3)
-            .map(|_| {
-                let command = BrightnessStep {
-                    monitors: monitors.clone(),
-                    direction: Direction::Up,
-                };
-                std::thread::spawn(move || {
-                    let sink = Arc::new(SupersededSink::default());
-                    command.invoke(&InvocationContext::for_test("display.x", sink));
-                })
+        let presses = Arc::new(Presses::default());
+        let outcomes: Vec<_> = (0..3)
+            .map(|_| press(&monitors, &presses, Direction::Up))
+            .collect::<Vec<_>>()
+            .into_iter()
+            .map(|handle| handle.join().unwrap())
+            .collect();
+        assert_eq!(*level.lock().unwrap(), 80);
+        let reported: Vec<_> = outcomes
+            .iter()
+            .filter(|outcome| matches!(outcome, Some(Outcome::Success(Some(_)))))
+            .collect();
+        assert!(!reported.is_empty());
+        assert!(outcomes.iter().all(Option::is_some), "every press reports");
+    }
+
+    #[test]
+    fn presses_during_a_step_are_applied_together() {
+        let (answer, level) = at(50);
+        let monitors: Arc<dyn BrightnessMonitors> = Arc::new(FakeMonitors(vec![answer]));
+        let presses = Arc::new(Presses::default());
+        let bus = lock(&presses.bus);
+        let waiting: Vec<_> = (0..4)
+            .map(|_| press(&monitors, &presses, Direction::Up))
+            .collect();
+        while *lock(&presses.pending) < 4 {
+            std::thread::sleep(Duration::from_millis(1));
+        }
+        drop(bus);
+        let outcomes: Vec<_> = waiting
+            .into_iter()
+            .map(|handle| handle.join().unwrap())
+            .collect();
+        assert_eq!(*level.lock().unwrap(), 90);
+        let messages: Vec<_> = outcomes
+            .iter()
+            .filter_map(|outcome| match outcome {
+                Some(Outcome::Success(Some(message))) => Some(message.as_str()),
+                _ => None,
             })
             .collect();
-        for press in presses {
-            press.join().unwrap();
+        assert_eq!(
+            messages,
+            ["Brightness set to 90%"],
+            "one step applied all four"
+        );
+    }
+
+    #[test]
+    fn up_and_down_during_a_step_cancel_out() {
+        let (answer, level) = at(50);
+        let monitors: Arc<dyn BrightnessMonitors> = Arc::new(FakeMonitors(vec![answer]));
+        let presses = Arc::new(Presses::default());
+        let bus = lock(&presses.bus);
+        let up = press(&monitors, &presses, Direction::Up);
+        while *lock(&presses.pending) != 1 {
+            std::thread::sleep(Duration::from_millis(1));
         }
-        assert_eq!(*level.lock().unwrap(), 80);
+        let down = press(&monitors, &presses, Direction::Down);
+        while *lock(&presses.pending) != 0 {
+            std::thread::sleep(Duration::from_millis(1));
+        }
+        drop(bus);
+        up.join().unwrap();
+        down.join().unwrap();
+        assert_eq!(*level.lock().unwrap(), 50);
     }
 
     #[test]
@@ -343,21 +443,21 @@ mod tests {
 
     #[test]
     fn two_monitors_each_step_from_their_own_level() {
-        assert_eq!(stepped(level(30), Direction::Up), Some(40));
-        assert_eq!(stepped(level(60), Direction::Up), Some(70));
+        assert_eq!(stepped(level(30), 1), Some(40));
+        assert_eq!(stepped(level(60), 1), Some(70));
     }
 
     #[test]
     fn a_step_stops_at_the_top() {
-        let once = stepped(level(95), Direction::Up).unwrap();
+        let once = stepped(level(95), 1).unwrap();
         assert_eq!(once, 100);
-        assert_eq!(stepped(level(once), Direction::Up), Some(100));
+        assert_eq!(stepped(level(once), 1), Some(100));
     }
 
     #[test]
     fn a_step_stops_at_the_bottom() {
-        assert_eq!(stepped(level(0), Direction::Down), Some(0));
-        assert_eq!(stepped(level(4), Direction::Down), Some(0));
+        assert_eq!(stepped(level(0), -1), Some(0));
+        assert_eq!(stepped(level(4), -1), Some(0));
     }
 
     #[test]
@@ -366,13 +466,20 @@ mod tests {
             value: 25,
             maximum: 50,
         };
-        assert_eq!(stepped(small, Direction::Up), Some(30));
+        assert_eq!(stepped(small, 1), Some(30));
         assert_eq!(percent(30, 50), 60);
         let tiny = Level {
             value: 2,
             maximum: 5,
         };
-        assert_eq!(stepped(tiny, Direction::Down), Some(1));
+        assert_eq!(stepped(tiny, -1), Some(1));
+    }
+
+    #[test]
+    fn several_tenths_apply_at_once_and_clamp() {
+        assert_eq!(stepped(level(50), 3), Some(80));
+        assert_eq!(stepped(level(50), 7), Some(100));
+        assert_eq!(stepped(level(50), -9), Some(0));
     }
 
     #[test]
@@ -381,7 +488,7 @@ mod tests {
             value: 0,
             maximum: 0,
         };
-        assert_eq!(stepped(none, Direction::Up), None);
+        assert_eq!(stepped(none, 1), None);
     }
 
     #[test]

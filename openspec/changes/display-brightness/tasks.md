@@ -20,7 +20,7 @@
 ## 3b. Snappy repeated presses
 
 - [x] 3.4 Add `InvocationContext::report` and `Output::Late`: a superseded run's success message or failure reaches the notice through a notice-only UI event that leaves `working` and the launcher alone. Verify: tests in `src/invocation.rs` (a superseded `report` sends `Late`, a current one sends `Finished`) and `src/app/tests.rs` (a late success shows in the notice without hiding the launcher; a late failure shows while hidden)
-- [ ] 3.5 Combine waiting presses: a shared pending sum of tenths, taken whole under the bus lock; `stepped` takes signed tenths; a press finding 0 succeeds without a message; brightness commands finish through `report`. Verify: tests in `src/extensions/display` cover "Three quick presses", "Up and down cancel out", a step of several tenths clamping, and that every finished step's message is delivered even when superseded
+- [x] 3.5 Combine waiting presses: a shared pending sum of tenths, taken whole under the bus lock; `stepped` takes signed tenths; a press finding 0 succeeds without a message; brightness commands finish through `report`. Verify: tests in `src/extensions/display` cover "Three quick presses", "Up and down cancel out", a step of several tenths clamping, and that every finished step's message is delivered even when superseded
 
 ## 4. Hand checks
 
