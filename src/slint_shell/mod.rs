@@ -15,7 +15,7 @@ mod tests;
 pub(crate) fn render_headless(snapshot: crate::ui::Snapshot) -> generated::LauncherWindow {
     i_slint_backend_testing::init_no_event_loop();
     let ui = generated::LauncherWindow::new().unwrap();
-    ui.window().set_size(slint::LogicalSize::new(720.0, 480.0));
+    ui.window().set_size(slint::LogicalSize::new(784.0, 544.0));
     ui.show().unwrap();
     let mut renderer = render::Renderer::new(&ui);
     render::publish(&mut renderer, &ui, snapshot, |_| {});
@@ -237,7 +237,10 @@ fn set_launcher_height(window: &LauncherWindow, platform: &Platform, height: f32
         return;
     }
     shell.set_height(height);
-    platform.set_height(handle, height.into());
+    platform.set_height(
+        handle,
+        f64::from(height) + 2.0 * crate::platform::LAUNCHER_SHADOW_MARGIN,
+    );
 }
 
 fn show_tray(component: &Tray, tray: &TrayStatus) {

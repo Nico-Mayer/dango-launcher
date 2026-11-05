@@ -18,13 +18,15 @@ use crate::protocol::{
 use crate::shell::TrayStatus;
 use crate::ui::{Context, Effect, Event, Input, Intent, Launcher, ResultItem, TemplateInspection};
 
+/// The transparent room around the launcher, matching `Theme.shadow-margin`.
+const MARGIN: f32 = 32.0;
 /// The SearchBar pill and the gap below it, above the card.
 const PILL: f32 = 52.0 + 8.0;
 const ACTION_BAR: f32 = 44.0;
 const LIST_PADDING: f32 = 8.0;
 const ROW: f32 = 44.0;
-const LIST_TOP: f32 = PILL + LIST_PADDING;
-const LIST_BOTTOM: f32 = 480.0 - ACTION_BAR - LIST_PADDING;
+const LIST_TOP: f32 = MARGIN + PILL + LIST_PADDING;
+const LIST_BOTTOM: f32 = MARGIN + 480.0 - ACTION_BAR - LIST_PADDING;
 
 struct Harness {
     ui: LauncherWindow,
@@ -42,7 +44,7 @@ impl Harness {
     fn new() -> Self {
         i_slint_backend_testing::init_no_event_loop();
         let ui = LauncherWindow::new().unwrap();
-        ui.window().set_size(slint::LogicalSize::new(720.0, 480.0));
+        ui.window().set_size(slint::LogicalSize::new(784.0, 544.0));
         ui.show().unwrap();
         let renderer = Rc::new(RefCell::new(Renderer::new(&ui)));
         let launcher = Rc::new(RefCell::new(Launcher::new()));
@@ -1204,7 +1206,7 @@ mod list_view {
             true,
         ));
         let first = h.find("First body").expect("the first detail");
-        assert!(first.absolute_position().x >= 720.0 * 2.0 / 5.0);
+        assert!(first.absolute_position().x >= MARGIN + 720.0 * 2.0 / 5.0);
         assert!(h.row("Item 1").size().width <= 720.0 * 2.0 / 5.0);
         h.arrow_down();
         assert!(h.find("Second body").is_some());
@@ -1235,7 +1237,7 @@ mod detail {
         let value = h.find("Terminal").expect("the metadata is drawn");
         (
             value.absolute_position().y + value.size().height,
-            480.0 - ACTION_BAR,
+            MARGIN + 480.0 - ACTION_BAR,
         )
     }
 
@@ -1577,7 +1579,7 @@ mod grid {
         let last = h.row("Tile 7");
         let bottom = last.absolute_position().y + last.size().height;
         assert!(
-            bottom <= h.height() - ACTION_BAR,
+            bottom <= MARGIN + h.height() - ACTION_BAR,
             "the last row is not cut off"
         );
     }
@@ -1773,7 +1775,7 @@ mod bare_pill {
         h.event(Event::Failed("Couldn't paste".into()));
         let ticker = h.find("Couldn't paste").expect("the ticker on the pill");
         let pill = h.find("Search bar").expect("the pill");
-        assert!(ticker.absolute_position().y < pill.size().height);
+        assert!(ticker.absolute_position().y < MARGIN + pill.size().height);
         assert_eq!(ticker.accessible_description().as_deref(), Some("Failed"));
         assert_eq!(h.height(), 52.0);
     }
@@ -1799,10 +1801,10 @@ mod bare_pill {
         h.wake_busy();
         let pill = h.find("Search bar").expect("the pill").size().height;
         let on_pill = h.find("Downloading Dango 0.5.1").expect("the ticker");
-        assert!(on_pill.absolute_position().y < pill);
+        assert!(on_pill.absolute_position().y < MARGIN + pill);
         h.arrow_down();
         let in_bar = h.find("Downloading Dango 0.5.1").expect("the ticker");
-        assert!(in_bar.absolute_position().y > pill);
+        assert!(in_bar.absolute_position().y > MARGIN + pill);
     }
 }
 
@@ -1824,16 +1826,38 @@ mod window_height {
     #[test]
     fn a_click_in_the_gap_is_a_click_outside() {
         let h = Harness::root(results(3));
-        h.click_at(360.0, 52.0 + 4.0);
+        h.click_at(MARGIN + 360.0, MARGIN + 52.0 + 4.0);
         assert_eq!(h.intents(), [Intent::ClickedOutside]);
+    }
+
+    #[test]
+    fn a_click_in_the_margin_beside_the_card_is_a_click_outside() {
+        let h = Harness::root(results(3));
+        let card = h.find("Results").expect("the card");
+        h.click_at(MARGIN / 2.0, card.absolute_position().y + 20.0);
+        assert_eq!(h.intents(), [Intent::ClickedOutside]);
+    }
+
+    #[test]
+    fn the_pill_and_the_card_sit_inside_the_margin() {
+        let h = Harness::root(results(3));
+        for label in ["Search bar", "Results"] {
+            let part = h.find(label).expect(label);
+            assert_eq!(part.absolute_position().x, MARGIN);
+            assert_eq!(part.size().width, 720.0);
+        }
+        assert_eq!(h.find("Search bar").unwrap().absolute_position().y, MARGIN);
     }
 
     #[test]
     fn a_click_on_the_pill_or_an_empty_part_of_the_card_stays_inside() {
         let h = Harness::root(results(3));
-        h.click_at(360.0, 26.0);
+        h.click_at(MARGIN + 360.0, MARGIN + 26.0);
         let card = h.find("Results").expect("the card");
-        h.click_at(360.0, card.absolute_position().y + LIST_PADDING / 2.0);
+        h.click_at(
+            MARGIN + 360.0,
+            card.absolute_position().y + LIST_PADDING / 2.0,
+        );
         assert!(!h.intents().contains(&Intent::ClickedOutside));
     }
 

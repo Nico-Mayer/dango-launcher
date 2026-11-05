@@ -49,6 +49,10 @@ pub trait LauncherWindow: Send {
 /// The launcher's tallest, in logical pixels.
 pub const LAUNCHER_MAX_HEIGHT: f64 = 480.0;
 
+/// Transparent room around the launcher for its shadow, on every side. Matches
+/// `Theme.shadow-margin`.
+pub const LAUNCHER_SHADOW_MARGIN: f64 = 32.0;
+
 /// The platform half of the notice. The shell shows and hides it through Slint;
 /// this places it and does what winit cannot.
 pub trait NoticeWindow: Send {

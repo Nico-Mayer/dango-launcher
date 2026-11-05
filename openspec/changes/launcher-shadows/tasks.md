@@ -6,7 +6,7 @@
 
 ## 2. Margin and shadows in the launcher window
 
-- [ ] 2.1 Add the margin, as design.md describes:
+- [x] 2.1 Add the margin, as design.md describes:
   - `LAUNCHER_SHADOW_MARGIN` (32.0) next to `LAUNCHER_MAX_HEIGHT` in `src/platform/mod.rs`.
   - `LauncherWindow`: `width: window-width + 2 * shadow-margin`, `height: Shell.height + 2 * shadow-margin`; pill and card inside one container `Rectangle` at the margin with no `TouchArea`; the card clamp becomes `min(Shell.launcher-height, parent.height) - self.y`.
   - `set_launcher_height`: `Shell.height` keeps the launcher height; only `platform.set_height` gets `height + 2 * LAUNCHER_SHADOW_MARGIN`.

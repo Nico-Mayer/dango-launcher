@@ -103,7 +103,9 @@ impl LauncherWindow for WindowsLauncherWindow {
             }
             let scale = f64::from(target_dpi) / f64::from(window_dpi);
             let width = f64::from(rect.right - rect.left) * scale;
-            let height = super::LAUNCHER_MAX_HEIGHT * f64::from(target_dpi) / 96.0;
+            let height = (super::LAUNCHER_MAX_HEIGHT + 2.0 * super::LAUNCHER_SHADOW_MARGIN)
+                * f64::from(target_dpi)
+                / 96.0;
             let (x, y) = super::launcher_origin(
                 f64::from(area.left),
                 f64::from(area.top),
