@@ -2,6 +2,11 @@
 
 All notable changes to Dango. Generated from commit history at release time.
 
+## [6.7.1] - 2026-11-05
+
+### Fixes
+
+- **macos:** Drop native shadow on launcher
 ## [6.7.0] - 2026-11-05
 
 ### Features
