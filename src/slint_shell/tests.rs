@@ -1141,6 +1141,54 @@ mod list_view {
         assert!(h.find("No results for “zzz”").is_some());
     }
 
+    fn web_search(query: &str) -> ResultItem {
+        ResultItem {
+            id: format!("web:duckduckgo:{query}"),
+            title: format!("Search DuckDuckGo for “{query}”"),
+            web_search: true,
+            ..result(0)
+        }
+    }
+
+    #[test]
+    fn a_web_search_sits_under_its_heading_below_the_results() {
+        let h = Harness::root(results(3));
+        h.type_text("fire");
+        h.event(Event::Results {
+            query: "fire".into(),
+            items: vec![result(1), web_search("fire")],
+            complete: true,
+        });
+
+        let ranked = h.row("Result 1").absolute_position().y;
+        let heading = h
+            .find("Search the web")
+            .expect("the web search heading is drawn")
+            .absolute_position()
+            .y;
+        let web = h.row("Search DuckDuckGo for “fire”").absolute_position().y;
+        assert!(
+            ranked < heading && heading < web,
+            "{ranked} {heading} {web}"
+        );
+    }
+
+    #[test]
+    fn a_web_search_alone_is_selected_and_opens() {
+        let h = Harness::root(results(3));
+        h.type_text("zzqx");
+        h.event(Event::Results {
+            query: "zzqx".into(),
+            items: vec![web_search("zzqx")],
+            complete: true,
+        });
+
+        assert!(h.find("No results for “zzqx”").is_none());
+        let row = h.row("Search DuckDuckGo for “zzqx”");
+        assert_eq!(row.accessible_item_selected(), Some(true));
+        assert!(h.find("Open").is_some());
+    }
+
     #[test]
     fn arrow_down_changes_the_detail_pane() {
         let detailed = |n: usize, body: &str| ListItem {

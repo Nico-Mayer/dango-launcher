@@ -13,7 +13,7 @@
 - [x] 2.4 Handle `web:` ids in `perform_action`: set the `query` argument from the id and go straight to open or copy, without a form. Verify: tests cover opening with the query encoded (`a&b?c`), opening in the named browser, a template with `clipboard` filled without a form, and copying the rendered URL
 - [x] 2.5 Add `web_search` to `ResultItem`, set in `Core::result_item`, and put these rows in a "Search the web" section in `root_screen`. Verify: state tests in `src/ui/tests.rs` cover the heading under the ranked rows with no other heading on a typed query, the first web search selected with no "No results" when nothing else matches, and "No results" still shown with no web search
 - [x] 2.6 Skip `record_use` for web search ids through a `pub` helper in the quicklinks module. Verify: a test in `src/app/tests.rs` confirms a web search row and checks frecency and learned inputs are unchanged
-- [ ] 2.7 UI test on the Slint testing backend for a query with one ranked result and one web search: both rows render, the "Search the web" heading sits between them, and the ActionBar reads "Open". Verify: the new test in `src/slint_shell/tests.rs` passes
+- [x] 2.7 UI test on the Slint testing backend for a query with one ranked result and one web search: both rows render, the "Search the web" heading sits between them, and the ActionBar reads "Open". Verify: the new test in `src/slint_shell/tests.rs` passes
 
 ## 3. DuckDuckGo default
 
