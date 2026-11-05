@@ -188,6 +188,7 @@ impl Handoff for WindowsHandoff {
                 return;
             }
             super::force_foreground(launcher);
+            super::take_keyboard(launcher);
             if GetForegroundWindow() != launcher {
                 eprintln!("[dango] the launcher didn't get the foreground back after a read");
             }

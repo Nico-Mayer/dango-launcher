@@ -379,9 +379,19 @@ pub(super) unsafe fn force_foreground(target: HWND) {
 }
 
 /// Not part of `force_foreground`: on another app's top-level window it would
-/// take focus from the control inside it.
-unsafe fn take_keyboard(hwnd: HWND) {
+/// take focus from the control inside it. `SetFocus` only reaches a window on
+/// the caller's input queue, and the selection read runs on a worker thread.
+pub(super) unsafe fn take_keyboard(hwnd: HWND) {
+    let current = GetCurrentThreadId();
+    let owner = GetWindowThreadProcessId(hwnd, std::ptr::null_mut());
+    let attach = owner != 0 && owner != current;
+    if attach {
+        AttachThreadInput(current, owner, TRUE);
+    }
     SetFocus(hwnd);
+    if attach {
+        AttachThreadInput(current, owner, FALSE);
+    }
 }
 
 fn hwnd(window: RawWindowHandle) -> Option<HWND> {
