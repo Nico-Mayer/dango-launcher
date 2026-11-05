@@ -15,7 +15,9 @@ mod tests;
 pub(crate) fn render_headless(snapshot: crate::ui::Snapshot) -> generated::LauncherWindow {
     i_slint_backend_testing::init_no_event_loop();
     let ui = generated::LauncherWindow::new().unwrap();
-    ui.window().set_size(slint::LogicalSize::new(784.0, 544.0));
+    let margins = 2.0 * crate::platform::LAUNCHER_SHADOW_MARGIN as f32;
+    ui.window()
+        .set_size(slint::LogicalSize::new(720.0 + margins, 480.0 + margins));
     ui.show().unwrap();
     let mut renderer = render::Renderer::new(&ui);
     render::publish(&mut renderer, &ui, snapshot, |_| {});

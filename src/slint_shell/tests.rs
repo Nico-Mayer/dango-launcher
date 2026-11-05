@@ -18,8 +18,7 @@ use crate::protocol::{
 use crate::shell::TrayStatus;
 use crate::ui::{Context, Effect, Event, Input, Intent, Launcher, ResultItem, TemplateInspection};
 
-/// The transparent room around the launcher, matching `Theme.shadow-margin`.
-const MARGIN: f32 = 32.0;
+const MARGIN: f32 = crate::platform::LAUNCHER_SHADOW_MARGIN as f32;
 /// The SearchBar pill and the gap below it, above the card.
 const PILL: f32 = 52.0 + 8.0;
 const ACTION_BAR: f32 = 44.0;
@@ -44,7 +43,10 @@ impl Harness {
     fn new() -> Self {
         i_slint_backend_testing::init_no_event_loop();
         let ui = LauncherWindow::new().unwrap();
-        ui.window().set_size(slint::LogicalSize::new(784.0, 544.0));
+        ui.window().set_size(slint::LogicalSize::new(
+            720.0 + 2.0 * MARGIN,
+            480.0 + 2.0 * MARGIN,
+        ));
         ui.show().unwrap();
         let renderer = Rc::new(RefCell::new(Renderer::new(&ui)));
         let launcher = Rc::new(RefCell::new(Launcher::new()));
