@@ -33,7 +33,7 @@
 
 ## 5. Review
 
-- [ ] 5.1 Run the `ponytail-review` skill in a fresh subagent on this change's commits, without the apply context; report findings to the author
+- [x] 5.1 Run the `ponytail-review` skill in a fresh subagent on this change's commits, without the apply context; report findings to the author
 
 ## Workflow follow-up
 
