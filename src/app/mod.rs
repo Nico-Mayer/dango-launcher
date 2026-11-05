@@ -543,9 +543,13 @@ impl Core {
     /// press never gets here, because a chord says nothing about what the user
     /// types to find an item.
     fn record_use(&self, extension_id: &str, item_id: &str, query: Option<&str>) {
-        // An answer is the query's own result, not something the user reaches
-        // for again, so learning it would only fill the tables.
-        if item_id.is_empty() || extension_id == extensions::calculator::EXTENSION_ID {
+        // An answer or a web search belongs to the query that made it, not
+        // something the user reaches for again, so learning it would only fill
+        // the tables.
+        if item_id.is_empty()
+            || extension_id == extensions::calculator::EXTENSION_ID
+            || extensions::snippets::is_web_search(extension_id, item_id)
+        {
             return;
         }
         let now = now_millis();

@@ -61,6 +61,10 @@ const FIELD_FALLBACK: &str = "fallback";
 /// Starts a web search row's id, which goes on to the record id and the typed
 /// query, so the row carries its query to the action.
 const WEB_SEARCH_PREFIX: &str = "web:";
+
+pub fn is_web_search(extension_id: &str, item_id: &str) -> bool {
+    extension_id == QUICKLINKS_ID && item_id.starts_with(WEB_SEARCH_PREFIX)
+}
 /// Prefix for the fields an argument form asks about, so an argument called
 /// "name" cannot collide with the snippet's own name field.
 const ARGUMENT_PREFIX: &str = "arg:";
