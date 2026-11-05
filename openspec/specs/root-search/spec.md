@@ -175,7 +175,8 @@ in exactly one section.
 
 When there is no pinned item and no item has been launched yet, the open list
 SHALL be shown flat, with no section headings. A non-empty query SHALL never
-show section headings.
+show section headings other than "Search the web" (see "Web searches close a
+typed query's results").
 
 #### Scenario: The launcher opens as the pill
 
@@ -187,8 +188,8 @@ show section headings.
 - **WHEN** the launcher shows the pill alone and the user types one character
 - **THEN** the pill stays alone until the first result for that character
   arrives
-- **AND** the card then opens with one ranked list for that query and no
-  section heading
+- **AND** the card then opens with one ranked list for that query, with no
+  heading other than "Search the web" below it
 
 #### Scenario: Clearing the query brings the sections back
 
@@ -201,7 +202,8 @@ show section headings.
 #### Scenario: Typing removes the sections
 
 - **WHEN** the user has opened the empty-query list and types one character
-- **THEN** the list shows one ranked list with no section heading
+- **THEN** the list shows one ranked list, with no heading other than
+  "Search the web" below it
 
 #### Scenario: The top suggestion is selected
 
@@ -456,3 +458,69 @@ keys. A result without a working hotkey SHALL show none.
 
 - **WHEN** a command's configured hotkey was refused by the operating system
 - **THEN** its row shows no key chord
+
+### Requirement: Web searches close a typed query's results
+
+For a non-empty query, web search rows (see quicklinks) SHALL be listed after
+every other result, under the heading "Search the web", in the order of their
+entries in `quicklinks.toml`. They SHALL be shown only once every provider has
+answered the query. They SHALL NOT be matched against the query, ranked, or
+reordered by use. They SHALL count toward the result limit, but other results
+SHALL be cut first. The empty query SHALL show none.
+
+#### Scenario: Web searches sit below the results
+
+- **WHEN** the user types `fire` and Firefox and two web searches match
+- **THEN** Firefox is listed first and selected
+- **AND** the two web search rows follow under "Search the web", in file order
+
+#### Scenario: Web searches wait for every provider
+
+- **WHEN** the user types a query and a provider has not answered yet
+- **THEN** no web search row is shown
+- **AND** the web search rows appear below the results once every provider
+  has answered
+
+#### Scenario: Enter before every provider answered
+
+- **WHEN** the user types `fire` and confirms before every provider has answered
+- **THEN** no web search is opened
+
+#### Scenario: Results are cut before web searches
+
+- **WHEN** a query matches more results than the limit allows
+- **THEN** every web search row is still shown at the bottom
+- **AND** the list holds no more rows than the limit
+
+#### Scenario: The empty query shows no web search
+
+- **WHEN** the user opens the empty-query list
+- **THEN** no web search row is shown
+
+### Requirement: Web searches stand in for no results
+
+When a typed query has no result other than web search rows, the first web
+search row SHALL be selected and "No results" SHALL NOT be shown.
+
+#### Scenario: Nothing else matches
+
+- **WHEN** the user types `zzqx`, no other result matches, and DuckDuckGo is a
+  web search
+- **THEN** once every provider has answered, the row
+  `Search DuckDuckGo for “zzqx”` is shown and selected
+- **AND** "No results" is not shown
+
+#### Scenario: No web search configured
+
+- **WHEN** no quicklink is a web search and the user types a query nothing matches
+- **THEN** "No results" is shown, as before
+
+### Requirement: A web search teaches nothing
+
+Confirming a web search row, or choosing any of its actions, SHALL NOT update
+frecency or record the typed text for any item.
+
+#### Scenario: Searching the web leaves ranking alone
+
+- **WHEN** the user types `rust`, confirms a web search row, and later types `rust` again
+- **THEN** results rank exactly as they did before the web search

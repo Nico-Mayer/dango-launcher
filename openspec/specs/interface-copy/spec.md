@@ -174,7 +174,8 @@ error SHALL follow the failure requirement above.
 
 #### Scenario: Root search finds nothing
 
-- **WHEN** the user types a query with no matching result and gets no answer
+- **WHEN** the user types a query with no matching result, gets no answer, and
+  no quicklink is a web search
 - **THEN** the list shows "No results for" followed by the query
 
 #### Scenario: A pushed list is empty
