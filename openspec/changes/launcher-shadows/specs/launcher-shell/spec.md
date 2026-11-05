@@ -26,8 +26,9 @@ same frame. While root search is still receiving results for a query, the
 window SHALL grow with them but SHALL NOT shrink until every provider has
 answered.
 
-On macOS, the window SHALL stay 480 logical pixels tall plus the margin for
-every view, and the area below the visible launcher SHALL be transparent.
+On macOS, the window SHALL keep the same height for every view, with room for
+the full 480 logical pixel launcher, and the area below the visible launcher
+SHALL be transparent.
 
 On both platforms, "No results" SHALL NOT show while root search is still
 receiving results for a query, until every provider has answered.
@@ -63,8 +64,8 @@ receiving results for a query, until every provider has answered.
 
 - **WHEN** the launcher opens on macOS with an empty query and no item is
   pinned
-- **THEN** the window stays 480 logical pixels tall plus the margin, and
-  everything below the pill and its shadow is transparent
+- **THEN** the window keeps its full height and everything below the pill and
+  its shadow is transparent
 
 #### Scenario: Few results make a short window on Windows
 
@@ -75,7 +76,7 @@ receiving results for a query, until every provider has answered.
 #### Scenario: Few results keep the full height on macOS
 
 - **WHEN** a query on macOS leaves three results
-- **THEN** the window stays 480 logical pixels tall plus the margin, the card
+- **THEN** the window keeps its full height, the card
   is as tall as three rows and the ActionBar, and the area below the card's
   shadow is transparent
 
@@ -115,4 +116,4 @@ receiving results for a query, until every provider has answered.
 
 - **WHEN** the user types on macOS and each keystroke changes the number of
   results
-- **THEN** the window stays 480 logical pixels tall plus the margin
+- **THEN** the window keeps its full height

@@ -35,8 +35,10 @@ shadow draws), so the follow-up can land.
 
 ## Platforms
 
-Windows and macOS. Both draw with femtovg. macOS window placement reads the
-window's size, so the margin needs no macOS code; it still gets a hand check.
+Windows and macOS. Both draw with femtovg. The Slint window adds the margin to
+its own size, so macOS gets it with no platform code, and its placement reads
+the window's frame. Windows' native resize and placement add the margin. Both
+get a hand check.
 
 ## Capabilities
 
@@ -56,9 +58,9 @@ None.
 - `ui/theme.slint`: shadow size and margin values.
 - `ui/shell/launcher-window.slint`, `ui/shell/action-panel.slint`: shadows,
   the margin, layout inside it.
-- `src/slint_shell/mod.rs`, `src/slint_shell/render/height.rs`: window height
-  adds the margin.
+- `src/slint_shell/mod.rs`: the Windows native resize adds the margin.
 - `src/platform/mod.rs`, `src/platform/windows/mod.rs`: placement height
   includes the margin.
-- `src/slint_shell/tests.rs`: click coordinates move by the margin.
+- `src/slint_shell/tests.rs`, `src/slint_shell/render/mod.rs`
+  (`render_headless`): window size and absolute positions move by the margin.
 - `.design/Launcher Component System v5.dc.html`: shows the shadows again.

@@ -4,12 +4,16 @@
 
 - `LauncherWindow` (`ui/shell/launcher-window.slint`) is `Theme.window-width`
   (720) wide and `Shell.height` tall. Pill at y 0, card below the gap, both
-  edge to edge. A full-window `TouchArea` turns clicks on transparent parts
-  into `Intents.clicked-outside`.
+  edge to edge. The card's height is `min(Shell.launcher-height, root.height)
+  - self.y`: the `root.height` term keeps the card inside the window when a
+  resize lands a frame before the new height. A full-window `TouchArea` turns
+  clicks on transparent parts into `Intents.clicked-outside`.
 - `render/height.rs` computes the visible launcher height (max
   `LAUNCHER_MAX_HEIGHT`, 480). `set_launcher_height` (`src/slint_shell/mod.rs`)
-  writes it to `Shell.height` and, on Windows, resizes the native window with
-  `SWP_NOMOVE`. macOS keeps the component at 480.
+  returns early when `Shell.height` already equals it, and on macOS
+  (`!keeps_top_edge`) before writing anything, so there `Shell.height` stays
+  at its default 480 (`ui/globals.slint`). On Windows it writes `Shell.height`
+  and resizes the native window with `SWP_NOMOVE`.
 - Placement: `launcher_origin` centres a window of a given size. Windows passes
   the real width and `LAUNCHER_MAX_HEIGHT` scaled to the target DPI; macOS
   passes the window frame's size.
@@ -19,6 +23,10 @@
   draws none. Confirmed femtovg on the author's Windows machine (debug build
   loads `atio6axx.dll`; pixels below the action panel fade 217 to 229 on a 255
   card).
+- Slint lowers `drop-shadow-*` into a sibling `BoxShadow` element before the
+  `clip` pass (`i-slint-compiler-1.18.1/passes/lower_shadows.rs`), so the
+  card's `clip: true` does not cut its own shadow, and a hidden card hides its
+  shadow too.
 
 ## Goals / Non-Goals
 
@@ -51,25 +59,40 @@ edge keep working as they are.
 Rejected: **per-side margins (16 / 24 / 24 / 32).** Saves a few transparent
 pixels but makes centring offset-aware on both platforms. Not worth it.
 
-### Height stays the launcher's; the window adds the margin
+### `Shell.height` stays the launcher's; the Slint window adds the margin
 
-`render/height.rs` keeps returning the visible launcher height, so UI tests and
-the height rules keep their meaning. `set_launcher_height` writes
-`height + 2 * margin` to `Shell.height` and to `platform.set_height`. A
-`LAUNCHER_SHADOW_MARGIN` constant sits next to `LAUNCHER_MAX_HEIGHT` in
+`render/height.rs` and `Shell.height` keep meaning the visible launcher height.
+`LauncherWindow` sets `width: Theme.window-width + 2 * Theme.shadow-margin` and
+`height: Shell.height + 2 * Theme.shadow-margin`. So:
+
+- macOS gets a 544 high window from the existing 480 default, with no Rust
+  change, and its placement reads that frame.
+- `set_launcher_height`'s early return (`get_height() == height`) keeps
+  matching, so Windows does not resize on every snapshot.
+- On Windows, `set_launcher_height` only passes
+  `height + 2 * LAUNCHER_SHADOW_MARGIN` to `platform.set_height`.
+
+`LAUNCHER_SHADOW_MARGIN` (32.0) sits next to `LAUNCHER_MAX_HEIGHT` in
 `src/platform/mod.rs`, matching `Theme.shadow-margin` (AGENTS.md: change
-`Theme` and the matching constant together). Windows' placement height
-becomes `LAUNCHER_MAX_HEIGHT + 2 * LAUNCHER_SHADOW_MARGIN`. macOS reads the
-frame, so it follows on its own.
+`Theme` and the matching constant together). Windows' placement height becomes
+`LAUNCHER_MAX_HEIGHT + 2 * LAUNCHER_SHADOW_MARGIN`.
 
-### Layout inside the margin
+Rejected: **writing `height + 2 * margin` to `Shell.height`.** macOS never
+writes `Shell.height`, so its window would stay 480 and cut the card's bottom,
+and the early return would never match.
 
-`LauncherWindow` width becomes `window-width + 2 * shadow-margin`. The pill and
-the card get `x: Theme.shadow-margin`, `width: Theme.window-width`, and their
-`y` moves down by the margin. The card's height clamp reads the launcher
-height, not `root.height`, minus the margin. The full-window `TouchArea`
-already covers the margin, so a click there is `clicked-outside` with no new
-code.
+### One container inside the margin
+
+Pill and card move into one plain `Rectangle` at `x`/`y`:
+`Theme.shadow-margin`, `width: Theme.window-width`, `height: parent.height -
+2 * Theme.shadow-margin`, with no `TouchArea`. Pill and card keep their
+coordinates. The card's clamp keeps its window term, reading `parent.height`
+instead of `root.height`: `min(Shell.launcher-height, parent.height) -
+self.y`. The full-window `TouchArea` stays outside the container and covers
+the margin, so a click there is `clicked-outside` with no new code.
+
+Rejected: **moving pill and card by the margin one by one.** More lines change,
+and the clamp has to subtract the margin itself.
 
 Design-system parts: pill and card in `ui/shell/launcher-window.slint`,
 `ActionPanel` in `ui/shell/action-panel.slint`. No new component.
@@ -88,9 +111,10 @@ No manifest or view protocol change. No user-visible text.
 
 ## Risks / Trade-offs
 
-- The card has `clip: true`. If Slint clips its own drop shadow with it, wrap
-  the card in a parent `Rectangle` that carries the shadow. The first UI task
-  checks this with a screenshot.
+- No automated test covers the margin maths in `set_launcher_height` or
+  Windows placement: the test harness bypasses `set_launcher_height`, and the
+  `launcher_origin` tests do not involve the margin. The hand checks cover
+  them.
 - The margin blocks clicks to the app behind within 32 pixels of the launcher.
   Same as the gap today; they dismiss the launcher, as the spec says.
 - The pill's shadow falls into the 8px gap and darkens it slightly. The app
