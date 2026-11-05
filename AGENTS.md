@@ -108,6 +108,7 @@ No millisecond budgets in specs or tests. Results depend on machine load, unreli
 - Keyboard `CGEventTap`s on macOS need Input Monitoring to see events; active one (hyperkey) also needs Accessibility, or creation is refused. Input Monitoring grant applies only after restart; Accessibility grant applies at once.
 - Revoking Accessibility under running active tap stalls all keyboard + mouse input system-wide. Permission poller restarts hyperkey on any permission change, so new tap matches current grants.
 - Showing launcher over fullscreen apps on macOS needs NSPanel.
+- winit leaves `hasShadow` on for every macOS window, borderless included. AppKit traces that shadow from window alpha, Slint's `drop-shadow` included, and recomputes it only on resize, so launcher `attach` turns it off.
 - Launcher window on macOS takes mouse clicks on its fully transparent pixels too (gap, area below card): app behind gets none, launcher's own `TouchArea` does.
 - Mouse click on launcher panel activates Dango on macOS despite `NonactivatingPanel` mask (hotkey show does not). macOS `restore_previous_focus` is a no-op, so after a click + hide Dango stays active app, focus not back to app behind.
 - Notice window on macOS reclassed to plain `NSPanel`, never launcher's `DangoPanel`: that class answers yes to `canBecomeKeyWindow` and writes global `PANEL_IS_KEY` in `becomeKeyWindow`. Borderless `NSPanel` never becomes key.

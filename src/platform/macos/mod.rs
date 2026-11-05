@@ -156,6 +156,10 @@ impl LauncherWindow for MacLauncherWindow {
             );
             ns_window.setLevel(NS_POPUP_MENU_WINDOW_LEVEL);
             ns_window.setHidesOnDeactivate(false);
+            // winit leaves AppKit's window shadow on. It traces the window's
+            // alpha, Slint shadow included, and is not recomputed when the
+            // card changes height, since the window never resizes here.
+            ns_window.setHasShadow(false);
         }
     }
 
