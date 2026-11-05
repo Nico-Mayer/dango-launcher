@@ -106,6 +106,7 @@ mod tests {
             icon: None,
             keywords: vec![],
             alias: None,
+            repeats: false,
         }
     }
 

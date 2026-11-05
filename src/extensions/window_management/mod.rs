@@ -330,6 +330,7 @@ fn command(id: &str, title: &str, icon: &str, keywords: &[&str]) -> crate::exten
         icon: Some(format!("{}{icon}", crate::extension::NAMED_ICON)),
         keywords: keywords.iter().map(|k| (*k).to_string()).collect(),
         alias: None,
+        repeats: false,
     }
 }
 

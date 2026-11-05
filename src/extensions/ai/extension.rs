@@ -631,6 +631,7 @@ pub(crate) fn manifest(commands: &[AiCommand]) -> Manifest {
                 icon: Some(format!("{NAMED_ICON}{ICON}")),
                 keywords: vec!["ai".into()],
                 alias: None,
+                repeats: false,
             })
             .collect(),
         root_items: false,

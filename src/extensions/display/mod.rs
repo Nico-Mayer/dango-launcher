@@ -139,6 +139,7 @@ fn command(id: &str, title: &str, icon: &str, keywords: &[&str]) -> CommandDecl 
         icon: Some(format!("{NAMED_ICON}{icon}")),
         keywords: keywords.iter().map(|k| (*k).to_string()).collect(),
         alias: None,
+        repeats: true,
     }
 }
 
@@ -489,6 +490,11 @@ mod tests {
             maximum: 0,
         };
         assert_eq!(stepped(none, 1), None);
+    }
+
+    #[test]
+    fn both_brightness_commands_repeat_while_held() {
+        assert!(manifest().commands.iter().all(|command| command.repeats));
     }
 
     #[test]

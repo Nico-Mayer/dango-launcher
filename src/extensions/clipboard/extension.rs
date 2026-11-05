@@ -153,6 +153,7 @@ pub(crate) fn manifest() -> Manifest {
                 .map(|k| (*k).to_string())
                 .collect(),
             alias: None,
+            repeats: false,
         }],
         root_items: false,
         services: true,

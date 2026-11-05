@@ -44,6 +44,12 @@ const BUSY_MARK_HOLD: Duration = Duration::from_millis(400);
 /// takes a failure notice away.
 const FAILURE_NOTICE_LIFETIME: Duration = Duration::from_secs(4);
 
+/// Neither platform repeats a held chord, so a command that repeats while held
+/// is run again by Dango: after a pause that tells a hold from a tap, then at a
+/// steady pace until the release.
+const REPEAT_DELAY: Duration = Duration::from_millis(350);
+const REPEAT_INTERVAL: Duration = Duration::from_millis(150);
+
 pub struct Core {
     shell: Arc<dyn Shell>,
     runtime: Handle,
@@ -52,6 +58,7 @@ pub struct Core {
     latency: LatencyProbe,
     hold: Mutex<Option<Hold>>,
     hold_generation: AtomicU64,
+    repeat_generation: AtomicU64,
     visible: AtomicBool,
     tray: Mutex<TrayStatus>,
     /// A snippet file or hotkey problem, which a config reload must not clear.
@@ -158,6 +165,7 @@ impl Core {
             latency: LatencyProbe::default(),
             hold: Mutex::new(None),
             hold_generation: AtomicU64::new(0),
+            repeat_generation: AtomicU64::new(0),
             visible: AtomicBool::new(false),
             tray: Mutex::new(tray),
             reported_problem: AtomicBool::new(false),
@@ -343,6 +351,7 @@ impl Core {
     /// `asked` when the user opened it: only then may it jump into an answer
     /// whose notice is showing.
     pub fn show(self: &Arc<Self>, probe: Option<u64>, asked: bool) {
+        self.stop_repeat();
         let core = self.clone();
         self.on_main_thread(move || {
             let held = core.clear_hold();
@@ -635,15 +644,48 @@ impl Core {
     }
 
     /// A press on a registered chord.
+    /// Any hotkey event ends a repeat: a release of the held chord, or another
+    /// press taking over.
     pub fn on_hotkey(self: &Arc<Self>, event: global_hotkey::GlobalHotKeyEvent) {
+        self.stop_repeat();
         match self.services.hotkeys.pressed(event.id(), event.state()) {
             Some(Pressed::Launcher) => self.toggle(),
-            Some(Pressed::Target(hotkeys::Target::Command(id))) => self.dispatch_command(&id),
+            Some(Pressed::Target(hotkeys::Target::Command(id))) => {
+                self.dispatch_command(&id);
+                if self.repeats(&id) {
+                    self.start_repeat(id);
+                }
+            }
             Some(Pressed::Target(hotkeys::Target::Application(name))) => {
                 self.dispatch_application(&name)
             }
             None => {}
         }
+    }
+
+    fn repeats(&self, command_id: &str) -> bool {
+        self.services
+            .host
+            .lock()
+            .ok()
+            .and_then(|host| Some(host.registry().get(command_id)?.decl.repeats))
+            .unwrap_or(false)
+    }
+
+    fn start_repeat(self: &Arc<Self>, command_id: String) {
+        let generation = self.repeat_generation.load(Ordering::SeqCst);
+        let core = self.clone();
+        self.runtime.spawn(async move {
+            tokio::time::sleep(REPEAT_DELAY).await;
+            while core.repeat_generation.load(Ordering::SeqCst) == generation {
+                core.dispatch_command(&command_id);
+                tokio::time::sleep(REPEAT_INTERVAL).await;
+            }
+        });
+    }
+
+    fn stop_repeat(&self) {
+        self.repeat_generation.fetch_add(1, Ordering::SeqCst);
     }
 
     /// Invokes a command from its hotkey. A no-view command runs without showing
@@ -837,6 +879,7 @@ impl Core {
     /// and updates the tray. A parse failure keeps the running config and is
     /// surfaced.
     fn apply_config_reload(self: &Arc<Self>, result: Result<config::Config, config::ConfigError>) {
+        self.stop_repeat();
         let config = match result {
             Ok(config) => config,
             Err(error) => {

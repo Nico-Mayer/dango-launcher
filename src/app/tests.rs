@@ -674,6 +674,7 @@ fn two_commands() -> Arc<TwoCommands> {
         icon: None,
         keywords: vec![],
         alias: None,
+        repeats: false,
     };
     Arc::new(TwoCommands(Manifest {
         manifest_version: 1,
@@ -1354,4 +1355,108 @@ async fn a_late_success_leaves_the_open_launcher_alone() {
         .calls()
         .iter()
         .any(|call| matches!(call, Call::Hide { .. })));
+}
+
+/// Two no-view commands counting their runs; `keep` repeats while held when
+/// `repeats` is set, `drop` never does.
+struct Counts(
+    crate::extension::Manifest,
+    Arc<std::sync::atomic::AtomicUsize>,
+);
+
+impl crate::extension::Extension for Counts {
+    fn manifest(&self) -> &crate::extension::Manifest {
+        &self.0
+    }
+    fn command(&self, _command_id: &str) -> Option<Arc<dyn crate::invocation::Command>> {
+        struct Count(Arc<std::sync::atomic::AtomicUsize>);
+        impl crate::invocation::Command for Count {
+            fn invoke(&self, ctx: &InvocationContext) {
+                self.0.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                ctx.succeed();
+            }
+        }
+        Some(Arc::new(Count(self.1.clone())))
+    }
+}
+
+const HELD_KEYS: &str =
+    r#"extensions = { x = { commands = { keep = { hotkey = "f2" }, drop = { hotkey = "f3" } } } }"#;
+
+fn counting(repeats: bool) -> (Arc<Core>, Arc<std::sync::atomic::AtomicUsize>) {
+    let mut manifest = two_commands().0.clone();
+    for command in &mut manifest.commands {
+        command.mode = crate::extension::InvocationMode::NoView;
+    }
+    manifest.commands[0].repeats = repeats;
+    let runs = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    let (core, _) = core_with(
+        "",
+        FakeGrab::default(),
+        vec![Arc::new(Counts(manifest, runs.clone()))],
+    );
+    core.apply_config_reload(Config::parse(HELD_KEYS));
+    (core, runs)
+}
+
+fn key(core: &Arc<Core>, command_id: &str, state: global_hotkey::HotKeyState) {
+    let id = core
+        .services
+        .hotkeys
+        .chord_for(&crate::hotkeys::Target::Command(command_id.into()))
+        .expect("bound")
+        .id();
+    core.on_hotkey(global_hotkey::GlobalHotKeyEvent { id, state });
+}
+
+/// Lets paused time run, then gives the command threads real time to count.
+async fn hold_for(millis: u64) {
+    tokio::time::sleep(Duration::from_millis(millis)).await;
+    std::thread::sleep(Duration::from_millis(30));
+}
+
+fn runs(count: &std::sync::atomic::AtomicUsize) -> usize {
+    count.load(std::sync::atomic::Ordering::SeqCst)
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_tap_on_a_repeating_command_runs_it_once() {
+    let (core, count) = counting(true);
+    key(&core, "x.keep", global_hotkey::HotKeyState::Pressed);
+    hold_for(100).await;
+    key(&core, "x.keep", global_hotkey::HotKeyState::Released);
+    hold_for(1000).await;
+    assert_eq!(runs(&count), 1);
+}
+
+#[tokio::test(start_paused = true)]
+async fn holding_a_repeating_command_runs_it_until_release() {
+    let (core, count) = counting(true);
+    key(&core, "x.keep", global_hotkey::HotKeyState::Pressed);
+    hold_for(1000).await;
+    let held = runs(&count);
+    assert!(held >= 4, "ran {held} times in a second");
+    key(&core, "x.keep", global_hotkey::HotKeyState::Released);
+    hold_for(1000).await;
+    assert_eq!(runs(&count), held, "stopped at the release");
+}
+
+#[tokio::test(start_paused = true)]
+async fn holding_any_other_command_runs_it_once() {
+    let (core, count) = counting(false);
+    key(&core, "x.keep", global_hotkey::HotKeyState::Pressed);
+    hold_for(1000).await;
+    assert_eq!(runs(&count), 1);
+}
+
+#[tokio::test(start_paused = true)]
+async fn another_hotkey_ends_a_repeat() {
+    let (core, count) = counting(true);
+    key(&core, "x.keep", global_hotkey::HotKeyState::Pressed);
+    hold_for(600).await;
+    key(&core, "x.drop", global_hotkey::HotKeyState::Pressed);
+    hold_for(0).await;
+    let after = runs(&count);
+    hold_for(1000).await;
+    assert_eq!(runs(&count), after);
 }

@@ -32,6 +32,8 @@ pub struct CommandDecl {
     pub icon: Option<String>,
     pub keywords: Vec<String>,
     pub alias: Option<String>,
+    /// Whether holding the command's hotkey runs it again until release.
+    pub repeats: bool,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -101,6 +103,7 @@ mod tests {
             icon: None,
             keywords: vec![],
             alias: None,
+            repeats: false,
         }
     }
 

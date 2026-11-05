@@ -57,6 +57,7 @@ pub(crate) fn manifest() -> Manifest {
             icon: Some(format!("{NAMED_ICON}refresh-cw")),
             keywords: vec!["update".into(), "upgrade".into(), "version".into()],
             alias: None,
+            repeats: false,
         }],
         root_items: true,
         services: true,

@@ -627,6 +627,7 @@ pub(crate) fn manifest(kind: Kind) -> Manifest {
                 icon: Some(icon(kind)),
                 keywords: vec!["new".into(), keyword.into()],
                 alias: None,
+                repeats: false,
             },
             CommandDecl {
                 id: COMMAND_SEARCH.into(),
@@ -635,6 +636,7 @@ pub(crate) fn manifest(kind: Kind) -> Manifest {
                 icon: Some(icon(kind)),
                 keywords: vec![keyword.into()],
                 alias: None,
+                repeats: false,
             },
         ],
         root_items: true,

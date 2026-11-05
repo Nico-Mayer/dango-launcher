@@ -176,6 +176,7 @@ fn command(
         icon: Some(format!("{NAMED_ICON}{icon}")),
         keywords: keywords.iter().map(|k| (*k).to_string()).collect(),
         alias: None,
+        repeats: false,
     }
 }
 

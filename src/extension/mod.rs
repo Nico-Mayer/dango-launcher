@@ -419,6 +419,7 @@ mod tests {
                         icon: None,
                         keywords: vec![],
                         alias: None,
+                        repeats: false,
                     }],
                     root_items: false,
                     services: false,
@@ -801,6 +802,7 @@ mod tests {
                 icon: None,
                 keywords: vec![],
                 alias: None,
+                repeats: false,
             };
             Arc::new(Self {
                 manifest: Manifest {
