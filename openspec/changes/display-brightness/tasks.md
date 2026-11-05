@@ -9,7 +9,7 @@
 
 - [x] 2.1 Add the `BrightnessMonitors` and `Monitor` traits, `Level`, and `MonitorError` (typed, `thiserror`) to `src/platform/mod.rs`, plus `ddc = "0.2"` and one adapter generic over `ddc::Ddc` that takes the monitor's name from its constructor. `Monitor` has no `Send` bound (see design.md). Verify: `cargo build` and `cargo clippy --all-targets -- -D warnings` pass
 - [x] 2.2 Windows: add `ddc-winapi = "0.2"` under the Windows target and implement `external()` in `platform/windows` with `ddc_winapi::Monitor::enumerate()`. Verify: `cargo build` and clippy pass on Windows
-- [ ] 2.3 macOS: add `ddc-macos = "0.2"` under the macOS target and implement `external()` in `platform/macos` with `ddc_macos::Monitor::enumerate()` (it already skips built-in displays). Check symbol names against the vendored crate source under `~/.cargo/registry`. Verify: CI's macOS job builds after the author pushes (left open until a macOS session)
+- [x] 2.3 macOS: add `ddc-macos = "0.2"` under the macOS target and implement `external()` in `platform/macos` with `ddc_macos::Monitor::enumerate()` (it already skips built-in displays). Check symbol names against the vendored crate source under `~/.cargo/registry`. Verify: CI's macOS job builds after the author pushes (left open until a macOS session)
 
 ## 3. Display extension
 
