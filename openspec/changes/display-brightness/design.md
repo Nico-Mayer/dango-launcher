@@ -65,22 +65,31 @@ Rejected: a trait method `step(direction)` per platform. It would duplicate clam
 
 Step = one tenth of the monitor's maximum, rounded, at least 1. New value = current plus or minus step, clamped to `0..=maximum`. Shown percentage = new value times 100 divided by maximum, rounded. A monitor with maximum 100 (the common case) moves exactly 10%. A monitor that reports a maximum of 0 counts as one that does not answer, so the percentage never divides by zero.
 
-### Repeated presses: one lock per step, ignore superseding
+### Repeated presses: combine waiting presses, one lock per step
 
-The spec requires every press to count and no two steps to overlap. Two facts decide this:
+The spec requires every press to count, no two steps to overlap, and the level to catch up with quick presses. Facts that decide this:
 
 - A second press supersedes the first run, so the first run's result is dropped. If the first run gave up on `is_cancelled`, quick presses would be lost.
 - Two runs talking to the same monitor at once interleave I2C messages, which many monitors answer with garbage or not at all.
+- Measured on the author's two monitors (Windows): a read takes about 60 ms and a write about 60 ms, so one step over two monitors takes about 240 ms. Five quick presses applied one by one take over a second.
 
-So each command run takes one `static Mutex<()>` in the extension and holds it for the whole step: enumerate, read, write. The command does not check `is_cancelled`. Each step reads fresh levels, so same-direction presses give the same result in any order. A superseded run's notice is dropped by the existing sink, so after quick presses only the last run's message shows.
+So each press adds `+1` or `-1` to a shared `static Mutex<i32>` of pending tenths, then takes the bus lock (`static Mutex<()>`) and, holding it, takes the whole pending sum (leaving 0) and applies it as one step of `n` tenths: enumerate, read, write. A press whose sum was already taken by an earlier holder finds 0 and succeeds without a message; its press counted in that earlier step. Up and down presses cancel inside the sum, so the order the lock is granted in no longer matters. Five quick presses become about two steps.
 
-Trade-off: `std::sync::Mutex` is not FIFO. An up press and a down press within one DDC round trip may apply in swapped order. The end level is the same unless a clamp sits between them, which is not worth more machinery.
+`stepped` takes the signed number of tenths instead of a direction.
 
 Rejected:
 
 - Drop presses while one is running: loses presses, breaks "each counts".
-- A worker thread fed by a channel: strict order, but a thread, a channel, and a reply path for an ordering difference no one will notice.
-- Coalescing queued presses into one step of `n` tenths: fewer bus round trips, but more state for a gain only noticeable with many presses. Revisit if holding a hotkey feels slow.
+- One step per press (the first version): correct, but trails quick presses by about 240 ms each, which felt slow in the hand check.
+- A worker thread fed by a channel: strict order and could combine presses too, but adds a thread and a reply path for what two statics do.
+
+### Reporting a step after a newer press
+
+Every step reports its level as it lands (spec: "Every change is reported as it lands"). The step that applies the presses is usually superseded by them, and `ChannelSink::finish` drops output from a superseded run, so the notice would only show after the last press.
+
+`InvocationContext::report(outcome)` finishes like `succeed_with` or `fail` while the run is current. Once superseded, it sends a new `Output::Late(Outcome)` instead of dropping it. The run's `pump` loop in `src/app/mod.rs` is still reading its channel, and turns `Late` into a notice-only UI event: a success message goes to `show_notice`, a failure to `show_failure` (ticker while visible, notice while hidden). Neither hides the launcher or touches `working`, so the newer invocation is unaffected. `command-invocation` gains this exception.
+
+Rejected: delivering a superseded `Finished` normally. It would hide the launcher and clear the busy state that belong to the newer command.
 
 ### Success with a message
 

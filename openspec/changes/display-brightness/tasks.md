@@ -17,6 +17,11 @@
 - [x] 3.2 Add the two no-view commands. Each holds one `static Mutex<()>` for its whole step (enumerate, read, write) and never checks `is_cancelled`. Map results: no monitor answers, every monitor refuses, partial success, with each monitor error written to `dango.log`. Verify: tests with fake monitors cover "Three quick presses" (three runs, monitor ends at 80%, runs superseded by later ones still apply), "No monitor answers", "Every monitor refuses", and "One of two monitors refuses"
 - [x] 3.3 Add the manifest (ids `increase-brightness`, `decrease-brightness`, titles, keywords, icons `sun` and `sun-dim` from design.md), register the icons in `src/slint_shell/icons.rs` if missing, add the extension to `builtin_manifests` and `src/app/startup.rs`. Verify: `every_built_in_manifest_validates` passes; a root search test finds both commands for "bright", "dim", and "monitor" and none when the extension is disabled; the generated config schema includes `display.commands.increase-brightness.hotkey`
 
+## 3b. Snappy repeated presses
+
+- [ ] 3.4 Add `InvocationContext::report` and `Output::Late`: a superseded run's success message or failure reaches the notice through a notice-only UI event that leaves `working` and the launcher alone. Verify: tests in `src/invocation.rs` (a superseded `report` sends `Late`, a current one sends `Finished`) and `src/app/tests.rs` (a late success shows in the notice without hiding the launcher; a late failure shows while hidden)
+- [ ] 3.5 Combine waiting presses: a shared pending sum of tenths, taken whole under the bus lock; `stepped` takes signed tenths; a press finding 0 succeeds without a message; brightness commands finish through `report`. Verify: tests in `src/extensions/display` cover "Three quick presses", "Up and down cancel out", a step of several tenths clamping, and that every finished step's message is delivered even when superseded
+
 ## 4. Hand checks
 
 - [ ] 4.1 Windows: on the author's monitors, run both commands from root search and from a bound hotkey (`mise run keys`), press the hotkey quickly several times, and open the launcher during a change. Check with `mise run shot` that the notice shows the level, the launcher does not appear for the hotkey, and the launcher still opens at once; turn DDC/CI off in one monitor's menu and check the partial and "no monitor" messages

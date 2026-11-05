@@ -58,13 +58,35 @@ A brightness command SHALL change every external monitor that answers DDC/CI. Ea
 
 ### Requirement: Repeated presses each count
 
-Each run of a brightness command SHALL take effect, also when the user runs it again before the previous run has finished. No two runs SHALL change monitors at the same time; each SHALL step from the level the previous one left.
+Each run of a brightness command SHALL take effect, also when the user runs it again before the previous run has finished. No two runs SHALL change monitors at the same time. Presses made while a change is in progress SHALL be combined and applied together as soon as it ends, so the level catches up with the presses instead of trailing them one step at a time.
 
 #### Scenario: Three quick presses
 
 - **GIVEN** a monitor at 50%
 - **WHEN** the user presses the `Increase Brightness` hotkey three times in quick succession
 - **THEN** the monitor ends at 80%
+
+#### Scenario: Up and down cancel out
+
+- **GIVEN** a monitor at 50% and a change in progress
+- **WHEN** the user presses `Increase Brightness` and then `Decrease Brightness` before it ends
+- **THEN** the monitor ends where that change left it
+
+### Requirement: Every change is reported as it lands
+
+During quick presses, each change SHALL report its level in the notice as soon as it lands, replacing the previous notice, also when a newer press has come in since. A failure SHALL be reported the same way, so it is never lost behind a later press.
+
+#### Scenario: The notice follows quick presses
+
+- **GIVEN** a monitor at 50%
+- **WHEN** the user presses the `Increase Brightness` hotkey five times in quick succession
+- **THEN** the notice shows a level between 60% and 100% while the presses are still being applied
+- **AND** it ends reading "Brightness set to 100%"
+
+#### Scenario: A failure during quick presses
+
+- **WHEN** the user presses a brightness hotkey three times in quick succession and no monitor answers DDC/CI
+- **THEN** the notice shows "Turn on DDC/CI in your monitor's menu to change brightness"
 
 ### Requirement: The new level is reported
 

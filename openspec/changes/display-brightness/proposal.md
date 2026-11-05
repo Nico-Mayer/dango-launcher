@@ -31,6 +31,7 @@ External monitors are dimmed and brightened with their own menu buttons, which i
 ### Modified Capabilities
 
 - `view-protocol`: a no-view command can report success with a one-line message.
+- `command-invocation`: a superseded no-view command's success message or failure still reaches the notice, so quick brightness presses show each level as it lands.
 - `notice`: the notice shows the success message of a no-view command that reported one, since a brightness level is an outcome the user cannot read off the screen.
 
 ## Impact
