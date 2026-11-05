@@ -84,6 +84,9 @@ export component LauncherWindow inherits Window {
                 height: Theme.search-height;
                 background: Theme.popover;
                 border-radius: self.height / 2;
+                drop-shadow-blur: Theme.shadow-blur;
+                drop-shadow-offset-y: Theme.shadow-offset;
+                drop-shadow-color: Theme.shadow;
                 accessible-role: groupbox;
                 accessible-label: "Search bar";
 
@@ -107,6 +110,9 @@ export component LauncherWindow inherits Window {
                 height: max(0, min(Shell.launcher-height, parent.height) - self.y);
                 background: Theme.popover;
                 border-radius: Theme.card-radius;
+                drop-shadow-blur: Theme.shadow-blur;
+                drop-shadow-offset-y: Theme.shadow-offset;
+                drop-shadow-color: Theme.shadow;
                 accessible-role: groupbox;
                 accessible-label: "Results";
                 clip: true;
