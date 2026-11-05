@@ -24,7 +24,7 @@
 
 ## 4. Design file
 
-- [ ] 4.1 Update `.design/Launcher Component System v5.dc.html` (gitignored): pill and card get `box-shadow: 0 8px 24px var(--shadow)`, drop the "no shadows" notes. Verify the file contains no "no shadow" note left
+- [x] 4.1 Update `.design/Launcher Component System v5.dc.html` (gitignored): pill and card get `box-shadow: 0 8px 24px var(--shadow)`, drop the "no shadows" notes. Verify the file contains no "no shadow" note left
 
 ## 5. Review
 
