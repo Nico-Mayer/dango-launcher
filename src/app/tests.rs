@@ -1028,6 +1028,19 @@ async fn an_answer_is_never_learned() {
 }
 
 #[tokio::test]
+async fn a_web_search_teaches_nothing() {
+    use crate::extensions::snippets::QUICKLINKS_ID;
+    let (core, _) = core("");
+    let id = "web:duckduckgo:rust";
+    core.record_use(QUICKLINKS_ID, id, Some("rust"));
+
+    let now = crate::ranking::now_millis();
+    assert_eq!(core.services.frecency.score(QUICKLINKS_ID, id, now), 0.0);
+    let learned = core.services.learned.lookup("rust", now);
+    assert_eq!(learned.exact(QUICKLINKS_ID, id), None);
+}
+
+#[tokio::test]
 async fn a_command_shows_its_registered_hotkey() {
     let (core, _) = core_with("", FakeGrab::default(), vec![two_commands()]);
     let config = Config::parse(

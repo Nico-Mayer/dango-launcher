@@ -44,12 +44,19 @@ impl DangoRanker {
 impl Ranker for DangoRanker {
     fn rank(&self, query: &str, candidates: Vec<Candidate>, limit: usize) -> Vec<Candidate> {
         // An answer is never matched against the query it answers: it leads.
+        // A web search takes any query, so it closes the list and is the last
+        // thing cut.
         let (answers, candidates): (Vec<Candidate>, Vec<Candidate>) = candidates
             .into_iter()
             .partition(|candidate| candidate.source == Source::Answer);
+        let (web_searches, candidates): (Vec<Candidate>, Vec<Candidate>) = candidates
+            .into_iter()
+            .partition(|candidate| candidate.source == Source::WebSearch);
+        let room = limit.saturating_sub(answers.len() + web_searches.len());
         answers
             .into_iter()
-            .chain(self.rank_results(query, candidates, limit))
+            .chain(self.rank_results(query, candidates, room))
+            .chain(web_searches)
             .take(limit)
             .collect()
     }
@@ -456,6 +463,52 @@ mod tests {
         );
         assert_eq!(ranked[0].id, "4");
         assert_eq!(ranked[0].source, Source::Answer);
+    }
+
+    fn web_search(id: &str) -> Candidate {
+        let mut candidate = candidate(id, &format!("Search {id} for “fire”"));
+        candidate.source = Source::WebSearch;
+        candidate
+    }
+
+    #[test]
+    fn web_searches_close_the_results_in_the_order_given() {
+        let frecency = Arc::new(FrecencyTable::in_memory());
+        frecency.record_launch("test", "ddg", frecency::now_millis());
+        let ranker = ranker_with(frecency, Arc::new(InputHistory::in_memory()));
+        let mut alias = candidate("ff", "Firefox");
+        alias.alias = Some("fire".into());
+        let ranked = ranker.rank(
+            "fire",
+            vec![
+                web_search("ddg"),
+                web_search("google"),
+                candidate("fw", "Firewall"),
+                alias,
+            ],
+            10,
+        );
+        let ids: Vec<&str> = ranked.iter().map(|c| c.id.as_str()).collect();
+        assert_eq!(ids, ["ff", "fw", "ddg", "google"]);
+    }
+
+    #[test]
+    fn results_are_cut_before_web_searches() {
+        let mut candidates: Vec<Candidate> = (0..10)
+            .map(|i| candidate(&format!("fire{i}"), &format!("Fire {i}")))
+            .collect();
+        let mut answer = candidate("4", "4");
+        answer.source = Source::Answer;
+        candidates.push(answer);
+        candidates.push(web_search("ddg"));
+        candidates.push(web_search("google"));
+
+        let ranked = ranker().rank("fire", candidates, 5);
+
+        let ids: Vec<&str> = ranked.iter().map(|c| c.id.as_str()).collect();
+        assert_eq!(ids.len(), 5);
+        assert_eq!(ids[0], "4");
+        assert_eq!(&ids[3..], ["ddg", "google"]);
     }
 
     #[test]

@@ -45,6 +45,8 @@ pub enum RecordError {
     Parse(String),
     #[error("Line {line}: {field} must be text")]
     NotText { line: usize, field: String },
+    #[error("Line {line}: {field} must be true or false")]
+    NotBool { line: usize, field: String },
     #[error("Couldn't read the file: {0}")]
     Read(String),
     #[error("A snippet that asks for input can't have a keyword")]
@@ -53,6 +55,8 @@ pub enum RecordError {
     KeywordTaken(String),
     #[error("One keyword can't be the start of another, so choose a different keyword")]
     KeywordOverlaps(String),
+    #[error("For web search, the URL must ask only for {{{{ query }}}}")]
+    WebSearchNeedsQuery,
     #[error("Fix the error in {0} first")]
     FileBroken(&'static str),
     #[error("Couldn't save, check that {0} isn't read-only")]
@@ -72,6 +76,21 @@ pub struct Record {
     /// The browser id a quicklink opens in, as stored. Always `None` for a
     /// snippet.
     pub browser: Option<String>,
+    /// Whether a quicklink is offered as a web search. Always `false` for a
+    /// snippet.
+    pub fallback: bool,
+}
+
+impl Record {
+    /// Whether root search offers it under every query: marked, and asking
+    /// for the typed text and nothing else, so it never needs a form.
+    pub fn is_web_search(&self) -> bool {
+        self.fallback && asks_only_for_query(&self.body)
+    }
+}
+
+fn asks_only_for_query(body: &str) -> bool {
+    Template::parse(body).is_ok_and(|template| template.prompts() == ["query"])
 }
 
 /// A snippet, keyed by its id.
@@ -96,6 +115,9 @@ pub struct QuicklinkEntry {
     pub url: String,
     /// The browser to open it in. Left out, the default browser opens it.
     pub browser: Option<String>,
+    /// Offers it below every search, with the typed text as `{{ query }}`. The
+    /// URL must ask for nothing else.
+    pub fallback: Option<bool>,
 }
 
 /// Which of the two kinds a store instance owns. They are identical in shape,
@@ -304,7 +326,7 @@ impl Records {
         body: &str,
         keyword: Option<&str>,
     ) -> Result<String, RecordError> {
-        self.save(None, name, body, keyword, None)
+        self.save(None, name, body, keyword, None, None)
     }
 
     #[cfg(test)]
@@ -315,13 +337,15 @@ impl Records {
         body: &str,
         keyword: Option<&str>,
     ) -> Result<(), RecordError> {
-        self.save(Some(id), name, body, keyword, None).map(|_| ())
+        self.save(Some(id), name, body, keyword, None, None)
+            .map(|_| ())
     }
 
     /// Creates the record when `id` is `None`, else updates it, and returns its
     /// id. `browser` is the form's value: `None` leaves the field as it is,
     /// `default` or empty removes it, and anything else is stored as given, so a
-    /// browser this platform does not offer survives an edit.
+    /// browser this platform does not offer survives an edit. `fallback` works
+    /// the same way: `None` leaves it, `false` removes it.
     pub fn save(
         &self,
         id: Option<&str>,
@@ -329,10 +353,14 @@ impl Records {
         body: &str,
         keyword: Option<&str>,
         browser: Option<&str>,
+        fallback: Option<bool>,
     ) -> Result<String, RecordError> {
         self.writable()?;
         self.validate(name, body)?;
         let keyword = self.validate_keyword(keyword, body, id)?;
+        if fallback == Some(true) && !asks_only_for_query(body) {
+            return Err(RecordError::WebSearchNeedsQuery);
+        }
         let kind = self.kind;
         let mut saved = id.map(str::to_string);
         self.change(|doc| {
@@ -356,9 +384,36 @@ impl Records {
                 Some("") | Some(Browser::DEFAULT_ID) => set_or_remove(table, "browser", None),
                 Some(browser) => set_or_remove(table, "browser", Some(browser.to_string())),
             }
+            match fallback {
+                None => {}
+                Some(true) => {
+                    table.insert("fallback", toml_edit::value(true));
+                }
+                Some(false) => {
+                    table.remove("fallback");
+                }
+            }
             Ok(())
         })?;
         Ok(saved.unwrap_or_default())
+    }
+
+    /// Creates a missing file with DuckDuckGo as a web search, so a new
+    /// install can search the web. An existing file is the user's choice and is
+    /// left alone, even when they deleted DuckDuckGo from it.
+    pub fn seed_web_search(&self) -> Result<(), RecordError> {
+        if self.kind != Kind::Quicklink || self.path.exists() {
+            return Ok(());
+        }
+        self.save(
+            None,
+            "DuckDuckGo",
+            "https://duckduckgo.com/?q={{ query }}",
+            None,
+            None,
+            Some(true),
+        )
+        .map(|_| ())
     }
 
     /// Removes the record's table outright. There is no tombstone: git remembers
@@ -416,6 +471,11 @@ impl Records {
         let mut records = self.cache.read().unwrap().records.clone();
         records.sort_by_key(|record| record.name.to_lowercase());
         Ok(records)
+    }
+
+    /// The records in the order the file lists them.
+    pub fn in_file_order(&self) -> Vec<Record> {
+        self.cache.read().unwrap().records.clone()
     }
 
     /// The records as the file has them now, for a caller that follows the file
@@ -543,12 +603,20 @@ fn project(
         Kind::Snippet => None,
         Kind::Quicklink => field("browser")?,
     };
+    let fallback = match (kind, table.get("fallback")) {
+        (Kind::Quicklink, Some(item)) => item.as_bool().ok_or_else(|| RecordError::NotBool {
+            line: line_of(text, item.span()),
+            field: "fallback".to_string(),
+        })?,
+        _ => false,
+    };
     Ok(name.map(|name| Record {
         id: id.to_string(),
         name,
         body,
         keyword,
         browser,
+        fallback,
     }))
 }
 
@@ -963,7 +1031,7 @@ mod tests {
         std::fs::create_dir_all(&dir).unwrap();
         let id = Records::open(&dir, Kind::Quicklink)
             .0
-            .save(None, "Docs", DOCS, None, Some("firefox"))
+            .save(None, "Docs", DOCS, None, Some("firefox"), None)
             .unwrap();
 
         let reopened = Records::open(&dir, Kind::Quicklink).0;
@@ -977,11 +1045,18 @@ mod tests {
     fn choosing_the_default_browser_removes_the_field() {
         let records = records(Kind::Quicklink);
         let id = records
-            .save(None, "Docs", DOCS, None, Some("firefox"))
+            .save(None, "Docs", DOCS, None, Some("firefox"), None)
             .unwrap();
 
         records
-            .save(Some(&id), "Docs", DOCS, None, Some(Browser::DEFAULT_ID))
+            .save(
+                Some(&id),
+                "Docs",
+                DOCS,
+                None,
+                Some(Browser::DEFAULT_ID),
+                None,
+            )
             .unwrap();
 
         assert_eq!(records.get(&id).unwrap().browser, None);
@@ -999,7 +1074,7 @@ mod tests {
             .unwrap();
 
         records
-            .save(Some("a"), "Docs", DOCS, None, Some("safari"))
+            .save(Some("a"), "Docs", DOCS, None, Some("safari"), None)
             .unwrap();
 
         assert_eq!(records.get("a").unwrap().browser.as_deref(), Some("safari"));
@@ -1009,12 +1084,145 @@ mod tests {
     fn an_edit_without_a_browser_keeps_the_stored_one() {
         let records = records(Kind::Quicklink);
         let id = records
-            .save(None, "Docs", DOCS, None, Some("brave"))
+            .save(None, "Docs", DOCS, None, Some("brave"), None)
             .unwrap();
 
         records.update(&id, "Docs renamed", DOCS, None).unwrap();
 
         assert_eq!(records.get(&id).unwrap().browser.as_deref(), Some("brave"));
+    }
+
+    const SEARCH: &str = "https://duckduckgo.com/?q={{ query }}";
+
+    #[test]
+    fn a_quicklink_is_a_web_search_only_when_marked() {
+        let records = records(Kind::Quicklink);
+        records
+            .reload(&format!(
+                "[a]
+name = \"A\"
+url = \"{SEARCH}\"
+fallback = true
+
+[b]
+name = \"B\"
+url = \"{SEARCH}\"
+"
+            ))
+            .unwrap();
+        assert!(records.get("a").unwrap().fallback);
+        assert!(!records.get("b").unwrap().fallback);
+    }
+
+    #[test]
+    fn a_fallback_that_is_not_a_bool_names_its_line() {
+        let records = records(Kind::Quicklink);
+        let error = records
+            .reload(&format!(
+                "[a]
+name = \"A\"
+url = \"{SEARCH}\"
+fallback = \"yes\"
+"
+            ))
+            .unwrap_err();
+        assert_eq!(error.to_string(), "Line 4: fallback must be true or false");
+    }
+
+    #[test]
+    fn marking_and_unmarking_a_web_search_writes_the_key() {
+        let records = records(Kind::Quicklink);
+        records
+            .reload(&format!(
+                "# engines
+[a]
+name = \"A\" # first
+url = \"{SEARCH}\"
+
+[b]
+name = \"B\"
+url = \"{DOCS}\"
+"
+            ))
+            .unwrap();
+
+        records
+            .save(Some("a"), "A", SEARCH, None, None, Some(true))
+            .unwrap();
+        let on_disk = std::fs::read_to_string(records.path()).unwrap();
+        assert!(on_disk.contains("fallback = true"), "{on_disk}");
+        assert!(on_disk.contains("# engines"), "{on_disk}");
+        assert!(on_disk.contains("name = \"A\" # first"), "{on_disk}");
+        assert!(on_disk.find("[a]").unwrap() < on_disk.find("[b]").unwrap());
+        assert!(records.get("a").unwrap().fallback);
+
+        records
+            .save(Some("a"), "A", SEARCH, None, None, None)
+            .unwrap();
+        assert!(records.get("a").unwrap().fallback, "None leaves it");
+
+        records
+            .save(Some("a"), "A", SEARCH, None, None, Some(false))
+            .unwrap();
+        let on_disk = std::fs::read_to_string(records.path()).unwrap();
+        assert!(!on_disk.contains("fallback"), "{on_disk}");
+        assert!(!records.get("a").unwrap().fallback);
+    }
+
+    #[test]
+    fn records_come_back_in_file_order_when_asked() {
+        let records = records(Kind::Quicklink);
+        records
+            .reload(&format!(
+                "[zeta]
+name = \"Zeta\"
+url = \"{DOCS}\"
+
+[alpha]
+name = \"Alpha\"
+url = \"{DOCS}\"
+"
+            ))
+            .unwrap();
+        let ids: Vec<String> = records.in_file_order().into_iter().map(|r| r.id).collect();
+        assert_eq!(ids, ["zeta", "alpha"]);
+    }
+
+    #[test]
+    fn a_missing_quicklinks_file_starts_with_duckduckgo() {
+        let records = records(Kind::Quicklink);
+        records.seed_web_search().unwrap();
+
+        let on_disk = std::fs::read_to_string(records.path()).unwrap();
+        assert!(
+            on_disk.starts_with("#:schema ./.schemas/quicklinks.schema.json\n"),
+            "{on_disk}"
+        );
+        assert!(on_disk.contains("[duckduckgo]"), "{on_disk}");
+        let reopened = Records::open(records.path().parent().unwrap(), Kind::Quicklink).0;
+        let all = reopened.all().unwrap();
+        assert_eq!(all.len(), 1);
+        assert_eq!(all[0].name, "DuckDuckGo");
+        assert!(all[0].is_web_search());
+    }
+
+    #[test]
+    fn an_existing_quicklinks_file_is_not_seeded() {
+        let dir = dir_with("quicklinks.toml", "# no engines\n");
+        let records = Records::open(&dir, Kind::Quicklink).0;
+
+        records.seed_web_search().unwrap();
+
+        let on_disk = std::fs::read_to_string(records.path()).unwrap();
+        assert_eq!(on_disk, "# no engines\n");
+        assert!(records.all().unwrap().is_empty());
+    }
+
+    #[test]
+    fn a_snippets_file_is_never_seeded() {
+        let records = records(Kind::Snippet);
+        records.seed_web_search().unwrap();
+        assert!(!records.path().exists());
     }
 
     #[test]

@@ -161,6 +161,8 @@ pub struct ResultItem {
     pub pinned: bool,
     /// The calculator's answer to the query, drawn as the card above the rows.
     pub answer: bool,
+    /// A web search for the query, listed under its own heading below the rows.
+    pub web_search: bool,
     /// The global hotkey that runs it, when one is registered.
     pub hotkey: Option<global_hotkey::hotkey::HotKey>,
 }

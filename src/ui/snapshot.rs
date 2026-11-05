@@ -375,7 +375,8 @@ impl Launcher {
             });
         let pinned = pick(|r| r.pinned);
         let suggested = pick(|r| !r.pinned && r.suggested);
-        let rest = pick(|r| !r.pinned && !r.suggested);
+        let rest = pick(|r| !r.pinned && !r.suggested && !r.web_search);
+        let web_searches = pick(|r| r.web_search);
         let section = |heading: Option<&str>, items| Section {
             heading: heading.map(str::to_string),
             items,
@@ -389,6 +390,7 @@ impl Launcher {
             sections.push(section(Some("Suggestions"), suggested));
         }
         sections.push(section(grouped.then_some("Everything else"), rest));
+        sections.push(section(Some("Search the web"), web_searches));
         sections.retain(|section| !section.items.is_empty());
         // Said only once every provider has answered, so a slow one does not
         // flash it up between keystrokes.

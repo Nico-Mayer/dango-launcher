@@ -19,6 +19,8 @@ pub enum Source {
     RootItem,
     /// The calculator's answer to the query: first, never ranked or filtered.
     Answer,
+    /// A web search for the query: last, never ranked or filtered.
+    WebSearch,
 }
 
 #[derive(Clone, Debug)]
@@ -188,7 +190,12 @@ async fn run_query(
     limit: usize,
     tx: mpsc::UnboundedSender<SearchResults>,
 ) {
-    let emit = |merged: Vec<Candidate>, complete: bool| {
+    // Web searches wait for the last provider, so Enter pressed early cannot
+    // open the browser in place of a result still on its way.
+    let emit = |mut merged: Vec<Candidate>, complete: bool| {
+        if !complete {
+            merged.retain(|candidate| candidate.source != Source::WebSearch);
+        }
         let ranked = ranker.rank(&query, merged, limit);
         tx.send(SearchResults {
             query: query.clone(),
@@ -340,6 +347,39 @@ mod tests {
             "Fast never showed before Slow: {updates:?}"
         );
         assert!(updates.last().unwrap().contains(&"Slow".to_string()));
+    }
+
+    struct WebSearchProvider;
+
+    #[async_trait]
+    impl RootProvider for WebSearchProvider {
+        async fn items(&self, query: String) -> Vec<Candidate> {
+            let mut web = candidate("web", Source::WebSearch);
+            web.title = format!("Search the web for {query}");
+            vec![web]
+        }
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn web_searches_wait_for_every_provider() {
+        let web: Arc<dyn RootProvider> = Arc::new(WebSearchProvider);
+        let slow: Arc<dyn RootProvider> = Arc::new(SleepyProvider::named("Slow", 300));
+        let pipe = pipeline(vec![web, slow]);
+        let mut rx = pipe.query("s".into());
+
+        let mut updates = Vec::new();
+        while let Some(update) = rx.recv().await {
+            let complete = update.complete;
+            updates.push((complete, update.items));
+            if complete {
+                break;
+            }
+        }
+        for (_, items) in updates.iter().filter(|(complete, _)| !complete) {
+            assert!(items.iter().all(|c| c.source != Source::WebSearch));
+        }
+        let last = &updates.last().unwrap().1;
+        assert!(last.iter().any(|c| c.id == "web"));
     }
 
     #[tokio::test(start_paused = true)]

@@ -371,6 +371,7 @@ Quicklinks, each a table keyed by its id. Dango adds, edits, and removes them fr
 | Setting | Type | Default | Values | Description |
 | --- | --- | --- | --- | --- |
 | `browser` | string |  | `chrome`, `edge`, `firefox`, `brave`, `safari` | The browser to open it in. Left out, the default browser opens it. |
+| `fallback` | boolean |  |  | Offers it below every search, with the typed text as `{{ query }}`. The URL must ask for nothing else. |
 | `name` | string |  |  | The title shown in the launcher. |
 | `url` | string |  |  | The URL to open. `{{ query }}` asks for text and places it in the URL. |
 
