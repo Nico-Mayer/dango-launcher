@@ -2,7 +2,7 @@
 
 ## 1. Shared shadow tokens
 
-- [ ] 1.1 Add `shadow-blur` (24px), `shadow-offset` (8px), `shadow-margin` (32px) to `Theme` in `ui/theme.slint`, and switch `ActionPanel` to `shadow-blur` / `shadow-offset`. Verify `mise run check` and `cargo test` pass unchanged
+- [x] 1.1 Add `shadow-blur` (24px), `shadow-offset` (8px), `shadow-margin` (32px) to `Theme` in `ui/theme.slint`, and switch `ActionPanel` to `shadow-blur` / `shadow-offset`. Verify `mise run check` and `cargo test` pass unchanged
 
 ## 2. Margin and shadows in the launcher window
 
