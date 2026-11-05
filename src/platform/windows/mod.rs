@@ -45,6 +45,7 @@ use windows_sys::Win32::Graphics::Gdi::{
 use windows_sys::Win32::System::Threading::{AttachThreadInput, GetCurrentThreadId};
 use windows_sys::Win32::UI::Accessibility::{SetWinEventHook, HWINEVENTHOOK};
 use windows_sys::Win32::UI::HiDpi::{GetDpiForMonitor, GetDpiForWindow, MDT_EFFECTIVE_DPI};
+use windows_sys::Win32::UI::Input::KeyboardAndMouse::SetFocus;
 use windows_sys::Win32::UI::WindowsAndMessaging::{
     AllowSetForegroundWindow, BringWindowToTop, GetCursorPos, GetForegroundWindow,
     GetWindowLongPtrW, GetWindowRect, GetWindowThreadProcessId, SetForegroundWindow,
@@ -78,6 +79,7 @@ impl LauncherWindow for WindowsLauncherWindow {
             unsafe {
                 apply_tool_window_style(hwnd);
                 force_foreground(hwnd);
+                take_keyboard(hwnd);
             }
         }
     }
@@ -374,6 +376,12 @@ pub(super) unsafe fn force_foreground(target: HWND) {
             0,
         );
     }
+}
+
+/// Not part of `force_foreground`: on another app's top-level window it would
+/// take focus from the control inside it.
+unsafe fn take_keyboard(hwnd: HWND) {
+    SetFocus(hwnd);
 }
 
 fn hwnd(window: RawWindowHandle) -> Option<HWND> {
