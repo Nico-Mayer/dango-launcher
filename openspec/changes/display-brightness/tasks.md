@@ -26,14 +26,14 @@
 
 ## 4. Hand checks
 
-- [ ] 4.1 Windows: on the author's monitors, run both commands from root search and from a bound hotkey (`mise run keys`), press the hotkey quickly several times, hold it, and open the launcher during a change. Check with `mise run shot` that the notice shows the level, the launcher does not appear for the hotkey, and the launcher still opens at once; turn DDC/CI off in one monitor's menu and check the partial and "no monitor" messages
+- [x] 4.1 Windows: on the author's monitors, run both commands from root search and from a bound hotkey (`mise run keys`), press the hotkey quickly several times, hold it, and open the launcher during a change. Check with `mise run shot` that the notice shows the level, the launcher does not appear for the hotkey, and the launcher still opens at once; turn DDC/CI off in one monitor's menu and check the partial and "no monitor" messages
 - [ ] 4.2 Windows: on a laptop with an external monitor, check that only the external monitor changes
 - [ ] 4.3 macOS: on an Apple Silicon Mac with an external monitor over USB-C or DisplayPort, run both commands from a hotkey and check the level changes and the notice reports it, in a debug build and in a signed bundle (see AGENTS.md for testing a signed copy); note any permission prompt
 - [ ] 4.4 macOS: on the same Mac, check the built-in panel does not change
 
 ## 5. Wrap-up
 
-- [ ] 5.1 Add any new platform trap or build fact found in tasks 2 to 4 to AGENTS.md. Verify: `mise run check` and `cargo test` pass
+- [x] 5.1 Add any new platform trap or build fact found in tasks 2 to 4 to AGENTS.md. Verify: `mise run check` and `cargo test` pass
 - [x] 5.2 Run the `ponytail-review` skill in a fresh subagent on this change's commits, without the apply context; report findings to the author
 
 ## Workflow follow-up

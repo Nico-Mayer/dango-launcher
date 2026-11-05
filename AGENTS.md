@@ -120,6 +120,8 @@ No millisecond budgets in specs or tests. Results depend on machine load, unreli
 - Slint's winit backend probes for OpenGL 2 on Windows, silently falls back to software renderer without it. That renderer refuses `set_rendering_notifier`, so paint timing hangs off `RedrawRequested` in window event filter.
 - Tray app's PATH lacks what shell adds. Windows: Explorer gives saved PATH, without `mise activate` folders (author's saved PATH has no mise folder). macOS: launchd PATH only, no shell profile. Agent CLI lookup adds known install folders + (macOS) login shell's PATH, and passes same list as child's PATH so npm `.cmd` wrappers find `node`.
 - Child process of GUI-subsystem Dango on Windows gets visible console unless `CREATE_NO_WINDOW`, which takes focus and hides launcher. With process-wrap's `JobObject`, set flag through `CreationFlags` wrapper, never on inner `Command`: `JobObject` overwrites inner command's flags. Dev and test runs have console, so only release build shows it.
+- Held global hotkey never repeats: `global-hotkey` registers with `MOD_NOREPEAT` on Windows, Carbon sends one press on macOS. Both report release (Windows: crate polls `GetAsyncKeyState` every 50 ms). Command with `repeats` in manifest re-run by `Core` until release.
+- `ddc-macos` records pause DDC/CI needs after each command but never waits for it; only `DdcHost::sleep()` does. Shared adapter in `platform/brightness.rs` sleeps after every read + write while bus lock held. dxva2 on Windows times itself; there `sleep()` is no-op.
 
 ## Build and verification facts
 
