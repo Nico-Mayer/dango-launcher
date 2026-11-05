@@ -14,7 +14,7 @@
   - Tests: harness and `render_headless` window size become 784 × 544; offset `LIST_TOP`, `LIST_BOTTOM`, the gap click (`MARGIN + 360, MARGIN + 56`), and other absolute-position asserts (panel `x`, grid bottom, ticker `y`) by the margin, or make them relative to the pill or card.
   - New UI tests: a click in the margin beside the card is `ClickedOutside`; pill and card are `window-width` wide at `x` = margin.
   - Verify `cargo test` and `mise run check`
-- [ ] 2.2 Give pill and card the shadow (`shadow-blur`, `shadow-offset`, `Theme.shadow`). Verify with `dango-ui` `take_screenshot`: pixels below pill and card fade from the shadow to transparent before the window edge, in dark and light theme
+- [x] 2.2 Give pill and card the shadow (`shadow-blur`, `shadow-offset`, `Theme.shadow`). Verify with `dango-ui` `take_screenshot`: pixels below pill and card fade from the shadow to transparent before the window edge, in dark and light theme
 
 ## 3. Hand checks
 
