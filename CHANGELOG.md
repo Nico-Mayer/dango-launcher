@@ -2,6 +2,46 @@
 
 All notable changes to Dango. Generated from commit history at release time.
 
+## [6.6.0] - 2026-11-05
+
+### Features
+
+- **app:** Show a no-view success message in the notice
+- **platform:** Read and set monitor brightness
+- **display:** Add brightness step and message
+- **display:** Step every monitor one at a time
+- **display:** Add brightness commands
+- **invocation:** Report a superseded outcome late
+- **display:** Combine presses made during a step
+- **hotkeys:** Repeat a command while its hotkey is held
+- **quicklinks:** Store the web search flag
+- **quicklinks:** Add web search toggle to the form
+- **search:** Rank web searches last
+- **search:** Hold web searches until complete
+- **quicklinks:** Offer web search rows
+- **ui:** List web searches under their own heading
+- **app:** Learn nothing from web searches
+- **quicklinks:** Start with DuckDuckGo web search
+
+### Fixes
+
+- **platform:** Wait between DDC commands
+- **windows:** Give the launcher keyboard focus
+- **windows:** Refocus the launcher after a selection read
+- **quicklinks:** Clear seed write marker
+
+### Refactoring
+
+- **invocation:** Let success carry a message
+
+### Documentation
+
+- Add hotkey repeat and DDC timing traps
+
+### Maintenance
+
+- **display:** Return the outcome without Some
+- **ui:** Render web search rows and heading
 ## [6.5.0] - 2026-11-04
 
 ### Features
