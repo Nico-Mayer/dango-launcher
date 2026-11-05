@@ -16,8 +16,11 @@ favicon.
   results, under its own heading, in file order, with the typed text filled
   into `{{ query }}`. Confirming one opens the URL without asking for the
   query.
-- Web search rows are not ranked, filtered, or learned from. They keep their
-  place at the bottom while other results stream in above them.
+- Web search rows are not ranked, filtered, or learned from. They appear only
+  once every provider has answered, so a quick Enter never opens the browser
+  in place of a result still on its way.
+- A web search asks only for `{{ query }}`. A quicklink that asks for more
+  cannot be a web search.
 - When nothing else matches, the first web search row is selected and
   "No results" is not shown. "No results" still shows when no quicklink is a
   web search.
@@ -50,8 +53,9 @@ None.
 - `quicklinks`: a quicklink can be a web search, set in the form or the file,
   offered under every typed query with the query filled in.
 - `root-search`: web search rows sit at the bottom of a typed query's results
-  under a heading, unranked, and take the place of "No results"; the rule that
-  a typed query never shows section headings gains this exception.
+  under a heading, unranked, shown once every provider has answered, and take
+  the place of "No results"; the rule that a typed query never shows section
+  headings gains this exception.
 - `config-files`: `quicklinks.toml` gains the `fallback` key, and Dango creates
   the file with a DuckDuckGo entry when it is missing at startup.
 - `interface-copy`: "No results" shows only when no web search is offered
@@ -63,7 +67,7 @@ None.
   file seeding).
 - `src/search/` and `src/ranking/` (a new result source that is never ranked
   and goes last).
-- `src/ui/` state machine and snapshot (bottom section, selection, empty
-  state), and `src/app/` (no frecency or learned input for web search rows).
+- `src/ui/` snapshot (bottom section, empty state), and `src/app/` (no
+  frecency or learned input for web search rows).
 - `quicklinks.toml` schema and settings reference.
 - No view protocol or extension manifest change.

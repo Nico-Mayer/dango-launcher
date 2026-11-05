@@ -43,10 +43,16 @@ Current state that shapes the approach:
 
 ### 1. A web search is a quicklink with `fallback = true`
 
-`QuicklinkEntry` gains `fallback: bool` (absent = false, `skip_serializing_if`
-false, so unmarking removes the key). `Records::save` takes it the same way it
-takes `browser` today. The schema and settings reference pick it up from the
-struct.
+`QuicklinkEntry` (schema only) gains `fallback: bool`, so the schema and
+settings reference list it. `Record` gains the same field. `project()` reads
+it as a bool and reports a value of another type with its line, like the other
+fields. `Records::save` takes it like `browser` today and writes it through
+`toml_edit`: `fallback = true` when set, key removed when not.
+
+A record is usable as a web search when it is marked and
+`Template::prompts()` is exactly `["query"]`. `clipboard` and `selection` are
+not prompts, so they still fill themselves. One helper decides this, used by
+the provider and by the form check.
 
 Rejected: a `[web-search.engines.<id>]` table in `config.toml`. It would
 duplicate URL templates, browser choice, favicons, and encoding. Also,
@@ -60,8 +66,10 @@ way as any other quicklink.
 ### 2. The quicklinks provider emits the web search rows
 
 `SnippetProvider::items` already receives the query. For a non-empty query
-and kind `Quicklink`, it also emits one candidate per record with `fallback`
-whose template uses `query`, in file order. These candidates have
+and kind `Quicklink`, it also emits one candidate per usable web search
+record. `Records::all()` sorts by name, so `Records` gets an accessor that
+returns the cached records in file order (the cache vector already holds
+them that way). These candidates have
 `source: Source::WebSearch`, the record's icon, and the title
 `Search <name> for “<query>”`.
 
@@ -71,23 +79,42 @@ from "quicklinks disabled = no web search".
 
 ### 3. `Source::WebSearch` is split off before ranking, like `Source::Answer`
 
-`DangoRanker::rank` partitions out `WebSearch` candidates and ranks the rest
-with `limit - web_searches.len()`, then appends the web searches. This puts
-them last on every streamed emit, and other results are cut first. On the
-empty query the provider emits none, so the ranker needs no special case for
-that.
+`DangoRanker::rank` partitions out `WebSearch` candidates next to answers,
+ranks the rest with `limit - answers.len() - web_searches.len()` (saturating),
+and returns answers, ranked results, then web searches. This puts them last,
+and other results are cut first. On the empty query the provider emits none,
+so the ranker needs no special case for that.
+
+### 3a. Web search rows wait for every provider
+
+`run_query` in `src/search/mod.rs` drops `WebSearch` candidates from every
+emit that is not complete, and keeps them in the complete one. So the UI never
+sees a web search row before the last provider answered, and a fast Enter
+cannot open the browser while a better result is still on its way.
+
+Rejected: show them at once and give up the selection to a later result. Enter
+pressed before the later result arrives still opens the browser, and the
+selection rule contradicts `list-navigation` ("Replacing the rows keeps the
+selected item").
+
+Rejected: hold them back in the UI state. The pipeline already knows when a
+query is complete, and filtering there keeps `src/ui/` unchanged except for
+the section.
 
 Rejected: give them the lowest score inside ranking. Frecency and learned
 inputs could still lift them, and the 50-row cut would drop them first.
 
 ### 4. The typed query travels in the item id
 
-The candidate id is `web:<record-id>:<query>`. Record ids are kebab-case and
-contain no `:`, so splitting at the first `:` after the prefix is unambiguous.
-`perform_action` strips the prefix, loads the record, and adds the query as
-the `query` argument before the existing argument check. So "asks only for the
-other arguments" and "copy" reuse the current `ACTION_INSERT` and `ACTION_COPY`
-paths unchanged.
+The candidate id is `web:<record-id>:<query>`. Ids Dango makes are kebab-case,
+but a hand-written quoted key can hold `:`. The provider skips a record whose
+id contains `:`, so splitting at the first `:` after the prefix is always
+unambiguous.
+
+`perform_action` handles `web:` ids before the existing argument check: it
+loads the record, sets the `query` argument, and goes straight to open or copy.
+The form is never needed, because a usable web search asks for nothing but
+`query` (decision 1).
 
 Rejected: passing the root query to `Extension::perform_action`. That changes
 a trait every extension implements, only for this one caller. The calculator
@@ -96,15 +123,12 @@ already uses the id this way.
 ### 5. UI state knows web search rows by a flag on `ResultItem`
 
 `ResultItem` gains `web_search: bool`, set in `Core::result_item` from the
-source (as `answer` is today). `root_order` and `root_screen` put these rows
-last, in their own `Section` headed "Search the web". The "No results" empty
-text is built only when no row is left at all, which already holds once the
-web search rows are in `results`.
-
-The selection rule needs no new state: `picked` is only set by the user, so
-an unpicked selection follows the first row in `root_order` when a result
-arrives above the web search rows. A web search the user picked keeps its id
-(the id holds the query, which does not change within one query).
+source (as `answer` is today). The ranker already puts these rows last, so
+`root_order` needs no change. Only `root_screen` splits them into their own
+`Section` headed "Search the web". The "No results" empty text is built only
+when no row is left at all, which already holds once the web search rows are
+in `results`. Selection needs no change: when nothing else matches, the first
+row is a web search.
 
 ### 6. Web searches teach nothing
 
@@ -140,9 +164,8 @@ dropdown. It uses the existing `ui/atoms/checkbox.slint` through the form view
 (`ui/views/form.slint`). Rows use the existing list row and section heading in
 `ui/views/list.slint`. No new design-system part.
 
-Save checks, before storing, that a quicklink marked as a web search has a
-template that uses `query` (`Template::uses`), and refuses it with a message
-otherwise.
+Save checks, before storing, that a quicklink marked as a web search is
+usable (decision 1), and refuses it with a message otherwise.
 
 ### Contracts
 
@@ -160,7 +183,7 @@ All new strings, checked against `openspec/specs/interface-copy`:
 | Row primary action (ActionBar) | "Open" |
 | Row second action | "Copy" |
 | Form toggle label | "Use for web search" |
-| Form validation | "Add {{ query }} to the URL to use it for web search." |
+| Form validation | "For web search, the URL must ask only for {{ query }}." |
 
 "Open" and "Copy" match the existing quicklink actions and the verb rules.
 The row title is not a command title, so it uses sentence case with the
@@ -172,10 +195,11 @@ text the user types in the URL field, not an internal identifier.
 - [The query is part of the item id, so a long query makes a long id] → The
   id is never stored, because `record_use` skips it, and is only compared
   within one query.
-- [`list-navigation` says a selected item stays selected when rows are
-  replaced. The web search rule gives up an unpicked selection.] → The code
-  already follows the first row when nothing is picked. The new
-  `root-search` requirement states the web search case explicitly.
+- [Web search rows wait for the slowest provider, up to the 5-second
+  straggler timeout when one hangs] → Same wait "No results" has today. A
+  hung provider is a bug to fix there, not here.
+- [A web search that also needs another argument is not possible] → Accepted.
+  Such a quicklink still works as an ordinary quicklink.
 - [Deleting `quicklinks.toml` brings DuckDuckGo back] → Accepted. Deleting the
   entry is the way to turn it off, and it stays off.
 - [A web search row appears for every query, also when good results exist] →

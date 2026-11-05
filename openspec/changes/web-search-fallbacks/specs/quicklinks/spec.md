@@ -6,8 +6,9 @@
 
 A quicklink SHALL be a web search when it is marked as one, either with the
 "Use for web search" toggle in its create and edit form or with
-`fallback = true` in `quicklinks.toml`. A web search's URL SHALL use `query`.
-A quicklink not marked SHALL NOT be a web search.
+`fallback = true` in `quicklinks.toml`. A web search's URL SHALL use `query`
+and SHALL ask for nothing else; `clipboard` and `selection` MAY fill
+themselves. A quicklink not marked SHALL NOT be a web search.
 
 #### Scenario: Marking a quicklink in the form
 
@@ -42,12 +43,19 @@ A quicklink not marked SHALL NOT be a web search.
 - **WHEN** the user saves a quicklink with "Use for web search" on and a URL
   that does not use `query`
 - **THEN** nothing is stored
-- **AND** the form says "Add {{ query }} to the URL to use it for web search."
+- **AND** the form says "For web search, the URL must ask only for {{ query }}."
 
-#### Scenario: A web search without a query in the file
+#### Scenario: A web search asking for more is refused in the form
+
+- **WHEN** the user saves a quicklink with "Use for web search" on and a URL
+  that uses `query` and another argument
+- **THEN** nothing is stored
+- **AND** the form says "For web search, the URL must ask only for {{ query }}."
+
+#### Scenario: An unusable web search in the file
 
 - **WHEN** `quicklinks.toml` holds an entry with `fallback = true` and a URL
-  that does not use `query`
+  that does not use `query`, or also asks for another argument
 - **THEN** it is offered as an ordinary quicklink and not as a web search
 
 ### Requirement: A web search is offered for every typed query
@@ -78,10 +86,9 @@ be offered.
 ### Requirement: Confirming a web search opens it with the typed query
 
 Confirming a web search row SHALL open the quicklink with the typed query as
-its `query` value, without asking for it, the same way a quicklink with a
+its `query` value, without showing a form, the same way a quicklink with a
 submitted query opens: encoded, in the quicklink's browser or the default
-browser. Any other value the template asks for SHALL be asked for as usual.
-The row SHALL also offer copying the rendered URL.
+browser. The row SHALL also offer copying the rendered URL.
 
 #### Scenario: Opening a web search
 
@@ -102,11 +109,11 @@ The row SHALL also offer copying the rendered URL.
   installed browser
 - **THEN** the URL opens in that browser
 
-#### Scenario: A web search that asks for more
+#### Scenario: A web search using the clipboard
 
-- **WHEN** a web search's template uses `query` and another argument
-- **THEN** confirming its row shows a form asking only for the other argument
-- **AND** submitting it opens the URL with the typed query filled in
+- **WHEN** a web search's template uses `query` and `clipboard`
+- **THEN** confirming its row opens the URL with the typed query and the
+  clipboard text filled in, without a form
 
 #### Scenario: Copying a web search URL
 

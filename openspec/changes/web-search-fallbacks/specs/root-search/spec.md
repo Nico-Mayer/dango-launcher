@@ -6,9 +6,9 @@
 
 For a non-empty query, web search rows (see quicklinks) SHALL be listed after
 every other result, under the heading "Search the web", in the order of their
-entries in `quicklinks.toml`. They SHALL NOT be matched against the query,
-ranked, or reordered by use, and SHALL keep their place at the bottom as other
-results arrive. They SHALL count toward the result limit, but other results
+entries in `quicklinks.toml`. They SHALL be shown only once every provider has
+answered the query. They SHALL NOT be matched against the query, ranked, or
+reordered by use. They SHALL count toward the result limit, but other results
 SHALL be cut first. The empty query SHALL show none.
 
 #### Scenario: Web searches sit below the results
@@ -17,10 +17,17 @@ SHALL be cut first. The empty query SHALL show none.
 - **THEN** Firefox is listed first and selected
 - **AND** the two web search rows follow under "Search the web", in file order
 
-#### Scenario: Late results arrive above them
+#### Scenario: Web searches wait for every provider
 
-- **WHEN** a slow provider's results arrive after the web search rows are shown
-- **THEN** the new results are placed above the "Search the web" heading
+- **WHEN** the user types a query and a provider has not answered yet
+- **THEN** no web search row is shown
+- **AND** the web search rows appear below the results once every provider
+  has answered
+
+#### Scenario: Enter before every provider answered
+
+- **WHEN** the user types `fire` and confirms before every provider has answered
+- **THEN** no web search is opened
 
 #### Scenario: Results are cut before web searches
 
@@ -36,28 +43,15 @@ SHALL be cut first. The empty query SHALL show none.
 ### Requirement: Web searches stand in for no results
 
 When a typed query has no result other than web search rows, the first web
-search row SHALL be selected and "No results" SHALL NOT be shown. A web search
-row selected only because nothing else had arrived SHALL give up the selection
-to the first result that arrives above it, unless the user moved the selection.
+search row SHALL be selected and "No results" SHALL NOT be shown.
 
 #### Scenario: Nothing else matches
 
 - **WHEN** the user types `zzqx`, no other result matches, and DuckDuckGo is a
   web search
-- **THEN** the row `Search DuckDuckGo for “zzqx”` is shown and selected
+- **THEN** once every provider has answered, the row
+  `Search DuckDuckGo for “zzqx”` is shown and selected
 - **AND** "No results" is not shown
-
-#### Scenario: A result arrives after the web search was selected
-
-- **WHEN** only web search rows are shown, the first is selected, and a slow
-  provider's matching result then arrives
-- **THEN** that result is selected
-
-#### Scenario: The user chose the web search
-
-- **WHEN** the user has moved the selection onto a web search row and a slow
-  provider's result then arrives
-- **THEN** the web search row stays selected
 
 #### Scenario: No web search configured
 
@@ -116,8 +110,8 @@ typed query's results").
 - **WHEN** the launcher shows the pill alone and the user types one character
 - **THEN** the pill stays alone until the first result for that character
   arrives
-- **AND** the card then opens with one ranked list for that query and no
-  section heading
+- **AND** the card then opens with one ranked list for that query, with no
+  heading other than "Search the web" below it
 
 #### Scenario: Clearing the query brings the sections back
 
@@ -130,7 +124,8 @@ typed query's results").
 #### Scenario: Typing removes the sections
 
 - **WHEN** the user has opened the empty-query list and types one character
-- **THEN** the list shows one ranked list with no section heading above it
+- **THEN** the list shows one ranked list, with no heading other than
+  "Search the web" below it
 
 #### Scenario: The top suggestion is selected
 
