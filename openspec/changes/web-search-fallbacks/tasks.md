@@ -17,7 +17,7 @@
 
 ## 3. DuckDuckGo default
 
-- [ ] 3.1 In `register_snippets`, when the quicklinks extension is enabled and `quicklinks.toml` is missing, create it through the records' write path with the `#:schema` header and the `[duckduckgo]` web search entry. Verify: tests cover a missing file being created with the entry, an existing file without the entry left untouched, and no file created when quicklinks are disabled; the created file loads back as one web search
+- [x] 3.1 In `register_snippets`, when the quicklinks extension is enabled and `quicklinks.toml` is missing, create it through the records' write path with the `#:schema` header and the `[duckduckgo]` web search entry. Verify: tests cover a missing file being created with the entry, an existing file without the entry left untouched, and no file created when quicklinks are disabled; the created file loads back as one web search
 
 ## 4. Wrap-up
 

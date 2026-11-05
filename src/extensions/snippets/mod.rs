@@ -8,8 +8,8 @@ mod store;
 
 pub(crate) use extension::manifest;
 pub use extension::{
-    extension_id, is_web_search, OpenUrl, SnippetsExtension, ACTION_EDIT, QUICKLINKS_ID,
-    SNIPPETS_ID,
+    extension_id, is_web_search, seed_quicklinks, OpenUrl, SnippetsExtension, ACTION_EDIT,
+    QUICKLINKS_ID, SNIPPETS_ID,
 };
 pub use favicons::{FaviconCache, FaviconService, FaviconsEnabled, HttpFavicons};
 pub use matcher::{match_keyword, KeywordEntry};

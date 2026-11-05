@@ -11,8 +11,8 @@ use async_trait::async_trait;
 
 use crate::browser::Browser;
 use crate::extension::{
-    ActionOutcome, CommandDecl, Extension, FormValues, InvocationMode, Manifest, Service,
-    NAMED_ICON,
+    ActionOutcome, CommandDecl, EnabledStore, Extension, FormValues, InvocationMode, Manifest,
+    Service, NAMED_ICON,
 };
 use crate::invocation::{Command, InvocationContext};
 use crate::protocol::{
@@ -61,6 +61,15 @@ const FIELD_FALLBACK: &str = "fallback";
 /// Starts a web search row's id, which goes on to the record id and the typed
 /// query, so the row carries its query to the action.
 const WEB_SEARCH_PREFIX: &str = "web:";
+
+/// Seeds the quicklinks file only while the extension runs, so turning
+/// quicklinks off also keeps Dango from writing their file.
+pub fn seed_quicklinks(records: &Records, enabled: &dyn EnabledStore) -> Result<(), RecordError> {
+    if !enabled.is_enabled(QUICKLINKS_ID) {
+        return Ok(());
+    }
+    records.seed_web_search()
+}
 
 pub fn is_web_search(extension_id: &str, item_id: &str) -> bool {
     extension_id == QUICKLINKS_ID && item_id.starts_with(WEB_SEARCH_PREFIX)
@@ -1014,6 +1023,25 @@ mod tests {
         };
         assert!(url.starts_with("https://duckduckgo.com/?q=rust"), "{url}");
         assert!(f.opener.opened().is_empty());
+    }
+
+    struct Enabled(bool);
+
+    impl EnabledStore for Enabled {
+        fn is_enabled(&self, _extension_id: &str) -> bool {
+            self.0
+        }
+    }
+
+    #[test]
+    fn quicklinks_seed_their_file_only_while_enabled() {
+        let off = fixture(Kind::Quicklink);
+        seed_quicklinks(&off.records, &Enabled(false)).unwrap();
+        assert!(!off.records.path().exists());
+
+        let on = fixture(Kind::Quicklink);
+        seed_quicklinks(&on.records, &Enabled(true)).unwrap();
+        assert!(on.records.get("duckduckgo").unwrap().is_web_search());
     }
 
     #[tokio::test]

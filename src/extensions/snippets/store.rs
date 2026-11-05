@@ -398,6 +398,24 @@ impl Records {
         Ok(saved.unwrap_or_default())
     }
 
+    /// Creates a missing file with DuckDuckGo as a web search, so a new
+    /// install can search the web. An existing file is the user's choice and is
+    /// left alone, even when they deleted DuckDuckGo from it.
+    pub fn seed_web_search(&self) -> Result<(), RecordError> {
+        if self.kind != Kind::Quicklink || self.path.exists() {
+            return Ok(());
+        }
+        self.save(
+            None,
+            "DuckDuckGo",
+            "https://duckduckgo.com/?q={{ query }}",
+            None,
+            None,
+            Some(true),
+        )
+        .map(|_| ())
+    }
+
     /// Removes the record's table outright. There is no tombstone: git remembers
     /// what was deleted, so a hard delete does not come back.
     pub fn remove(&self, id: &str) -> Result<(), RecordError> {
@@ -1168,6 +1186,43 @@ url = \"{DOCS}\"
             .unwrap();
         let ids: Vec<String> = records.in_file_order().into_iter().map(|r| r.id).collect();
         assert_eq!(ids, ["zeta", "alpha"]);
+    }
+
+    #[test]
+    fn a_missing_quicklinks_file_starts_with_duckduckgo() {
+        let records = records(Kind::Quicklink);
+        records.seed_web_search().unwrap();
+
+        let on_disk = std::fs::read_to_string(records.path()).unwrap();
+        assert!(
+            on_disk.starts_with("#:schema ./.schemas/quicklinks.schema.json\n"),
+            "{on_disk}"
+        );
+        assert!(on_disk.contains("[duckduckgo]"), "{on_disk}");
+        let reopened = Records::open(records.path().parent().unwrap(), Kind::Quicklink).0;
+        let all = reopened.all().unwrap();
+        assert_eq!(all.len(), 1);
+        assert_eq!(all[0].name, "DuckDuckGo");
+        assert!(all[0].is_web_search());
+    }
+
+    #[test]
+    fn an_existing_quicklinks_file_is_not_seeded() {
+        let dir = dir_with("quicklinks.toml", "# no engines\n");
+        let records = Records::open(&dir, Kind::Quicklink).0;
+
+        records.seed_web_search().unwrap();
+
+        let on_disk = std::fs::read_to_string(records.path()).unwrap();
+        assert_eq!(on_disk, "# no engines\n");
+        assert!(records.all().unwrap().is_empty());
+    }
+
+    #[test]
+    fn a_snippets_file_is_never_seeded() {
+        let records = records(Kind::Snippet);
+        records.seed_web_search().unwrap();
+        assert!(!records.path().exists());
     }
 
     #[test]
