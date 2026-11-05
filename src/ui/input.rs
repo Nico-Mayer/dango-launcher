@@ -116,6 +116,9 @@ pub enum Event {
     Failed(String),
     /// A no-view command succeeded with a message for the notice.
     Succeeded(String),
+    /// A superseded command's message. Unlike `Succeeded`, the command
+    /// running now keeps its busy state.
+    LateSuccess(String),
     /// A hotkey press failed. Unlike `Failed`, a command still running from
     /// the launcher keeps running.
     HotkeyFailed(String),

@@ -620,6 +620,15 @@ impl Core {
                         core.apply(ui::Input::Event(ui::Event::Failed(message)));
                         break;
                     }
+                    Output::Late(outcome) => {
+                        let event = match outcome {
+                            Outcome::Success(Some(message)) => ui::Event::LateSuccess(message),
+                            Outcome::Success(None) => break,
+                            Outcome::Failure(message) => ui::Event::HotkeyFailed(message),
+                        };
+                        core.apply(ui::Input::Event(event));
+                        break;
+                    }
                 }
             }
         });

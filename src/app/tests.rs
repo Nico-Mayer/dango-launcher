@@ -1252,3 +1252,106 @@ async fn a_disabled_display_extension_offers_no_brightness_command() {
     settle().await;
     assert!(root_ids(&shell).is_empty());
 }
+
+/// Waits to be released, then reports through `report`, like a brightness step
+/// that a quicker press superseded.
+struct ReportsLate {
+    manifest: crate::extension::Manifest,
+    release: Arc<Mutex<bool>>,
+    outcome: crate::invocation::Outcome,
+}
+
+impl crate::extension::Extension for ReportsLate {
+    fn manifest(&self) -> &crate::extension::Manifest {
+        &self.manifest
+    }
+    fn command(&self, command_id: &str) -> Option<Arc<dyn crate::invocation::Command>> {
+        struct Step(Arc<Mutex<bool>>, crate::invocation::Outcome);
+        impl crate::invocation::Command for Step {
+            fn invoke(&self, ctx: &InvocationContext) {
+                while !*self.0.lock().unwrap() {
+                    std::thread::sleep(Duration::from_millis(2));
+                }
+                ctx.report(self.1.clone());
+            }
+        }
+        struct Quick;
+        impl crate::invocation::Command for Quick {
+            fn invoke(&self, ctx: &InvocationContext) {
+                ctx.succeed();
+            }
+        }
+        if command_id == "drop" {
+            return Some(Arc::new(Quick));
+        }
+        Some(Arc::new(Step(self.release.clone(), self.outcome.clone())))
+    }
+}
+
+fn reports_late(outcome: crate::invocation::Outcome) -> (Arc<ReportsLate>, Arc<Mutex<bool>>) {
+    let mut manifest = two_commands().0.clone();
+    for command in &mut manifest.commands {
+        command.mode = crate::extension::InvocationMode::NoView;
+    }
+    let release = Arc::new(Mutex::new(false));
+    (
+        Arc::new(ReportsLate {
+            manifest,
+            release: release.clone(),
+            outcome,
+        }),
+        release,
+    )
+}
+
+#[tokio::test]
+async fn a_superseded_success_message_still_shows_in_the_notice() {
+    let (extension, release) = reports_late(crate::invocation::Outcome::Success(Some(
+        "Brightness set to 70%".into(),
+    )));
+    let shell = Arc::new(RecordingShell::default());
+    let (core, _) = core_with_shell("", vec![extension], shell.clone());
+
+    core.dispatch_command("x.keep");
+    core.dispatch_command("x.drop");
+    *release.lock().unwrap() = true;
+
+    assert_eq!(
+        wait_for_notice(&shell).await.as_deref(),
+        Some("Brightness set to 70%")
+    );
+}
+
+#[tokio::test]
+async fn a_superseded_failure_still_shows_in_the_notice() {
+    let (extension, release) =
+        reports_late(crate::invocation::Outcome::Failure("No monitor".into()));
+    let shell = Arc::new(RecordingShell::default());
+    let (core, _) = core_with_shell("", vec![extension], shell.clone());
+
+    core.dispatch_command("x.keep");
+    core.dispatch_command("x.drop");
+    *release.lock().unwrap() = true;
+
+    assert_eq!(wait_for_notice(&shell).await.as_deref(), Some("No monitor"));
+}
+
+#[tokio::test]
+async fn a_late_success_leaves_the_open_launcher_alone() {
+    let (extension, release) = reports_late(crate::invocation::Outcome::Success(Some(
+        "Brightness set to 70%".into(),
+    )));
+    let shell = Arc::new(RecordingShell::default());
+    let (core, _) = core_with_shell("", vec![extension], shell.clone());
+    core.toggle();
+
+    core.run_command("x.keep").unwrap();
+    core.services.invoker.abandon();
+    *release.lock().unwrap() = true;
+    tokio::time::sleep(Duration::from_millis(100)).await;
+
+    assert!(!shell
+        .calls()
+        .iter()
+        .any(|call| matches!(call, Call::Hide { .. })));
+}

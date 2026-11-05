@@ -27,6 +27,8 @@ pub enum Outcome {
 pub enum Output {
     View(ViewTree),
     Finished(Outcome),
+    /// A superseded run's outcome, delivered only for the notice.
+    Late(Outcome),
 }
 
 /// Where a running command puts what it produces. Behind this sits the check
@@ -34,6 +36,10 @@ pub enum Output {
 pub trait Sink: Send + Sync {
     fn push_view(&self, tree: ViewTree);
     fn finish(&self, outcome: Outcome);
+    /// Like `finish`, but a superseded run's outcome still arrives, as `Late`.
+    fn report(&self, outcome: Outcome) {
+        self.finish(outcome);
+    }
     /// Whether this invocation's output is still wanted. A command that runs
     /// for a while polls it, so an abandoned request stops costing anything
     /// rather than only having its output dropped.
@@ -75,6 +81,12 @@ impl InvocationContext {
 
     pub fn fail(&self, message: impl Into<String>) {
         self.sink.finish(Outcome::Failure(message.into()));
+    }
+
+    /// Finishes, and still reports a message after a newer invocation
+    /// superseded this one, for work every press of which has to show.
+    pub fn report(&self, outcome: Outcome) {
+        self.sink.report(outcome);
     }
 
     /// True once the launcher has moved on: hidden, or a newer invocation
@@ -228,6 +240,15 @@ impl Sink for ChannelSink {
         if !self.superseded() {
             let _ = self.tx.send(Output::Finished(outcome));
         }
+    }
+
+    fn report(&self, outcome: Outcome) {
+        let output = if self.superseded() {
+            Output::Late(outcome)
+        } else {
+            Output::Finished(outcome)
+        };
+        let _ = self.tx.send(output);
     }
 }
 
@@ -455,6 +476,52 @@ mod tests {
         // The superseded command runs to completion; nothing it produced is
         // delivered, and its channel closes empty.
         assert!(slow.recv().await.is_none());
+    }
+
+    /// Waits to be released, then reports a level.
+    struct ReportsLate(Arc<Mutex<bool>>);
+    impl Command for ReportsLate {
+        fn invoke(&self, ctx: &InvocationContext) {
+            while !*self.0.lock().unwrap() {
+                std::thread::sleep(std::time::Duration::from_millis(5));
+            }
+            ctx.report(Outcome::Success(Some("Brightness set to 70%".into())));
+        }
+    }
+
+    #[tokio::test]
+    async fn a_superseded_report_still_arrives_as_late() {
+        let release = Arc::new(Mutex::new(false));
+        let invoker = Invoker::new(Fixed::new(vec![
+            (
+                "sys.slow",
+                Arc::new(ReportsLate(release.clone())),
+                Host::Builtin,
+            ),
+            ("sys.quick", Arc::new(Succeeds), Host::Builtin),
+        ]));
+        let mut slow = invoker.invoke("sys.slow").unwrap().output;
+        let _quick = invoker.invoke("sys.quick").unwrap();
+        *release.lock().unwrap() = true;
+        assert!(matches!(
+            slow.recv().await,
+            Some(Output::Late(Outcome::Success(Some(m)))) if m == "Brightness set to 70%"
+        ));
+    }
+
+    #[tokio::test]
+    async fn a_current_report_finishes() {
+        let release = Arc::new(Mutex::new(true));
+        let invoker = Invoker::new(Fixed::new(vec![(
+            "sys.slow",
+            Arc::new(ReportsLate(release)),
+            Host::Builtin,
+        )]));
+        let mut rx = invoker.invoke("sys.slow").unwrap().output;
+        assert!(matches!(
+            rx.recv().await,
+            Some(Output::Finished(Outcome::Success(Some(_))))
+        ));
     }
 
     #[tokio::test]
