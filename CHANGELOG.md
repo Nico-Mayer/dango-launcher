@@ -2,6 +2,25 @@
 
 All notable changes to Dango. Generated from commit history at release time.
 
+## [6.7.0] - 2026-11-05
+
+### Features
+
+- **ui:** Add shadow margin around launcher
+- **ui:** Draw shadows under pill and card
+
+### Refactoring
+
+- **ui:** Share action panel shadow via theme
+
+### Documentation
+
+- **design:** Add pill and card shadows
+- **platform:** Mention margin in keeps_top_edge
+
+### Maintenance
+
+- **ui:** Derive test window size from margin
 ## [6.6.0] - 2026-11-05
 
 ### Features
