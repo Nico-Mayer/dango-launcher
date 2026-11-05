@@ -437,11 +437,13 @@ fn register_snippets(
             crate::log::append(&format!("{}: {error}", kind.file_name()));
             problems.push(format!("{} has an error, see dango.log", kind.file_name()));
         }
-        if kind == snippets::Kind::Quicklink {
-            if let Err(error) = snippets::seed_quicklinks(&records, file_config.as_ref()) {
-                crate::log::append(&format!("could not create {}: {error}", kind.file_name()));
-            }
+        if let Err(error) = snippets::seed_quicklinks(&records, file_config.as_ref()) {
+            crate::log::append(&format!("could not create {}: {error}", kind.file_name()));
         }
+        // The watch starts after the seed, so it never sees that write to
+        // consume the marker; left set, it would swallow a later hand edit that
+        // restores the seeded text.
+        *records.own_write().lock().unwrap() = None;
         // Apply hand-edits to the file live, keeping the last good records on a
         // parse failure.
         {
