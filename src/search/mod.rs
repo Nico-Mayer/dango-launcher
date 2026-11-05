@@ -19,6 +19,8 @@ pub enum Source {
     RootItem,
     /// The calculator's answer to the query: first, never ranked or filtered.
     Answer,
+    /// A web search for the query: last, never ranked or filtered.
+    WebSearch,
 }
 
 #[derive(Clone, Debug)]
