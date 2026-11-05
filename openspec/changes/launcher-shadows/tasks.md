@@ -18,12 +18,12 @@
 
 ## 3. Hand checks
 
-- [ ] 3.1 Windows: with `dango-ui` and `mise run shot`, check pill and card shadows over a light and a dark app, SearchBar stays at the same screen place as before the change (compare with a `shot` from `main`), height follows results without flicker, a real click in the margin and in the gap hides the launcher
+- [x] 3.1 Windows: with `dango-ui` and `mise run shot`, check pill and card shadows over a light and a dark app, SearchBar stays at the same screen place as before the change (compare with a `shot` from `main`), height follows results without flicker, a real click in the margin and in the gap hides the launcher
   - Agent part done, femtovg, 5120×2160 primary at 150 percent. Placement: window rect (96-DPI units) 1315,275 784 wide, so the pill sits at 1347,307; the old formula with 720×480 gives 1346.5,307.2. Same place, so no `main` build was needed.
   - Height: bare pill window 116 (52 + 64), a long list (`se`) 544 (480 + 64), one heading and one row 256 (192 + 64). Top edge stays at 275 throughout.
   - Real screen capture over a dark app: margin and gap transparent, app behind shows through the gap, shadow barely visible on the dark background as expected.
   - Shadow alpha from `take_screenshot`: fades to 0 before every window edge, light and dark theme (see 2.2).
-  - Left to the author: shadow over a light app by eye, flicker while typing by eye, real mouse click in the margin and in the gap.
+  - Checked by the author by eye: shadow over a light app, no flicker while typing, a real click in the margin and in the gap hides the launcher.
 - [ ] 3.2 macOS: check pill and card shadows, placement centred on the full frame at the same place as before, window keeps its full height with the area below the card's shadow transparent, the card's bottom and shadow are not cut, a click in the margin hides the launcher
 - [ ] 3.3 Add any platform trap found in 3.1 or 3.2 to `AGENTS.md`
 
