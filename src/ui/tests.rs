@@ -44,6 +44,7 @@ fn result(n: usize) -> ResultItem {
         suggested: false,
         pinned: false,
         answer: false,
+        web_search: false,
         hotkey: None,
     }
 }
@@ -2816,6 +2817,7 @@ fn answer_item() -> ResultItem {
         suggested: false,
         pinned: false,
         answer: true,
+        web_search: false,
         hotkey: None,
     }
 }
@@ -3178,4 +3180,57 @@ fn a_success_message_shows_in_the_notice_once_hidden() {
     let effects = h.event(Event::Hidden);
     notice_expiry(&effects);
     assert_eq!(notice_text(&h).as_deref(), Some("Brightness set to 60%"));
+}
+
+fn web_search(name: &str, query: &str) -> ResultItem {
+    ResultItem {
+        id: format!("web:{name}:{query}"),
+        title: format!("Search {name} for “{query}”"),
+        web_search: true,
+        ..result(0)
+    }
+}
+
+fn headings(h: &Harness) -> Vec<Option<String>> {
+    h.root_screen()
+        .sections
+        .iter()
+        .map(|section| section.heading.clone())
+        .collect()
+}
+
+#[test]
+fn web_searches_sit_under_their_own_heading_below_the_results() {
+    let mut h = Harness::root(0);
+    h.typed("fire");
+    let mut items = results(2);
+    items.push(web_search("DuckDuckGo", "fire"));
+    h.results("fire", items);
+
+    assert_eq!(headings(&h), [None, Some("Search the web".to_string())]);
+    let root = h.root_screen();
+    assert_eq!(
+        root.sections[1].items[0].title,
+        "Search DuckDuckGo for “fire”"
+    );
+    assert_eq!(root.selected.as_deref(), Some("result-1"));
+}
+
+#[test]
+fn a_web_search_stands_in_for_no_results() {
+    let mut h = Harness::root(0);
+    h.typed("zzqx");
+    h.results("zzqx", vec![web_search("DuckDuckGo", "zzqx")]);
+
+    let root = h.root_screen();
+    assert_eq!(root.empty, None);
+    assert_eq!(root.selected.as_deref(), Some("web:DuckDuckGo:zzqx"));
+}
+
+#[test]
+fn without_a_web_search_nothing_found_still_says_so() {
+    let mut h = Harness::root(0);
+    h.typed("zzqx");
+    h.results("zzqx", Vec::new());
+    assert!(h.root_screen().empty.is_some());
 }

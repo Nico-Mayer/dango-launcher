@@ -257,6 +257,7 @@ fn result(n: usize) -> ResultItem {
         suggested: false,
         pinned: false,
         answer: false,
+        web_search: false,
         hotkey: None,
     }
 }
@@ -2339,6 +2340,7 @@ mod inline_answer {
             id: "4".into(),
             title: "4".into(),
             answer: true,
+            web_search: false,
             ..result(0)
         }
     }

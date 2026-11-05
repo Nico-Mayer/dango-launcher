@@ -323,6 +323,7 @@ impl Core {
         ui::ResultItem {
             hotkey,
             answer: c.source == crate::search::Source::Answer,
+            web_search: c.source == crate::search::Source::WebSearch,
             context,
             extension_id: c.extension_id,
             id: c.id,
