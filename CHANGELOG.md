@@ -2,6 +2,15 @@
 
 All notable changes to Dango. Generated from commit history at release time.
 
+## [6.8.1] - 2026-11-06
+
+### Fixes
+
+- **ui:** Rewrite a thumbnail that went missing
+
+### Performance
+
+- **ui:** Keep large image thumbnails on disk
 ## [6.8.0] - 2026-11-06
 
 ### Features
