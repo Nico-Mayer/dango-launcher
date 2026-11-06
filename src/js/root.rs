@@ -14,14 +14,17 @@ use super::manifest::resolve_icon;
 
 /// One row as `rootItems()` returns it.
 #[derive(Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS), ts(optional_fields))]
 #[serde(rename_all = "camelCase")]
 pub struct RootItem {
     id: String,
     title: String,
     icon: Option<String>,
     #[serde(default)]
+    #[cfg_attr(test, ts(optional, as = "Option<_>"))]
     keywords: Vec<String>,
     #[serde(default)]
+    #[cfg_attr(test, ts(optional, as = "Option<_>"))]
     actions: Vec<Action>,
 }
 

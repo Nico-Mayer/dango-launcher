@@ -8,8 +8,9 @@ pub(crate) mod host;
 mod live;
 pub mod load;
 pub mod manifest;
-mod root;
+pub(crate) mod root;
 mod session;
+pub mod types;
 pub mod watch;
 
 pub use extension::JsExtension;

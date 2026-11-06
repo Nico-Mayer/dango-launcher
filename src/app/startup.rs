@@ -433,6 +433,7 @@ fn build_services(
     );
     let js = Arc::new(crate::js::load::JsExtensions::new(js_dir, js_host));
     problems.extend(load_problems(&js.register_all(&mut host)));
+    crate::js::types::write(js.dir());
 
     let frecency = Arc::new(match &store {
         Some(store) => FrecencyTable::load(Box::new(store.clone())),

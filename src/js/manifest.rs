@@ -30,19 +30,27 @@ pub enum ManifestFileError {
 }
 
 #[derive(Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS), ts(rename = "Manifest", optional_fields))]
 #[serde(rename_all = "camelCase")]
-struct ManifestFile {
+pub(crate) struct ManifestFile {
     manifest_version: u32,
     id: String,
     name: String,
     icon: Option<String>,
     #[serde(default)]
+    #[cfg_attr(test, ts(optional, as = "Option<_>"))]
     commands: Vec<CommandFile>,
     root_items: Option<RootItemsFile>,
+    #[cfg_attr(test, ts(skip))]
     services: Option<serde_json::Value>,
 }
 
 #[derive(Deserialize)]
+#[cfg_attr(
+    test,
+    derive(ts_rs::TS),
+    ts(rename = "ManifestCommand", optional_fields)
+)]
 #[serde(rename_all = "camelCase")]
 struct CommandFile {
     id: String,
@@ -50,10 +58,12 @@ struct CommandFile {
     mode: ModeFile,
     icon: Option<String>,
     #[serde(default)]
+    #[cfg_attr(test, ts(optional, as = "Option<_>"))]
     keywords: Vec<String>,
 }
 
 #[derive(Deserialize)]
+#[cfg_attr(test, derive(ts_rs::TS), ts(rename = "CommandMode"))]
 #[serde(rename_all = "kebab-case")]
 enum ModeFile {
     View,
@@ -61,9 +71,25 @@ enum ModeFile {
 }
 
 #[derive(Deserialize)]
+#[cfg_attr(
+    test,
+    derive(ts_rs::TS),
+    ts(rename = "ManifestRootItems", optional_fields)
+)]
 #[serde(rename_all = "camelCase")]
 struct RootItemsFile {
     refresh_minutes: Option<u64>,
+}
+
+#[cfg(test)]
+pub(crate) fn type_decls(cfg: &ts_rs::Config) -> Vec<String> {
+    use ts_rs::TS;
+    vec![
+        ManifestFile::decl(cfg),
+        CommandFile::decl(cfg),
+        ModeFile::decl(cfg),
+        RootItemsFile::decl(cfg),
+    ]
 }
 
 /// Reads the manifest of the extension in `folder`, whose name is its id.

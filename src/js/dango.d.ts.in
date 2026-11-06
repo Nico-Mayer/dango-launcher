@@ -1,0 +1,109 @@
+// Types for Dango extensions. Dango writes this file when it starts, so edits
+// to it are lost. Reference it from an extension's main.js with:
+//
+//   /// <reference path="../dango.d.ts" />
+//
+// main.js is an ES module. It exports:
+//
+//   - one function per command in manifest.json, named by the command's id
+//   - `rootItems()`, when the manifest declares `rootItems`, returning the
+//     rows Dango shows in root search: RootItem[] | Promise<RootItem[]>
+//   - `onAction(itemId, actionId, values)`, which runs an action of a root
+//     item, and of any action without an `onAction` of its own
+
+// ---- Generated from Dango's own types ----
+
+{{GENERATED}}
+
+// ---- Extension code ----
+
+/** What an action handler gets. `values` holds a form's fields by id. */
+type ActionEvent = { itemId: string; values: Record<string, string> };
+
+/**
+ * What an action returns. Returning nothing closes the launcher; calling
+ * `dango.push` inside it opens a view of its own instead.
+ */
+type ActionResult =
+  | { replace: View }
+  | { ticker: string }
+  | { back: true }
+  | { copy: string };
+
+type ActionHandler = (
+  event: ActionEvent,
+) => ActionResult | void | Promise<ActionResult | void>;
+
+/**
+ * Answers the query of a list or grid that searches through its command. A
+ * newer query aborts this one: check `signal.aborted` after slow work.
+ */
+type SearchHandler = (
+  query: string,
+  options: { signal: { aborted: boolean } },
+) => View | void | Promise<View | void>;
+
+type ExecResult = { code: number | null; stdout: string; stderr: string };
+
+type ExecOptions = {
+  cwd?: string;
+  env?: Record<string, string>;
+  input?: string;
+};
+
+type FetchInit = {
+  method?: string;
+  headers?: Record<string, string>;
+  body?: string;
+};
+
+type FetchResponse = {
+  status: number;
+  ok: boolean;
+  headers: Record<string, string>;
+  text(): Promise<string>;
+  json(): Promise<unknown>;
+};
+
+type DirEntry = { name: string; isDir: boolean };
+
+type FileStat = { size: number; isDir: boolean; modifiedMs: number | null };
+
+interface Dango {
+  /** Shows a view, replacing the one this command showed before. */
+  push(view: View): void;
+  /** Stops with a failure the launcher shows as given. */
+  fail(message: string): never;
+  /** Runs a program with no window, on the PATH a shell would give. */
+  exec(program: string, args?: string[], options?: ExecOptions): Promise<ExecResult>;
+  fetch(url: string, init?: FetchInit): Promise<FetchResponse>;
+  fs: {
+    readText(path: string): Promise<string>;
+    writeText(path: string, text: string): Promise<void>;
+    readDir(path: string): Promise<DirEntry[]>;
+    remove(path: string): Promise<void>;
+    exists(path: string): Promise<boolean>;
+    stat(path: string): Promise<FileStat>;
+  };
+  /**
+   * Values kept for this extension on this machine. They survive restarts,
+   * but keep only what can be fetched again or lost without harm.
+   */
+  storage: {
+    get(key: string): Promise<unknown>;
+    set(key: string, value: unknown): Promise<void>;
+    remove(key: string): Promise<void>;
+    keys(): Promise<string[]>;
+  };
+  /** A secret from this extension's `[extensions.<id>]` table in auth.toml. */
+  secret(name: string): string | undefined;
+  open(target: string): void;
+  copy(text: string): void;
+  /** Pastes text into the app the user was in before the launcher. */
+  paste(text: string): void;
+  /** Every key of `[extensions.<id>]` in config.toml besides enabled and commands. */
+  preferences: Readonly<Record<string, unknown>>;
+  env: { id: string; folder: string };
+}
+
+declare const dango: Dango;
