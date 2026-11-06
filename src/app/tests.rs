@@ -561,11 +561,13 @@ fn every_load_problem_gets_a_line() {
             existing_extension: "x".into(),
             rejected_extension: "y".into(),
         }],
+        load_errors: vec![("gh-prs".into(), "main.js is missing".into())],
     };
     let lines = super::load_problems(&report);
-    assert_eq!(lines.len(), 2);
+    assert_eq!(lines.len(), 3);
     assert!(lines[0].contains("boom"));
     assert!(lines[1].contains("x.a"));
+    assert_eq!(lines[2], "Extension gh-prs didn't load, see dango.log");
 }
 
 mod inspect_tests {

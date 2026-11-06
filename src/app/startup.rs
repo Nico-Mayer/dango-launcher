@@ -345,6 +345,12 @@ fn build_services(
         register(&mut host, "ai", extension);
     }
 
+    // After the built-ins, so a built-in keeps its id when one collides.
+    let js_dir = crate::js::load::extensions_dir(&config::config_dir());
+    problems.extend(load_problems(&crate::js::load::register_all(
+        &mut host, &js_dir,
+    )));
+
     let frecency = Arc::new(match &store {
         Some(store) => FrecencyTable::load(Box::new(store.clone())),
         None => FrecencyTable::in_memory(),

@@ -108,11 +108,21 @@ pub enum HostError {
 pub struct LoadReport {
     pub activation_errors: Vec<(String, String)>,
     pub collisions: Vec<Collision>,
+    /// Extensions that couldn't be read at all, by id, with the reason.
+    pub load_errors: Vec<(String, String)>,
 }
 
 impl LoadReport {
     pub fn is_clean(&self) -> bool {
-        self.activation_errors.is_empty() && self.collisions.is_empty()
+        self.activation_errors.is_empty()
+            && self.collisions.is_empty()
+            && self.load_errors.is_empty()
+    }
+
+    pub fn merge(&mut self, other: LoadReport) {
+        self.activation_errors.extend(other.activation_errors);
+        self.collisions.extend(other.collisions);
+        self.load_errors.extend(other.load_errors);
     }
 }
 

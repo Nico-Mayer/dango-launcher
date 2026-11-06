@@ -1041,7 +1041,11 @@ fn load_problems(report: &extension::LoadReport) -> Vec<String> {
             collision.qualified_id, collision.existing_extension, collision.rejected_extension
         )
     });
-    activations.chain(collisions).collect()
+    let unloaded = report
+        .load_errors
+        .iter()
+        .map(|(id, _)| format!("Extension {id} didn't load, see dango.log"));
+    activations.chain(collisions).chain(unloaded).collect()
 }
 
 /// Each extension's name and icon. Names never change at runtime, so the
