@@ -43,6 +43,13 @@
     },
   };
 
+  const write = (level) => (...parts) =>
+    __dangoNative.log(
+      level,
+      parts.map((part) => (typeof part === "string" ? part : JSON.stringify(part))).join(" "),
+    );
+  globalThis.console = { log: write("log"), info: write("info"), warn: write("warn"), error: write("error") };
+
   globalThis.__dangoPrepare = prepare;
   globalThis.__dangoHasHandler = (actionId) => handlers.has(actionId);
   globalThis.__dangoAction = (request) =>

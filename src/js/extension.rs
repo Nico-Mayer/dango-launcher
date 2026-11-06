@@ -385,4 +385,21 @@ pub(crate) mod tests {
 
         assert_eq!(recorded.views.lock().unwrap().len(), 1);
     }
+
+    #[test]
+    fn console_calls_reach_the_log_without_failing() {
+        let runtime = runtime();
+        let extension = extension(
+            &runtime,
+            "no-view",
+            "export function run() { console.log('hi', { n: 1 }); console.error('bad'); return 'ok'; }",
+        );
+
+        let recorded = invoke(&extension);
+
+        assert_eq!(
+            *recorded.outcome.lock().unwrap(),
+            Some(Outcome::Success(Some("ok".into())))
+        );
+    }
 }

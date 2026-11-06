@@ -55,6 +55,13 @@ impl Natives for Bridge {
         _ctx: &Ctx<'js>,
         native: &Object<'js>,
     ) -> rquickjs::Result<()> {
+        let id = self.extension_id.clone();
+        native.set(
+            "log",
+            Func::from(move |level: String, text: String| {
+                crate::log::append(&console_line(&id, &level, &text));
+            }),
+        )?;
         let bridge = self.clone();
         native.set(
             "push",
@@ -65,6 +72,10 @@ impl Natives for Bridge {
             }),
         )
     }
+}
+
+fn console_line(extension_id: &str, level: &str, text: &str) -> String {
+    format!("extension {extension_id} {level}: {text}")
 }
 
 /// How often a session looks at whether the launcher has moved on.
@@ -173,5 +184,18 @@ impl Live {
 
     pub fn pushed(&self) -> bool {
         self.bridge.pushed.load(Ordering::SeqCst)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_console_line_names_the_extension() {
+        assert_eq!(
+            console_line("gh-prs", "warn", "hi"),
+            "extension gh-prs warn: hi"
+        );
     }
 }
