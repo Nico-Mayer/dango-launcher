@@ -9,7 +9,7 @@
 
 ## 2. Manifest and loading
 
-- [ ] 2.1 Add the `manifest.json` DTO in `src/js/` mapping to `Manifest` (camelCase, `rootItems.refreshMinutes`, relative `icon` resolved against the folder), rejecting id mismatch and `services`; verify with `cargo test` cases for valid, bad JSON, id mismatch, services, and a relative icon
+- [x] 2.1 Add the `manifest.json` DTO in `src/js/` mapping to `Manifest` (camelCase, `rootItems.refreshMinutes`, relative `icon` resolved against the folder), rejecting id mismatch and `services`; verify with `cargo test` cases for valid, bad JSON, id mismatch, services, and a relative icon
 - [ ] 2.2 Add the folder scan of `<config_dir>/extensions/*/` (missing folder is fine, a folder with neither file is ignored, one file only is reported) and register each `JsExtension`; verify with `cargo test` on a temp dir that commands appear in the registry, a folder without `main.js` lands in `LoadReport`, and a `.git` folder is not reported
 - [ ] 2.3 Show JS load problems in the tray as "Extension <id> didn't load, see dango.log" through `load_problems`; verify with a `cargo test` on `load_problems`
 - [ ] 2.4 Add a fixture extension under `tests/fixtures/extensions/` whose top level writes a marker file; verify with `cargo test` that root search finds its command and the marker is absent
