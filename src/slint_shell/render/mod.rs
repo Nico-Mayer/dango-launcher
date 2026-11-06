@@ -167,6 +167,17 @@ impl Renderer {
         self.last = Some(snapshot);
     }
 
+    pub fn icons_mut(&mut self) -> &mut Icons {
+        &mut self.icons
+    }
+
+    /// Draws the last snapshot again, as when an image it shows is ready.
+    pub fn refresh(&mut self, ui: &LauncherWindow) {
+        if let Some(snapshot) = self.last.clone() {
+            self.render(ui, snapshot);
+        }
+    }
+
     /// The list and grid models and the detail hold their images too, so they
     /// go with the cache.
     pub fn forget_images(&mut self) {

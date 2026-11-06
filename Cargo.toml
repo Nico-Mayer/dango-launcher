@@ -94,6 +94,9 @@ steamlocate = "2.1"
 toml_edit = "0.25"
 slug = "0.1.6"
 ddc = "0.2"
+# Shrinks an extension's large image files off the UI thread. Same version
+# Slint already pulls in for its own image loading.
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "webp", "gif", "bmp"] }
 rquickjs = { version = "0.14", features = ["futures", "parallel"] }
 rquickjs-extra = { version = "0.3", default-features = false, features = ["timers", "url"] }
 

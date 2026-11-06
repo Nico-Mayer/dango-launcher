@@ -299,6 +299,25 @@ pub fn run() {
     tray.set_hint("Dango".into());
 
     let renderer = Rc::new(RefCell::new(Renderer::new(&window)));
+    let weak = window.as_weak();
+    renderer
+        .borrow_mut()
+        .icons_mut()
+        .set_thumbnail_sink(Arc::new(move |path, pixels| {
+            let weak = weak.clone();
+            let _ = slint::invoke_from_event_loop(move || {
+                let Some(window) = weak.upgrade() else {
+                    return;
+                };
+                RENDERER.with(|renderer| {
+                    if let Some(renderer) = renderer.borrow().as_ref() {
+                        let mut renderer = renderer.borrow_mut();
+                        renderer.icons_mut().add_thumbnail(path, pixels);
+                        renderer.refresh(&window);
+                    }
+                });
+            });
+        }));
     RENDERER.with(|slot| *slot.borrow_mut() = Some(renderer.clone()));
 
     let shell = Arc::new(SlintShell {

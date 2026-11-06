@@ -1354,6 +1354,7 @@ dependencies = [
  "i-slint-backend-testing",
  "icondata_core",
  "icondata_lu",
+ "image",
  "interprocess",
  "jsonschema",
  "libc",
