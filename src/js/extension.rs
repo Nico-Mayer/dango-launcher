@@ -708,9 +708,9 @@ pub(crate) mod tests {
             host,
             "no-view",
             r#"export async function run() {
-                dango.open("https://example.com");
-                dango.copy("copied");
-                dango.paste("pasted");
+                await dango.open("https://example.com");
+                await dango.copy("copied");
+                await dango.paste("pasted");
                 const file = dango.env.folder + "/note.txt";
                 await dango.fs.writeText(file, "kept");
                 return `${dango.env.id} ${await dango.fs.readText(file)}`;
@@ -798,10 +798,10 @@ pub(crate) mod tests {
         let extension = extension_with(
             host,
             "no-view",
-            r#"export function run() {
+            r#"export async function run() {
                 let caught = "";
-                try { dango.secret("broken"); } catch (error) { caught = error.message; }
-                return `${dango.secret("token")} ${dango.secret("other")} ${caught}`;
+                try { await dango.secret("broken"); } catch (error) { caught = error.message; }
+                return `${await dango.secret("token")} ${await dango.secret("other")} ${caught}`;
             }"#,
         );
 

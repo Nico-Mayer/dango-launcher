@@ -116,9 +116,15 @@ impl Natives for Bridge {
         ] {
             native.set(
                 name,
-                Func::from(move |ctx: Ctx<'js>, text: String| -> rquickjs::Result<()> {
-                    action(&text).map_err(|message| throw(&ctx, message))
-                }),
+                Func::from(Async(move |ctx: Ctx<'js>, text: String| {
+                    let action = action.clone();
+                    async move {
+                        tokio::task::spawn_blocking(move || action(&text))
+                            .await
+                            .map_err(|error| throw(&ctx, error))?
+                            .map_err(|message| throw(&ctx, message))
+                    }
+                })),
             )?;
         }
         let store = self.host.store.clone();
@@ -143,14 +149,22 @@ impl Natives for Bridge {
         let id = self.extension_id.clone();
         native.set(
             "secret",
-            Func::from(
-                move |ctx: Ctx<'js>, name: String| -> rquickjs::Result<Option<String>> {
-                    secret(&id, &name).map_err(|detail| {
+            Func::from(Async(move |ctx: Ctx<'js>, name: String| {
+                let secret = secret.clone();
+                let id = id.clone();
+                async move {
+                    let read = {
+                        let id = id.clone();
+                        tokio::task::spawn_blocking(move || secret(&id, &name))
+                            .await
+                            .map_err(|error| throw(&ctx, error))?
+                    };
+                    read.map_err(|detail| {
                         crate::log::append(&format!("extension {id}: {detail}"));
                         throw(&ctx, "auth.toml can't be read")
                     })
-                },
-            ),
+                }
+            })),
         )?;
         let preferences = serde_json::Value::Object((self.host.preferences)(&self.extension_id));
         native.set("preferences", preferences.to_string())?;

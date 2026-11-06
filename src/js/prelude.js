@@ -57,10 +57,10 @@
     preferences: Object.freeze(
       __dangoNative.preferences ? JSON.parse(__dangoNative.preferences) : {},
     ),
-    secret: (name) => __dangoNative.secret(name) ?? undefined,
-    open: (target) => __dangoNative.open(target),
-    copy: (text) => __dangoNative.copy(text),
-    paste: (text) => __dangoNative.paste(text),
+    secret: async (name) => (await __dangoNative.secret(name)) ?? undefined,
+    open: async (target) => __dangoNative.open(target),
+    copy: async (text) => __dangoNative.copy(text),
+    paste: async (text) => __dangoNative.paste(text),
     async fetch(url, init = {}) {
       const response = JSON.parse(await __dangoNative.fetch(JSON.stringify({ url, ...init })));
       return {

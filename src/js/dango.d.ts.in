@@ -96,11 +96,11 @@ interface Dango {
     keys(): Promise<string[]>;
   };
   /** A secret from this extension's `[extensions.<id>]` table in auth.toml. */
-  secret(name: string): string | undefined;
-  open(target: string): void;
-  copy(text: string): void;
+  secret(name: string): Promise<string | undefined>;
+  open(target: string): Promise<void>;
+  copy(text: string): Promise<void>;
   /** Pastes text into the app the user was in before the launcher. */
-  paste(text: string): void;
+  paste(text: string): Promise<void>;
   /** Every key of `[extensions.<id>]` in config.toml besides enabled and commands. */
   preferences: Readonly<Record<string, unknown>>;
   env: { id: string; folder: string };
