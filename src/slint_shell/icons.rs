@@ -46,6 +46,9 @@ pub struct Icons {
     shrinking: RefCell<HashSet<String>>,
     /// Without one, as in tests, a large file is shrunk on the spot.
     sink: Option<ThumbnailSink>,
+    /// One worker shrinks files in turn: a grid of wallpapers decoded all at
+    /// once held every full image in memory together.
+    queue: RefCell<Option<std::sync::mpsc::Sender<String>>>,
     #[cfg(test)]
     decoded: std::cell::Cell<usize>,
 }
@@ -134,13 +137,20 @@ impl Icons {
             return shrink(path).map(Image::from_rgba8);
         };
         if self.shrinking.borrow_mut().insert(path.to_string()) {
-            let sink = sink.clone();
-            let path = path.to_string();
-            std::thread::spawn(move || {
-                if let Some(pixels) = shrink(&path) {
-                    sink(path, pixels);
-                }
+            let mut queue = self.queue.borrow_mut();
+            let sender = queue.get_or_insert_with(|| {
+                let (sender, paths) = std::sync::mpsc::channel::<String>();
+                let sink = sink.clone();
+                std::thread::spawn(move || {
+                    for path in paths {
+                        if let Some(pixels) = shrink(&path) {
+                            sink(path, pixels);
+                        }
+                    }
+                });
+                sender
             });
+            let _ = sender.send(path.to_string());
         }
         None
     }
@@ -385,5 +395,30 @@ mod tests {
         assert!(matches!(again, Icon::Missing));
         assert!(finished.try_recv().is_err(), "it was shrunk twice");
         assert!(matches!(icons.get(Some(&path)), Icon::File(_)));
+    }
+
+    #[test]
+    fn large_files_are_shrunk_one_after_another_on_one_thread() {
+        let (sender, finished) = std::sync::mpsc::channel();
+        let mut icons = Icons::default();
+        icons.set_thumbnail_sink(Arc::new(move |path, _| {
+            let _ = sender.send((path, std::thread::current().id()));
+        }));
+        let paths = [large_image(), large_image(), large_image()];
+
+        for path in &paths {
+            icons.get(Some(path));
+        }
+        let done: Vec<_> = (0..3)
+            .map(|_| {
+                finished
+                    .recv_timeout(std::time::Duration::from_secs(20))
+                    .unwrap()
+            })
+            .collect();
+
+        let order: Vec<&String> = done.iter().map(|(path, _)| path).collect();
+        assert_eq!(order, paths.iter().collect::<Vec<_>>());
+        assert!(done.iter().all(|(_, thread)| *thread == done[0].1));
     }
 }
