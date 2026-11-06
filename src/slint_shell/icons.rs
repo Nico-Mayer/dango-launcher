@@ -6,14 +6,17 @@
 //! somewhere in an extension.
 
 use std::cell::RefCell;
+use std::collections::hash_map::DefaultHasher;
 use std::collections::{HashMap, HashSet};
-use std::path::Path;
+use std::hash::{Hash, Hasher};
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use icondata_core::IconData;
 use slint::{Image, Rgba8Pixel, SharedPixelBuffer};
 
 use crate::extension::NAMED_ICON;
+use crate::icon_cache::{IconCache, IconRgba};
 
 pub enum Icon {
     Named(Image),
@@ -45,7 +48,7 @@ pub struct Icons {
     thumbnails: RefCell<HashMap<String, Image>>,
     shrinking: RefCell<HashSet<String>>,
     /// Without one, as in tests, a large file is shrunk on the spot.
-    sink: Option<ThumbnailSink>,
+    sink: Option<(ThumbnailSink, PathBuf)>,
     /// One worker shrinks files in turn: a grid of wallpapers decoded all at
     /// once held every full image in memory together.
     queue: RefCell<Option<std::sync::mpsc::Sender<String>>>,
@@ -84,8 +87,9 @@ impl Icons {
         self.thumbnails.borrow_mut().clear();
     }
 
-    pub fn set_thumbnail_sink(&mut self, sink: ThumbnailSink) {
-        self.sink = Some(sink);
+    /// Thumbnails are kept in `dir` across shows and restarts.
+    pub fn set_thumbnail_sink(&mut self, sink: ThumbnailSink, dir: PathBuf) {
+        self.sink = Some((sink, dir));
     }
 
     /// Takes a thumbnail a thread finished; the next render shows it.
@@ -133,18 +137,19 @@ impl Icons {
         if let Some(image) = self.thumbnails.borrow().get(path) {
             return Some(image.clone());
         }
-        let Some(sink) = &self.sink else {
-            return shrink(path).map(Image::from_rgba8);
+        let Some((sink, dir)) = &self.sink else {
+            return shrink(path).map(|image| Image::from_rgba8(pixels(image)));
         };
         if self.shrinking.borrow_mut().insert(path.to_string()) {
             let mut queue = self.queue.borrow_mut();
             let sender = queue.get_or_insert_with(|| {
                 let (sender, paths) = std::sync::mpsc::channel::<String>();
-                let sink = sink.clone();
+                let (sink, dir) = (sink.clone(), dir.clone());
                 std::thread::spawn(move || {
+                    let cache = IconCache::new(dir);
                     for path in paths {
-                        if let Some(pixels) = shrink(&path) {
-                            sink(path, pixels);
+                        if let Some(image) = cached_thumbnail(&cache, &path) {
+                            sink(path, pixels(image));
                         }
                     }
                 });
@@ -160,16 +165,49 @@ fn is_large(path: &str) -> bool {
     std::fs::metadata(path).is_ok_and(|metadata| metadata.len() > LARGE_FILE_BYTES)
 }
 
-fn shrink(path: &str) -> Option<SharedPixelBuffer<Rgba8Pixel>> {
-    let image = image::open(path)
-        .ok()?
-        .thumbnail(THUMBNAIL_SIDE, THUMBNAIL_SIDE)
-        .to_rgba8();
-    Some(SharedPixelBuffer::clone_from_slice(
-        image.as_raw(),
-        image.width(),
-        image.height(),
-    ))
+fn cached_thumbnail(cache: &IconCache, path: &str) -> Option<image::RgbaImage> {
+    let key = thumbnail_key(path)?;
+    if let Some(cached) = cache.path(&key) {
+        if let Ok(image) = image::open(cached) {
+            return Some(image.to_rgba8());
+        }
+    }
+    let image = shrink(path)?;
+    cache.ensure_with(&key, || {
+        Some(IconRgba {
+            width: image.width(),
+            height: image.height(),
+            rgba: image.as_raw().clone(),
+        })
+    });
+    Some(image)
+}
+
+/// A changed file gets a new key, so its old thumbnail is never shown.
+fn thumbnail_key(path: &str) -> Option<String> {
+    let metadata = std::fs::metadata(path).ok()?;
+    let mut hasher = DefaultHasher::new();
+    (
+        path,
+        metadata.len(),
+        metadata.modified().ok(),
+        THUMBNAIL_SIDE,
+    )
+        .hash(&mut hasher);
+    Some(format!("{:016x}", hasher.finish()))
+}
+
+fn shrink(path: &str) -> Option<image::RgbaImage> {
+    Some(
+        image::open(path)
+            .ok()?
+            .thumbnail(THUMBNAIL_SIDE, THUMBNAIL_SIDE)
+            .to_rgba8(),
+    )
+}
+
+fn pixels(image: image::RgbaImage) -> SharedPixelBuffer<Rgba8Pixel> {
+    SharedPixelBuffer::clone_from_slice(image.as_raw(), image.width(), image.height())
 }
 
 fn named_image(name: &str) -> Option<Image> {
@@ -362,6 +400,31 @@ mod tests {
         path.to_string_lossy().into_owned()
     }
 
+    fn temp_dir() -> PathBuf {
+        std::env::temp_dir().join(format!("dango-thumbnails-{}", uuid::Uuid::new_v4()))
+    }
+
+    #[test]
+    fn a_thumbnail_is_kept_on_disk_for_a_later_run() {
+        let (dir, path) = (temp_dir(), large_image());
+        let shrunk = cached_thumbnail(&IconCache::new(dir.clone()), &path).unwrap();
+        let key = thumbnail_key(&path).unwrap();
+
+        let cache = IconCache::new(dir);
+        let cached = image::open(cache.path(&key).unwrap()).unwrap().to_rgba8();
+
+        assert_eq!(cached.dimensions(), shrunk.dimensions());
+    }
+
+    #[test]
+    fn a_changed_file_gets_a_new_thumbnail() {
+        let path = large_image();
+        let before = thumbnail_key(&path);
+        std::fs::write(&path, b"changed").unwrap();
+
+        assert_ne!(thumbnail_key(&path), before);
+    }
+
     #[test]
     fn a_large_file_is_shown_shrunk() {
         let icons = Icons::default();
@@ -378,9 +441,12 @@ mod tests {
     fn a_large_file_is_shrunk_off_the_ui_thread_once() {
         let (sender, finished) = std::sync::mpsc::channel();
         let mut icons = Icons::default();
-        icons.set_thumbnail_sink(Arc::new(move |path, pixels| {
-            let _ = sender.send((path, pixels));
-        }));
+        icons.set_thumbnail_sink(
+            Arc::new(move |path, pixels| {
+                let _ = sender.send((path, pixels));
+            }),
+            temp_dir(),
+        );
         let path = large_image();
 
         let first = icons.get(Some(&path));
@@ -401,9 +467,12 @@ mod tests {
     fn large_files_are_shrunk_one_after_another_on_one_thread() {
         let (sender, finished) = std::sync::mpsc::channel();
         let mut icons = Icons::default();
-        icons.set_thumbnail_sink(Arc::new(move |path, _| {
-            let _ = sender.send((path, std::thread::current().id()));
-        }));
+        icons.set_thumbnail_sink(
+            Arc::new(move |path, _| {
+                let _ = sender.send((path, std::thread::current().id()));
+            }),
+            temp_dir(),
+        );
         let paths = [large_image(), large_image(), large_image()];
 
         for path in &paths {

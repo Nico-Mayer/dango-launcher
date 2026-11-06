@@ -300,10 +300,8 @@ pub fn run() {
 
     let renderer = Rc::new(RefCell::new(Renderer::new(&window)));
     let weak = window.as_weak();
-    renderer
-        .borrow_mut()
-        .icons_mut()
-        .set_thumbnail_sink(Arc::new(move |path, pixels| {
+    renderer.borrow_mut().icons_mut().set_thumbnail_sink(
+        Arc::new(move |path, pixels| {
             let weak = weak.clone();
             let _ = slint::invoke_from_event_loop(move || {
                 let Some(window) = weak.upgrade() else {
@@ -317,7 +315,9 @@ pub fn run() {
                     }
                 });
             });
-        }));
+        }),
+        app::cache_dir().join("thumbnails"),
+    );
     RENDERER.with(|slot| *slot.borrow_mut() = Some(renderer.clone()));
 
     let shell = Arc::new(SlintShell {
