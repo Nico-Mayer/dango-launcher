@@ -116,11 +116,15 @@
   globalThis.__dangoAction = async (request) => {
     const handler = handlers.get(request.actionId);
     const main = globalThis.__dangoMain;
+    let level = null;
+    const push = (view) => {
+      level = __dangoNative.pushLevel(JSON.stringify(prepare(view)), level);
+    };
     let result;
     if (handler) {
-      result = await handler({ itemId: request.itemId, values: request.values });
+      result = await handler({ itemId: request.itemId, values: request.values, push });
     } else if (main && typeof main.onAction === "function") {
-      result = await main.onAction(request.itemId, request.actionId, request.values);
+      result = await main.onAction(request.itemId, request.actionId, request.values, push);
     } else {
       return { missing: true };
     }

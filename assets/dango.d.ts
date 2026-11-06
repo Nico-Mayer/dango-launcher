@@ -10,8 +10,8 @@
 //     `export { randomTheme as "random-theme" }`)
 //   - `rootItems()`, when the manifest declares `rootItems`, returning the
 //     rows Dango shows in root search: RootItem[] | Promise<RootItem[]>
-//   - `onAction(itemId, actionId, values)`, which runs an action of a root
-//     item, and of any action without an `onAction` of its own
+//   - `onAction(itemId, actionId, values, push)`, which runs an action of a
+//     root item, and of any action without an `onAction` of its own
 
 // ---- Generated from Dango's own types ----
 
@@ -164,12 +164,20 @@ section?: string, style?: ActionStyle, };
 
 // ---- Extension code ----
 
-/** What an action handler gets. `values` holds a form's fields by id. */
-type ActionEvent = { itemId: string; values: Record<string, string> };
+/**
+ * What an action handler gets. `values` holds a form's fields by id. `push`
+ * opens a view of the action's own on its first call; later calls replace
+ * what that view shows.
+ */
+type ActionEvent = {
+  itemId: string;
+  values: Record<string, string>;
+  push(view: View): void;
+};
 
 /**
- * What an action returns. Returning nothing closes the launcher; calling
- * `dango.push` inside it opens a view of its own instead.
+ * What an action returns. Returning nothing closes the launcher, unless the
+ * action showed a view with `push`.
  */
 type ActionResult =
   | { replace: View }
@@ -217,7 +225,10 @@ type DirEntry = { name: string; isDir: boolean };
 type FileStat = { size: number; isDir: boolean; modifiedMs: number | null };
 
 interface Dango {
-  /** Shows a view, replacing the one this command showed before. */
+  /**
+   * Shows a view in place of the one this command showed. An action shows a
+   * view of its own with the `push` its event carries instead.
+   */
   push(view: View): void;
   /** Stops with a failure the launcher shows as given. */
   fail(message: string): never;

@@ -1,6 +1,7 @@
 //! A session bound to the launcher: where its views go and when it stops.
 
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::collections::HashMap;
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
@@ -22,43 +23,65 @@ pub struct Bridge {
     extension_id: String,
     folder: PathBuf,
     host: Arc<JsHost>,
-    context: Mutex<Option<InvocationContext>>,
-    /// Set while an action runs: its first push opens a level of its own.
-    opens_level: AtomicBool,
+    /// The command's own invocation, where `dango.push` goes.
+    command: Option<InvocationContext>,
+    /// Levels actions opened, by the token their `event.push` carries, so a
+    /// push from the command's code never lands in one, nor opens one.
+    levels: Mutex<HashMap<u32, InvocationContext>>,
+    next_level: AtomicU32,
+    /// The latest invocation, the one the watcher follows.
+    newest: Mutex<Option<InvocationContext>>,
     pushed: AtomicBool,
 }
 
 impl Bridge {
-    fn push(&self, json: &str) -> Result<(), String> {
+    fn tree(json: &str) -> Result<ViewTree, String> {
         let view: View = serde_json::from_str(json).map_err(|error| error.to_string())?;
-        let tree = ViewTree {
+        Ok(ViewTree {
             protocol_version: PROTOCOL_VERSION,
             view,
-        };
-        let mut context = self.context.lock().unwrap();
-        if self.opens_level.swap(false, Ordering::SeqCst) {
-            let opened = (self.host.start_view)(&self.extension_id, None)
-                .ok_or("the launcher can't show a new view")?;
-            *context = Some((*opened).clone());
-        }
-        let context = context.as_ref().ok_or("there is no view to show this in")?;
+        })
+    }
+
+    fn push(&self, json: &str) -> Result<(), String> {
+        let tree = Self::tree(json)?;
+        let context = self
+            .command
+            .as_ref()
+            .ok_or("there is no view to show this in")?;
         context.push_view(tree);
         self.pushed.store(true, Ordering::SeqCst);
         Ok(())
     }
 
-    /// Marks the start of an action: its first push opens a level.
-    pub fn begin_action(&self) {
-        self.opens_level.store(true, Ordering::SeqCst);
+    /// An action's push: the first opens a level of its own and returns its
+    /// token; a push carrying that token replaces what the level shows.
+    fn push_level(&self, json: &str, token: Option<u32>) -> Result<u32, String> {
+        let tree = Self::tree(json)?;
+        let mut levels = self.levels.lock().unwrap();
+        let token = match token.filter(|token| levels.contains_key(token)) {
+            Some(token) => token,
+            None => {
+                let opened = (self.host.start_view)(&self.extension_id, None)
+                    .ok_or("the launcher can't show a new view")?;
+                let token = self.next_level.fetch_add(1, Ordering::SeqCst);
+                *self.newest.lock().unwrap() = Some((*opened).clone());
+                levels.insert(token, (*opened).clone());
+                token
+            }
+        };
+        levels[&token].push_view(tree);
+        self.pushed.store(true, Ordering::SeqCst);
+        Ok(token)
     }
 
-    /// Ends an action and says whether it opened a level of its own.
-    pub fn finish_action(&self) -> bool {
-        !self.opens_level.swap(false, Ordering::SeqCst)
+    /// How many levels actions have opened, to tell whether one just did.
+    pub fn levels_opened(&self) -> u32 {
+        self.next_level.load(Ordering::SeqCst)
     }
 
     pub fn context(&self) -> Option<InvocationContext> {
-        self.context.lock().unwrap().clone()
+        self.newest.lock().unwrap().clone()
     }
 }
 
@@ -176,6 +199,17 @@ impl Natives for Bridge {
         native.set("env", env)?;
         let bridge = self.clone();
         native.set(
+            "pushLevel",
+            Func::from(
+                move |ctx: Ctx<'js>, json: String, token: Option<u32>| -> rquickjs::Result<u32> {
+                    bridge
+                        .push_level(&json, token)
+                        .map_err(|message| throw(&ctx, message))
+                },
+            ),
+        )?;
+        let bridge = self.clone();
+        native.set(
             "push",
             Func::from(move |ctx: Ctx<'js>, json: String| -> rquickjs::Result<()> {
                 bridge
@@ -258,8 +292,10 @@ impl Live {
             extension_id: extension_id.to_owned(),
             folder,
             host,
-            context: Mutex::new(context),
-            opens_level: AtomicBool::new(false),
+            newest: Mutex::new(context.clone()),
+            command: context,
+            levels: Mutex::default(),
+            next_level: AtomicU32::new(0),
             pushed: AtomicBool::new(false),
         });
         let cancel = Arc::new(AtomicBool::new(false));

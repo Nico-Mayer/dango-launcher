@@ -258,11 +258,11 @@ impl Inner {
                 Err(error) => return self.action_failed(error),
             },
         };
-        live.bridge().begin_action();
+        let levels = live.bridge().levels_opened();
         let result = live
             .call(Target::Global("__dangoAction"), Some(request))
             .await;
-        let opened = live.bridge().finish_action();
+        let opened = live.bridge().levels_opened() > levels;
         if fresh {
             match opened {
                 true => self.adopt(&live),
@@ -889,7 +889,7 @@ pub(crate) mod tests {
             "view",
             r##"export function run() {
                 dango.push({ kind: "list", items: [{ id: "a", title: "A", actions: [
-                    { title: "Open", onAction: () => dango.push({ kind: "detail", markdown: "# A" }) },
+                    { title: "Open", onAction: ({ push }) => push({ kind: "detail", markdown: "# A" }) },
                     { title: "Ticker", onAction: async () => {
                         await new Promise(resolve => setTimeout(resolve, 200));
                         return { ticker: "Still here" };
@@ -1220,5 +1220,53 @@ export function run() {}",
                 "{main}"
             );
         }
+    }
+
+    #[test]
+    fn the_command_s_own_push_never_opens_a_level() {
+        let runtime = runtime();
+        let detail = Arc::new(Recorded::default());
+        let opened = detail.clone();
+        let opens = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let counted = opens.clone();
+        let host = Arc::new(JsHost {
+            start_view: Arc::new(move |_, _| {
+                counted.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                Some(Arc::new(InvocationContext::for_test("ext", opened.clone())))
+            }),
+            ..Arc::into_inner(test_host(runtime.handle().clone())).unwrap()
+        });
+        let extension = extension_with(
+            host,
+            "view",
+            r#"export function run() {
+                const list = (title) => ({ kind: "list", items: [{ id: "a", title, actions: [
+                    { title: "Open", onAction: async ({ push }) => {
+                        push({ kind: "detail", markdown: "loading" });
+                        await new Promise(resolve => setTimeout(resolve, 200));
+                        push({ kind: "detail", markdown: "done" });
+                    } },
+                ] }] });
+                dango.push(list("cached"));
+                setTimeout(() => dango.push(list("fresh")), 100);
+            }"#,
+        );
+        let list = invoke(&extension);
+        let ids = action_ids(&list);
+
+        let outcome = extension.perform_action("a", &ids[0], &FormValues::new());
+
+        assert_eq!(outcome, ActionOutcome::Started);
+        assert_eq!(opens.load(std::sync::atomic::Ordering::SeqCst), 1);
+        assert_eq!(
+            list.views.lock().unwrap().len(),
+            2,
+            "the refresh went to the list"
+        );
+        assert_eq!(
+            detail.views.lock().unwrap().len(),
+            2,
+            "both pushes went to the detail"
+        );
     }
 }
