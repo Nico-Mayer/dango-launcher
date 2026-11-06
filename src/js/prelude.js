@@ -1,6 +1,8 @@
 (() => {
   const handlers = new Map();
   let next = 0;
+  let search = null;
+  let searching = null;
 
   class DangoFailure extends Error {
     constructor(message) {
@@ -22,6 +24,11 @@
 
   const prepare = (view) => {
     const out = { ...view };
+    if (typeof out.onSearch === "function") {
+      search = out.onSearch;
+      delete out.onSearch;
+      if (!out.filtering) out.filtering = "command";
+    }
     if (out.actions) out.actions = strip(out.actions);
     if (out.items) {
       out.items = out.items.map((item) =>
@@ -91,6 +98,18 @@
   globalThis.console = { log: write("log"), info: write("info"), warn: write("warn"), error: write("error") };
 
   globalThis.__dangoPrepare = prepare;
+  // A new query aborts the search for the last one, whose answer is then
+  // dropped even if the handler ignores the signal.
+  globalThis.__dangoSearch = async (request) => {
+    if (!search) return null;
+    if (searching) searching.aborted = true;
+    const signal = { aborted: false };
+    searching = signal;
+    const view = await search(request.query, { signal });
+    if (signal.aborted || !view) return null;
+    return prepare(view);
+  };
+
   // A handler from a view this session showed, or else the module's
   // `onAction`, which is how a root item's action reaches fresh code.
   globalThis.__dangoAction = async (request) => {

@@ -3249,7 +3249,7 @@ fn search_request(query: &str) -> super::effect::ActionRequest {
     super::effect::ActionRequest {
         origin: super::effect::Origin::View,
         extension_id: "fixture".into(),
-        item_id: String::new(),
+        item_id: query.into(),
         action_id: crate::protocol::SEARCH_ACTION.into(),
         values: None,
         query: Some(query.into()),
@@ -3274,6 +3274,7 @@ fn each_query_reaches_a_command_that_searches() {
         panic!("expected one action, got {effects:?}");
     };
     assert_eq!(request.action_id, crate::protocol::SEARCH_ACTION);
+    assert_eq!(request.item_id, "rust");
     assert_eq!(request.query.as_deref(), Some("rust"));
 }
 

@@ -851,7 +851,7 @@ impl Launcher {
                         fx.push(Effect::RunAction(ActionRequest {
                             origin: Origin::View,
                             extension_id: owner,
-                            item_id: String::new(),
+                            item_id: text.clone(),
                             action_id: SEARCH_ACTION.to_string(),
                             values: None,
                             query: Some(text),

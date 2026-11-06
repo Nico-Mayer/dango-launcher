@@ -43,7 +43,7 @@
 
 - [x] 6.1 Add the optional `filtering` field to `ListView` and `GridView` (default `"launcher"`, protocol stays 2); verify with `src/ui/tests.rs` that a tree without it filters as before
 - [x] 6.2 In the `src/ui/` reducer, skip narrowing for `"command"` views and emit `SEARCH_ACTION` with the query on each change; drop a `Replaced` reply for an older query; verify with `src/ui/tests.rs` cases for delivery, out-of-order answers, no re-narrowing, the 50-item limit in command order, and query kept on going back
-- [ ] 6.3 Hand the query and an abort signal to the JS search handler; verify with `cargo test` that a superseded search's result is never pushed
+- [x] 6.3 Hand the query and an abort signal to the JS search handler; verify with `cargo test` that a superseded search's result is never pushed
 
 ## 7. Reload and types file
 

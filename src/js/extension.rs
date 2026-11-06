@@ -5,7 +5,7 @@ use std::time::Duration;
 use crate::extension::manifest::{InvocationMode, Manifest};
 use crate::extension::{ActionOutcome, ActivationResult, Extension, FormValues};
 use crate::invocation::{Command, InvocationContext};
-use crate::protocol::{View, ViewTree, PROTOCOL_VERSION};
+use crate::protocol::{View, ViewTree, PROTOCOL_VERSION, SEARCH_ACTION};
 
 use super::host::JsHost;
 use super::live::Live;
@@ -116,13 +116,16 @@ impl Extension for JsExtension {
     }
 
     fn perform_action(&self, item_id: &str, action_id: &str, values: &FormValues) -> ActionOutcome {
+        let runtime = self.inner.host.runtime.clone();
+        if action_id == SEARCH_ACTION {
+            return runtime.block_on(self.inner.search(item_id));
+        }
         let request = serde_json::json!({
             "itemId": item_id,
             "actionId": action_id,
             "values": values,
         })
         .to_string();
-        let runtime = self.inner.host.runtime.clone();
         runtime.block_on(self.inner.action(&request))
     }
 }
@@ -255,6 +258,36 @@ impl Inner {
             return ActionOutcome::Back;
         }
         ActionOutcome::Done
+    }
+
+    /// Hands a query to the search handler of the session's view. Its answer
+    /// replaces the view; no answer, as for a superseded search, changes
+    /// nothing.
+    async fn search(&self, query: &str) -> ActionOutcome {
+        let Some(live) = self
+            .live
+            .lock()
+            .unwrap()
+            .clone()
+            .filter(|live| !live.is_ended())
+        else {
+            return ActionOutcome::Started;
+        };
+        let request = serde_json::json!({ "query": query }).to_string();
+        match live
+            .call(Target::Global("__dangoSearch"), Some(&request))
+            .await
+        {
+            Ok(Some(json)) => match serde_json::from_str::<View>(&json) {
+                Ok(view) => ActionOutcome::Replaced(Box::new(ViewTree {
+                    protocol_version: PROTOCOL_VERSION,
+                    view,
+                })),
+                Err(_) => ActionOutcome::Started,
+            },
+            Ok(None) => ActionOutcome::Started,
+            Err(error) => self.action_failed(error),
+        }
     }
 
     fn action_failed(&self, error: JsError) -> ActionOutcome {
@@ -960,5 +993,47 @@ pub(crate) mod tests {
             extension.perform_action("repo-1", "open", &FormValues::new()),
             ActionOutcome::Ticker("repo-1 open".into())
         );
+    }
+
+    #[test]
+    fn a_superseded_search_answers_nothing() {
+        let runtime = runtime();
+        let extension = Arc::new(extension(
+            &runtime,
+            "view",
+            r#"export function run() {
+                dango.push({ kind: "list", items: [], onSearch: async (query) => {
+                    await new Promise(resolve => setTimeout(resolve, query === "ru" ? 300 : 10));
+                    return { kind: "list", items: [{ id: query, title: query }] };
+                } });
+            }"#,
+        ));
+        let recorded = invoke(&extension);
+        {
+            let views = recorded.views.lock().unwrap();
+            let View::List(list) = &views[0].view else {
+                panic!("expected a list");
+            };
+            assert_eq!(list.filtering, crate::protocol::Filtering::Command);
+        }
+
+        let slow = {
+            let extension = extension.clone();
+            std::thread::spawn(move || {
+                extension.perform_action("ru", SEARCH_ACTION, &FormValues::new())
+            })
+        };
+        std::thread::sleep(std::time::Duration::from_millis(50));
+        let fast = extension.perform_action("rust", SEARCH_ACTION, &FormValues::new());
+        let slow = slow.join().unwrap();
+
+        let ActionOutcome::Replaced(tree) = fast else {
+            panic!("expected the newer search to answer, got {fast:?}");
+        };
+        let View::List(list) = tree.view else {
+            panic!("expected a list");
+        };
+        assert_eq!(list.items[0].id, "rust");
+        assert_eq!(slow, ActionOutcome::Started);
     }
 }

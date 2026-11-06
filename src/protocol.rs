@@ -405,7 +405,7 @@ fn square() -> f32 {
 pub const FILTER_ACTION: &str = "filter";
 
 /// The action a view that searches through its command receives on every
-/// change to the query, which arrives as the request's query.
+/// change to the query, which arrives as the item.
 pub const SEARCH_ACTION: &str = "search";
 
 /// The column counts a grid may declare.
