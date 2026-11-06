@@ -1475,3 +1475,61 @@ async fn another_hotkey_ends_a_repeat() {
     hold_for(1000).await;
     assert_eq!(runs(&count), after);
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn leaving_a_js_view_stops_its_timer_and_its_program() {
+    let dir = crate::js::load::tests::temp();
+    let ticks = dir.join("ticks.txt");
+    let finished = dir.join("finished.txt");
+    let program = if cfg!(windows) {
+        let line = format!(
+            "ping -n 3 127.0.0.1 >nul & echo done > \"{}\"",
+            finished.display()
+        );
+        format!("dango.exec('cmd', ['/c', {line:?}])")
+    } else {
+        let line = format!("sleep 2; echo done > '{}'", finished.display());
+        format!("dango.exec('sh', ['-c', {line:?}])")
+    };
+    let main = format!(
+        r#"export function run() {{
+            dango.push({{ kind: "list", items: [{{ id: "a", title: "A" }}] }});
+            let n = 0;
+            setInterval(() => dango.fs.writeText({ticks:?}, String(n++)), 20);
+            {program};
+        }}"#,
+        ticks = ticks.to_string_lossy()
+    );
+    let folder = crate::js::load::tests::write_extension(&dir, "ext", &main);
+    let core_slot: Arc<std::sync::OnceLock<std::sync::Weak<Core>>> = Arc::default();
+    let showing_core = core_slot.clone();
+    let host = Arc::new(crate::js::JsHost {
+        showing: Arc::new(move |owner| {
+            showing_core
+                .get()
+                .and_then(std::sync::Weak::upgrade)
+                .is_some_and(|core| core.view_owner().as_deref() == Some(owner))
+        }),
+        ..Arc::into_inner(crate::js::load::tests::test_host(Handle::current())).unwrap()
+    });
+    let extension = crate::js::load::load(&folder, &host).unwrap().unwrap();
+    let (core, _) = core_with("", FakeGrab::default(), vec![Arc::new(extension)]);
+    core_slot.set(Arc::downgrade(&core)).unwrap();
+    core.toggle();
+
+    core.run_command("ext.run").unwrap();
+    for _ in 0..200 {
+        if core.view_owner().is_some() && ticks.exists() {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(10)).await;
+    }
+    assert_eq!(core.view_owner().as_deref(), Some("ext"));
+    escape(&core);
+    tokio::time::sleep(Duration::from_millis(300)).await;
+    let after_escape = std::fs::read_to_string(&ticks).unwrap();
+    tokio::time::sleep(Duration::from_millis(3000)).await;
+
+    assert_eq!(std::fs::read_to_string(&ticks).unwrap(), after_escape);
+    assert!(!finished.exists(), "the program ran to the end");
+}
