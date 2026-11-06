@@ -48,7 +48,7 @@
 ## 7. Reload and types file
 
 - [x] 7.1 Add `ExtensionHost::remove`; verify with a `cargo test` in `src/extension/mod.rs` that it deactivates, unregisters commands, and leaves other extensions alone
-- [ ] 7.2 Watch `extensions/` with `notify`, group events per folder, then `replace` registered ones, `register` unknown ones, `remove` deleted or broken ones, and rebuild candidates, pipeline, and hotkeys as `reload_config` does; verify with `cargo test` on a temp dir that editing `main.js` changes the next run, a folder fixed after a failed start loads, deleting a folder releases its hotkeys, and a broken manifest is reported while others keep working
+- [x] 7.2 Watch `extensions/` with `notify`, group events per folder, then `replace` registered ones, `register` unknown ones, `remove` deleted or broken ones, and rebuild candidates, pipeline, and hotkeys as `reload_config` does; verify with `cargo test` on a temp dir that editing `main.js` changes the next run, a folder fixed after a failed start loads, deleting a folder releases its hotkeys, and a broken manifest is reported while others keep working
 - [ ] 7.3 Add the `dango.d.ts` template (documenting `rootItems`, `onAction`, and that storage is machine-local) and the drift test that writes `assets/dango.d.ts`; write it at startup only when the folder exists; verify with `cargo test` that the checked-in file matches and that no folder means no file
 - [ ] 7.4 Update `AGENTS.md`: replace "sandboxed host" with the trusted JS host, add `src/js/` to Architecture, and add any build fact found in group 1; verify by reading the diff
 

@@ -105,7 +105,27 @@ pub fn start(startup: Startup) -> Arc<Core> {
     core.shell.set_tray(&core.tray());
     core.watch_permissions();
     watch_config(&core);
+    watch_extensions(&core);
     core
+}
+
+/// Reloads an extension when a file in its folder changes, on the main
+/// thread like a config edit. A folder that doesn't exist yet isn't watched.
+fn watch_extensions(core: &Arc<Core>) {
+    let Some(js) = &core.services.js else {
+        return;
+    };
+    if !js.dir().is_dir() {
+        return;
+    }
+    let weak = Arc::downgrade(core);
+    crate::js::watch::watch(js.dir().to_path_buf(), move |folders| {
+        let Some(core) = weak.upgrade() else {
+            return;
+        };
+        let shell = core.shell.clone();
+        shell.on_main_thread(Box::new(move || core.reload_js(folders)));
+    });
 }
 
 /// Applies edits to the config file live, on the main thread.
@@ -411,9 +431,8 @@ fn build_services(
         file_config.shared(),
         Arc::new(AuthFile::new(config::UserFile::Auth.path())),
     );
-    problems.extend(load_problems(&crate::js::load::register_all(
-        &mut host, &js_dir, &js_host,
-    )));
+    let js = Arc::new(crate::js::load::JsExtensions::new(js_dir, js_host));
+    problems.extend(load_problems(&js.register_all(&mut host)));
 
     let frecency = Arc::new(match &store {
         Some(store) => FrecencyTable::load(Box::new(store.clone())),
@@ -468,7 +487,8 @@ fn build_services(
         pipeline,
         frecency,
         learned,
-        contexts,
+        contexts: std::sync::RwLock::new(contexts),
+        js: Some(js),
         applications: Some(applications),
         ai: Some(ai),
         clipboard: clipboard.map(|clipboard| clipboard as Arc<dyn ClipboardSource>),

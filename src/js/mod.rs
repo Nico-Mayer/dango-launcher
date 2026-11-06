@@ -10,6 +10,7 @@ pub mod load;
 pub mod manifest;
 mod root;
 mod session;
+pub mod watch;
 
 pub use extension::JsExtension;
 pub use host::JsHost;

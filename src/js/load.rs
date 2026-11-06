@@ -1,7 +1,8 @@
 //! Finding extensions in the extensions folder.
 
+use std::collections::HashSet;
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use crate::extension::{ExtensionHost, LoadReport};
 
@@ -53,19 +54,87 @@ pub fn scan(dir: &Path, host: &Arc<JsHost>) -> (Vec<JsExtension>, Vec<LoadFailur
 /// Registers every extension in `dir`. A failure is logged with its reason and
 /// lands in the report, so the tray can name the extension.
 pub fn register_all(host: &mut ExtensionHost, dir: &Path, js: &Arc<JsHost>) -> LoadReport {
-    let (loaded, failed) = scan(dir, js);
-    let mut report = LoadReport::default();
-    for failure in failed {
-        fail(&mut report, failure.id, failure.reason);
-    }
-    for extension in loaded {
-        let id = extension.manifest_id().to_owned();
-        match host.register(Arc::new(extension)) {
-            Ok(registered) => report.merge(registered),
-            Err(error) => fail(&mut report, id, error.to_string()),
+    JsExtensions::new(dir.to_path_buf(), js.clone()).register_all(host)
+}
+
+/// The JavaScript extensions of one extensions folder, and which ids are
+/// theirs, so a reload never touches a built-in that shares an id.
+pub struct JsExtensions {
+    dir: PathBuf,
+    host: Arc<JsHost>,
+    ids: Mutex<HashSet<String>>,
+}
+
+impl JsExtensions {
+    pub fn new(dir: PathBuf, host: Arc<JsHost>) -> Self {
+        Self {
+            dir,
+            host,
+            ids: Mutex::default(),
         }
     }
-    report
+
+    pub fn dir(&self) -> &Path {
+        &self.dir
+    }
+
+    pub fn register_all(&self, host: &mut ExtensionHost) -> LoadReport {
+        let (loaded, failed) = scan(&self.dir, &self.host);
+        let mut report = LoadReport::default();
+        for failure in failed {
+            fail(&mut report, failure.id, failure.reason);
+        }
+        for extension in loaded {
+            self.register(host, extension, &mut report);
+        }
+        report
+    }
+
+    /// Brings the host in line with each changed folder: a registered
+    /// extension is replaced, a new or fixed one registered, and one whose
+    /// folder is gone or broken removed.
+    pub fn reload(&self, host: &mut ExtensionHost, folders: &[PathBuf]) -> LoadReport {
+        let mut report = LoadReport::default();
+        for folder in folders {
+            let id = folder_id(folder);
+            let ours = self.ids.lock().unwrap().contains(&id);
+            match load(folder, &self.host) {
+                Some(Ok(extension)) if ours => match host.replace(Arc::new(extension)) {
+                    Ok(replaced) => report.merge(replaced),
+                    Err(error) => {
+                        self.forget(host, &id);
+                        fail(&mut report, id, error.to_string());
+                    }
+                },
+                Some(Ok(extension)) => self.register(host, extension, &mut report),
+                Some(Err(reason)) => {
+                    if ours {
+                        self.forget(host, &id);
+                    }
+                    fail(&mut report, id, reason);
+                }
+                None if ours => self.forget(host, &id),
+                None => {}
+            }
+        }
+        report
+    }
+
+    fn register(&self, host: &mut ExtensionHost, extension: JsExtension, report: &mut LoadReport) {
+        let id = extension.manifest_id().to_owned();
+        match host.register(Arc::new(extension)) {
+            Ok(registered) => {
+                report.merge(registered);
+                self.ids.lock().unwrap().insert(id);
+            }
+            Err(error) => fail(report, id, error.to_string()),
+        }
+    }
+
+    fn forget(&self, host: &mut ExtensionHost, id: &str) {
+        host.remove(id);
+        self.ids.lock().unwrap().remove(id);
+    }
 }
 
 fn fail(report: &mut LoadReport, id: String, reason: String) {
@@ -90,6 +159,11 @@ fn read(folder: &Path, host: &Arc<JsHost>) -> Result<JsExtension, String> {
         .map_err(|error| format!("{MANIFEST_FILE} can't be read: {error}"))?;
     let read = manifest::parse(&text, folder).map_err(|error| error.to_string())?;
     Ok(JsExtension::new(read, folder.to_path_buf(), host.clone()))
+}
+
+/// The tray line for an extension that didn't load.
+pub fn problem_line(id: &str) -> String {
+    format!("Extension {id} didn't load, see dango.log")
 }
 
 pub fn folder_id(folder: &Path) -> String {
@@ -222,6 +296,110 @@ pub(crate) mod tests {
         let candidates = host.command_candidates();
         assert!(candidates.iter().any(|c| c.title == "Run It"));
         assert!(!marker.exists());
+    }
+
+    fn run_message(host: &ExtensionHost, id: &str) -> Option<crate::invocation::Outcome> {
+        let recorded = Arc::new(crate::js::extension::tests::Recorded::default());
+        let ctx = crate::invocation::InvocationContext::for_test(id, recorded.clone());
+        host.resolve_command(id).unwrap().command.invoke(&ctx);
+        let outcome = recorded.outcome.lock().unwrap().clone();
+        outcome
+    }
+
+    fn no_view(folder: &Path) {
+        let manifest = std::fs::read_to_string(folder.join(MANIFEST_FILE)).unwrap();
+        std::fs::write(
+            folder.join(MANIFEST_FILE),
+            manifest.replace(r#""mode": "view""#, r#""mode": "no-view""#),
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn editing_main_js_changes_the_next_run() {
+        let dir = temp();
+        let folder = write_extension(&dir, "ext", "export function run() { return 'old'; }");
+        no_view(&folder);
+        let js = JsExtensions::new(dir.clone(), self::host());
+        let mut host = ExtensionHost::new(Arc::new(AllEnabled));
+        js.register_all(&mut host);
+
+        std::fs::write(
+            folder.join(MAIN_FILE),
+            "export function run() { return 'new'; }",
+        )
+        .unwrap();
+        js.reload(&mut host, &[folder]);
+
+        assert_eq!(
+            run_message(&host, "ext.run"),
+            Some(crate::invocation::Outcome::Success(Some("new".into())))
+        );
+    }
+
+    #[test]
+    fn a_folder_fixed_after_a_failed_start_loads() {
+        let dir = temp();
+        let folder = write_extension(&dir, "ext", "");
+        std::fs::remove_file(folder.join(MAIN_FILE)).unwrap();
+        let js = JsExtensions::new(dir.clone(), self::host());
+        let mut host = ExtensionHost::new(Arc::new(AllEnabled));
+        assert_eq!(js.register_all(&mut host).load_errors.len(), 1);
+
+        std::fs::write(folder.join(MAIN_FILE), "export function run() {}").unwrap();
+        let report = js.reload(&mut host, &[folder]);
+
+        assert!(report.is_clean());
+        assert!(host.registry().get("ext.run").is_some());
+    }
+
+    #[test]
+    fn deleting_a_folder_unregisters_its_commands() {
+        let dir = temp();
+        let folder = write_extension(&dir, "ext", "export function run() {}");
+        let js = JsExtensions::new(dir.clone(), self::host());
+        let mut host = ExtensionHost::new(Arc::new(AllEnabled));
+        js.register_all(&mut host);
+
+        std::fs::remove_dir_all(&folder).unwrap();
+        js.reload(&mut host, &[folder]);
+
+        assert!(host.registry().get("ext.run").is_none());
+        assert!(!host.contains("ext"));
+    }
+
+    #[test]
+    fn a_broken_manifest_is_reported_and_others_keep_working() {
+        let dir = temp();
+        let broken = write_extension(&dir, "broken", "export function run() {}");
+        write_extension(&dir, "fine", "export function run() {}");
+        let js = JsExtensions::new(dir.clone(), self::host());
+        let mut host = ExtensionHost::new(Arc::new(AllEnabled));
+        js.register_all(&mut host);
+
+        std::fs::write(broken.join(MANIFEST_FILE), "{ nope").unwrap();
+        let report = js.reload(&mut host, &[broken]);
+
+        assert_eq!(report.load_errors[0].0, "broken");
+        assert!(host.registry().get("broken.run").is_none());
+        assert!(host.registry().get("fine.run").is_some());
+    }
+
+    #[test]
+    fn a_reload_never_touches_a_built_in_with_the_same_id() {
+        let dir = temp();
+        let folder = write_extension(&dir, "ext", "export function run() {}");
+        let js = JsExtensions::new(dir.clone(), self::host());
+        let mut host = ExtensionHost::new(Arc::new(AllEnabled));
+        let built_in = crate::js::load::load(&folder, &self::host())
+            .unwrap()
+            .unwrap();
+        host.register(Arc::new(built_in)).unwrap();
+
+        std::fs::remove_dir_all(&folder).unwrap();
+        js.reload(&mut host, &[folder]);
+
+        assert!(host.contains("ext"));
     }
 
     #[test]

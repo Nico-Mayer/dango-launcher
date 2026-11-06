@@ -8,7 +8,7 @@ mod tests;
 use crate::tasks::Tasks;
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::sync::{Arc, Mutex, Weak};
+use std::sync::{Arc, Mutex, RwLock, Weak};
 use std::time::Duration;
 
 use tokio::runtime::Handle;
@@ -76,7 +76,9 @@ pub struct Services {
     /// Each extension's name and icon, keyed by id, for the ActionBar. Held
     /// apart from the host, whose lock has no business on the path that
     /// streams results.
-    pub contexts: HashMap<String, ui::Context>,
+    pub contexts: RwLock<HashMap<String, ui::Context>>,
+    /// The extensions folder's extensions, which reload when it changes.
+    pub js: Option<Arc<crate::js::load::JsExtensions>>,
     pub applications: Option<Arc<ApplicationsExtension>>,
     pub ai: Option<AiParts>,
     pub clipboard: Option<Arc<dyn ClipboardSource>>,
@@ -587,6 +589,46 @@ impl Core {
         Ok(owner)
     }
 
+    /// Applies edits in the extensions folder: each changed folder is loaded
+    /// again, and everything built from the host follows, as on a config
+    /// reload.
+    pub(crate) fn reload_js(&self, folders: Vec<std::path::PathBuf>) {
+        let Some(js) = &self.services.js else {
+            return;
+        };
+        let report = {
+            let mut host = self.services.host.lock().unwrap();
+            let report = js.reload(&mut host, &folders);
+            *self.services.contexts.write().unwrap() = extension_contexts(&host);
+            let candidates = aliased_candidates(&host, &self.config);
+            self.services.pipeline.reload(
+                Arc::new(StaticCommandSource(candidates)),
+                host.root_providers(),
+            );
+            report
+        };
+        let conflicts = {
+            let config = self.config.shared();
+            let config = config.read().unwrap();
+            self.services.hotkeys.apply(&config)
+        };
+        for conflict in &conflicts {
+            crate::log::append(conflict);
+        }
+        let reloaded: Vec<String> = folders
+            .iter()
+            .map(|folder| crate::js::load::folder_id(folder))
+            .collect();
+        let mut tray = self.tray.lock().unwrap();
+        tray.problems.retain(|line| {
+            !reloaded
+                .iter()
+                .any(|id| *line == crate::js::load::problem_line(id))
+        });
+        tray.problems.extend(load_problems(&report));
+        self.shell.set_tray(&tray);
+    }
+
     /// The extension whose views the launcher shows, if any.
     pub(crate) fn view_owner(&self) -> Option<String> {
         let ui = self.ui.lock().unwrap();
@@ -596,6 +638,8 @@ impl Core {
     fn context(&self, extension_id: &str) -> ui::Context {
         self.services
             .contexts
+            .read()
+            .unwrap()
             .get(extension_id)
             .cloned()
             .unwrap_or_default()
@@ -1050,7 +1094,7 @@ fn load_problems(report: &extension::LoadReport) -> Vec<String> {
     let unloaded = report
         .load_errors
         .iter()
-        .map(|(id, _)| format!("Extension {id} didn't load, see dango.log"));
+        .map(|(id, _)| crate::js::load::problem_line(id));
     activations.chain(collisions).chain(unloaded).collect()
 }
 
