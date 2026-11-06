@@ -19,6 +19,15 @@ pub const STOPPED_BY_ERROR: &str = "This command stopped because of an error, se
 pub const OUT_OF_MEMORY: &str = "This command used too much memory, so Dango stopped it";
 const NO_ACTION: &str = "That action isn't available";
 
+/// How long a session nothing on screen follows may run: a root items build,
+/// or a root item's action that opens no view. Ended from a task of its own,
+/// since code that loops holds the task it runs in.
+const UNWATCHED_LIMIT: Duration = if cfg!(test) {
+    Duration::from_secs(1)
+} else {
+    Duration::from_secs(30)
+};
+
 /// An extension loaded from a folder of the extensions directory.
 pub struct JsExtension {
     inner: Arc<Inner>,
@@ -34,6 +43,8 @@ struct Inner {
     rows: Arc<CachedRows>,
     /// Builds root items while the extension is active.
     builder: Mutex<Option<tokio::task::JoinHandle<()>>>,
+    /// The session of a root items build while it runs.
+    building: Mutex<Option<Arc<Live>>>,
 }
 
 impl JsExtension {
@@ -47,6 +58,7 @@ impl JsExtension {
                 live: Mutex::new(None),
                 rows: Arc::default(),
                 builder: Mutex::new(None),
+                building: Mutex::new(None),
             }),
         }
     }
@@ -88,9 +100,16 @@ impl Extension for JsExtension {
         Ok(())
     }
 
+    /// Aborting the builder can't stop code running inside it, so its
+    /// session is ended too, as is the one behind the extension's views.
     fn deactivate(&self) {
         if let Some(builder) = self.inner.builder.lock().unwrap().take() {
             builder.abort();
+        }
+        for slot in [&self.inner.building, &self.inner.live] {
+            if let Some(live) = slot.lock().unwrap().take() {
+                live.end();
+            }
         }
     }
 
@@ -201,6 +220,24 @@ impl Inner {
         });
     }
 
+    /// Ends `live` after `UNWATCHED_LIMIT` unless it has become the session
+    /// behind the extension's views, which the watcher follows instead.
+    fn limit(self: &Arc<Self>, live: &Arc<Live>) {
+        let inner = Arc::downgrade(self);
+        let live = Arc::downgrade(live);
+        self.host.runtime.spawn(async move {
+            tokio::time::sleep(UNWATCHED_LIMIT).await;
+            let Some(live) = live.upgrade() else { return };
+            let adopted = inner.upgrade().is_some_and(|inner| {
+                let slot = inner.live.lock().unwrap();
+                slot.as_ref().is_some_and(|shown| Arc::ptr_eq(shown, &live))
+            });
+            if !adopted {
+                live.end();
+            }
+        });
+    }
+
     /// Runs an action in the session behind the extension's views, or in a
     /// fresh one when none is live, as for a root item.
     async fn action(self: &Arc<Self>, request: &str) -> ActionOutcome {
@@ -213,7 +250,11 @@ impl Inner {
         let (live, fresh) = match live {
             Some(live) => (live, false),
             None => match self.start(None).await {
-                Ok(live) => (Arc::new(live), true),
+                Ok(live) => {
+                    let live = Arc::new(live);
+                    self.limit(&live);
+                    (live, true)
+                }
                 Err(error) => return self.action_failed(error),
             },
         };
@@ -317,12 +358,16 @@ impl Inner {
 
     /// Calls `rootItems()` in a session of its own and keeps the rows. A
     /// failed build keeps the rows from the last good one.
-    async fn build_root_items(&self) {
+    async fn build_root_items(self: &Arc<Self>) {
         let id = &self.manifest.id;
         let built = match self.start(None).await {
             Ok(live) => {
+                let live = Arc::new(live);
+                *self.building.lock().unwrap() = Some(live.clone());
+                self.limit(&live);
                 let result = live.call(Target::Export("rootItems"), None).await;
                 live.end();
+                self.building.lock().unwrap().take();
                 result
             }
             Err(error) => Err(error),
@@ -1061,5 +1106,63 @@ pub(crate) mod tests {
 
         assert_eq!(outcome, ActionOutcome::Started);
         assert!(started.elapsed() < std::time::Duration::from_secs(2));
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn deactivating_stops_a_looping_root_items_build() {
+        let host = test_host(tokio::runtime::Handle::current());
+        let extension = rooted(host, "export function rootItems() { for (;;) {} }", None);
+        extension.activate().unwrap();
+        for _ in 0..100 {
+            if extension.inner.building.lock().unwrap().is_some() {
+                break;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+        }
+        let building = extension.inner.building.lock().unwrap().clone().unwrap();
+
+        extension.deactivate();
+
+        for _ in 0..100 {
+            if Arc::strong_count(&building) == 1 {
+                break;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+        }
+        assert!(building.is_ended());
+        assert_eq!(Arc::strong_count(&building), 1, "the build kept running");
+    }
+
+    #[test]
+    fn a_looping_root_action_is_stopped_after_its_limit() {
+        let runtime = runtime();
+        let extension = rooted(
+            test_host(runtime.handle().clone()),
+            "export function onAction() { for (;;) {} }",
+            None,
+        );
+
+        let started = std::time::Instant::now();
+        let outcome = extension.perform_action("repo-1", "open", &FormValues::new());
+
+        assert_eq!(outcome, ActionOutcome::Started);
+        assert!(started.elapsed() < UNWATCHED_LIMIT * 3);
+    }
+
+    #[test]
+    fn deactivating_ends_the_session_behind_the_views() {
+        let runtime = runtime();
+        let extension = extension(
+            &runtime,
+            "view",
+            r#"export function run() { dango.push({ kind: "list", items: [] }); setInterval(() => {}, 10); }"#,
+        );
+        invoke(&extension);
+        let live = extension.inner.live.lock().unwrap().clone().unwrap();
+
+        extension.deactivate();
+
+        assert!(live.is_ended());
+        assert!(extension.inner.live.lock().unwrap().is_none());
     }
 }
