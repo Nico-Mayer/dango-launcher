@@ -171,6 +171,7 @@ fn cached_thumbnail(cache: &IconCache, path: &str) -> Option<image::RgbaImage> {
         if let Ok(image) = image::open(cached) {
             return Some(image.to_rgba8());
         }
+        cache.forget(&key);
     }
     let image = shrink(path)?;
     cache.ensure_with(&key, || {
@@ -414,6 +415,19 @@ mod tests {
         let cached = image::open(cache.path(&key).unwrap()).unwrap().to_rgba8();
 
         assert_eq!(cached.dimensions(), shrunk.dimensions());
+    }
+
+    #[test]
+    fn a_thumbnail_deleted_while_running_is_written_again() {
+        let (dir, path) = (temp_dir(), large_image());
+        let cache = IconCache::new(dir);
+        cached_thumbnail(&cache, &path).unwrap();
+        let saved = cache.path(&thumbnail_key(&path).unwrap()).unwrap();
+        std::fs::remove_file(&saved).unwrap();
+
+        cached_thumbnail(&cache, &path).unwrap();
+
+        assert!(Path::new(&saved).exists());
     }
 
     #[test]

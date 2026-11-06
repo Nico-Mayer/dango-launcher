@@ -35,6 +35,12 @@ impl IconCache {
         })
     }
 
+    /// For a cached file that went missing or would not load, so the next
+    /// `ensure_with` writes it again.
+    pub fn forget(&self, key: &str) {
+        self.cached.write().unwrap().remove(&file_name(key));
+    }
+
     pub fn path(&self, key: &str) -> Option<String> {
         let name = file_name(key);
         self.cached
