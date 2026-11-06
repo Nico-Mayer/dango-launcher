@@ -30,7 +30,7 @@
 
 - [x] 4.1 Route `perform_action` for JS extensions to the session's handler table, block on the handler, and map its result to `Replaced`, `Ticker`, `Back`, `Done`, `CopyToClipboard`, or `Failed`; verify with `cargo test` for each mapping
 - [x] 4.2 Push a new level through `Runner::start` and return `Started`, with the session following the newest context; verify with `cargo test` that a pushed detail view keeps the session alive and Escape back to the list keeps the list's actions working
-- [ ] 4.3 Deliver form values to the submit handler; verify with `cargo test` that "Fix login" reaches the handler for field "title"
+- [x] 4.3 Deliver form values to the submit handler; verify with `cargo test` that "Fix login" reaches the handler for field "title"
 - [ ] 4.4 End a session when its newest context is cancelled; verify in `src/app/tests.rs` that Escape out of a JS view stops its timer and its running program
 
 ## 5. Cached root items

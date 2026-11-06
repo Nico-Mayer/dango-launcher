@@ -766,4 +766,31 @@ pub(crate) mod tests {
         ));
         assert_eq!(again, ActionOutcome::Ticker("Still here".into()));
     }
+
+    #[test]
+    fn a_form_submit_hands_its_values_to_the_handler() {
+        let runtime = runtime();
+        let extension = extension(
+            &runtime,
+            "view",
+            r#"export function run() {
+                dango.push({ kind: "form", fields: [{ id: "title", label: "Title", kind: "text" }],
+                    actions: [{ title: "Create", onAction: ({ values }) => ({ ticker: values.title }) }] });
+            }"#,
+        );
+        let recorded = invoke(&extension);
+        let id = {
+            let views = recorded.views.lock().unwrap();
+            let View::Form(form) = &views[0].view else {
+                panic!("expected a form");
+            };
+            form.actions[0].id.clone()
+        };
+        let values = FormValues::from([("title".to_string(), "Fix login".to_string())]);
+
+        assert_eq!(
+            extension.perform_action("", &id, &values),
+            ActionOutcome::Ticker("Fix login".into())
+        );
+    }
 }
