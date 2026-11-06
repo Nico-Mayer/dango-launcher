@@ -138,7 +138,14 @@ impl Inner {
     async fn start(&self, context: Option<InvocationContext>) -> Result<Live, JsError> {
         let source = std::fs::read_to_string(self.folder.join(MAIN_FILE))
             .map_err(|error| JsError::Engine(format!("{MAIN_FILE} can't be read: {error}")))?;
-        Live::start(&source, &self.manifest.id, self.host.clone(), context).await
+        Live::start(
+            &source,
+            &self.manifest.id,
+            self.folder.clone(),
+            self.host.clone(),
+            context,
+        )
+        .await
     }
 
     fn report(&self, ctx: &InvocationContext, command_id: &str, error: JsError) {
@@ -400,6 +407,28 @@ pub(crate) mod tests {
         assert_eq!(
             *recorded.outcome.lock().unwrap(),
             Some(Outcome::Success(Some("ok".into())))
+        );
+    }
+
+    #[test]
+    fn exec_hands_a_program_s_output_to_the_extension() {
+        let runtime = runtime();
+        let call = if cfg!(windows) {
+            "dango.exec('cmd', ['/c', 'echo hi'])"
+        } else {
+            "dango.exec('sh', ['-c', 'echo hi'])"
+        };
+        let extension = extension(
+            &runtime,
+            "no-view",
+            &format!("export async function run() {{ const r = await {call}; return `${{r.code}} ${{r.stdout.trim()}}`; }}"),
+        );
+
+        let recorded = invoke(&extension);
+
+        assert_eq!(
+            *recorded.outcome.lock().unwrap(),
+            Some(Outcome::Success(Some("0 hi".into())))
         );
     }
 }

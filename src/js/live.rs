@@ -6,7 +6,9 @@ use std::time::Duration;
 
 use tokio::sync::Notify;
 
-use rquickjs::prelude::Func;
+use std::path::PathBuf;
+
+use rquickjs::prelude::{Async, Func};
 use rquickjs::{Ctx, Exception, Object};
 
 use crate::invocation::InvocationContext;
@@ -18,6 +20,7 @@ use super::session::{JsError, Natives, Session, Target};
 /// Carries views from extension code to the invocation they belong to.
 pub struct Bridge {
     extension_id: String,
+    folder: PathBuf,
     host: Arc<JsHost>,
     context: Mutex<Option<InvocationContext>>,
     /// Set while an action runs: its first push opens a level of its own.
@@ -62,6 +65,21 @@ impl Natives for Bridge {
                 crate::log::append(&console_line(&id, &level, &text));
             }),
         )?;
+        let folder = self.folder.clone();
+        native.set(
+            "exec",
+            Func::from(Async(move |ctx: Ctx<'js>, json: String| {
+                let folder = folder.clone();
+                async move {
+                    let request = serde_json::from_str(&json)
+                        .map_err(|error| Exception::throw_message(&ctx, &error.to_string()))?;
+                    let result = super::exec::exec(request, folder)
+                        .await
+                        .map_err(|message| Exception::throw_message(&ctx, &message))?;
+                    Ok::<_, rquickjs::Error>(serde_json::to_string(&result).unwrap_or_default())
+                }
+            })),
+        )?;
         let bridge = self.clone();
         native.set(
             "push",
@@ -94,11 +112,13 @@ impl Live {
     pub async fn start(
         source: &str,
         extension_id: &str,
+        folder: PathBuf,
         host: Arc<JsHost>,
         context: Option<InvocationContext>,
     ) -> Result<Self, JsError> {
         let bridge = Arc::new(Bridge {
             extension_id: extension_id.to_owned(),
+            folder,
             host,
             context: Mutex::new(context),
             opens_level: AtomicBool::new(false),

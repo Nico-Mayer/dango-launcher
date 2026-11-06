@@ -41,6 +41,9 @@
     fail(message) {
       throw new DangoFailure(message);
     },
+    async exec(program, args = [], options = {}) {
+      return JSON.parse(await __dangoNative.exec(JSON.stringify({ program, args, ...options })));
+    },
   };
 
   const write = (level) => (...parts) =>

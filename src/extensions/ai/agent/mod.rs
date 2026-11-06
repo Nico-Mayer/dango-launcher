@@ -7,7 +7,7 @@
 //! program and everything it started, at any point of the run.
 
 mod args;
-mod lookup;
+pub(crate) mod lookup;
 
 use std::io::{Read, Write};
 use std::path::PathBuf;
