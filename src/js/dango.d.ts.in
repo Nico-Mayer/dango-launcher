@@ -6,6 +6,8 @@
 // main.js is an ES module. It exports:
 //
 //   - one function per command in manifest.json, named by the command's id
+//     (an id with a dash needs a quoted name:
+//     `export { randomTheme as "random-theme" }`)
 //   - `rootItems()`, when the manifest declares `rootItems`, returning the
 //     rows Dango shows in root search: RootItem[] | Promise<RootItem[]>
 //   - `onAction(itemId, actionId, values)`, which runs an action of a root
