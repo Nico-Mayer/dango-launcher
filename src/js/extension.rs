@@ -1,42 +1,289 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use crate::extension::manifest::Manifest;
+use crate::extension::manifest::{InvocationMode, Manifest};
 use crate::extension::Extension;
+use crate::invocation::{Command, InvocationContext};
 
+use super::host::JsHost;
+use super::live::Live;
+use super::load::MAIN_FILE;
 use super::manifest::JsManifest;
+use super::session::{JsError, Target};
+
+pub const NO_CODE: &str = "This command's extension has no code for it";
+pub const STOPPED_BY_ERROR: &str = "This command stopped because of an error, see dango.log";
+pub const OUT_OF_MEMORY: &str = "This command used too much memory, so Dango stopped it";
 
 /// An extension loaded from a folder of the extensions directory.
 pub struct JsExtension {
+    inner: Arc<Inner>,
+}
+
+struct Inner {
     manifest: Manifest,
     folder: PathBuf,
     refresh: Option<Duration>,
+    host: Arc<JsHost>,
+    /// The session behind the views it shows, so their actions reach it.
+    live: Mutex<Option<Arc<Live>>>,
 }
 
 impl JsExtension {
-    pub fn new(read: JsManifest, folder: PathBuf) -> Self {
+    pub fn new(read: JsManifest, folder: PathBuf, host: Arc<JsHost>) -> Self {
         Self {
-            manifest: read.manifest,
-            folder,
-            refresh: read.refresh,
+            inner: Arc::new(Inner {
+                manifest: read.manifest,
+                folder,
+                refresh: read.refresh,
+                host,
+                live: Mutex::new(None),
+            }),
         }
     }
 
     pub fn manifest_id(&self) -> &str {
-        &self.manifest.id
+        &self.inner.manifest.id
     }
 
-    pub fn folder(&self) -> &std::path::Path {
-        &self.folder
+    pub fn folder(&self) -> &Path {
+        &self.inner.folder
     }
 
     pub fn refresh(&self) -> Option<Duration> {
-        self.refresh
+        self.inner.refresh
     }
 }
 
 impl Extension for JsExtension {
     fn manifest(&self) -> &Manifest {
-        &self.manifest
+        &self.inner.manifest
+    }
+
+    fn command(&self, command_id: &str) -> Option<Arc<dyn Command>> {
+        let decl = self
+            .inner
+            .manifest
+            .commands
+            .iter()
+            .find(|command| command.id == command_id)?;
+        Some(Arc::new(JsCommand {
+            inner: self.inner.clone(),
+            command_id: decl.id.clone(),
+            mode: decl.mode,
+        }))
+    }
+}
+
+struct JsCommand {
+    inner: Arc<Inner>,
+    command_id: String,
+    mode: InvocationMode,
+}
+
+impl Command for JsCommand {
+    fn invoke(&self, ctx: &InvocationContext) {
+        let runtime = self.inner.host.runtime.clone();
+        runtime.block_on(self.run(ctx));
+    }
+}
+
+impl JsCommand {
+    async fn run(&self, ctx: &InvocationContext) {
+        let live = match self.inner.start(Some(ctx.clone())).await {
+            Ok(live) => Arc::new(live),
+            Err(error) => return self.inner.report(ctx, &self.command_id, error),
+        };
+        let result = live.call(Target::Export(&self.command_id), None).await;
+        match (self.mode, result) {
+            (_, Err(error)) => self.inner.report(ctx, &self.command_id, error),
+            (InvocationMode::NoView, Ok(returned)) => match message(returned.as_deref()) {
+                Some(message) => ctx.succeed_with(message),
+                None => ctx.succeed(),
+            },
+            (InvocationMode::View, Ok(_)) if !live.pushed() => ctx.succeed(),
+            (InvocationMode::View, Ok(_)) => {
+                *self.inner.live.lock().unwrap() = Some(live);
+            }
+        }
+    }
+}
+
+impl Inner {
+    async fn start(&self, context: Option<InvocationContext>) -> Result<Live, JsError> {
+        let source = std::fs::read_to_string(self.folder.join(MAIN_FILE))
+            .map_err(|error| JsError::Engine(format!("{MAIN_FILE} can't be read: {error}")))?;
+        Live::start(&source, &self.manifest.id, self.host.clone(), context).await
+    }
+
+    fn report(&self, ctx: &InvocationContext, command_id: &str, error: JsError) {
+        let id = &self.manifest.id;
+        match error {
+            JsError::Interrupted => {}
+            JsError::Failure(message) => ctx.fail(message),
+            JsError::MissingExport(_) => ctx.fail(NO_CODE),
+            JsError::OutOfMemory => {
+                crate::log::append(&format!("extension {id}: {command_id} ran out of memory"));
+                ctx.fail(OUT_OF_MEMORY);
+            }
+            JsError::Exception { message, stack } => {
+                let stack = stack.unwrap_or_default();
+                crate::log::append(&format!(
+                    "extension {id}: {command_id} failed: {message}\n{stack}"
+                ));
+                ctx.fail(STOPPED_BY_ERROR);
+            }
+            JsError::Engine(message) => {
+                crate::log::append(&format!("extension {id}: {command_id} failed: {message}"));
+                ctx.fail(STOPPED_BY_ERROR);
+            }
+        }
+    }
+}
+
+/// A returned string is the success message; anything else is no message.
+fn message(returned: Option<&str>) -> Option<String> {
+    serde_json::from_str::<String>(returned?).ok()
+}
+
+#[cfg(test)]
+pub(crate) mod tests {
+    use std::sync::Mutex;
+
+    use super::*;
+    use crate::invocation::{Outcome, Sink};
+    use crate::js::load::tests::{temp, test_host, write_extension};
+    use crate::protocol::{View, ViewTree};
+
+    #[derive(Default)]
+    pub struct Recorded {
+        pub views: Mutex<Vec<ViewTree>>,
+        pub outcome: Mutex<Option<Outcome>>,
+    }
+
+    impl Sink for Recorded {
+        fn push_view(&self, tree: ViewTree) {
+            self.views.lock().unwrap().push(tree);
+        }
+        fn finish(&self, outcome: Outcome) {
+            *self.outcome.lock().unwrap() = Some(outcome);
+        }
+    }
+
+    pub fn runtime() -> tokio::runtime::Runtime {
+        tokio::runtime::Runtime::new().unwrap()
+    }
+
+    pub fn extension(runtime: &tokio::runtime::Runtime, mode: &str, main: &str) -> JsExtension {
+        let dir = temp();
+        let folder = write_extension(&dir, "ext", main);
+        if mode == "no-view" {
+            let manifest = std::fs::read_to_string(folder.join("manifest.json")).unwrap();
+            std::fs::write(
+                folder.join("manifest.json"),
+                manifest.replace(r#""mode": "view""#, r#""mode": "no-view""#),
+            )
+            .unwrap();
+        }
+        crate::js::load::load(&folder, &test_host(runtime.handle().clone()))
+            .unwrap()
+            .unwrap()
+    }
+
+    pub fn invoke(extension: &JsExtension) -> Arc<Recorded> {
+        let recorded = Arc::new(Recorded::default());
+        let ctx = InvocationContext::for_test("ext.run", recorded.clone());
+        extension.command("run").unwrap().invoke(&ctx);
+        recorded
+    }
+
+    #[test]
+    fn a_view_command_shows_loading_then_content() {
+        let runtime = runtime();
+        let extension = extension(
+            &runtime,
+            "view",
+            r#"export async function run() {
+                dango.push({ kind: "list", loading: true, items: [] });
+                await new Promise(resolve => setTimeout(resolve, 10));
+                dango.push({ kind: "list", items: [1, 2, 3, 4, 5].map(n => ({ id: `${n}`, title: `Item ${n}` })) });
+            }"#,
+        );
+
+        let recorded = invoke(&extension);
+
+        let views = recorded.views.lock().unwrap();
+        assert_eq!(views.len(), 2);
+        let (View::List(first), View::List(second)) = (&views[0].view, &views[1].view) else {
+            panic!("expected two lists");
+        };
+        assert!(first.loading);
+        assert_eq!(second.items.len(), 5);
+        assert_eq!(*recorded.outcome.lock().unwrap(), None);
+    }
+
+    #[test]
+    fn a_no_view_command_succeeds_with_its_message() {
+        let runtime = runtime();
+        let extension = extension(
+            &runtime,
+            "no-view",
+            "export function run() { return 'VPN connected'; }",
+        );
+
+        let recorded = invoke(&extension);
+
+        assert_eq!(
+            *recorded.outcome.lock().unwrap(),
+            Some(Outcome::Success(Some("VPN connected".into())))
+        );
+    }
+
+    #[test]
+    fn a_reported_failure_is_shown_as_given() {
+        let runtime = runtime();
+        let extension = extension(
+            &runtime,
+            "no-view",
+            "export function run() { dango.fail('VPN is not installed'); }",
+        );
+
+        let recorded = invoke(&extension);
+
+        assert_eq!(
+            *recorded.outcome.lock().unwrap(),
+            Some(Outcome::Failure("VPN is not installed".into()))
+        );
+    }
+
+    #[test]
+    fn a_command_without_code_says_so() {
+        let runtime = runtime();
+        let extension = extension(&runtime, "no-view", "export const nothing = 1;");
+
+        let recorded = invoke(&extension);
+
+        assert_eq!(
+            *recorded.outcome.lock().unwrap(),
+            Some(Outcome::Failure(NO_CODE.into()))
+        );
+    }
+
+    #[test]
+    fn an_uncaught_error_shows_the_generic_message() {
+        let runtime = runtime();
+        let extension = extension(
+            &runtime,
+            "no-view",
+            "export async function run() { throw new TypeError('bad'); }",
+        );
+
+        let recorded = invoke(&extension);
+
+        assert_eq!(
+            *recorded.outcome.lock().unwrap(),
+            Some(Outcome::Failure(STOPPED_BY_ERROR.into()))
+        );
     }
 }

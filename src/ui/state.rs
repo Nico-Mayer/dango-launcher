@@ -213,6 +213,14 @@ impl Launcher {
         Self::default()
     }
 
+    /// The extension whose views are on screen, if any.
+    pub fn view_owner(&self) -> Option<&str> {
+        if self.stack.is_empty() {
+            return None;
+        }
+        self.owner.as_deref()
+    }
+
     pub fn apply(&mut self, input: Input) -> Vec<Effect> {
         let mut effects = Vec::new();
         match input {

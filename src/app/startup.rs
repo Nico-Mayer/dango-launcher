@@ -29,6 +29,7 @@ use crate::extensions::{self};
 use crate::hotkeys::{self, Grab, Registry, SystemGrab};
 use crate::icon_cache::IconCache;
 use crate::invocation::Invoker;
+use crate::invocation::Runner;
 use crate::opener::SystemOpener;
 use crate::platform::{self, Label};
 use crate::ranking::{DangoRanker, FrecencyTable, InputHistory};
@@ -131,6 +132,24 @@ fn watch_config(core: &Arc<Core>) {
 fn open_store() -> Result<Opened, Box<dyn std::error::Error>> {
     let dir = data_dir().ok_or("no data directory")?;
     Ok(Store::open(&dir.join("dango.sqlite"))?)
+}
+
+fn js_host(runtime: Handle, core: Weak<Core>) -> Arc<crate::js::JsHost> {
+    let start_core = core.clone();
+    Arc::new(crate::js::JsHost {
+        runtime,
+        start_view: Arc::new(move |owner, title| {
+            ViewRunner {
+                core: start_core.clone(),
+                owner: owner.to_string(),
+            }
+            .start(title)
+        }),
+        showing: Arc::new(move |owner| {
+            core.upgrade()
+                .is_some_and(|core| core.view_owner().as_deref() == Some(owner))
+        }),
+    })
 }
 
 fn register(host: &mut ExtensionHost, name: &str, extension: Arc<dyn extension::Extension>) {
@@ -288,7 +307,7 @@ fn build_services(
         startup.runtime.clone(),
         Some(Arc::new(ViewRunner {
             core: core.clone(),
-            owner: updates::EXTENSION_ID,
+            owner: updates::EXTENSION_ID.to_string(),
         })),
         tasks.clone(),
     ));
@@ -319,7 +338,7 @@ fn build_services(
             .map(|clipboard| clipboard.clone() as Arc<dyn ClipboardSource>),
         runner: Some(Arc::new(ViewRunner {
             core: core.clone(),
-            owner: extensions::ai::EXTENSION_ID,
+            owner: extensions::ai::EXTENSION_ID.to_string(),
         })),
         tasks: tasks.clone(),
         visible: {
@@ -347,8 +366,9 @@ fn build_services(
 
     // After the built-ins, so a built-in keeps its id when one collides.
     let js_dir = crate::js::load::extensions_dir(&config::config_dir());
+    let js_host = js_host(startup.runtime.clone(), core.clone());
     problems.extend(load_problems(&crate::js::load::register_all(
-        &mut host, &js_dir,
+        &mut host, &js_dir, &js_host,
     )));
 
     let frecency = Arc::new(match &store {

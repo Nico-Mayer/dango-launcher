@@ -6,6 +6,7 @@ use std::sync::Arc;
 use crate::extension::{ExtensionHost, LoadReport};
 
 use super::extension::JsExtension;
+use super::host::JsHost;
 use super::manifest;
 
 pub const MANIFEST_FILE: &str = "manifest.json";
@@ -24,7 +25,7 @@ pub struct LoadFailure {
 
 /// Reads every extension folder in `dir`, in name order. A missing `dir` is no
 /// extensions; a folder with neither file isn't an extension and is skipped.
-pub fn scan(dir: &Path) -> (Vec<JsExtension>, Vec<LoadFailure>) {
+pub fn scan(dir: &Path, host: &Arc<JsHost>) -> (Vec<JsExtension>, Vec<LoadFailure>) {
     let mut folders: Vec<PathBuf> = match std::fs::read_dir(dir) {
         Ok(entries) => entries
             .filter_map(Result::ok)
@@ -37,7 +38,7 @@ pub fn scan(dir: &Path) -> (Vec<JsExtension>, Vec<LoadFailure>) {
     let mut loaded = Vec::new();
     let mut failed = Vec::new();
     for folder in folders {
-        match load(&folder) {
+        match load(&folder, host) {
             Some(Ok(extension)) => loaded.push(extension),
             Some(Err(reason)) => failed.push(LoadFailure {
                 id: folder_id(&folder),
@@ -51,8 +52,8 @@ pub fn scan(dir: &Path) -> (Vec<JsExtension>, Vec<LoadFailure>) {
 
 /// Registers every extension in `dir`. A failure is logged with its reason and
 /// lands in the report, so the tray can name the extension.
-pub fn register_all(host: &mut ExtensionHost, dir: &Path) -> LoadReport {
-    let (loaded, failed) = scan(dir);
+pub fn register_all(host: &mut ExtensionHost, dir: &Path, js: &Arc<JsHost>) -> LoadReport {
+    let (loaded, failed) = scan(dir, js);
     let mut report = LoadReport::default();
     for failure in failed {
         fail(&mut report, failure.id, failure.reason);
@@ -73,22 +74,22 @@ fn fail(report: &mut LoadReport, id: String, reason: String) {
 }
 
 /// `None` when the folder holds neither file and so isn't an extension.
-pub fn load(folder: &Path) -> Option<Result<JsExtension, String>> {
+pub fn load(folder: &Path, host: &Arc<JsHost>) -> Option<Result<JsExtension, String>> {
     let has_manifest = folder.join(MANIFEST_FILE).is_file();
     let has_main = folder.join(MAIN_FILE).is_file();
     match (has_manifest, has_main) {
         (false, false) => None,
         (true, false) => Some(Err(format!("{MAIN_FILE} is missing"))),
         (false, true) => Some(Err(format!("{MANIFEST_FILE} is missing"))),
-        (true, true) => Some(read(folder)),
+        (true, true) => Some(read(folder, host)),
     }
 }
 
-fn read(folder: &Path) -> Result<JsExtension, String> {
+fn read(folder: &Path, host: &Arc<JsHost>) -> Result<JsExtension, String> {
     let text = std::fs::read_to_string(folder.join(MANIFEST_FILE))
         .map_err(|error| format!("{MANIFEST_FILE} can't be read: {error}"))?;
     let read = manifest::parse(&text, folder).map_err(|error| error.to_string())?;
-    Ok(JsExtension::new(read, folder.to_path_buf()))
+    Ok(JsExtension::new(read, folder.to_path_buf(), host.clone()))
 }
 
 pub fn folder_id(folder: &Path) -> String {
@@ -118,7 +119,21 @@ pub(crate) mod tests {
         folder
     }
 
-    fn temp() -> PathBuf {
+    pub fn test_host(runtime: tokio::runtime::Handle) -> Arc<JsHost> {
+        Arc::new(JsHost {
+            runtime,
+            start_view: Arc::new(|_, _| None),
+            showing: Arc::new(|_| false),
+        })
+    }
+
+    fn host() -> Arc<JsHost> {
+        static RUNTIME: std::sync::OnceLock<tokio::runtime::Runtime> = std::sync::OnceLock::new();
+        let runtime = RUNTIME.get_or_init(|| tokio::runtime::Runtime::new().unwrap());
+        test_host(runtime.handle().clone())
+    }
+
+    pub fn temp() -> PathBuf {
         let dir = std::env::temp_dir().join(format!("dango-js-{}", uuid::Uuid::new_v4()));
         std::fs::create_dir_all(&dir).unwrap();
         dir
@@ -126,7 +141,7 @@ pub(crate) mod tests {
 
     #[test]
     fn a_missing_folder_is_no_extensions() {
-        let (loaded, failed) = scan(&temp().join("nope"));
+        let (loaded, failed) = scan(&temp().join("nope"), &host());
 
         assert!(loaded.is_empty());
         assert!(failed.is_empty());
@@ -137,7 +152,7 @@ pub(crate) mod tests {
         let dir = temp();
         write_extension(&dir, "gh-prs", "export function run() {}");
 
-        let (loaded, failed) = scan(&dir);
+        let (loaded, failed) = scan(&dir, &host());
 
         assert_eq!(loaded.len(), 1);
         assert_eq!(loaded[0].manifest().id, "gh-prs");
@@ -150,7 +165,7 @@ pub(crate) mod tests {
         let folder = write_extension(&dir, "gh-prs", "");
         std::fs::remove_file(folder.join(MAIN_FILE)).unwrap();
 
-        let (loaded, failed) = scan(&dir);
+        let (loaded, failed) = scan(&dir, &host());
 
         assert!(loaded.is_empty());
         assert_eq!(
@@ -178,7 +193,7 @@ pub(crate) mod tests {
         std::fs::write(dir.join("broken").join(MANIFEST_FILE), "{}").unwrap();
         let mut host = ExtensionHost::new(Arc::new(AllEnabled));
 
-        let report = register_all(&mut host, &dir);
+        let report = register_all(&mut host, &dir, &self::host());
 
         assert!(host.registry().get("gh-prs.run").is_some());
         assert_eq!(report.load_errors.len(), 1);
@@ -196,7 +211,7 @@ pub(crate) mod tests {
         write_extension(&dir, "eager", &main);
         let mut host = ExtensionHost::new(Arc::new(AllEnabled));
 
-        register_all(&mut host, &dir);
+        register_all(&mut host, &dir, &self::host());
 
         let candidates = host.command_candidates();
         assert!(candidates.iter().any(|c| c.title == "Run It"));
@@ -208,7 +223,7 @@ pub(crate) mod tests {
         let dir = temp();
         std::fs::create_dir_all(dir.join(".git")).unwrap();
 
-        let (loaded, failed) = scan(&dir);
+        let (loaded, failed) = scan(&dir, &host());
 
         assert!(loaded.is_empty());
         assert!(failed.is_empty());

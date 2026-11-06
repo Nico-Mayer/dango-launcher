@@ -2,9 +2,12 @@
 //! QuickJS runtime.
 
 mod extension;
+mod host;
+mod live;
 pub mod load;
 pub mod manifest;
 mod session;
 
 pub use extension::JsExtension;
-pub use session::{JsError, Session};
+pub use host::JsHost;
+pub use session::{JsError, Natives, Session, Target};

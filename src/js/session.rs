@@ -11,6 +11,22 @@ use rquickjs::{
 /// outside the context.
 const MAIN: &str = "__dangoMain";
 
+const PRELUDE: &str = include_str!("prelude.js");
+
+/// The Rust side of the `dango` global: the functions the prelude and
+/// extension code call into, put on `__dangoNative` before `main.js` runs.
+pub trait Natives: Send + Sync + 'static {
+    fn install<'js>(self: Arc<Self>, ctx: &Ctx<'js>, native: &Object<'js>) -> rquickjs::Result<()>;
+}
+
+/// What a call runs: an export of `main.js`, or a function the prelude put on
+/// the global object.
+#[derive(Clone, Copy, Debug)]
+pub enum Target<'a> {
+    Export(&'a str),
+    Global(&'a str),
+}
+
 /// What one session may allocate. Generous for list building and JSON, small
 /// enough that a runaway extension can't take the machine's memory with it.
 const MEMORY_LIMIT: usize = 64 * 1024 * 1024;
@@ -22,6 +38,9 @@ pub enum JsError {
         message: String,
         stack: Option<String>,
     },
+    /// Extension code reported a failure on purpose, through `dango.fail`.
+    #[error("{0}")]
+    Failure(String),
     #[error("main.js exports no function named '{0}'")]
     MissingExport(String),
     #[error("the session ran out of memory")]
@@ -58,10 +77,17 @@ impl From<rquickjs::Error> for JsError {
 impl From<CaughtError<'_>> for JsError {
     fn from(error: CaughtError<'_>) -> Self {
         match error {
-            CaughtError::Exception(exception) => Self::Exception {
-                message: exception.message().unwrap_or_default(),
-                stack: exception.stack(),
-            },
+            CaughtError::Exception(exception) => {
+                let message = exception.message().unwrap_or_default();
+                let name: Option<String> = exception.as_object().get("name").ok();
+                if name.as_deref() == Some("DangoFailure") {
+                    return Self::Failure(message);
+                }
+                Self::Exception {
+                    message,
+                    stack: exception.stack(),
+                }
+            }
             CaughtError::Value(value) => Self::Exception {
                 message: format!("{value:?}"),
                 stack: None,
@@ -83,7 +109,11 @@ pub struct Session {
 impl Session {
     /// Loads `main.js`. Setting `cancel` stops any running code at its next
     /// bytecode check, which is how an endless loop is ended.
-    pub async fn start(source: &str, cancel: Arc<AtomicBool>) -> Result<Self, JsError> {
+    pub async fn start(
+        source: &str,
+        cancel: Arc<AtomicBool>,
+        natives: Arc<dyn Natives>,
+    ) -> Result<Self, JsError> {
         let runtime = AsyncRuntime::new()?;
         runtime.set_memory_limit(MEMORY_LIMIT).await;
         let flag = cancel.clone();
@@ -97,6 +127,10 @@ impl Session {
             .async_with(async move |ctx| -> Result<(), JsError> {
                 rquickjs_extra::timers::init(&ctx)?;
                 rquickjs_extra::url::init(&ctx)?;
+                let native = Object::new(ctx.clone())?;
+                natives.install(&ctx, &native)?;
+                ctx.globals().set("__dangoNative", native)?;
+                ctx.eval::<(), _>(PRELUDE).catch(&ctx)?;
                 let (module, evaluated) = Module::declare(ctx.clone(), "main.js", source)
                     .catch(&ctx)?
                     .eval()
@@ -119,27 +153,46 @@ impl Session {
     /// awaited if it is a promise, as JSON. `None` means it returned nothing.
     pub async fn call(
         &self,
-        export: &str,
+        target: Target<'_>,
         argument: Option<&str>,
     ) -> Result<Option<String>, JsError> {
-        let export = export.to_owned();
+        let target = match target {
+            Target::Export(name) => (true, name.to_owned()),
+            Target::Global(name) => (false, name.to_owned()),
+        };
         let argument = argument.map(str::to_owned);
         self.context
-            .async_with(async move |ctx| call(&ctx, &export, argument).await)
+            .async_with(async move |ctx| call(&ctx, target, argument).await)
             .await
             .map_err(|error| error.classify(&self.cancel))
+    }
+
+    /// Whether `main.js` exports a function by that name.
+    pub async fn exports(&self, name: &str) -> bool {
+        let name = name.to_owned();
+        self.context
+            .with(move |ctx| {
+                let main: rquickjs::Result<Object> = ctx.globals().get(MAIN);
+                main.and_then(|main| main.get::<_, Value>(name.as_str()))
+                    .is_ok_and(|value| value.is_function())
+            })
+            .await
     }
 }
 
 async fn call<'js>(
     ctx: &Ctx<'js>,
-    export: &str,
+    (is_export, name): (bool, String),
     argument: Option<String>,
 ) -> Result<Option<String>, JsError> {
-    let main: Object = ctx.globals().get(MAIN)?;
-    let value: Value = main.get(export)?;
+    let holder: Object = if is_export {
+        ctx.globals().get(MAIN)?
+    } else {
+        ctx.globals()
+    };
+    let value: Value = holder.get(name.as_str())?;
     let Some(function) = value.as_function() else {
-        return Err(JsError::MissingExport(export.to_owned()));
+        return Err(JsError::MissingExport(name));
     };
     let arguments = match argument {
         Some(json) => vec![ctx.json_parse(json).catch(ctx)?],
@@ -166,6 +219,34 @@ impl Drop for Session {
 mod tests {
     use super::*;
 
+    struct NoNatives;
+
+    impl Natives for NoNatives {
+        fn install<'js>(self: Arc<Self>, _: &Ctx<'js>, _: &Object<'js>) -> rquickjs::Result<()> {
+            Ok(())
+        }
+    }
+
+    fn no_natives() -> Arc<dyn Natives> {
+        Arc::new(NoNatives)
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn dango_fail_is_a_failure_not_an_exception() {
+        let session = Session::start(
+            "export function run() { dango.fail('VPN is not installed'); }",
+            Arc::default(),
+            no_natives(),
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(
+            session.call(Target::Export("run"), None).await,
+            Err(JsError::Failure("VPN is not installed".into()))
+        );
+    }
+
     #[tokio::test(flavor = "multi_thread")]
     async fn an_export_awaits_a_timer_and_returns_json() {
         let session = Session::start(
@@ -176,32 +257,35 @@ mod tests {
             }
             "#,
             Arc::default(),
+            no_natives(),
         )
         .await
         .unwrap();
 
-        let result = session.call("greet", Some(r#"{"name":"nico"}"#)).await;
+        let result = session
+            .call(Target::Export("greet"), Some(r#"{"name":"nico"}"#))
+            .await;
 
         assert_eq!(result, Ok(Some(r#"{"text":"hi nico"}"#.to_string())));
     }
 
     #[tokio::test(flavor = "multi_thread")]
     async fn returning_nothing_is_none() {
-        let session = Session::start("export function quiet() {}", Arc::default())
+        let session = Session::start("export function quiet() {}", Arc::default(), no_natives())
             .await
             .unwrap();
 
-        assert_eq!(session.call("quiet", None).await, Ok(None));
+        assert_eq!(session.call(Target::Export("quiet"), None).await, Ok(None));
     }
 
     #[tokio::test(flavor = "multi_thread")]
     async fn a_missing_export_is_named() {
-        let session = Session::start("export const x = 1;", Arc::default())
+        let session = Session::start("export const x = 1;", Arc::default(), no_natives())
             .await
             .unwrap();
 
         assert_eq!(
-            session.call("run", None).await,
+            session.call(Target::Export("run"), None).await,
             Err(JsError::MissingExport("run".into()))
         );
     }
@@ -211,11 +295,14 @@ mod tests {
         let session = Session::start(
             "export function boom() { throw new TypeError('bad'); }",
             Arc::default(),
+            no_natives(),
         )
         .await
         .unwrap();
 
-        let Err(JsError::Exception { message, stack }) = session.call("boom", None).await else {
+        let Err(JsError::Exception { message, stack }) =
+            session.call(Target::Export("boom"), None).await
+        else {
             panic!("expected an exception");
         };
         assert_eq!(message, "bad");
@@ -225,16 +312,23 @@ mod tests {
     #[tokio::test(flavor = "multi_thread")]
     async fn cancelling_stops_an_endless_loop() {
         let cancel = Arc::new(AtomicBool::new(false));
-        let session = Session::start("export function spin() { for (;;) {} }", cancel.clone())
-            .await
-            .unwrap();
+        let session = Session::start(
+            "export function spin() { for (;;) {} }",
+            cancel.clone(),
+            no_natives(),
+        )
+        .await
+        .unwrap();
         let flag = cancel.clone();
         tokio::spawn(async move {
             tokio::time::sleep(std::time::Duration::from_millis(50)).await;
             flag.store(true, Ordering::SeqCst);
         });
 
-        assert_eq!(session.call("spin", None).await, Err(JsError::Interrupted));
+        assert_eq!(
+            session.call(Target::Export("spin"), None).await,
+            Err(JsError::Interrupted)
+        );
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -242,10 +336,14 @@ mod tests {
         let session = Session::start(
             "export function hog() { const all = []; for (;;) all.push('x'.repeat(1 << 20)); }",
             Arc::default(),
+            no_natives(),
         )
         .await
         .unwrap();
 
-        assert_eq!(session.call("hog", None).await, Err(JsError::OutOfMemory));
+        assert_eq!(
+            session.call(Target::Export("hog"), None).await,
+            Err(JsError::OutOfMemory)
+        );
     }
 }

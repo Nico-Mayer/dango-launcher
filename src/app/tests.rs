@@ -149,7 +149,7 @@ fn start_work(core: &Arc<Core>) -> Arc<InvocationContext> {
 fn start_titled(core: &Arc<Core>, title: Option<&str>) -> Arc<InvocationContext> {
     ViewRunner {
         core: Arc::downgrade(core),
-        owner: "test",
+        owner: "test".to_string(),
     }
     .start(title)
     .unwrap()

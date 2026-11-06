@@ -587,6 +587,12 @@ impl Core {
         Ok(owner)
     }
 
+    /// The extension whose views the launcher shows, if any.
+    pub(crate) fn view_owner(&self) -> Option<String> {
+        let ui = self.ui.lock().unwrap();
+        ui.launcher.view_owner().map(str::to_owned)
+    }
+
     fn context(&self, extension_id: &str) -> ui::Context {
         self.services
             .contexts
@@ -969,20 +975,20 @@ impl Core {
 /// Starts an invocation for work an extension begins itself. A submitted
 /// argument form has an answer to stream but no command running behind it, so
 /// it asks for one and its output reaches the launcher the usual way.
-struct ViewRunner {
-    core: Weak<Core>,
-    owner: &'static str,
+pub(crate) struct ViewRunner {
+    pub(crate) core: Weak<Core>,
+    pub(crate) owner: String,
 }
 
 impl invocation::Runner for ViewRunner {
     fn start(&self, title: Option<&str>) -> Option<Arc<InvocationContext>> {
         let core = self.core.upgrade()?;
-        let (ctx, running) = core.services.invoker.detached(self.owner);
-        let mut context = core.context(self.owner);
+        let (ctx, running) = core.services.invoker.detached(&self.owner);
+        let mut context = core.context(&self.owner);
         if let Some(title) = title {
             context.title = title.to_string();
         }
-        core.pump(self.owner.to_string(), context, running);
+        core.pump(self.owner.clone(), context, running);
         Some(Arc::new(ctx))
     }
 }
