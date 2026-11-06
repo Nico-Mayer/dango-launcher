@@ -1165,4 +1165,34 @@ pub(crate) mod tests {
         assert!(live.is_ended());
         assert!(extension.inner.live.lock().unwrap().is_none());
     }
+
+    #[test]
+    fn every_search_answer_keeps_searching() {
+        let runtime = runtime();
+        let extension = extension(
+            &runtime,
+            "view",
+            r#"export function run() {
+                dango.push({ kind: "list", items: [], onSearch: (query) =>
+                    ({ kind: "list", items: [{ id: query, title: query }] }) });
+            }"#,
+        );
+        invoke(&extension);
+
+        for query in ["r", "ru"] {
+            let ActionOutcome::Replaced(tree) =
+                extension.perform_action(query, SEARCH_ACTION, &FormValues::new())
+            else {
+                panic!("expected an answer for {query}");
+            };
+            let View::List(list) = tree.view else {
+                panic!("expected a list");
+            };
+            assert_eq!(
+                list.filtering,
+                crate::protocol::Filtering::Command,
+                "{query}"
+            );
+        }
+    }
 }

@@ -106,7 +106,9 @@
     searching = signal;
     const view = await search(request.query, { signal });
     if (signal.aborted || !view) return null;
-    return prepare(view);
+    // The answer keeps searching through the same handler, or the launcher
+    // would narrow it itself from the next keystroke on.
+    return prepare(view.onSearch ? view : { ...view, onSearch: search });
   };
 
   // A handler from a view this session showed, or else the module's
