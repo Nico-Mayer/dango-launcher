@@ -12,6 +12,7 @@ macro_rules! protocol_types {
     ($($item:item)*) => {
         $(
             #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+            #[cfg_attr(test, derive(ts_rs::TS), ts(optional_fields))]
             $item
         )*
     };
@@ -37,14 +38,17 @@ protocol_types! {
     #[serde(rename_all = "camelCase")]
     pub struct ListView {
         #[serde(default)]
+        #[cfg_attr(test, ts(optional, as = "Option<_>"))]
         pub loading: bool,
         #[serde(default)]
         pub empty_state: Option<EmptyState>,
         /// In the order they are shown. Items name the one they belong to.
         #[serde(default)]
+        #[cfg_attr(test, ts(optional, as = "Option<_>"))]
         pub sections: Vec<Section>,
         /// Shows the selected item's detail beside the list.
         #[serde(default)]
+        #[cfg_attr(test, ts(optional, as = "Option<_>"))]
         pub detail_pane: bool,
         #[serde(default)]
         pub filter: Option<Filter>,
@@ -60,12 +64,15 @@ protocol_types! {
         pub columns: u8,
         /// A tile's width over its height.
         #[serde(default = "square")]
+        #[cfg_attr(test, ts(optional, as = "Option<_>"))]
         pub aspect: f32,
         #[serde(default)]
+        #[cfg_attr(test, ts(optional, as = "Option<_>"))]
         pub loading: bool,
         #[serde(default)]
         pub empty_state: Option<EmptyState>,
         #[serde(default)]
+        #[cfg_attr(test, ts(optional, as = "Option<_>"))]
         pub sections: Vec<Section>,
         #[serde(default)]
         pub filter: Option<Filter>,
@@ -83,8 +90,10 @@ protocol_types! {
         #[serde(default)]
         pub section: Option<String>,
         #[serde(default)]
+        #[cfg_attr(test, ts(optional, as = "Option<_>"))]
         pub keywords: Vec<String>,
         #[serde(default)]
+        #[cfg_attr(test, ts(optional, as = "Option<_>"))]
         pub actions: Vec<Action>,
     }
 
@@ -131,15 +140,18 @@ protocol_types! {
         pub section: Option<String>,
         /// A row shows the first three.
         #[serde(default)]
+        #[cfg_attr(test, ts(optional, as = "Option<_>"))]
         pub accessories: Vec<Accessory>,
         /// Matched by the launcher's filter as the title is, never shown.
         #[serde(default)]
+        #[cfg_attr(test, ts(optional, as = "Option<_>"))]
         pub keywords: Vec<String>,
         /// Shown in the list's detail pane while the item is selected.
         #[serde(default)]
         pub detail: Option<ItemDetail>,
         /// The selected item's action panel. The first action is primary.
         #[serde(default)]
+        #[cfg_attr(test, ts(optional, as = "Option<_>"))]
         pub actions: Vec<Action>,
     }
 
@@ -150,11 +162,13 @@ protocol_types! {
         #[serde(default)]
         pub image: Option<String>,
         #[serde(default)]
+        #[cfg_attr(test, ts(optional, as = "Option<_>"))]
         pub markdown: String,
         /// Shown as written in place of `markdown`.
         #[serde(default)]
         pub text: Option<String>,
         #[serde(default)]
+        #[cfg_attr(test, ts(optional, as = "Option<_>"))]
         pub metadata: Vec<Metadata>,
     }
 
@@ -172,6 +186,7 @@ protocol_types! {
         Tag {
             text: String,
             #[serde(default)]
+            #[cfg_attr(test, ts(optional, as = "Option<_>"))]
             role: TagRole,
         },
         Kbd { shortcut: Shortcut },
@@ -212,10 +227,13 @@ protocol_types! {
         #[serde(default)]
         pub text: Option<String>,
         #[serde(default)]
+        #[cfg_attr(test, ts(optional, as = "Option<_>"))]
         pub metadata: Vec<Metadata>,
         #[serde(default)]
+        #[cfg_attr(test, ts(optional, as = "Option<_>"))]
         pub loading: bool,
         #[serde(default)]
+        #[cfg_attr(test, ts(optional, as = "Option<_>"))]
         pub actions: Vec<Action>,
     }
 
@@ -225,15 +243,19 @@ protocol_types! {
     pub struct ProgressView {
         pub title: String,
         #[serde(default)]
+        #[cfg_attr(test, ts(optional, as = "Option<_>"))]
         pub subtitle: String,
         /// From 0 to 1. Without one, the bar claims no amount.
         #[serde(default)]
         pub value: Option<f32>,
         #[serde(default)]
+        #[cfg_attr(test, ts(optional, as = "Option<_>"))]
         pub detail: String,
         #[serde(default)]
+        #[cfg_attr(test, ts(optional, as = "Option<_>"))]
         pub steps: Vec<Step>,
         #[serde(default)]
+        #[cfg_attr(test, ts(optional, as = "Option<_>"))]
         pub actions: Vec<Action>,
     }
 
@@ -249,6 +271,7 @@ protocol_types! {
         pub item_id: Option<String>,
         pub fields: Vec<FormField>,
         #[serde(default)]
+        #[cfg_attr(test, ts(optional, as = "Option<_>"))]
         pub actions: Vec<Action>,
     }
 
@@ -257,12 +280,14 @@ protocol_types! {
     pub struct FormField {
         pub id: String,
         #[serde(default)]
+        #[cfg_attr(test, ts(optional, as = "Option<_>"))]
         pub label: String,
         pub kind: FieldKind,
         #[serde(default)]
         pub value: Option<String>,
         /// What a dropdown offers. Its value is the chosen option's id.
         #[serde(default)]
+        #[cfg_attr(test, ts(optional, as = "Option<_>"))]
         pub options: Vec<FieldOption>,
     }
 
@@ -301,6 +326,7 @@ protocol_types! {
         pub icon: Option<String>,
         /// Offered while the view shows nothing. The first runs on Enter.
         #[serde(default)]
+        #[cfg_attr(test, ts(optional, as = "Option<_>"))]
         pub actions: Vec<Action>,
     }
 
@@ -317,6 +343,7 @@ protocol_types! {
         #[serde(default)]
         pub section: Option<String>,
         #[serde(default)]
+        #[cfg_attr(test, ts(optional, as = "Option<_>"))]
         pub style: ActionStyle,
     }
 
@@ -338,6 +365,7 @@ protocol_types! {
     pub struct Shortcut {
         pub key: String,
         #[serde(default)]
+        #[cfg_attr(test, ts(optional, as = "Option<_>"))]
         pub modifiers: Vec<Modifier>,
     }
 
@@ -428,5 +456,28 @@ mod tests {
                 serde_json::from_str(&serde_json::to_string(&accessory).unwrap()).unwrap();
             assert_eq!(written, accessory);
         }
+    }
+}
+
+#[cfg(test)]
+mod typescript {
+    use ts_rs::{Config, TS};
+
+    use super::*;
+
+    #[test]
+    fn views_are_a_union_on_kind() {
+        let decl = View::decl(&Config::new());
+
+        assert!(decl.contains(r#"{ "kind": "list" } & ListView"#), "{decl}");
+    }
+
+    #[test]
+    fn defaulted_fields_are_optional() {
+        let decl = ListView::decl(&Config::new());
+
+        assert!(decl.contains("loading?: boolean"), "{decl}");
+        assert!(decl.contains("emptyState?: EmptyState"), "{decl}");
+        assert!(decl.contains("items: Array<ListItem>"), "{decl}");
     }
 }

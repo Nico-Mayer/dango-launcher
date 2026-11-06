@@ -259,9 +259,11 @@ ignored.
   checked-in `assets/dango.d.ts`. With an env var set, it rewrites the file.
 - Dango writes the file with `include_str!` at startup when the folder exists
   and the content differs.
-- Not checked yet: how ts-rs renders `#[serde(default)]` fields as optional.
-  Covered by the spike. Fallback: `specta` 2.0 (still rc.28), else hand-written
-  types with the same drift test against `serde_json` samples.
+- ts-rs makes a `#[serde(default)]` field optional only when it also skips
+  serializing, since it can't tell input from output. `protocol_types!` adds
+  `ts(optional_fields)` for `Option` fields, and each defaulted non-`Option`
+  field carries `ts(optional, as = "Option<_>")`, all under `cfg_attr(test)`.
+  `specta` (still rc.28) was the fallback and is not needed.
 
 ### 12. Failure reporting
 
