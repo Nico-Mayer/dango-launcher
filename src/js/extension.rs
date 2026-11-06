@@ -276,10 +276,10 @@ impl Inner {
         if opened {
             return ActionOutcome::Started;
         }
-        let result: ActionResult = returned
-            .as_deref()
-            .and_then(|json| serde_json::from_str(json).ok())
-            .unwrap_or_default();
+        let result = match parse_result(returned.as_deref()) {
+            Ok(result) => result,
+            Err(error) => return self.bad_result("an action", &error),
+        };
         if result.missing {
             return ActionOutcome::Failed(NO_ACTION.into());
         }
@@ -319,16 +319,27 @@ impl Inner {
             .call(Target::Global("__dangoSearch"), Some(&request))
             .await
         {
+            Ok(Some(json)) if json == "null" => ActionOutcome::Started,
             Ok(Some(json)) => match serde_json::from_str::<View>(&json) {
                 Ok(view) => ActionOutcome::Replaced(Box::new(ViewTree {
                     protocol_version: PROTOCOL_VERSION,
                     view,
                 })),
-                Err(_) => ActionOutcome::Started,
+                Err(error) => self.bad_result("a search", &error.to_string()),
             },
             Ok(None) => ActionOutcome::Started,
             Err(error) => self.action_failed(error),
         }
+    }
+
+    /// A result Dango can't read is the author's bug: it goes to the log,
+    /// and the user sees the same ticker as for an uncaught error.
+    fn bad_result(&self, what: &str, error: &str) -> ActionOutcome {
+        crate::log::append(&format!(
+            "extension {}: {what} returned something Dango can't show: {error}",
+            self.manifest.id
+        ));
+        ActionOutcome::Failed(STOPPED_BY_ERROR.into())
     }
 
     fn action_failed(&self, error: JsError) -> ActionOutcome {
@@ -423,6 +434,20 @@ impl Inner {
                 ctx.fail(STOPPED_BY_ERROR);
             }
         }
+    }
+}
+
+/// An action's result. Anything but an object, nothing included, means done;
+/// an object must be one Dango reads.
+fn parse_result(returned: Option<&str>) -> Result<ActionResult, String> {
+    let Some(json) = returned else {
+        return Ok(ActionResult::default());
+    };
+    match serde_json::from_str::<serde_json::Value>(json) {
+        Ok(value) if value.is_object() => {
+            serde_json::from_value(value).map_err(|error| error.to_string())
+        }
+        _ => Ok(ActionResult::default()),
     }
 }
 
@@ -1267,6 +1292,36 @@ export function run() {}",
             detail.views.lock().unwrap().len(),
             2,
             "both pushes went to the detail"
+        );
+    }
+
+    #[test]
+    fn a_result_dango_cannot_read_is_a_failure() {
+        let runtime = runtime();
+        let extension = extension(
+            &runtime,
+            "view",
+            r#"export function run() {
+                dango.push({ kind: "list", items: [{ id: "a", title: "A", actions: [
+                    { title: "Bad", onAction: () => ({ replace: { kind: "list", items: [{ title: "no id" }] } }) },
+                    { title: "Plain", onAction: () => "fine" },
+                ] }], onSearch: () => ({ kind: "list", items: [{ title: "no id" }] }) });
+            }"#,
+        );
+        let recorded = invoke(&extension);
+        let ids = action_ids(&recorded);
+
+        assert_eq!(
+            extension.perform_action("a", &ids[0], &FormValues::new()),
+            ActionOutcome::Failed(STOPPED_BY_ERROR.into())
+        );
+        assert_eq!(
+            extension.perform_action("a", &ids[1], &FormValues::new()),
+            ActionOutcome::Done
+        );
+        assert_eq!(
+            extension.perform_action("r", SEARCH_ACTION, &FormValues::new()),
+            ActionOutcome::Failed(STOPPED_BY_ERROR.into())
         );
     }
 }

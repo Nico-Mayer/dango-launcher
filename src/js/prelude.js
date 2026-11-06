@@ -128,7 +128,9 @@
     } else {
       return { missing: true };
     }
-    if (result && result.replace) return { ...result, replace: prepare(result.replace) };
+    if (result && typeof result === "object" && result.replace) {
+      return { ...result, replace: prepare(result.replace) };
+    }
     return result;
   };
 })();
