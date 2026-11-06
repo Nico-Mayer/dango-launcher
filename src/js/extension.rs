@@ -530,4 +530,35 @@ pub(crate) mod tests {
             Some(Outcome::Success(Some("anna".into())))
         );
     }
+
+    #[test]
+    fn a_secret_reaches_its_extension_and_a_broken_file_can_be_caught() {
+        let runtime = runtime();
+        let host = Arc::new(JsHost {
+            secret: Arc::new(|id, name| match (id, name) {
+                ("ext", "token") => Ok(Some("glpat-123".into())),
+                ("ext", "broken") => Err("auth.toml: line 2 isn't valid TOML".into()),
+                _ => Ok(None),
+            }),
+            ..Arc::into_inner(test_host(runtime.handle().clone())).unwrap()
+        });
+        let extension = extension_with(
+            host,
+            "no-view",
+            r#"export function run() {
+                let caught = "";
+                try { dango.secret("broken"); } catch (error) { caught = error.message; }
+                return `${dango.secret("token")} ${dango.secret("other")} ${caught}`;
+            }"#,
+        );
+
+        let recorded = invoke(&extension);
+
+        assert_eq!(
+            *recorded.outcome.lock().unwrap(),
+            Some(Outcome::Success(Some(
+                "glpat-123 undefined auth.toml can't be read".into()
+            )))
+        );
+    }
 }

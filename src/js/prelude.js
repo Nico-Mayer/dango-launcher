@@ -50,6 +50,7 @@
     preferences: Object.freeze(
       __dangoNative.preferences ? JSON.parse(__dangoNative.preferences) : {},
     ),
+    secret: (name) => __dangoNative.secret(name) ?? undefined,
     open: (target) => __dangoNative.open(target),
     copy: (text) => __dangoNative.copy(text),
     paste: (text) => __dangoNative.paste(text),

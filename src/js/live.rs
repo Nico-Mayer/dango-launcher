@@ -129,6 +129,19 @@ impl Natives for Bridge {
                 }
             })),
         )?;
+        let secret = self.host.secret.clone();
+        let id = self.extension_id.clone();
+        native.set(
+            "secret",
+            Func::from(
+                move |ctx: Ctx<'js>, name: String| -> rquickjs::Result<Option<String>> {
+                    secret(&id, &name).map_err(|detail| {
+                        crate::log::append(&format!("extension {id}: {detail}"));
+                        throw(&ctx, "auth.toml can't be read")
+                    })
+                },
+            ),
+        )?;
         let preferences = serde_json::Value::Object((self.host.preferences)(&self.extension_id));
         native.set("preferences", preferences.to_string())?;
         let env = serde_json::json!({

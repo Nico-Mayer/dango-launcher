@@ -129,6 +129,7 @@ pub(crate) mod tests {
             paste: Arc::new(|_| Ok(())),
             store: crate::store::Store::in_memory().ok().map(Arc::new),
             preferences: Arc::new(|_| serde_json::Map::new()),
+            secret: Arc::new(|_, _| Ok(None)),
         })
     }
 

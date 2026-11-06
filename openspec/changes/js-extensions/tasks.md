@@ -24,7 +24,7 @@
 - [x] 3.6 Add `dango.fetch`, `dango.fs`, `dango.open`, `dango.copy`, `dango.paste`, `dango.env`; verify each with `cargo test` (fetch against a local `TcpListener` server, fs in a temp dir, open/copy/paste through the existing test fakes)
 - [x] 3.7 Add the `local_extension_storage` migration and `dango.storage`; verify with `cargo test` that values survive a reopened database and that two extensions with the same key read their own values
 - [x] 3.8 Allow extra keys in `extensions.<id>` in the config schema and pass them as `dango.preferences`; verify with `cargo test` that `user = "nico"` loads without a problem and reaches the extension, and that a reload changes the value for the next session
-- [ ] 3.9 Add `dango.secret` reading `[extensions.<id>]` from `auth.toml` per call, and make `AuthFile::key` ignore the `extensions` table; verify with `cargo test` for a found token, a missing table, another extension's secret, a provider key out of reach, an unparsable file logging only the line, and a provider named `extensions` getting no key
+- [x] 3.9 Add `dango.secret` reading `[extensions.<id>]` from `auth.toml` per call, and make `AuthFile::key` ignore the `extensions` table; verify with `cargo test` for a found token, a missing table, another extension's secret, a provider key out of reach, an unparsable file logging only the line, and a provider named `extensions` getting no key
 
 ## 4. Actions
 

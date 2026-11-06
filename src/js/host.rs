@@ -18,6 +18,10 @@ pub type TextAction = dyn Fn(&str) -> Result<(), String> + Send + Sync;
 /// An extension's preferences as the config file holds them right now.
 pub type Preferences = dyn Fn(&str) -> serde_json::Map<String, serde_json::Value> + Send + Sync;
 
+/// A secret of an extension by name. `Err` carries what may be logged: the
+/// file and line, never its text.
+pub type Secret = dyn Fn(&str, &str) -> Result<Option<String>, String> + Send + Sync;
+
 /// What every JavaScript extension shares: the runtime sessions run on, the
 /// launcher hooks they report through, and the built-ins' system paths.
 pub struct JsHost {
@@ -30,4 +34,5 @@ pub struct JsHost {
     /// Where `dango.storage` keeps values; absent when the database is.
     pub store: Option<Arc<Store>>,
     pub preferences: Arc<Preferences>,
+    pub secret: Arc<Secret>,
 }

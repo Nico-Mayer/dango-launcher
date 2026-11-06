@@ -40,17 +40,50 @@ impl AuthFile {
     }
 }
 
-impl Keys for AuthFile {
-    fn key(&self, provider: &str) -> Result<Option<String>, AuthError> {
+/// The table extension secrets are filed under, never a provider's key.
+const EXTENSIONS: &str = "extensions";
+
+impl AuthFile {
+    /// A secret of a JavaScript extension, from its own `[extensions.<id>]`
+    /// table. Read per call, like a provider key.
+    pub fn extension_secret(
+        &self,
+        extension_id: &str,
+        name: &str,
+    ) -> Result<Option<String>, AuthError> {
+        let Some(table) = self.table()? else {
+            return Ok(None);
+        };
+        Ok(table
+            .get(EXTENSIONS)
+            .and_then(|extensions| extensions.get(extension_id))
+            .and_then(|secrets| secrets.get(name))
+            .and_then(Value::as_str)
+            .filter(|secret| !secret.trim().is_empty())
+            .map(str::to_string))
+    }
+
+    fn table(&self) -> Result<Option<Table>, AuthError> {
         let Some(text) = read(&self.path)? else {
             return Ok(None);
         };
         restrict_to_owner(&self.path);
-        let table: Table = text
-            .parse()
+        text.parse()
+            .map(Some)
             .map_err(|error: toml::de::Error| AuthError::Parse {
                 line: line_of(&text, error.span()),
-            })?;
+            })
+    }
+}
+
+impl Keys for AuthFile {
+    fn key(&self, provider: &str) -> Result<Option<String>, AuthError> {
+        if provider == EXTENSIONS {
+            return Ok(None);
+        }
+        let Some(table) = self.table()? else {
+            return Ok(None);
+        };
         Ok(table
             .get(provider)
             .and_then(Value::as_str)
@@ -118,6 +151,58 @@ mod tests {
         assert_eq!(auth.key("openrouter").unwrap().as_deref(), Some("sk-or"));
         assert_eq!(auth.key("ollama").unwrap(), None);
         assert_eq!(auth.key("version").unwrap(), None);
+    }
+
+    #[test]
+    fn an_extension_reads_only_its_own_secrets() {
+        let dir = temp_dir("extension-secrets");
+        let path = write(
+            &dir,
+            "anthropic = \"sk-ant-secret\"
+[extensions.gitlab]
+token = \"glpat-123\"
+",
+        );
+        let auth = AuthFile::new(path);
+
+        assert_eq!(
+            auth.extension_secret("gitlab", "token").unwrap().as_deref(),
+            Some("glpat-123")
+        );
+        assert_eq!(auth.extension_secret("jira", "token").unwrap(), None);
+        assert_eq!(auth.extension_secret("gitlab", "anthropic").unwrap(), None);
+        assert_eq!(auth.extension_secret("anthropic", "x").unwrap(), None);
+    }
+
+    #[test]
+    fn the_extensions_table_is_no_provider_s_key() {
+        let dir = temp_dir("extensions-provider");
+        let path = write(
+            &dir,
+            "[extensions.gitlab]
+token = \"glpat-123\"
+",
+        );
+
+        assert_eq!(AuthFile::new(path).key("extensions").unwrap(), None);
+    }
+
+    #[test]
+    fn a_broken_file_gives_an_extension_only_the_line() {
+        let dir = temp_dir("extension-broken");
+        let path = write(
+            &dir,
+            "[extensions.gitlab]
+token = \"glpat-secret
+",
+        );
+
+        let error = AuthFile::new(path)
+            .extension_secret("gitlab", "token")
+            .unwrap_err();
+
+        assert_eq!(error, AuthError::Parse { line: 2 });
+        assert!(!error.to_string().contains("glpat-secret"));
     }
 
     #[test]

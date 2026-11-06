@@ -141,6 +141,7 @@ fn js_host(
     exchange: Option<Arc<dyn text::TextTarget>>,
     store: Option<Arc<Store>>,
     config: Arc<std::sync::RwLock<config::Config>>,
+    auth: Arc<AuthFile>,
 ) -> Arc<crate::js::JsHost> {
     let start_core = core.clone();
     Arc::new(crate::js::JsHost {
@@ -178,6 +179,10 @@ fn js_host(
         }),
         store,
         preferences: Arc::new(move |id| config.read().unwrap().preferences(id)),
+        secret: Arc::new(move |id, name| {
+            auth.extension_secret(id, name)
+                .map_err(|error| error.to_string())
+        }),
     })
 }
 
@@ -404,6 +409,7 @@ fn build_services(
         exchange.clone(),
         store.clone(),
         file_config.shared(),
+        Arc::new(AuthFile::new(config::UserFile::Auth.path())),
     );
     problems.extend(load_problems(&crate::js::load::register_all(
         &mut host, &js_dir, &js_host,
