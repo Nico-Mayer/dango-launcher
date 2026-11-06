@@ -7,6 +7,7 @@ pub mod extensions;
 pub mod hotkeys;
 pub mod icon_cache;
 pub mod invocation;
+pub mod js;
 mod latency;
 pub mod log;
 mod opener;
