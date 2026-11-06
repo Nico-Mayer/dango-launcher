@@ -186,6 +186,24 @@ pub(crate) mod tests {
     }
 
     #[test]
+    fn a_command_is_searchable_before_its_code_runs() {
+        let dir = temp();
+        let marker = dir.join("ran");
+        let main = format!(
+            "await dango.fs.writeText({:?}, 'yes');\nexport function run() {{}}",
+            marker.to_string_lossy()
+        );
+        write_extension(&dir, "eager", &main);
+        let mut host = ExtensionHost::new(Arc::new(AllEnabled));
+
+        register_all(&mut host, &dir);
+
+        let candidates = host.command_candidates();
+        assert!(candidates.iter().any(|c| c.title == "Run It"));
+        assert!(!marker.exists());
+    }
+
+    #[test]
     fn a_folder_that_is_not_an_extension_is_ignored() {
         let dir = temp();
         std::fs::create_dir_all(dir.join(".git")).unwrap();
