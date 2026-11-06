@@ -4,7 +4,7 @@
 
 - [x] 1.1 Add `rquickjs` 0.14 (`futures`, `parallel`, `loader`, `macro`) and `rquickjs-extra` 0.3 (`timers`, `url`) to `Cargo.toml`; verify `mise run check` passes on Windows
 - [x] 1.2 Add a minimal session runner in a new `src/js/` module: fresh `AsyncRuntime` per session, load an ES module from a string, call an exported async function on the shell's tokio runtime, return its JSON result; verify with a `cargo test` that awaits a `setTimeout` inside the export
-- [ ] 1.3 Add the memory limit and the interrupt handler tied to a cancel flag; verify with `cargo test` that an endless loop stops once the flag is set and that over-allocation returns an out-of-memory error
+- [x] 1.3 Add the memory limit and the interrupt handler tied to a cancel flag; verify with `cargo test` that an endless loop stops once the flag is set and that over-allocation returns an out-of-memory error
 - [ ] 1.4 Add `ts-rs` 12 as a dev-dependency, derive `TS` for `ViewTree` under `cfg_attr(test, ...)`, and check `tag = "kind"` enums and `#[serde(default)]` fields; verify with a `cargo test` asserting the `View` union has a `kind` discriminant and defaulted fields are optional (fall back to `specta` per design if not)
 
 ## 2. Manifest and loading
