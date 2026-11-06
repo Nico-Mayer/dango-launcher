@@ -95,22 +95,46 @@ impl JsCommand {
             Ok(live) => Arc::new(live),
             Err(error) => return self.inner.report(ctx, &self.command_id, error),
         };
+        self.inner.adopt(&live);
         let result = live.call(Target::Export(&self.command_id), None).await;
         match (self.mode, result) {
-            (_, Err(error)) => self.inner.report(ctx, &self.command_id, error),
-            (InvocationMode::NoView, Ok(returned)) => match message(returned.as_deref()) {
-                Some(message) => ctx.succeed_with(message),
-                None => ctx.succeed(),
-            },
-            (InvocationMode::View, Ok(_)) if !live.pushed() => ctx.succeed(),
-            (InvocationMode::View, Ok(_)) => {
-                *self.inner.live.lock().unwrap() = Some(live);
+            (_, Err(error)) => {
+                live.end();
+                self.inner.report(ctx, &self.command_id, error);
             }
+            (InvocationMode::NoView, Ok(returned)) => {
+                live.end();
+                match message(returned.as_deref()) {
+                    Some(message) => ctx.succeed_with(message),
+                    None => ctx.succeed(),
+                }
+            }
+            (InvocationMode::View, Ok(_)) if !live.pushed() => {
+                live.end();
+                ctx.succeed();
+            }
+            (InvocationMode::View, Ok(_)) => {}
         }
     }
 }
 
 impl Inner {
+    /// Makes `live` the session behind the extension's views, ending the one
+    /// before it, and lets it go once its work is over.
+    fn adopt(self: &Arc<Self>, live: &Arc<Live>) {
+        if let Some(previous) = self.live.lock().unwrap().replace(live.clone()) {
+            previous.end();
+        }
+        let inner = Arc::downgrade(self);
+        live.watch(move |ended| {
+            let Some(inner) = inner.upgrade() else { return };
+            let mut slot = inner.live.lock().unwrap();
+            if slot.as_ref().is_some_and(|live| Arc::ptr_eq(live, ended)) {
+                *slot = None;
+            }
+        });
+    }
+
     async fn start(&self, context: Option<InvocationContext>) -> Result<Live, JsError> {
         let source = std::fs::read_to_string(self.folder.join(MAIN_FILE))
             .map_err(|error| JsError::Engine(format!("{MAIN_FILE} can't be read: {error}")))?;
@@ -160,9 +184,20 @@ pub(crate) mod tests {
     pub struct Recorded {
         pub views: Mutex<Vec<ViewTree>>,
         pub outcome: Mutex<Option<Outcome>>,
+        pub cancelled: std::sync::atomic::AtomicBool,
+    }
+
+    impl Recorded {
+        pub fn cancel(&self) {
+            self.cancelled
+                .store(true, std::sync::atomic::Ordering::SeqCst);
+        }
     }
 
     impl Sink for Recorded {
+        fn superseded(&self) -> bool {
+            self.cancelled.load(std::sync::atomic::Ordering::SeqCst)
+        }
         fn push_view(&self, tree: ViewTree) {
             self.views.lock().unwrap().push(tree);
         }
@@ -285,5 +320,69 @@ pub(crate) mod tests {
             *recorded.outcome.lock().unwrap(),
             Some(Outcome::Failure(STOPPED_BY_ERROR.into()))
         );
+    }
+
+    #[test]
+    fn running_out_of_memory_says_so() {
+        let runtime = runtime();
+        let extension = extension(
+            &runtime,
+            "no-view",
+            "export function run() { const all = []; for (;;) all.push('x'.repeat(1 << 20)); }",
+        );
+
+        let recorded = invoke(&extension);
+
+        assert_eq!(
+            *recorded.outcome.lock().unwrap(),
+            Some(Outcome::Failure(OUT_OF_MEMORY.into()))
+        );
+    }
+
+    #[test]
+    fn a_looping_command_stops_once_abandoned() {
+        let runtime = runtime();
+        let extension = Arc::new(extension(
+            &runtime,
+            "view",
+            "export function run() { for (;;) {} }",
+        ));
+        let recorded = Arc::new(Recorded::default());
+        let ctx = InvocationContext::for_test("ext.run", recorded.clone());
+        let running = {
+            let extension = extension.clone();
+            std::thread::spawn(move || extension.command("run").unwrap().invoke(&ctx))
+        };
+
+        std::thread::sleep(std::time::Duration::from_millis(100));
+        recorded.cancel();
+
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+        while !running.is_finished() {
+            assert!(
+                std::time::Instant::now() < deadline,
+                "the loop kept running"
+            );
+            std::thread::sleep(std::time::Duration::from_millis(20));
+        }
+    }
+
+    #[test]
+    fn a_timer_never_pushes_after_the_view_is_left() {
+        let runtime = runtime();
+        let extension = extension(
+            &runtime,
+            "view",
+            r#"export function run() {
+                dango.push({ kind: "list", items: [] });
+                setTimeout(() => dango.push({ kind: "list", items: [] }), 300);
+            }"#,
+        );
+
+        let recorded = invoke(&extension);
+        recorded.cancel();
+        std::thread::sleep(std::time::Duration::from_millis(600));
+
+        assert_eq!(recorded.views.lock().unwrap().len(), 1);
     }
 }

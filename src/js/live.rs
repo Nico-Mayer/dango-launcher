@@ -1,7 +1,10 @@
 //! A session bound to the launcher: where its views go and when it stops.
 
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
+
+use tokio::sync::Notify;
 
 use rquickjs::prelude::Func;
 use rquickjs::{Ctx, Exception, Object};
@@ -64,10 +67,16 @@ impl Natives for Bridge {
     }
 }
 
+/// How often a session looks at whether the launcher has moved on.
+const WATCH: Duration = Duration::from_millis(50);
+
 pub struct Live {
-    pub session: Session,
-    pub bridge: Arc<Bridge>,
-    pub cancel: Arc<AtomicBool>,
+    session: Session,
+    bridge: Arc<Bridge>,
+    cancel: Arc<AtomicBool>,
+    interrupt: Notify,
+    in_flight: AtomicUsize,
+    ended: AtomicBool,
 }
 
 impl Live {
@@ -90,15 +99,76 @@ impl Live {
             session,
             bridge,
             cancel,
+            interrupt: Notify::new(),
+            in_flight: AtomicUsize::new(0),
+            ended: AtomicBool::new(false),
         })
     }
 
+    /// Runs extension code until it returns or the launcher moves on. An
+    /// interrupt stops running bytecode; the select drops an await on a host
+    /// call, which bytecode checks can't reach.
     pub async fn call(
         &self,
         target: Target<'_>,
         argument: Option<&str>,
     ) -> Result<Option<String>, JsError> {
-        self.session.call(target, argument).await
+        self.in_flight.fetch_add(1, Ordering::SeqCst);
+        let interrupted = self.interrupt.notified();
+        let result = tokio::select! {
+            result = self.session.call(target, argument) => result,
+            _ = interrupted => Err(JsError::Interrupted),
+        };
+        if self.in_flight.fetch_sub(1, Ordering::SeqCst) == 1 {
+            self.cancel.store(false, Ordering::SeqCst);
+        }
+        result
+    }
+
+    /// Stops the session for good: running code is interrupted and the
+    /// watcher lets go of it, which drops its timers and pending work.
+    pub fn end(&self) {
+        self.ended.store(true, Ordering::SeqCst);
+        self.stop_running();
+    }
+
+    pub fn is_ended(&self) -> bool {
+        self.ended.load(Ordering::SeqCst)
+    }
+
+    fn stop_running(&self) {
+        self.cancel.store(true, Ordering::SeqCst);
+        self.interrupt.notify_waiters();
+    }
+
+    /// Follows the launcher until the session's work is over. Running code
+    /// stops when its invocation is abandoned; the session itself ends once
+    /// nothing runs and none of the extension's views are on screen.
+    pub fn watch(self: &Arc<Self>, on_end: impl FnOnce(&Arc<Live>) + Send + 'static) {
+        let live = self.clone();
+        let runtime = self.bridge.host.runtime.clone();
+        runtime.spawn(async move {
+            loop {
+                tokio::time::sleep(WATCH).await;
+                if live.is_ended() {
+                    break;
+                }
+                let abandoned = live
+                    .bridge
+                    .context()
+                    .is_none_or(|context| context.is_cancelled());
+                if !abandoned {
+                    continue;
+                }
+                if live.in_flight.load(Ordering::SeqCst) > 0 {
+                    live.stop_running();
+                } else if !(live.bridge.host.showing)(&live.bridge.extension_id) {
+                    live.end();
+                    break;
+                }
+            }
+            on_end(&live);
+        });
     }
 
     pub fn pushed(&self) -> bool {
