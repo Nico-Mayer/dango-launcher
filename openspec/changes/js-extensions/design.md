@@ -302,6 +302,7 @@ existing tickers ("That action isn't available"):
 | Tray, extension failed to load | "Extension <id> didn't load, see dango.log" |
 | Failure ticker, command has no code | "This command's extension has no code for it" |
 | Failure ticker, uncaught error | "This command stopped because of an error, see dango.log" |
+| Busy ticker, an action runs | "Running <action title>…", as for a command |
 | Failure ticker, memory limit | "This command used too much memory, so Dango stopped it" |
 
 The tray line follows the existing tray problems ("Hyperkey didn't start, see

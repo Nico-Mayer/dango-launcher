@@ -1604,7 +1604,10 @@ mod games {
         assert!(h.find("Brawlhalla").is_none());
 
         h.key("\n");
-        let Some(Effect::RunAction(request)) = h.effects().pop() else {
+        let Some(request) = h.effects().into_iter().find_map(|effect| match effect {
+            Effect::RunAction(request) => Some(request),
+            _ => None,
+        }) else {
             panic!("Enter runs the tile's action");
         };
         assert_eq!(
@@ -1653,7 +1656,10 @@ mod quicklink_browser {
             chord: Chord::command("Enter"),
         }));
 
-        let Some(Effect::RunAction(request)) = effects.into_iter().last() else {
+        let Some(request) = effects.into_iter().find_map(|effect| match effect {
+            Effect::RunAction(request) => Some(request),
+            _ => None,
+        }) else {
             panic!("the form is submitted");
         };
         extension.perform_action(

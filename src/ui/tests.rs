@@ -3336,3 +3336,25 @@ fn a_searching_list_keeps_its_query_when_going_back() {
 
     assert_eq!(h.list().query.text, "rust");
 }
+
+#[test]
+fn a_running_action_says_so_until_it_finishes() {
+    let mut h = Harness::view(list_tree(vec![list_item(1)]));
+    let effects = h.press("Enter");
+    let Some(Effect::RunAction(request)) = effects.first() else {
+        panic!("expected an action, got {effects:?}");
+    };
+    let request = request.clone();
+
+    assert!(effects
+        .iter()
+        .any(|effect| matches!(effect, Effect::WakeBusyMarks { .. })));
+    assert_eq!(h.launcher.busy_text().as_deref(), Some("Running Open…"));
+
+    h.event(Event::ActionFinished {
+        request,
+        outcome: ActionOutcome::Ticker("Done".into()),
+    });
+
+    assert_eq!(h.launcher.busy_text(), None);
+}

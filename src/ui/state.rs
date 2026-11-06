@@ -623,6 +623,9 @@ impl Launcher {
         outcome: ActionOutcome,
         fx: &mut Vec<Effect>,
     ) {
+        if request.action_id != SEARCH_ACTION {
+            self.working = None;
+        }
         match (outcome, request.origin) {
             // A plain success already hid the launcher. A start reports through
             // the render channel and pushes its own view.
@@ -1127,6 +1130,11 @@ impl Launcher {
     fn run_root_action(&mut self, item: &ResultItem, action: &str, fx: &mut Vec<Effect>) {
         self.clear_lasting();
         self.panel = None;
+        self.working = item
+            .actions
+            .iter()
+            .find(|available| available.id == action)
+            .map(|available| available.title.clone());
         fx.push(Effect::RunAction(ActionRequest {
             origin: Origin::Root,
             extension_id: item.extension_id.clone(),
@@ -1151,6 +1159,13 @@ impl Launcher {
         };
         self.clear_lasting();
         self.panel = None;
+        if action != FILTER_ACTION {
+            self.working = self
+                .available_actions()
+                .iter()
+                .find(|available| available.id == action)
+                .map(|available| available.title.clone());
+        }
         fx.push(Effect::RunAction(ActionRequest {
             origin: Origin::View,
             extension_id: owner,

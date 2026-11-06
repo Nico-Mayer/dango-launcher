@@ -95,3 +95,23 @@ never shown. Typing SHALL NOT wait on the command.
 
 - **WHEN** the user pushes a detail view from such a list and presses Escape
 - **THEN** the list shows with the query it had
+
+### Requirement: A running action shows the launcher is busy
+
+While an action chosen in a view or on a root item runs, the launcher SHALL
+show the busy marks, following the busy-mark timing in design-system, with a
+busy ticker reading "Running" followed by the action's title. The marks SHALL
+go when the action finishes, whatever its outcome. Choosing a filter option and
+a search that the query sends SHALL NOT show them.
+
+#### Scenario: A slow action
+
+- **WHEN** the user runs the action "Apply theme" and it is still running
+  after the busy-mark delay
+- **THEN** the busy ticker reads "Running Apply theme…"
+
+#### Scenario: The action finishes
+
+- **WHEN** that action finishes with a success ticker
+- **THEN** the busy marks are gone and the success ticker shows
+
