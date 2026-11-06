@@ -2,6 +2,70 @@
 
 All notable changes to Dango. Generated from commit history at release time.
 
+## [6.8.0] - 2026-11-06
+
+### Features
+
+- **js:** Run an ES module in a QuickJS session
+- **js:** Bound session memory and stop on cancel
+- **js:** Read an extension's manifest.json
+- **js:** Load extensions from the extensions folder
+- **js:** Run extension commands
+- **js:** Stop a session when the launcher moves on
+- **js:** Send console output to the Dango log
+- **js:** Run programs from extensions
+- **js:** Give extensions files, HTTP, open, copy, paste
+- **js:** Give each extension its own storage
+- **js:** Pass an extension its preferences
+- **js:** Read extension secrets from auth.toml
+- **js:** Run actions in extension code
+- **js:** Cache an extension's root items
+- **ui:** Let a list or grid search through its command
+- **js:** Search through an extension's onSearch
+- **extension:** Remove an extension from the host
+- **js:** Reload an extension when its folder changes
+- **js:** Ship dango.d.ts for extension authors
+- **icons:** Add github, pull request, issue icons
+- **ui:** Show a running action as busy
+
+### Fixes
+
+- **js:** Keep slow actions alive under a pushed view
+- **js:** Stop sessions nothing on screen follows
+- **js:** Treat a zero refresh as no refresh
+- **js:** Run open, copy, paste, secret off the runtime
+- **js:** Type root item actions as protocol actions
+- **js:** Keep a stopped exec from starting
+- **ui:** Shrink large image files off the UI thread
+- **js:** Keep searching after the first answer
+- **js:** Give up on a main.js that never loads
+- **js:** Share one HTTP client with a timeout
+- **js:** Give an action its own push
+- **ui:** Shrink large images on one worker in turn
+- **js:** Report a result Dango can't show
+
+### Refactoring
+
+- **js:** Drop unused code and features
+- **js:** Drop unused accessors
+
+### Documentation
+
+- **agents:** Describe the JavaScript extension host
+- **js:** Note quoted exports for dashed command ids
+- **agents:** Add macOS bundle check facts
+- **agents:** Note Little Snitch holds fetch on Mac
+
+### Maintenance
+
+- **deps:** Add rquickjs and rquickjs-extra
+- **protocol:** Derive TypeScript types in tests
+- **js:** Search a command without running its code
+- **js:** Keep a session for the list under a pushed view
+- **js:** Hand form values to the submit handler
+- **app:** Stop a JS view's timer and program on Escape
+- **ui:** Put group's doc comment back on group
+- Let SLINT_EMIT_DEBUG_INFO reach a release
 ## [6.7.1] - 2026-11-05
 
 ### Fixes
