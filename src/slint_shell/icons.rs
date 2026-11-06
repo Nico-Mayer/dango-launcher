@@ -116,6 +116,7 @@ fn named(name: &str) -> Option<&'static IconData> {
         "arrow-right" => lu::LuArrowRight,
         "calculator" => lu::LuCalculator,
         "check" => lu::LuCheck,
+        "circle-dot" => lu::LuCircleDot,
         "circle-alert" => lu::LuCircleAlert,
         "circle-arrow-down" => lu::LuCircleArrowDown,
         "circle-power" => lu::LuCirclePower,
@@ -124,6 +125,8 @@ fn named(name: &str) -> Option<&'static IconData> {
         "columns-3" => lu::LuColumns3,
         "file" => lu::LuFile,
         "gamepad-2" => lu::LuGamepad2,
+        "git-pull-request" => lu::LuGitPullRequest,
+        "github" => lu::LuGithub,
         "grid-2x2" => lu::LuGrid2x2,
         "loader-circle" => lu::LuLoaderCircle,
         "link" => lu::LuLink,
@@ -155,12 +158,13 @@ fn named(name: &str) -> Option<&'static IconData> {
 mod tests {
     use super::*;
 
-    const REGISTRY: [&str; 36] = [
+    const REGISTRY: [&str; 39] = [
         "app-window",
         "arrow-left",
         "arrow-right",
         "calculator",
         "check",
+        "circle-dot",
         "circle-alert",
         "circle-arrow-down",
         "circle-power",
@@ -169,6 +173,8 @@ mod tests {
         "columns-3",
         "file",
         "gamepad-2",
+        "git-pull-request",
+        "github",
         "grid-2x2",
         "loader-circle",
         "link",
