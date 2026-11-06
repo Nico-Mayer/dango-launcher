@@ -14,6 +14,7 @@ use serde::{Deserialize, Serialize};
 use crate::extensions::ai::agent::lookup;
 
 const POLL: Duration = Duration::from_millis(20);
+const STOPPED: &str = "the program was stopped";
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -34,15 +35,24 @@ pub struct ExecResult {
     pub stderr: String,
 }
 
-type Slot = Arc<Mutex<Option<Box<dyn ChildWrapper + Send>>>>;
+#[derive(Default)]
+struct Running {
+    child: Option<Box<dyn ChildWrapper + Send>>,
+    stopped: bool,
+}
+
+type Slot = Arc<Mutex<Running>>;
 
 /// Kills the program when the call is dropped before it finished, as when
-/// the session it runs for is stopped.
+/// the session it runs for is stopped. A stop that lands while the program
+/// is still being looked up keeps it from starting.
 struct KillOnDrop(Slot);
 
 impl Drop for KillOnDrop {
     fn drop(&mut self) {
-        if let Some(child) = self.0.lock().unwrap().as_mut() {
+        let mut running = self.0.lock().unwrap();
+        running.stopped = true;
+        if let Some(child) = running.child.as_mut() {
             let _ = child.start_kill();
         }
     }
@@ -90,6 +100,10 @@ fn run(
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
+    let mut running = slot.lock().unwrap();
+    if running.stopped {
+        return Err(STOPPED.into());
+    }
     let mut child = command
         .spawn()
         .map_err(|error| format!("{} couldn't start: {error}", request.program))?;
@@ -97,7 +111,8 @@ fn run(
     let stdin = child.stdin().take();
     let stdout = child.stdout().take();
     let stderr = child.stderr().take();
-    *slot.lock().unwrap() = Some(child);
+    running.child = Some(child);
+    drop(running);
 
     if let Some(mut stdin) = stdin {
         let input = request.input.unwrap_or_default();
@@ -111,8 +126,8 @@ fn run(
     // behind a blocking wait for the lock.
     let status = loop {
         let mut guard = slot.lock().unwrap();
-        let Some(child) = guard.as_mut() else {
-            return Err("the program was stopped".into());
+        let Some(child) = guard.child.as_mut() else {
+            return Err(STOPPED.into());
         };
         match child.try_wait() {
             Ok(Some(status)) => break status,
@@ -122,7 +137,7 @@ fn run(
         drop(guard);
         std::thread::sleep(POLL);
     };
-    *slot.lock().unwrap() = None;
+    slot.lock().unwrap().child = None;
     Ok(ExecResult {
         code: status.code(),
         stdout: stdout.join().unwrap_or_default(),
