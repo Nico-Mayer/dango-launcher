@@ -55,8 +55,7 @@ See proposal.md for why. Today every extension is a native built-in:
 
 A **session** is one unit of work: an invocation together with the views it
 and its actions show, or one root items build. Each session gets a fresh
-`AsyncRuntime` + `AsyncContext` (features `futures`, `parallel`, `loader`,
-`macro`), loads `main.js` as an ES module, runs, and is dropped when the
+`AsyncRuntime` + `AsyncContext` (features `futures`, `parallel`), loads `main.js` as an ES module, runs, and is dropped when the
 session ends. Sessions run as tasks on the tokio runtime the shell owns.
 
 - Memory: `set_memory_limit` per runtime (start at 64 MB, a constant in

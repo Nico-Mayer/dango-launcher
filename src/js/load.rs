@@ -51,12 +51,6 @@ pub fn scan(dir: &Path, host: &Arc<JsHost>) -> (Vec<JsExtension>, Vec<LoadFailur
     (loaded, failed)
 }
 
-/// Registers every extension in `dir`. A failure is logged with its reason and
-/// lands in the report, so the tray can name the extension.
-pub fn register_all(host: &mut ExtensionHost, dir: &Path, js: &Arc<JsHost>) -> LoadReport {
-    JsExtensions::new(dir.to_path_buf(), js.clone()).register_all(host)
-}
-
 /// The JavaScript extensions of one extensions folder, and which ids are
 /// theirs, so a reload never touches a built-in that shares an id.
 pub struct JsExtensions {
@@ -78,6 +72,8 @@ impl JsExtensions {
         &self.dir
     }
 
+    /// Registers every extension in the folder. A failure is logged with its
+    /// reason and lands in the report, so the tray can name the extension.
     pub fn register_all(&self, host: &mut ExtensionHost) -> LoadReport {
         let (loaded, failed) = scan(&self.dir, &self.host);
         let mut report = LoadReport::default();
@@ -273,7 +269,7 @@ pub(crate) mod tests {
         std::fs::write(dir.join("broken").join(MANIFEST_FILE), "{}").unwrap();
         let mut host = ExtensionHost::new(Arc::new(AllEnabled));
 
-        let report = register_all(&mut host, &dir, &self::host());
+        let report = JsExtensions::new(dir.clone(), self::host()).register_all(&mut host);
 
         assert!(host.registry().get("gh-prs.run").is_some());
         assert_eq!(report.load_errors.len(), 1);
@@ -291,7 +287,7 @@ pub(crate) mod tests {
         write_extension(&dir, "eager", &main);
         let mut host = ExtensionHost::new(Arc::new(AllEnabled));
 
-        register_all(&mut host, &dir, &self::host());
+        JsExtensions::new(dir.clone(), self::host()).register_all(&mut host);
 
         let candidates = host.command_candidates();
         assert!(candidates.iter().any(|c| c.title == "Run It"));

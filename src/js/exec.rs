@@ -61,11 +61,10 @@ async fn exec_watched(
     on_spawn: impl FnOnce(u32) + Send + 'static,
 ) -> Result<ExecResult, String> {
     let slot: Slot = Arc::default();
-    let guard = KillOnDrop(slot.clone());
+    let _kill = KillOnDrop(slot.clone());
     let result = tokio::task::spawn_blocking(move || run(request, &folder, &slot, on_spawn))
         .await
         .map_err(|error| error.to_string())?;
-    std::mem::forget(guard);
     result
 }
 

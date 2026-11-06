@@ -94,7 +94,7 @@ steamlocate = "2.1"
 toml_edit = "0.25"
 slug = "0.1.6"
 ddc = "0.2"
-rquickjs = { version = "0.14", features = ["futures", "parallel", "loader", "macro"] }
+rquickjs = { version = "0.14", features = ["futures", "parallel"] }
 rquickjs-extra = { version = "0.3", default-features = false, features = ["timers", "url"] }
 
 [dev-dependencies]

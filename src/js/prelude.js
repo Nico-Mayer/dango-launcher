@@ -97,7 +97,6 @@
     );
   globalThis.console = { log: write("log"), info: write("info"), warn: write("warn"), error: write("error") };
 
-  globalThis.__dangoPrepare = prepare;
   // A new query aborts the search for the last one, whose answer is then
   // dropped even if the handler ignores the signal.
   globalThis.__dangoSearch = async (request) => {

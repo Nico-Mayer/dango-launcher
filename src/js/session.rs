@@ -166,18 +166,6 @@ impl Session {
             .await
             .map_err(|error| error.classify(&self.cancel))
     }
-
-    /// Whether `main.js` exports a function by that name.
-    pub async fn exports(&self, name: &str) -> bool {
-        let name = name.to_owned();
-        self.context
-            .with(move |ctx| {
-                let main: rquickjs::Result<Object> = ctx.globals().get(MAIN);
-                main.and_then(|main| main.get::<_, Value>(name.as_str()))
-                    .is_ok_and(|value| value.is_function())
-            })
-            .await
-    }
 }
 
 async fn call<'js>(
