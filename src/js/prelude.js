@@ -36,6 +36,9 @@
 
   const fsCall = async (request) => JSON.parse(await __dangoNative.fs(JSON.stringify(request)));
 
+  const storageCall = async (request) =>
+    JSON.parse(await __dangoNative.storage(JSON.stringify(request)));
+
   globalThis.dango = {
     push(view) {
       __dangoNative.push(JSON.stringify(prepare(view)));
@@ -64,6 +67,12 @@
       remove: async (path) => fsCall({ op: "remove", path }),
       exists: async (path) => fsCall({ op: "exists", path }),
       stat: async (path) => fsCall({ op: "stat", path }),
+    },
+    storage: {
+      get: async (key) => storageCall({ op: "get", key }),
+      set: async (key, value) => storageCall({ op: "set", key, value: JSON.stringify(value) }),
+      remove: async (key) => storageCall({ op: "remove", key }),
+      keys: async () => storageCall({ op: "keys" }),
     },
     async exec(program, args = [], options = {}) {
       return JSON.parse(await __dangoNative.exec(JSON.stringify({ program, args, ...options })));

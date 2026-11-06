@@ -127,6 +127,7 @@ pub(crate) mod tests {
             open: Arc::new(|_| Ok(())),
             copy: Arc::new(|_| Ok(())),
             paste: Arc::new(|_| Ok(())),
+            store: crate::store::Store::in_memory().ok().map(Arc::new),
         })
     }
 

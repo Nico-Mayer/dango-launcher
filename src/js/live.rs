@@ -111,6 +111,24 @@ impl Natives for Bridge {
                 }),
             )?;
         }
+        let store = self.host.store.clone();
+        let id = self.extension_id.clone();
+        native.set(
+            "storage",
+            Func::from(Async(move |ctx: Ctx<'js>, json: String| {
+                let store = store.clone();
+                let id = id.clone();
+                async move {
+                    let request =
+                        serde_json::from_str(&json).map_err(|error| throw(&ctx, error))?;
+                    let store = store.ok_or_else(|| throw(&ctx, "storage is unavailable"))?;
+                    tokio::task::spawn_blocking(move || storage(&store, &id, request))
+                        .await
+                        .map_err(|error| throw(&ctx, error))?
+                        .map_err(|error| throw(&ctx, error))
+                }
+            })),
+        )?;
         let env = serde_json::json!({
             "id": self.extension_id,
             "folder": self.folder.to_string_lossy(),
@@ -127,6 +145,39 @@ impl Natives for Bridge {
             }),
         )
     }
+}
+
+#[derive(serde::Deserialize)]
+#[serde(tag = "op", rename_all = "camelCase")]
+enum StorageRequest {
+    Get { key: String },
+    Set { key: String, value: String },
+    Remove { key: String },
+    Keys,
+}
+
+/// One storage call, scoped to the calling extension. Values travel as the
+/// JSON they were stored as.
+fn storage(
+    store: &crate::store::Store,
+    extension_id: &str,
+    request: StorageRequest,
+) -> rusqlite::Result<String> {
+    Ok(match request {
+        StorageRequest::Get { key } => store
+            .extension_value(extension_id, &key)?
+            .unwrap_or_else(|| "null".into()),
+        StorageRequest::Set { key, value } => {
+            store.set_extension_value(extension_id, &key, &value)?;
+            "null".into()
+        }
+        StorageRequest::Remove { key } => {
+            store.remove_extension_value(extension_id, &key)?;
+            "null".into()
+        }
+        StorageRequest::Keys => serde_json::to_string(&store.extension_keys(extension_id)?)
+            .unwrap_or_else(|_| "[]".into()),
+    })
 }
 
 fn throw(ctx: &Ctx<'_>, message: impl ToString) -> rquickjs::Error {

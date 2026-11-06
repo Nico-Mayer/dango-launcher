@@ -3,6 +3,7 @@ use std::sync::Arc;
 use tokio::runtime::Handle;
 
 use crate::invocation::InvocationContext;
+use crate::store::Store;
 
 /// Opens a new invocation for an extension, titled when given, so an action
 /// can push a view level of its own.
@@ -23,4 +24,6 @@ pub struct JsHost {
     pub open: Arc<TextAction>,
     pub copy: Arc<TextAction>,
     pub paste: Arc<TextAction>,
+    /// Where `dango.storage` keeps values; absent when the database is.
+    pub store: Option<Arc<Store>>,
 }

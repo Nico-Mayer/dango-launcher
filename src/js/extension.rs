@@ -475,4 +475,26 @@ pub(crate) mod tests {
             vec!["open https://example.com", "copy copied", "paste pasted"]
         );
     }
+
+    #[test]
+    fn storage_keeps_values_per_extension() {
+        let runtime = runtime();
+        let extension = extension(
+            &runtime,
+            "no-view",
+            r#"export async function run() {
+                await dango.storage.set("count", { n: 2 });
+                const value = await dango.storage.get("count");
+                const missing = await dango.storage.get("nope");
+                return `${value.n} ${missing} ${(await dango.storage.keys()).join()}`;
+            }"#,
+        );
+
+        let recorded = invoke(&extension);
+
+        assert_eq!(
+            *recorded.outcome.lock().unwrap(),
+            Some(Outcome::Success(Some("2 null count".into())))
+        );
+    }
 }

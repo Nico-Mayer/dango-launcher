@@ -139,6 +139,7 @@ fn js_host(
     core: Weak<Core>,
     clipboard: Option<Arc<dyn ClipboardSource>>,
     exchange: Option<Arc<dyn text::TextTarget>>,
+    store: Option<Arc<Store>>,
 ) -> Arc<crate::js::JsHost> {
     let start_core = core.clone();
     Arc::new(crate::js::JsHost {
@@ -174,6 +175,7 @@ fn js_host(
                 .map_err(|error| error.to_string()),
             None => Err("pasting is off".to_string()),
         }),
+        store,
     })
 }
 
@@ -398,6 +400,7 @@ fn build_services(
             .as_ref()
             .map(|clipboard| clipboard.clone() as Arc<dyn ClipboardSource>),
         exchange.clone(),
+        store.clone(),
     );
     problems.extend(load_problems(&crate::js::load::register_all(
         &mut host, &js_dir, &js_host,

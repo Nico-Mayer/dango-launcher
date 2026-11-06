@@ -9,6 +9,7 @@ pub const MIGRATIONS: &[&str] = &[
     include_str!("migrations/0006_input_history.sql"),
     include_str!("migrations/0007_rank_by_extension.sql"),
     include_str!("migrations/0008_clipboard_metadata.sql"),
+    include_str!("migrations/0009_extension_storage.sql"),
 ];
 
 #[derive(Debug, thiserror::Error)]

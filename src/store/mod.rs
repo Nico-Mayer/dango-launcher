@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use rusqlite::{params, Connection, OpenFlags};
+use rusqlite::{params, Connection, OpenFlags, OptionalExtension};
 
 pub use migrations::MigrationError;
 
@@ -95,6 +95,64 @@ impl Store {
     ) -> rusqlite::Result<T> {
         let connection = self.connection.lock().unwrap();
         query(&connection)
+    }
+
+    /// A JavaScript extension's stored value, as the JSON it was stored as.
+    pub fn extension_value(
+        &self,
+        extension_id: &str,
+        key: &str,
+    ) -> rusqlite::Result<Option<String>> {
+        self.with(|connection| {
+            connection
+                .query_row(
+                    "SELECT value_json FROM local_extension_storage
+                     WHERE extension_id = ?1 AND key = ?2",
+                    rusqlite::params![extension_id, key],
+                    |row| row.get(0),
+                )
+                .optional()
+        })
+    }
+
+    pub fn set_extension_value(
+        &self,
+        extension_id: &str,
+        key: &str,
+        value_json: &str,
+    ) -> rusqlite::Result<()> {
+        self.with(|connection| {
+            connection.execute(
+                "INSERT INTO local_extension_storage (extension_id, key, value_json, updated_at)
+                 VALUES (?1, ?2, ?3, ?4)
+                 ON CONFLICT (extension_id, key)
+                 DO UPDATE SET value_json = excluded.value_json, updated_at = excluded.updated_at",
+                rusqlite::params![extension_id, key, value_json, now_millis()],
+            )?;
+            Ok(())
+        })
+    }
+
+    pub fn remove_extension_value(&self, extension_id: &str, key: &str) -> rusqlite::Result<()> {
+        self.with(|connection| {
+            connection.execute(
+                "DELETE FROM local_extension_storage WHERE extension_id = ?1 AND key = ?2",
+                rusqlite::params![extension_id, key],
+            )?;
+            Ok(())
+        })
+    }
+
+    pub fn extension_keys(&self, extension_id: &str) -> rusqlite::Result<Vec<String>> {
+        self.with(|connection| {
+            let mut statement = connection.prepare(
+                "SELECT key FROM local_extension_storage WHERE extension_id = ?1 ORDER BY key",
+            )?;
+            let keys = statement
+                .query_map([extension_id], |row| row.get(0))?
+                .collect();
+            keys
+        })
     }
 
     pub fn load_apps(&self) -> rusqlite::Result<Vec<(String, String, Option<String>)>> {
@@ -277,6 +335,47 @@ mod tests {
 
     fn cleanup(path: &Path) {
         let _ = std::fs::remove_dir_all(path.parent().unwrap());
+    }
+
+    #[test]
+    fn an_extension_value_survives_reopening() {
+        let path = temp_db();
+        {
+            let store = Store::open(&path).unwrap().store;
+            store
+                .set_extension_value("gh-prs", "token", r#""a""#)
+                .unwrap();
+            store
+                .set_extension_value("gh-prs", "token", r#""b""#)
+                .unwrap();
+        }
+        let store = Store::open(&path).unwrap().store;
+
+        assert_eq!(
+            store.extension_value("gh-prs", "token").unwrap().as_deref(),
+            Some(r#""b""#)
+        );
+        assert_eq!(store.extension_keys("gh-prs").unwrap(), vec!["token"]);
+        store.remove_extension_value("gh-prs", "token").unwrap();
+        assert_eq!(store.extension_value("gh-prs", "token").unwrap(), None);
+        drop(store);
+        cleanup(&path);
+    }
+
+    #[test]
+    fn extensions_keep_their_own_values() {
+        let store = Store::in_memory().unwrap();
+        store.set_extension_value("a", "key", "1").unwrap();
+        store.set_extension_value("b", "key", "2").unwrap();
+
+        assert_eq!(
+            store.extension_value("a", "key").unwrap().as_deref(),
+            Some("1")
+        );
+        assert_eq!(
+            store.extension_value("b", "key").unwrap().as_deref(),
+            Some("2")
+        );
     }
 
     #[test]
