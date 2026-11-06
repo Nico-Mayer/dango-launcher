@@ -54,7 +54,7 @@
 
 ## 8. Platform checks
 
-- [ ] 8.1 Windows: in a release build started with `DANGO_CONFIG_DIR` set to a scratch dir, run a fixture command that calls `dango.exec("gh", ...)`; check through `dango-ui` and `mise run shot` that no console window appears and the launcher keeps focus
+- [x] 8.1 Windows: in a release build started with `DANGO_CONFIG_DIR` set to a scratch dir, run a fixture command that calls `dango.exec("gh", ...)`; check through `dango-ui` and `mise run shot` that no console window appears and the launcher keeps focus
 - [ ] 8.2 macOS: start the bundle the Finder way (`env -i ... open`, see `AGENTS.md`) and run a fixture command that execs a Homebrew program; check through `dango-ui` that its output shows
 
 ## 9. Review
