@@ -91,7 +91,20 @@
   globalThis.console = { log: write("log"), info: write("info"), warn: write("warn"), error: write("error") };
 
   globalThis.__dangoPrepare = prepare;
-  globalThis.__dangoHasHandler = (actionId) => handlers.has(actionId);
-  globalThis.__dangoAction = (request) =>
-    handlers.get(request.actionId)({ itemId: request.itemId, values: request.values });
+  // A handler from a view this session showed, or else the module's
+  // `onAction`, which is how a root item's action reaches fresh code.
+  globalThis.__dangoAction = async (request) => {
+    const handler = handlers.get(request.actionId);
+    const main = globalThis.__dangoMain;
+    let result;
+    if (handler) {
+      result = await handler({ itemId: request.itemId, values: request.values });
+    } else if (main && typeof main.onAction === "function") {
+      result = await main.onAction(request.itemId, request.actionId, request.values);
+    } else {
+      return { missing: true };
+    }
+    if (result && result.replace) return { ...result, replace: prepare(result.replace) };
+    return result;
+  };
 })();

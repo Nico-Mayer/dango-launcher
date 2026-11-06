@@ -47,6 +47,16 @@ impl Bridge {
         Ok(())
     }
 
+    /// Marks the start of an action: its first push opens a level.
+    pub fn begin_action(&self) {
+        self.opens_level.store(true, Ordering::SeqCst);
+    }
+
+    /// Ends an action and says whether it opened a level of its own.
+    pub fn finish_action(&self) -> bool {
+        !self.opens_level.swap(false, Ordering::SeqCst)
+    }
+
     pub fn context(&self) -> Option<InvocationContext> {
         self.context.lock().unwrap().clone()
     }
@@ -307,6 +317,10 @@ impl Live {
             }
             on_end(&live);
         });
+    }
+
+    pub fn bridge(&self) -> &Bridge {
+        &self.bridge
     }
 
     pub fn pushed(&self) -> bool {

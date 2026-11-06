@@ -3,8 +3,9 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use crate::extension::manifest::{InvocationMode, Manifest};
-use crate::extension::Extension;
+use crate::extension::{ActionOutcome, Extension, FormValues};
 use crate::invocation::{Command, InvocationContext};
+use crate::protocol::{View, ViewTree, PROTOCOL_VERSION};
 
 use super::host::JsHost;
 use super::live::Live;
@@ -15,6 +16,7 @@ use super::session::{JsError, Target};
 pub const NO_CODE: &str = "This command's extension has no code for it";
 pub const STOPPED_BY_ERROR: &str = "This command stopped because of an error, see dango.log";
 pub const OUT_OF_MEMORY: &str = "This command used too much memory, so Dango stopped it";
+const NO_ACTION: &str = "That action isn't available";
 
 /// An extension loaded from a folder of the extensions directory.
 pub struct JsExtension {
@@ -74,6 +76,29 @@ impl Extension for JsExtension {
             mode: decl.mode,
         }))
     }
+
+    fn perform_action(&self, item_id: &str, action_id: &str, values: &FormValues) -> ActionOutcome {
+        let request = serde_json::json!({
+            "itemId": item_id,
+            "actionId": action_id,
+            "values": values,
+        })
+        .to_string();
+        let runtime = self.inner.host.runtime.clone();
+        runtime.block_on(self.inner.action(&request))
+    }
+}
+
+/// What an action's code returned, as the prelude normalised it.
+#[derive(serde::Deserialize, Default)]
+struct ActionResult {
+    replace: Option<View>,
+    ticker: Option<String>,
+    #[serde(default)]
+    back: bool,
+    copy: Option<String>,
+    #[serde(default)]
+    missing: bool,
 }
 
 struct JsCommand {
@@ -133,6 +158,90 @@ impl Inner {
                 *slot = None;
             }
         });
+    }
+
+    /// Runs an action in the session behind the extension's views, or in a
+    /// fresh one when none is live, as for a root item.
+    async fn action(self: &Arc<Self>, request: &str) -> ActionOutcome {
+        let live = self
+            .live
+            .lock()
+            .unwrap()
+            .clone()
+            .filter(|live| !live.is_ended());
+        let (live, fresh) = match live {
+            Some(live) => (live, false),
+            None => match self.start(None).await {
+                Ok(live) => (Arc::new(live), true),
+                Err(error) => return self.action_failed(error),
+            },
+        };
+        live.bridge().begin_action();
+        let result = live
+            .call(Target::Global("__dangoAction"), Some(request))
+            .await;
+        let opened = live.bridge().finish_action();
+        if fresh {
+            match opened {
+                true => self.adopt(&live),
+                false => live.end(),
+            }
+        }
+        let returned = match result {
+            Ok(returned) => returned,
+            Err(error) => return self.action_failed(error),
+        };
+        if opened {
+            return ActionOutcome::Started;
+        }
+        let result: ActionResult = returned
+            .as_deref()
+            .and_then(|json| serde_json::from_str(json).ok())
+            .unwrap_or_default();
+        if result.missing {
+            return ActionOutcome::Failed(NO_ACTION.into());
+        }
+        if let Some(view) = result.replace {
+            return ActionOutcome::Replaced(Box::new(ViewTree {
+                protocol_version: PROTOCOL_VERSION,
+                view,
+            }));
+        }
+        if let Some(message) = result.ticker {
+            return ActionOutcome::Ticker(message);
+        }
+        if let Some(text) = result.copy {
+            return ActionOutcome::CopyToClipboard(text);
+        }
+        if result.back {
+            return ActionOutcome::Back;
+        }
+        ActionOutcome::Done
+    }
+
+    fn action_failed(&self, error: JsError) -> ActionOutcome {
+        let id = &self.manifest.id;
+        match error {
+            JsError::Interrupted => ActionOutcome::Done,
+            JsError::Failure(message) => ActionOutcome::Failed(message),
+            JsError::MissingExport(_) => ActionOutcome::Failed(NO_ACTION.into()),
+            JsError::OutOfMemory => {
+                crate::log::append(&format!("extension {id}: an action ran out of memory"));
+                ActionOutcome::Failed(OUT_OF_MEMORY.into())
+            }
+            JsError::Exception { message, stack } => {
+                let stack = stack.unwrap_or_default();
+                crate::log::append(&format!(
+                    "extension {id}: an action failed: {message}
+{stack}"
+                ));
+                ActionOutcome::Failed(STOPPED_BY_ERROR.into())
+            }
+            JsError::Engine(message) => {
+                crate::log::append(&format!("extension {id}: an action failed: {message}"));
+                ActionOutcome::Failed(STOPPED_BY_ERROR.into())
+            }
+        }
     }
 
     async fn start(&self, context: Option<InvocationContext>) -> Result<Live, JsError> {
@@ -559,6 +668,59 @@ pub(crate) mod tests {
             Some(Outcome::Success(Some(
                 "glpat-123 undefined auth.toml can't be read".into()
             )))
+        );
+    }
+
+    fn action_ids(recorded: &Recorded) -> Vec<String> {
+        let views = recorded.views.lock().unwrap();
+        let View::List(list) = &views[0].view else {
+            panic!("expected a list");
+        };
+        list.items[0]
+            .actions
+            .iter()
+            .map(|action| action.id.clone())
+            .collect()
+    }
+
+    #[test]
+    fn an_action_s_result_becomes_its_outcome() {
+        let runtime = runtime();
+        let extension = extension(
+            &runtime,
+            "view",
+            r#"export function run() {
+                const act = (title, onAction) => ({ title, onAction });
+                dango.push({ kind: "list", items: [{ id: "a", title: "A", actions: [
+                    act("Replace", () => ({ replace: { kind: "list", items: [] } })),
+                    act("Ticker", () => ({ ticker: "Saved" })),
+                    act("Back", () => ({ back: true })),
+                    act("Done", () => {}),
+                    act("Copy", () => ({ copy: "text" })),
+                    act("Fail", () => dango.fail("No luck")),
+                ] }] });
+            }"#,
+        );
+        let recorded = invoke(&extension);
+        let ids = action_ids(&recorded);
+        let run = |index: usize| extension.perform_action("a", &ids[index], &FormValues::new());
+
+        assert!(matches!(run(0), ActionOutcome::Replaced(_)));
+        assert_eq!(run(1), ActionOutcome::Ticker("Saved".into()));
+        assert_eq!(run(2), ActionOutcome::Back);
+        assert_eq!(run(3), ActionOutcome::Done);
+        assert_eq!(run(4), ActionOutcome::CopyToClipboard("text".into()));
+        assert_eq!(run(5), ActionOutcome::Failed("No luck".into()));
+    }
+
+    #[test]
+    fn an_unknown_action_is_not_available() {
+        let runtime = runtime();
+        let extension = extension(&runtime, "view", "export function run() {}");
+
+        assert_eq!(
+            extension.perform_action("a", "nope", &FormValues::new()),
+            ActionOutcome::Failed(NO_ACTION.into())
         );
     }
 }
