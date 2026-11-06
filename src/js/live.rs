@@ -230,6 +230,14 @@ fn console_line(extension_id: &str, level: &str, text: &str) -> String {
 /// How often a session looks at whether the launcher has moved on.
 const WATCH: Duration = Duration::from_millis(50);
 
+/// How long `main.js` may take to load, top-level awaits included. Nothing
+/// else can stop it then: the watcher only starts once the session exists.
+const LOAD_LIMIT: Duration = if cfg!(test) {
+    Duration::from_secs(1)
+} else {
+    Duration::from_secs(10)
+};
+
 pub struct Live {
     session: Session,
     bridge: Arc<Bridge>,
@@ -255,7 +263,33 @@ impl Live {
             pushed: AtomicBool::new(false),
         });
         let cancel = Arc::new(AtomicBool::new(false));
-        let session = Session::start(source, cancel.clone(), bridge.clone()).await?;
+        let loaded = Arc::new(AtomicBool::new(false));
+        // A top-level loop holds the task it runs in, so the limit is also
+        // enforced from a task of its own, through the interrupt flag.
+        bridge.host.runtime.spawn({
+            let (cancel, loaded) = (cancel.clone(), loaded.clone());
+            async move {
+                tokio::time::sleep(LOAD_LIMIT).await;
+                if !loaded.load(Ordering::SeqCst) {
+                    cancel.store(true, Ordering::SeqCst);
+                }
+            }
+        });
+        let started = tokio::time::timeout(
+            LOAD_LIMIT,
+            Session::start(source, cancel.clone(), bridge.clone()),
+        )
+        .await;
+        loaded.store(true, Ordering::SeqCst);
+        let session = match started {
+            Ok(Ok(session)) => session,
+            Ok(Err(JsError::Interrupted)) | Err(_) => {
+                return Err(JsError::Engine(
+                    "main.js didn't finish loading in time".into(),
+                ))
+            }
+            Ok(Err(error)) => return Err(error),
+        };
         Ok(Self {
             session,
             bridge,

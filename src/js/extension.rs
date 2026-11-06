@@ -1195,4 +1195,30 @@ pub(crate) mod tests {
             );
         }
     }
+
+    #[test]
+    fn a_main_js_that_never_loads_is_given_up_on() {
+        let runtime = runtime();
+        for main in [
+            "await new Promise(() => {});
+export function run() {}",
+            "for (;;) {}
+export function run() {}",
+        ] {
+            let extension = extension(&runtime, "no-view", main);
+
+            let started = std::time::Instant::now();
+            let recorded = invoke(&extension);
+
+            assert_eq!(
+                *recorded.outcome.lock().unwrap(),
+                Some(Outcome::Failure(STOPPED_BY_ERROR.into())),
+                "{main}"
+            );
+            assert!(
+                started.elapsed() < std::time::Duration::from_secs(5),
+                "{main}"
+            );
+        }
+    }
 }
