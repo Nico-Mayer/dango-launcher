@@ -72,7 +72,9 @@ a local provider SHALL NOT leave the machine.
 Keys for hosted providers SHALL be read from `auth.toml`, a user-owned file
 under the contract in `config-files`. The file SHALL map a provider's name to
 its key, as in `anthropic = "sk-ant-..."`. It SHALL be optional: with no
-file, only providers needing no key work.
+file, only providers needing no key work. The `extensions` table SHALL hold
+secrets of JavaScript extensions, as `js-extensions` describes, and SHALL NOT
+be read as a provider's key.
 
 Dango SHALL only read this file; it SHALL NOT write keys into it. A key SHALL
 NOT be written into `config.toml`, into the local database, into a log, or into
@@ -138,6 +140,12 @@ Dango SHALL keep the file readable only by its owner.
 - **WHEN** the user adds a key to `auth.toml` while Dango is running and then
   runs a command using that provider
 - **THEN** the request is made with the new key, without a restart
+
+#### Scenario: The extensions table is not a provider
+
+- **WHEN** `auth.toml` holds an `[extensions.gitlab]` table and an AI command
+  names a provider called `extensions`
+- **THEN** no key is read from that table for the provider
 
 ### Requirement: A command chooses its own provider, model, and thinking level
 
