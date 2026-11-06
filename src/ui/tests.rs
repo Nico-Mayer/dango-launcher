@@ -3234,3 +3234,104 @@ fn without_a_web_search_nothing_found_still_says_so() {
     h.results("zzqx", Vec::new());
     assert!(h.root_screen().empty.is_some());
 }
+
+// A view that searches through its command
+
+fn searching_tree(items: Vec<ListItem>) -> ViewTree {
+    ViewTree::new(View::List(ListView {
+        filtering: crate::protocol::Filtering::Command,
+        items,
+        ..Default::default()
+    }))
+}
+
+fn search_request(query: &str) -> super::effect::ActionRequest {
+    super::effect::ActionRequest {
+        origin: super::effect::Origin::View,
+        extension_id: "fixture".into(),
+        item_id: String::new(),
+        action_id: crate::protocol::SEARCH_ACTION.into(),
+        values: None,
+        query: Some(query.into()),
+    }
+}
+
+fn titled(title: &str) -> ListItem {
+    ListItem {
+        id: title.to_lowercase(),
+        title: title.into(),
+        ..Default::default()
+    }
+}
+
+#[test]
+fn each_query_reaches_a_command_that_searches() {
+    let mut h = Harness::view(searching_tree(vec![list_item(1)]));
+
+    let effects = h.typed("rust");
+
+    let [Effect::RunAction(request)] = effects.as_slice() else {
+        panic!("expected one action, got {effects:?}");
+    };
+    assert_eq!(request.action_id, crate::protocol::SEARCH_ACTION);
+    assert_eq!(request.query.as_deref(), Some("rust"));
+}
+
+#[test]
+fn a_list_that_searches_is_not_narrowed_again() {
+    let mut h = Harness::view(searching_tree(vec![list_item(1)]));
+    h.typed("rust");
+
+    h.event(Event::ActionFinished {
+        request: search_request("rust"),
+        outcome: ActionOutcome::Replaced(Box::new(searching_tree(vec![titled("Cargo")]))),
+    });
+
+    assert_eq!(shown_ids(&h.list()), ["cargo"]);
+}
+
+#[test]
+fn an_answer_for_an_older_query_is_dropped() {
+    let mut h = Harness::view(searching_tree(vec![list_item(1)]));
+    h.typed("ru");
+    h.typed("rust");
+
+    h.event(Event::ActionFinished {
+        request: search_request("rust"),
+        outcome: ActionOutcome::Replaced(Box::new(searching_tree(vec![titled("Cargo")]))),
+    });
+    h.event(Event::ActionFinished {
+        request: search_request("ru"),
+        outcome: ActionOutcome::Replaced(Box::new(searching_tree(vec![titled("Old")]))),
+    });
+
+    assert_eq!(shown_ids(&h.list()), ["cargo"]);
+}
+
+#[test]
+fn a_searching_list_shows_the_first_fifty_in_the_command_s_order() {
+    let mut h = Harness::view(searching_tree(vec![list_item(1)]));
+    h.typed("rust");
+
+    h.event(Event::ActionFinished {
+        request: search_request("rust"),
+        outcome: ActionOutcome::Replaced(Box::new(searching_tree(
+            (1..=80).rev().map(list_item).collect(),
+        ))),
+    });
+
+    let shown = shown_ids(&h.list());
+    assert_eq!(shown.len(), 50);
+    assert_eq!(shown[0], "item-80");
+}
+
+#[test]
+fn a_searching_list_keeps_its_query_when_going_back() {
+    let mut h = Harness::view(searching_tree(vec![list_item(1)]));
+    h.typed("rust");
+    h.render(2, ViewTree::new(View::List(ListView::default())));
+
+    h.press("Escape");
+
+    assert_eq!(h.list().query.text, "rust");
+}

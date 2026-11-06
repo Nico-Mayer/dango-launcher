@@ -204,9 +204,13 @@ it would keep runtimes alive and put JS on the root search path.
   view and emits a reserved `SEARCH_ACTION` (beside `FILTER_ACTION`) with the
   query on every change. The 50-item limit applies in the command's order (the
   view-protocol delta modifies that requirement).
-- Each `SEARCH_ACTION` carries a sequence number; the core drops a tree whose
-  query is not the latest, and the session's JS sees the previous search's
-  abort signal. No debounce, as `AGENTS.md` performance requires.
+- The request carries the query. The command answers with
+  `ActionOutcome::Replaced`, not a push: after Escape every earlier invocation
+  context is superseded, so pushes into the list below would be dropped. The
+  reducer drops a reply whose query is no longer the view's query, and the
+  session's JS sees the previous search's abort signal. No debounce, as
+  `AGENTS.md` performance requires.
+- One search handler per session: the latest view declaring `onSearch`.
 - Per-level query keeping works as today because the query stays on the view
   stack level.
 

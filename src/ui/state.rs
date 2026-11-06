@@ -2,8 +2,9 @@ use std::collections::HashMap;
 
 use crate::extension::{ActionOutcome, FormValues};
 use crate::protocol::{
-    Action, ActionStyle, FieldKind, Filter, FormField, GridItem, GridView, ListItem, Modifier,
-    Section, Shortcut, View, ViewTree, FILTER_ACTION, GRID_COLUMNS, PROTOCOL_VERSION,
+    Action, ActionStyle, FieldKind, Filter, Filtering, FormField, GridItem, GridView, ListItem,
+    Modifier, Section, Shortcut, View, ViewTree, FILTER_ACTION, GRID_COLUMNS, PROTOCOL_VERSION,
+    SEARCH_ACTION,
 };
 
 use super::effect::{ActionRequest, BusyStage, Effect, Origin};
@@ -656,6 +657,10 @@ impl Launcher {
             (ActionOutcome::Removed(_), Origin::Root) => {
                 fx.push(Effect::Search(self.query.clone()))
             }
+            (ActionOutcome::Replaced(_), Origin::View)
+                if request.action_id == SEARCH_ACTION
+                    && request.query.as_deref()
+                        != self.stack.last().map(|view| view.query.as_str()) => {}
             (ActionOutcome::Replaced(tree) | ActionOutcome::Removed(tree), Origin::View) => {
                 if self.refused(&tree) {
                     return;
@@ -839,8 +844,20 @@ impl Launcher {
                 fx.push(Effect::Search(text));
             }
             Some(view) => {
-                view.query = text;
+                view.query = text.clone();
                 view.picked = None;
+                if filtering(&view.tree.view) == Filtering::Command {
+                    if let Some(owner) = self.owner.clone() {
+                        fx.push(Effect::RunAction(ActionRequest {
+                            origin: Origin::View,
+                            extension_id: owner,
+                            item_id: String::new(),
+                            action_id: SEARCH_ACTION.to_string(),
+                            values: None,
+                            query: Some(text),
+                        }));
+                    }
+                }
             }
         }
     }
@@ -1206,7 +1223,11 @@ impl Launcher {
         let View::List(list) = &view.tree.view else {
             return Vec::new();
         };
-        group(&list.items, &list.sections, &view.query)
+        group(
+            &list.items,
+            &list.sections,
+            narrowing(&view.tree.view, &view.query),
+        )
     }
 
     /// A pushed grid's tiles, grouped and narrowed as a list's items are.
@@ -1217,7 +1238,11 @@ impl Launcher {
         let View::Grid(grid) = &view.tree.view else {
             return Vec::new();
         };
-        group(&grid.items, &grid.sections, &view.query)
+        group(
+            &grid.items,
+            &grid.sections,
+            narrowing(&view.tree.view, &view.query),
+        )
     }
 
     pub(super) fn grid(&self) -> Option<&GridView> {
@@ -1439,6 +1464,22 @@ pub(super) const FILTER_PREFIX: &str = "dango.filter:";
 /// Items in section order, narrowed by the query and then cut to the item
 /// limit, without the groups left empty. Items naming no declared section come
 /// first.
+fn filtering(view: &View) -> Filtering {
+    match view {
+        View::List(list) => list.filtering,
+        View::Grid(grid) => grid.filtering,
+        _ => Filtering::Launcher,
+    }
+}
+
+/// The query the launcher narrows a view by: none when its command searches.
+fn narrowing<'a>(view: &View, query: &'a str) -> &'a str {
+    match filtering(view) {
+        Filtering::Launcher => query,
+        Filtering::Command => "",
+    }
+}
+
 fn group<'a, T: Grouped>(
     items: &'a [T],
     sections: &'a [Section],

@@ -52,6 +52,10 @@ protocol_types! {
         pub detail_pane: bool,
         #[serde(default)]
         pub filter: Option<Filter>,
+        /// Who narrows the items as the user types.
+        #[serde(default)]
+        #[cfg_attr(test, ts(optional, as = "Option<_>"))]
+        pub filtering: Filtering,
         pub items: Vec<ListItem>,
     }
 
@@ -76,6 +80,10 @@ protocol_types! {
         pub sections: Vec<Section>,
         #[serde(default)]
         pub filter: Option<Filter>,
+        /// Who narrows the items as the user types.
+        #[serde(default)]
+        #[cfg_attr(test, ts(optional, as = "Option<_>"))]
+        pub filtering: Filtering,
         pub items: Vec<GridItem>,
     }
 
@@ -115,6 +123,16 @@ protocol_types! {
     pub struct Filter {
         pub options: Vec<FieldOption>,
         pub selected: String,
+    }
+
+    #[derive(Copy, Default, Eq)]
+    #[serde(rename_all = "camelCase")]
+    pub enum Filtering {
+        /// The launcher narrows the items against the query.
+        #[default]
+        Launcher,
+        /// The command gets each query and answers with the items to show.
+        Command,
     }
 
     #[serde(rename_all = "camelCase")]
@@ -385,6 +403,10 @@ fn square() -> f32 {
 /// The action a view's command receives when the user chooses a filter
 /// option. The option's id arrives as the item.
 pub const FILTER_ACTION: &str = "filter";
+
+/// The action a view that searches through its command receives on every
+/// change to the query, which arrives as the request's query.
+pub const SEARCH_ACTION: &str = "search";
 
 /// The column counts a grid may declare.
 pub const GRID_COLUMNS: std::ops::RangeInclusive<u8> = 4..=8;
