@@ -180,14 +180,15 @@ fn strip_null(node: &mut Value) {
 }
 
 /// Every object that names its properties rejects any other. Maps keyed by
-/// the user's own names carry an item schema instead and are left open.
+/// the user's own names carry an item schema instead and are left open, as
+/// is an extension's table, whose preferences are its own.
 fn close_objects(node: &mut Value) {
     match node {
         Value::Object(map) => {
             if map.contains_key("properties")
                 && !map
                     .get("additionalProperties")
-                    .is_some_and(Value::is_object)
+                    .is_some_and(|open| open.is_object() || *open == Value::Bool(true))
             {
                 map.insert("additionalProperties".into(), Value::Bool(false));
             }
@@ -546,7 +547,7 @@ fn type_name(schema: &Value, property: &Value) -> String {
 
 fn def_title(name: &str) -> String {
     match name {
-        "Table" => "Extension table",
+        "Table" | "ExtensionSettings" => "Extension table",
         "CommandSettings" => "Command settings",
         "AiCommandSettings" => "AI command settings",
         "AppSettings" => "Application settings",
@@ -700,8 +701,11 @@ mod tests {
         assert!(accepts(
             r#"extensions = { "author.x" = { enabled = false, commands = { go = { alias = "g" } } } }"#
         ));
-        assert!(!accepts(
+        assert!(accepts(
             r#"extensions = { "author.x" = { colour = "red" } }"#
+        ));
+        assert!(!accepts(
+            r#"extensions = { "author.x" = { enabled = "yes" } }"#
         ));
     }
 

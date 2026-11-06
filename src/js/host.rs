@@ -15,6 +15,9 @@ pub type Showing = dyn Fn(&str) -> bool + Send + Sync;
 /// Hands text to the system: opening a URL or file, copying, pasting.
 pub type TextAction = dyn Fn(&str) -> Result<(), String> + Send + Sync;
 
+/// An extension's preferences as the config file holds them right now.
+pub type Preferences = dyn Fn(&str) -> serde_json::Map<String, serde_json::Value> + Send + Sync;
+
 /// What every JavaScript extension shares: the runtime sessions run on, the
 /// launcher hooks they report through, and the built-ins' system paths.
 pub struct JsHost {
@@ -26,4 +29,5 @@ pub struct JsHost {
     pub paste: Arc<TextAction>,
     /// Where `dango.storage` keeps values; absent when the database is.
     pub store: Option<Arc<Store>>,
+    pub preferences: Arc<Preferences>,
 }

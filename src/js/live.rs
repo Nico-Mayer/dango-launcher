@@ -129,6 +129,8 @@ impl Natives for Bridge {
                 }
             })),
         )?;
+        let preferences = serde_json::Value::Object((self.host.preferences)(&self.extension_id));
+        native.set("preferences", preferences.to_string())?;
         let env = serde_json::json!({
             "id": self.extension_id,
             "folder": self.folder.to_string_lossy(),

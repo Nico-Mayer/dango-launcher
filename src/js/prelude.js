@@ -47,6 +47,9 @@
       throw new DangoFailure(message);
     },
     env: __dangoNative.env ? JSON.parse(__dangoNative.env) : {},
+    preferences: Object.freeze(
+      __dangoNative.preferences ? JSON.parse(__dangoNative.preferences) : {},
+    ),
     open: (target) => __dangoNative.open(target),
     copy: (text) => __dangoNative.copy(text),
     paste: (text) => __dangoNative.paste(text),

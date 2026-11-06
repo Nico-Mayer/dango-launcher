@@ -89,6 +89,31 @@ pub struct Table {
     pub commands: BTreeMap<String, CommandSettings>,
 }
 
+/// The table of an extension that is not built in: what Dango reads for it,
+/// and every other key as the extension's own preferences.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, JsonSchema)]
+pub struct ExtensionSettings {
+    #[serde(flatten)]
+    pub table: Table,
+    /// The extension's own settings, handed to it as they are.
+    #[serde(flatten)]
+    pub preferences: BTreeMap<String, serde_json::Value>,
+}
+
+impl ExtensionTable for ExtensionSettings {
+    fn enabled(&self) -> Option<bool> {
+        self.table.enabled()
+    }
+
+    fn commands(&self) -> Vec<(&str, CommandBinding<'_>)> {
+        self.table.commands()
+    }
+
+    fn command(&self, id: &str) -> Option<CommandBinding<'_>> {
+        self.table.command(id)
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(default, rename_all = "kebab-case")]
 pub struct ClipboardTable {

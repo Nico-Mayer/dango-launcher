@@ -497,4 +497,37 @@ pub(crate) mod tests {
             Some(Outcome::Success(Some("2 null count".into())))
         );
     }
+
+    #[test]
+    fn preferences_reach_the_next_session() {
+        let runtime = runtime();
+        let user = Arc::new(Mutex::new("nico"));
+        let read = user.clone();
+        let host = Arc::new(JsHost {
+            preferences: Arc::new(move |_| {
+                let mut map = serde_json::Map::new();
+                map.insert("user".into(), (*read.lock().unwrap()).into());
+                map
+            }),
+            ..Arc::into_inner(test_host(runtime.handle().clone())).unwrap()
+        });
+        let extension = extension_with(
+            host,
+            "no-view",
+            "export function run() { return dango.preferences.user; }",
+        );
+
+        let first = invoke(&extension);
+        *user.lock().unwrap() = "anna";
+        let second = invoke(&extension);
+
+        assert_eq!(
+            *first.outcome.lock().unwrap(),
+            Some(Outcome::Success(Some("nico".into())))
+        );
+        assert_eq!(
+            *second.outcome.lock().unwrap(),
+            Some(Outcome::Success(Some("anna".into())))
+        );
+    }
 }

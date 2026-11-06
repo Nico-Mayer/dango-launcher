@@ -28,7 +28,7 @@ pub use location::config_dir;
 pub use store::FileConfig;
 pub use tables::{
     table_name, AiCommandSettings, AiTable, ApplicationsTable, ClipboardTable, CommandBinding,
-    ExtensionTable, PrimaryAction, QuicklinksTable, Table,
+    ExtensionSettings, ExtensionTable, PrimaryAction, QuicklinksTable, Table,
 };
 
 #[derive(Debug, thiserror::Error)]
@@ -89,10 +89,10 @@ pub struct Config {
     /// Settings for the Window Management extension.
     #[serde(default)]
     pub window_management: Table,
-    /// Extensions that are not built in, keyed by extension id. Holds only
-    /// what Dango itself reads for them: enabled state, aliases, and hotkeys.
+    /// Extensions that are not built in, keyed by extension id: enabled
+    /// state, aliases, hotkeys, and any setting of the extension's own.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
-    pub extensions: BTreeMap<String, Table>,
+    pub extensions: BTreeMap<String, ExtensionSettings>,
 }
 
 /// Whether an extension id names a built-in, which is configured in its own
@@ -348,6 +348,21 @@ impl Config {
         })
     }
 
+    /// An extension's own preferences: every key of its `extensions` table
+    /// besides `enabled` and `commands`.
+    pub fn preferences(&self, extension_id: &str) -> serde_json::Map<String, serde_json::Value> {
+        self.extensions
+            .get(extension_id)
+            .map(|settings| {
+                settings
+                    .preferences
+                    .iter()
+                    .map(|(key, value)| (key.clone(), value.clone()))
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
+
     /// Every table with its extension id, in id order, so walking them is
     /// deterministic.
     pub fn tables(&self) -> Vec<(String, &dyn ExtensionTable)> {
@@ -554,6 +569,24 @@ mod tests {
         assert!(Config::default().quicklinks.favicons);
         let config = Config::parse("quicklinks = { favicons = false }").unwrap();
         assert!(!config.quicklinks.favicons);
+    }
+
+    #[test]
+    fn an_extension_s_own_keys_are_its_preferences() {
+        let config = Config::parse(
+            r#"
+            [extensions.gh-prs]
+            enabled = true
+            user = "nico"
+            "#,
+        )
+        .unwrap();
+
+        let preferences = config.preferences("gh-prs");
+
+        assert_eq!(preferences.get("user"), Some(&serde_json::json!("nico")));
+        assert!(!preferences.contains_key("enabled"));
+        assert_eq!(config.enabled("gh-prs"), Some(true));
     }
 
     #[test]

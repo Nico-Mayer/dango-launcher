@@ -15,7 +15,7 @@ Every setting is optional; anything left out uses its built-in default. Dango ke
 | `calculator` | object |  |  | Settings for the Calculator extension. |
 | `clipboard` | object |  |  | Settings for the Clipboard History extension. |
 | `display` | object |  |  | Settings for the Display extension. |
-| `extensions` | map of [Extension table](#extension-table) |  |  | Extensions that are not built in, keyed by extension id. Holds only what Dango itself reads for them: enabled state, aliases, and hotkeys. |
+| `extensions` | map of [Extension table](#extension-table) |  |  | Extensions that are not built in, keyed by extension id: enabled state, aliases, hotkeys, and any setting of the extension's own. |
 | `games` | object |  |  | Settings for the Games extension. |
 | `hyperkey` | [Hyperkey](#hyperkey) |  |  | CapsLock, remapped to act as the hyper modifier system-wide. On macOS it uses F18, so a hotkey with `f18` does not work while it is on. |
 | `launcher` | [Launcher](#launcher) |  |  | Settings of the launcher itself. |
