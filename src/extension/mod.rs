@@ -252,6 +252,19 @@ impl ExtensionHost {
         Ok(report)
     }
 
+    /// Whether an extension with this id is registered, enabled or not.
+    pub fn contains(&self, extension_id: &str) -> bool {
+        self.extensions.contains_key(extension_id)
+    }
+
+    /// Takes an extension out entirely, as when its folder is deleted: it is
+    /// deactivated first, so its commands and services go with it.
+    pub fn remove(&mut self, extension_id: &str) {
+        self.deactivate(extension_id);
+        self.extensions.remove(extension_id);
+        self.order.retain(|id| id != extension_id);
+    }
+
     /// Brings every extension's active state and registered commands in line
     /// with the enabled store. Used on a config reload, where the store (the
     /// file) is already the new source of truth.
@@ -535,6 +548,21 @@ mod tests {
         );
         assert!(host.registry().get("ai.translate").is_some());
         assert!(host.is_active("ai"));
+    }
+
+    #[test]
+    fn removing_an_extension_takes_its_commands_and_leaves_the_rest() {
+        let mut host = host();
+        host.register(TestExtension::new("a", "one")).unwrap();
+        host.register(TestExtension::new("b", "two")).unwrap();
+
+        host.remove("a");
+
+        assert!(!host.contains("a"));
+        assert!(!host.is_active("a"));
+        assert!(host.registry().get("a.one").is_none());
+        assert!(host.registry().get("b.two").is_some());
+        assert!(host.register(TestExtension::new("a", "one")).is_ok());
     }
 
     #[test]
