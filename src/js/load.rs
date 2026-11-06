@@ -361,7 +361,7 @@ pub(crate) mod tests {
         js.reload(&mut host, &[folder]);
 
         assert!(host.registry().get("ext.run").is_none());
-        assert!(!host.contains("ext"));
+        assert!(!host.manifests().any(|manifest| manifest.id == "ext"));
     }
 
     #[test]
@@ -395,7 +395,7 @@ pub(crate) mod tests {
         std::fs::remove_dir_all(&folder).unwrap();
         js.reload(&mut host, &[folder]);
 
-        assert!(host.contains("ext"));
+        assert!(host.manifests().any(|manifest| manifest.id == "ext"));
     }
 
     #[test]

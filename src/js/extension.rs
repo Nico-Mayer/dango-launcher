@@ -1,4 +1,4 @@
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
@@ -65,14 +65,6 @@ impl JsExtension {
 
     pub fn manifest_id(&self) -> &str {
         &self.inner.manifest.id
-    }
-
-    pub fn folder(&self) -> &Path {
-        &self.inner.folder
-    }
-
-    pub fn refresh(&self) -> Option<Duration> {
-        self.inner.refresh
     }
 }
 

@@ -252,11 +252,6 @@ impl ExtensionHost {
         Ok(report)
     }
 
-    /// Whether an extension with this id is registered, enabled or not.
-    pub fn contains(&self, extension_id: &str) -> bool {
-        self.extensions.contains_key(extension_id)
-    }
-
     /// Takes an extension out entirely, as when its folder is deleted: it is
     /// deactivated first, so its commands and services go with it.
     pub fn remove(&mut self, extension_id: &str) {
@@ -558,7 +553,7 @@ mod tests {
 
         host.remove("a");
 
-        assert!(!host.contains("a"));
+        assert!(!host.manifests().any(|manifest| manifest.id == "a"));
         assert!(!host.is_active("a"));
         assert!(host.registry().get("a.one").is_none());
         assert!(host.registry().get("b.two").is_some());
