@@ -114,7 +114,8 @@ pub fn parse(text: &str, folder: &Path) -> Result<JsManifest, ManifestFileError>
         .root_items
         .as_ref()
         .and_then(|root| root.refresh_minutes)
-        .map(|minutes| Duration::from_secs(minutes * 60));
+        .filter(|minutes| *minutes > 0)
+        .map(|minutes| Duration::from_secs(minutes.saturating_mul(60)));
     let manifest = Manifest {
         manifest_version: file.manifest_version,
         id: file.id,
@@ -242,6 +243,16 @@ mod tests {
 
         assert!(read.manifest.root_items);
         assert_eq!(read.refresh, Some(Duration::from_secs(1800)));
+    }
+
+    #[test]
+    fn a_refresh_of_zero_minutes_means_no_refresh() {
+        let text = VALID.replace(
+            r#""name""#,
+            r#""rootItems": { "refreshMinutes": 0 }, "name""#,
+        );
+
+        assert_eq!(parse(&text, folder()).unwrap().refresh, None);
     }
 
     #[test]
