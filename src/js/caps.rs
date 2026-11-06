@@ -3,7 +3,8 @@
 
 use std::collections::BTreeMap;
 use std::path::Path;
-use std::time::UNIX_EPOCH;
+use std::sync::LazyLock;
+use std::time::{Duration, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
 
@@ -27,6 +28,15 @@ pub struct FetchResponse {
     pub body: String,
 }
 
+/// Shared, so repeated calls to one host reuse its connection, and bounded,
+/// so a server that stalls ends the request instead of the view's loading.
+static CLIENT: LazyLock<reqwest::Client> = LazyLock::new(|| {
+    reqwest::Client::builder()
+        .timeout(Duration::from_secs(30))
+        .build()
+        .unwrap_or_default()
+});
+
 pub async fn fetch(request: FetchRequest) -> Result<FetchResponse, String> {
     let method = request
         .method
@@ -34,7 +44,7 @@ pub async fn fetch(request: FetchRequest) -> Result<FetchResponse, String> {
         .unwrap_or("GET")
         .parse::<reqwest::Method>()
         .map_err(|error| error.to_string())?;
-    let mut builder = reqwest::Client::new().request(method, &request.url);
+    let mut builder = CLIENT.request(method, &request.url);
     for (name, value) in &request.headers {
         builder = builder.header(name, value);
     }
