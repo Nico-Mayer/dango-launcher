@@ -35,9 +35,9 @@
 
 ## 5. Cached root items
 
-- [ ] 5.1 Implement the cached `RootProvider` calling the exported `rootItems()` on load, enable, and reload; verify with `cargo test` that rows match a query and that ten keystrokes run no JS
-- [ ] 5.2 Add the `refreshMinutes` interval (stops on deactivate) and keep last rows on a failed build; verify with `cargo test` using tokio's paused time
-- [ ] 5.3 Run a root item's actions through a new session calling `onAction(itemId, actionId)`; verify with `cargo test` that Enter on root item `repo-1` calls `onAction` with `repo-1` and its first action's id
+- [x] 5.1 Implement the cached `RootProvider` calling the exported `rootItems()` on load, enable, and reload; verify with `cargo test` that rows match a query and that ten keystrokes run no JS
+- [x] 5.2 Add the `refreshMinutes` interval (stops on deactivate) and keep last rows on a failed build; verify with `cargo test` using tokio's paused time
+- [x] 5.3 Run a root item's actions through a new session calling `onAction(itemId, actionId)`; verify with `cargo test` that Enter on root item `repo-1` calls `onAction` with `repo-1` and its first action's id
 
 ## 6. Live search
 

@@ -3,7 +3,7 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use crate::extension::manifest::{InvocationMode, Manifest};
-use crate::extension::{ActionOutcome, Extension, FormValues};
+use crate::extension::{ActionOutcome, ActivationResult, Extension, FormValues};
 use crate::invocation::{Command, InvocationContext};
 use crate::protocol::{View, ViewTree, PROTOCOL_VERSION};
 
@@ -11,6 +11,7 @@ use super::host::JsHost;
 use super::live::Live;
 use super::load::MAIN_FILE;
 use super::manifest::JsManifest;
+use super::root::{CachedProvider, CachedRows, RootItem};
 use super::session::{JsError, Target};
 
 pub const NO_CODE: &str = "This command's extension has no code for it";
@@ -30,6 +31,9 @@ struct Inner {
     host: Arc<JsHost>,
     /// The session behind the views it shows, so their actions reach it.
     live: Mutex<Option<Arc<Live>>>,
+    rows: Arc<CachedRows>,
+    /// Builds root items while the extension is active.
+    builder: Mutex<Option<tokio::task::JoinHandle<()>>>,
 }
 
 impl JsExtension {
@@ -41,6 +45,8 @@ impl JsExtension {
                 refresh: read.refresh,
                 host,
                 live: Mutex::new(None),
+                rows: Arc::default(),
+                builder: Mutex::new(None),
             }),
         }
     }
@@ -61,6 +67,38 @@ impl JsExtension {
 impl Extension for JsExtension {
     fn manifest(&self) -> &Manifest {
         &self.inner.manifest
+    }
+
+    fn activate(&self) -> ActivationResult {
+        if self.inner.manifest.root_items {
+            let inner = self.inner.clone();
+            let builder = self.inner.host.runtime.spawn(async move {
+                loop {
+                    inner.build_root_items().await;
+                    match inner.refresh {
+                        Some(every) => tokio::time::sleep(every).await,
+                        None => break,
+                    }
+                }
+            });
+            if let Some(previous) = self.inner.builder.lock().unwrap().replace(builder) {
+                previous.abort();
+            }
+        }
+        Ok(())
+    }
+
+    fn deactivate(&self) {
+        if let Some(builder) = self.inner.builder.lock().unwrap().take() {
+            builder.abort();
+        }
+    }
+
+    fn root_provider(&self) -> Option<Arc<dyn crate::search::RootProvider>> {
+        self.inner
+            .manifest
+            .root_items
+            .then(|| Arc::new(CachedProvider(self.inner.rows.clone())) as _)
     }
 
     fn command(&self, command_id: &str) -> Option<Arc<dyn Command>> {
@@ -241,6 +279,34 @@ impl Inner {
                 crate::log::append(&format!("extension {id}: an action failed: {message}"));
                 ActionOutcome::Failed(STOPPED_BY_ERROR.into())
             }
+        }
+    }
+
+    /// Calls `rootItems()` in a session of its own and keeps the rows. A
+    /// failed build keeps the rows from the last good one.
+    async fn build_root_items(&self) {
+        let id = &self.manifest.id;
+        let built = match self.start(None).await {
+            Ok(live) => {
+                let result = live.call(Target::Export("rootItems"), None).await;
+                live.end();
+                result
+            }
+            Err(error) => Err(error),
+        };
+        let rows = built.and_then(|json| {
+            serde_json::from_str::<Vec<RootItem>>(json.as_deref().unwrap_or("[]"))
+                .map_err(|error| JsError::Engine(format!("rootItems returned bad rows: {error}")))
+        });
+        match rows {
+            Ok(rows) => self.rows.replace(
+                rows.into_iter()
+                    .map(|row| row.candidate(id, &self.folder))
+                    .collect(),
+            ),
+            Err(error) => crate::log::append(&format!(
+                "extension {id}: root items weren't built: {error}"
+            )),
         }
     }
 
@@ -791,6 +857,108 @@ pub(crate) mod tests {
         assert_eq!(
             extension.perform_action("", &id, &values),
             ActionOutcome::Ticker("Fix login".into())
+        );
+    }
+
+    fn rooted(host: Arc<JsHost>, main: &str, refresh: Option<std::time::Duration>) -> JsExtension {
+        let dir = temp();
+        let folder = write_extension(&dir, "ext", main);
+        let text = r#"{ "manifestVersion": 1, "id": "ext", "name": "Test", "rootItems": {} }"#;
+        let mut read = crate::js::manifest::parse(text, &folder).unwrap();
+        read.refresh = refresh;
+        JsExtension::new(read, folder, host)
+    }
+
+    async fn rows_after(
+        provider: &Arc<dyn crate::search::RootProvider>,
+        wanted: usize,
+    ) -> Vec<String> {
+        for _ in 0..200 {
+            let rows = provider.items(String::new()).await;
+            if rows.len() >= wanted {
+                return rows.into_iter().map(|row| row.title).collect();
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+        }
+        Vec::new()
+    }
+
+    const COUNTING: &str = r#"
+        export async function rootItems() {
+            const builds = ((await dango.storage.get("builds")) ?? 0) + 1;
+            await dango.storage.set("builds", builds);
+            if (builds === 2) throw new Error("flaky");
+            return [{ id: `repo-${builds}`, title: `Repo ${builds}`, actions: [{ id: "open", title: "Open" }] }];
+        }
+        export function onAction(itemId, actionId) { return { ticker: `${itemId} ${actionId}` }; }
+    "#;
+
+    fn builds(host: &JsHost) -> String {
+        host.store
+            .as_ref()
+            .unwrap()
+            .extension_value("ext", "builds")
+            .unwrap()
+            .unwrap_or_default()
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn root_items_are_built_once_and_answer_queries_without_code() {
+        let host = test_host(tokio::runtime::Handle::current());
+        let extension = rooted(host.clone(), COUNTING, None);
+        extension.activate().unwrap();
+        let provider = extension.root_provider().unwrap();
+
+        let rows = rows_after(&provider, 1).await;
+        for query in [
+            "r", "re", "rep", "repo", "repo ", "repo 1", "x", "xy", "xyz", "q",
+        ] {
+            provider.items(query.into()).await;
+        }
+
+        assert_eq!(rows, vec!["Repo 1"]);
+        assert_eq!(builds(&host), "1");
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn root_items_refresh_and_a_failed_build_keeps_the_last_rows() {
+        let host = test_host(tokio::runtime::Handle::current());
+        let extension = rooted(
+            host.clone(),
+            COUNTING,
+            Some(std::time::Duration::from_millis(100)),
+        );
+        extension.activate().unwrap();
+        let provider = extension.root_provider().unwrap();
+
+        assert_eq!(rows_after(&provider, 1).await, vec!["Repo 1"]);
+        for _ in 0..200 {
+            if builds(&host) == "2" {
+                break;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+        }
+        let after_failure = rows_after(&provider, 1).await;
+        for _ in 0..200 {
+            if provider.items(String::new()).await[0].title == "Repo 3" {
+                break;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+        }
+        extension.deactivate();
+
+        assert_eq!(after_failure, vec!["Repo 1"]);
+        assert_eq!(provider.items(String::new()).await[0].title, "Repo 3");
+    }
+
+    #[test]
+    fn enter_on_a_root_item_calls_on_action() {
+        let runtime = runtime();
+        let extension = rooted(test_host(runtime.handle().clone()), COUNTING, None);
+
+        assert_eq!(
+            extension.perform_action("repo-1", "open", &FormValues::new()),
+            ActionOutcome::Ticker("repo-1 open".into())
         );
     }
 }

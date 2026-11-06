@@ -213,8 +213,9 @@ NOT delay root search: until rows exist, the extension adds none.
 
 ### Requirement: A root item carries a title and actions
 
-A root item SHALL have an id and a title and MAY have a subtitle, an icon,
-keywords, and actions. Its first action SHALL run on Enter, and the action
+A root item SHALL have an id and a title and MAY have an icon, keywords,
+and actions. Like every root row, it shows its extension's name beside the
+title. Its first action SHALL run on Enter, and the action
 panel SHALL reach the rest. Running an action of a root item SHALL call the
 function `main.js` exports as `onAction` with the item's id and the action's
 id, even when nothing of that extension is running.
