@@ -134,7 +134,12 @@ fn open_store() -> Result<Opened, Box<dyn std::error::Error>> {
     Ok(Store::open(&dir.join("dango.sqlite"))?)
 }
 
-fn js_host(runtime: Handle, core: Weak<Core>) -> Arc<crate::js::JsHost> {
+fn js_host(
+    runtime: Handle,
+    core: Weak<Core>,
+    clipboard: Option<Arc<dyn ClipboardSource>>,
+    exchange: Option<Arc<dyn text::TextTarget>>,
+) -> Arc<crate::js::JsHost> {
     let start_core = core.clone();
     Arc::new(crate::js::JsHost {
         runtime,
@@ -148,6 +153,26 @@ fn js_host(runtime: Handle, core: Weak<Core>) -> Arc<crate::js::JsHost> {
         showing: Arc::new(move |owner| {
             core.upgrade()
                 .is_some_and(|core| core.view_owner().as_deref() == Some(owner))
+        }),
+        open: Arc::new(|target| {
+            if target.contains("://") || target.starts_with("mailto:") {
+                snippets::OpenUrl::open(&SystemOpener, target)
+            } else {
+                extensions::system::OpenFile::open(&SystemOpener, std::path::Path::new(target))
+            }
+        }),
+        copy: Arc::new(move |text| match &clipboard {
+            Some(clipboard) => {
+                clipboard.set_text(text);
+                Ok(())
+            }
+            None => Err("there is no clipboard".to_string()),
+        }),
+        paste: Arc::new(move |text| match &exchange {
+            Some(exchange) => exchange
+                .insert(text, None)
+                .map_err(|error| error.to_string()),
+            None => Err("pasting is off".to_string()),
         }),
     })
 }
@@ -366,7 +391,14 @@ fn build_services(
 
     // After the built-ins, so a built-in keeps its id when one collides.
     let js_dir = crate::js::load::extensions_dir(&config::config_dir());
-    let js_host = js_host(startup.runtime.clone(), core.clone());
+    let js_host = js_host(
+        startup.runtime.clone(),
+        core.clone(),
+        clipboard
+            .as_ref()
+            .map(|clipboard| clipboard.clone() as Arc<dyn ClipboardSource>),
+        exchange.clone(),
+    );
     problems.extend(load_problems(&crate::js::load::register_all(
         &mut host, &js_dir, &js_host,
     )));

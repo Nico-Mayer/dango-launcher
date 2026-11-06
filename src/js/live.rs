@@ -80,6 +80,43 @@ impl Natives for Bridge {
                 }
             })),
         )?;
+        native.set(
+            "fetch",
+            Func::from(Async(move |ctx: Ctx<'js>, json: String| async move {
+                let request = serde_json::from_str(&json).map_err(|error| throw(&ctx, error))?;
+                let response = super::caps::fetch(request)
+                    .await
+                    .map_err(|message| throw(&ctx, message))?;
+                Ok::<_, rquickjs::Error>(serde_json::to_string(&response).unwrap_or_default())
+            })),
+        )?;
+        native.set(
+            "fs",
+            Func::from(Async(move |ctx: Ctx<'js>, json: String| async move {
+                let request = serde_json::from_str(&json).map_err(|error| throw(&ctx, error))?;
+                super::caps::fs(request)
+                    .await
+                    .map_err(|message| throw(&ctx, message))
+            })),
+        )?;
+        for (name, action) in [
+            ("open", self.host.open.clone()),
+            ("copy", self.host.copy.clone()),
+            ("paste", self.host.paste.clone()),
+        ] {
+            native.set(
+                name,
+                Func::from(move |ctx: Ctx<'js>, text: String| -> rquickjs::Result<()> {
+                    action(&text).map_err(|message| throw(&ctx, message))
+                }),
+            )?;
+        }
+        let env = serde_json::json!({
+            "id": self.extension_id,
+            "folder": self.folder.to_string_lossy(),
+        })
+        .to_string();
+        native.set("env", env)?;
         let bridge = self.clone();
         native.set(
             "push",
@@ -90,6 +127,10 @@ impl Natives for Bridge {
             }),
         )
     }
+}
+
+fn throw(ctx: &Ctx<'_>, message: impl ToString) -> rquickjs::Error {
+    Exception::throw_message(ctx, &message.to_string())
 }
 
 fn console_line(extension_id: &str, level: &str, text: &str) -> String {

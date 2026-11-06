@@ -124,6 +124,9 @@ pub(crate) mod tests {
             runtime,
             start_view: Arc::new(|_, _| None),
             showing: Arc::new(|_| false),
+            open: Arc::new(|_| Ok(())),
+            copy: Arc::new(|_| Ok(())),
+            paste: Arc::new(|_| Ok(())),
         })
     }
 

@@ -218,6 +218,10 @@ pub(crate) mod tests {
     }
 
     pub fn extension(runtime: &tokio::runtime::Runtime, mode: &str, main: &str) -> JsExtension {
+        extension_with(test_host(runtime.handle().clone()), mode, main)
+    }
+
+    pub fn extension_with(host: Arc<JsHost>, mode: &str, main: &str) -> JsExtension {
         let dir = temp();
         let folder = write_extension(&dir, "ext", main);
         if mode == "no-view" {
@@ -228,9 +232,7 @@ pub(crate) mod tests {
             )
             .unwrap();
         }
-        crate::js::load::load(&folder, &test_host(runtime.handle().clone()))
-            .unwrap()
-            .unwrap()
+        crate::js::load::load(&folder, &host).unwrap().unwrap()
     }
 
     pub fn invoke(extension: &JsExtension) -> Arc<Recorded> {
@@ -429,6 +431,48 @@ pub(crate) mod tests {
         assert_eq!(
             *recorded.outcome.lock().unwrap(),
             Some(Outcome::Success(Some("0 hi".into())))
+        );
+    }
+
+    #[test]
+    fn open_copy_paste_and_files_reach_the_system() {
+        let runtime = runtime();
+        let calls: Arc<Mutex<Vec<String>>> = Arc::default();
+        let record = |name: &'static str| {
+            let calls = calls.clone();
+            Arc::new(move |text: &str| {
+                calls.lock().unwrap().push(format!("{name} {text}"));
+                Ok(())
+            }) as Arc<crate::js::host::TextAction>
+        };
+        let host = Arc::new(JsHost {
+            open: record("open"),
+            copy: record("copy"),
+            paste: record("paste"),
+            ..Arc::into_inner(test_host(runtime.handle().clone())).unwrap()
+        });
+        let extension = extension_with(
+            host,
+            "no-view",
+            r#"export async function run() {
+                dango.open("https://example.com");
+                dango.copy("copied");
+                dango.paste("pasted");
+                const file = dango.env.folder + "/note.txt";
+                await dango.fs.writeText(file, "kept");
+                return `${dango.env.id} ${await dango.fs.readText(file)}`;
+            }"#,
+        );
+
+        let recorded = invoke(&extension);
+
+        assert_eq!(
+            *recorded.outcome.lock().unwrap(),
+            Some(Outcome::Success(Some("ext kept".into())))
+        );
+        assert_eq!(
+            *calls.lock().unwrap(),
+            vec!["open https://example.com", "copy copied", "paste pasted"]
         );
     }
 }

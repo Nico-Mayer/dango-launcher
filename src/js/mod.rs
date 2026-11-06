@@ -1,9 +1,10 @@
 //! JavaScript extensions: folders in the config directory run by an embedded
 //! QuickJS runtime.
 
+mod caps;
 mod exec;
 mod extension;
-mod host;
+pub(crate) mod host;
 mod live;
 pub mod load;
 pub mod manifest;
