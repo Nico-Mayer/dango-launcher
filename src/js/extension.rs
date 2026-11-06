@@ -723,4 +723,47 @@ pub(crate) mod tests {
             ActionOutcome::Failed(NO_ACTION.into())
         );
     }
+
+    #[test]
+    fn a_pushed_view_keeps_the_session_for_the_list_below() {
+        use std::sync::atomic::{AtomicBool, Ordering};
+
+        let runtime = runtime();
+        let detail = Arc::new(Recorded::default());
+        let opened = detail.clone();
+        let showing = Arc::new(AtomicBool::new(true));
+        let shown = showing.clone();
+        let host = Arc::new(JsHost {
+            start_view: Arc::new(move |_, _| {
+                Some(Arc::new(InvocationContext::for_test("ext", opened.clone())))
+            }),
+            showing: Arc::new(move |_| shown.load(Ordering::SeqCst)),
+            ..Arc::into_inner(test_host(runtime.handle().clone())).unwrap()
+        });
+        let extension = extension_with(
+            host,
+            "view",
+            r##"export function run() {
+                dango.push({ kind: "list", items: [{ id: "a", title: "A", actions: [
+                    { title: "Open", onAction: () => dango.push({ kind: "detail", markdown: "# A" }) },
+                    { title: "Ticker", onAction: () => ({ ticker: "Still here" }) },
+                ] }] });
+            }"##,
+        );
+        let list = invoke(&extension);
+        let ids = action_ids(&list);
+
+        let pushed = extension.perform_action("a", &ids[0], &FormValues::new());
+        list.cancel();
+        detail.cancel();
+        std::thread::sleep(std::time::Duration::from_millis(200));
+        let again = extension.perform_action("a", &ids[1], &FormValues::new());
+
+        assert_eq!(pushed, ActionOutcome::Started);
+        assert!(matches!(
+            detail.views.lock().unwrap()[0].view,
+            View::Detail(_)
+        ));
+        assert_eq!(again, ActionOutcome::Ticker("Still here".into()));
+    }
 }
