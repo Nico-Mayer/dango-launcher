@@ -293,7 +293,7 @@ impl Inner {
     fn action_failed(&self, error: JsError) -> ActionOutcome {
         let id = &self.manifest.id;
         match error {
-            JsError::Interrupted => ActionOutcome::Done,
+            JsError::Interrupted => ActionOutcome::Started,
             JsError::Failure(message) => ActionOutcome::Failed(message),
             JsError::MissingExport(_) => ActionOutcome::Failed(NO_ACTION.into()),
             JsError::OutOfMemory => {
@@ -845,7 +845,10 @@ pub(crate) mod tests {
             r##"export function run() {
                 dango.push({ kind: "list", items: [{ id: "a", title: "A", actions: [
                     { title: "Open", onAction: () => dango.push({ kind: "detail", markdown: "# A" }) },
-                    { title: "Ticker", onAction: () => ({ ticker: "Still here" }) },
+                    { title: "Ticker", onAction: async () => {
+                        await new Promise(resolve => setTimeout(resolve, 200));
+                        return { ticker: "Still here" };
+                    } },
                 ] }] });
             }"##,
         );
@@ -1035,5 +1038,28 @@ pub(crate) mod tests {
         };
         assert_eq!(list.items[0].id, "rust");
         assert_eq!(slow, ActionOutcome::Started);
+    }
+
+    #[test]
+    fn an_action_cut_short_by_leaving_changes_nothing() {
+        let runtime = runtime();
+        let extension = extension(
+            &runtime,
+            "view",
+            r#"export function run() {
+                dango.push({ kind: "list", items: [{ id: "a", title: "A", actions: [
+                    { title: "Slow", onAction: () => new Promise(resolve => setTimeout(resolve, 5000)) },
+                ] }] });
+            }"#,
+        );
+        let recorded = invoke(&extension);
+        let ids = action_ids(&recorded);
+        recorded.cancel();
+
+        let started = std::time::Instant::now();
+        let outcome = extension.perform_action("a", &ids[0], &FormValues::new());
+
+        assert_eq!(outcome, ActionOutcome::Started);
+        assert!(started.elapsed() < std::time::Duration::from_secs(2));
     }
 }
