@@ -78,6 +78,7 @@ enum ModeFile {
 )]
 #[serde(rename_all = "camelCase")]
 struct RootItemsFile {
+    #[cfg_attr(test, ts(as = "Option<u32>"))]
     refresh_minutes: Option<u64>,
 }
 

@@ -144,7 +144,7 @@ type Shortcut = { key: string, modifiers?: Array<Modifier>, };
 
 type Modifier = "cmd" | "ctrl" | "alt" | "shift";
 
-type RootItem = { id: string, title: string, icon?: string, keywords?: Array<string>, actions?: Array<Action>, };
+type RootItem = { id: string, title: string, icon?: string, keywords?: Array<string>, actions?: Array<ProtocolAction>, };
 
 type Manifest = { manifestVersion: number, id: string, name: string, icon?: string, commands?: Array<ManifestCommand>, rootItems?: ManifestRootItems, };
 
@@ -152,7 +152,13 @@ type ManifestCommand = { id: string, title: string, mode: CommandMode, icon?: st
 
 type CommandMode = "view" | "no-view";
 
-type ManifestRootItems = { refreshMinutes?: bigint, };
+type ManifestRootItems = { refreshMinutes?: number, };
+
+type ProtocolAction = { id: string, title: string, shortcut?: Shortcut, 
+/**
+ * The heading it is listed under in the action panel.
+ */
+section?: string, style?: ActionStyle, };
 
 // ---- Extension code ----
 

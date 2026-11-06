@@ -65,6 +65,7 @@ mod tests {
             RootItem::decl(&cfg),
         ];
         decls.extend(crate::js::manifest::type_decls(&cfg));
+        decls.push(Action::decl(&cfg).replacen("type Action =", "type ProtocolAction =", 1));
         let generated = decls
             .into_iter()
             .map(authored)
@@ -75,7 +76,11 @@ mod tests {
 
     /// Extension code writes actions with handlers and no ids, and a view
     /// that searches with its handler; the prelude turns both into protocol.
+    /// Root items skip the prelude, so their actions stay protocol actions.
     fn authored(decl: String) -> String {
+        if decl.starts_with("type RootItem = ") {
+            return decl.replace("Array<Action>", "Array<ProtocolAction>");
+        }
         let decl = if decl.starts_with("type Action = ") {
             decl.replacen("id: string,", "id?: string, onAction?: ActionHandler,", 1)
         } else {
@@ -111,7 +116,8 @@ mod tests {
         assert!(TYPES.contains("onAction?: ActionHandler"));
         assert!(TYPES.contains("onSearch?: SearchHandler"));
         assert!(TYPES.contains("type Manifest = "));
-        assert!(TYPES.contains("type RootItem = "));
+        assert!(TYPES.contains("actions?: Array<ProtocolAction>"));
+        assert!(TYPES.contains("refreshMinutes?: number"));
     }
 
     #[test]
