@@ -6,13 +6,13 @@
 
 ## 2. Platform lookup
 
-- [ ] 2.1 Add `under_pointer()` to `BrightnessMonitors` in `src/platform/mod.rs`; give the test fake in `src/extensions/display/` and `src/app/tests.rs` a pointer index. Verify: `cargo build` and `cargo clippy --all-targets -- -D warnings` pass
+- [ ] 2.1 Add `under_pointer()` to `BrightnessMonitors` in `src/platform/mod.rs`; give `FakeMonitors` in `src/extensions/display/` a pointer index; `NoMonitors` in `src/app/tests.rs` returns an empty list. Verify: `cargo build` and `cargo clippy --all-targets -- -D warnings` pass
 - [ ] 2.2 Windows: implement `under_pointer()` in `platform/windows/brightness.rs` with `GetCursorPos`, `MonitorFromPoint(.., MONITOR_DEFAULTTONULL)`, `ddc_winapi::get_physical_monitors_from_hmonitor`, and `ddc_winapi::Monitor::new`. Verify: `cargo build` and clippy pass on Windows
-- [ ] 2.3 macOS: add the `CGDirectDisplay` feature to `objc2-core-graphics` and implement `under_pointer()` in `platform/macos/brightness.rs` with `CGEvent::location`, `CGGetDisplaysWithPoint`, and `ddc_macos::Monitor::enumerate()` filtered by `handle().id`. Check symbol names against the vendored crate source under `~/.cargo/registry`. Verify: CI's macOS job builds after the author pushes (left open until a macOS session)
+- [ ] 2.3 macOS: implement `under_pointer()` in `platform/macos/brightness.rs` (no `Cargo.toml` change: the needed `objc2-core-graphics` features are already on) with `CGEvent::location`, `CGGetDisplaysWithPoint`, and `ddc_macos::Monitor::enumerate()` filtered by `handle().id`. Check symbol names against the vendored crate source under `~/.cargo/registry`. Verify: CI's macOS job builds after the author pushes (left open until a macOS session)
 
 ## 3. Extension reads the setting
 
-- [ ] 3.1 Pass `FileConfig::shared()` into `DisplayExtension::new` (`src/app/startup.rs`, tests), read `display.monitors` once per step, and call `external()` or `under_pointer()`. Verify: tests in `src/extensions/display/` cover the `display-brightness` scenarios "Default changes every monitor", "Only the monitor under the pointer changes", "Moving the pointer moves the target", "The pointer is on a monitor without DDC/CI", and "The setting applies without a restart" (change the shared config between two presses)
+- [ ] 3.1 Pass `FileConfig::shared()` into `DisplayExtension::new` (`src/app/startup.rs`, tests), read `display.monitors` once per step after the bus lock is taken, and call `external()` or `under_pointer()`. Verify: tests in `src/extensions/display/` cover the `display-brightness` scenarios "Only the monitor under the pointer changes", "Moving the pointer moves the target", "The pointer is on a monitor without DDC/CI", and "The setting applies without a restart" (change the shared config between two presses)
 
 ## 4. Hand checks
 

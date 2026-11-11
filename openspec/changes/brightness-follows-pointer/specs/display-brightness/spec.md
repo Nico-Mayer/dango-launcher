@@ -32,13 +32,7 @@ A brightness command SHALL change every external monitor that answers DDC/CI, or
 
 ### Requirement: Brightness can follow the pointer
 
-The `display.monitors` setting SHALL choose which monitors a brightness command changes: `"all"` changes every external monitor, `"pointer"` changes only the external monitor under the mouse pointer when the change is applied. Absent means `"all"`. An edit to the setting SHALL apply from the next press, without a restart. When the monitor under the pointer does not answer DDC/CI, the command SHALL fail as when no monitor answers, and SHALL NOT change any other monitor.
-
-#### Scenario: Default changes every monitor
-
-- **GIVEN** `display.monitors` is not set, and two monitors at 30% and 60%
-- **WHEN** the user runs `Increase Brightness`
-- **THEN** the monitors are at 40% and 70%
+The `display.monitors` setting SHALL choose which monitors a brightness command changes: `"all"` changes every external monitor, `"pointer"` changes only the external monitor under the mouse pointer when the change is applied. Absent means `"all"`. An edit to the setting SHALL apply from the next press, without a restart. When the monitor under the pointer does not answer DDC/CI, the command SHALL fail and SHALL NOT change any other monitor.
 
 #### Scenario: Only the monitor under the pointer changes
 
@@ -64,14 +58,14 @@ The `display.monitors` setting SHALL choose which monitors a brightness command 
 
 - **GIVEN** a Windows laptop with one external monitor, `display.monitors = "pointer"`, and the pointer on the laptop's screen
 - **WHEN** the user runs `Increase Brightness`
-- **THEN** the failure reads "Turn on DDC/CI in your monitor's menu to change brightness"
+- **THEN** the command fails
 - **AND** neither screen changes
 
 #### Scenario: The pointer is on a MacBook's own screen
 
 - **GIVEN** a MacBook with one external monitor, `display.monitors = "pointer"`, and the pointer on the MacBook's screen
 - **WHEN** the user runs `Increase Brightness`
-- **THEN** the failure reads "Turn on DDC/CI in your monitor's menu to change brightness"
+- **THEN** the command fails
 - **AND** neither screen changes
 
 #### Scenario: The setting applies without a restart

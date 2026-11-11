@@ -43,10 +43,10 @@ fn under_pointer(&self) -> Vec<Box<dyn Monitor>>;
 
 Returns the external monitor(s) under the pointer, or none. A `Vec` because one Windows `HMONITOR` can hold more than one physical monitor (mirroring), and so `step_all` takes it unchanged: an empty list gives the existing "no monitor answers" failure.
 
-- Windows: `GetCursorPos`, `MonitorFromPoint(point, MONITOR_DEFAULTTONULL)`, then `ddc_winapi::get_physical_monitors_from_hmonitor` and `unsafe ddc_winapi::Monitor::new` for each. `ddc-winapi` takes a `winapi` `HMONITOR`; the project's comes from the `windows` crate, so cast the raw pointer. A laptop panel enumerates but does not answer DDC/CI, so it fails like today.
-- macOS: pointer from `CGEvent::location(CGEvent::new(None))` and display id from `CGGetDisplaysWithPoint` (`objc2-core-graphics`, add feature `CGDirectDisplay`). Both are thread-safe CoreGraphics calls, so they run on the step's worker thread. Then `ddc_macos::Monitor::enumerate()` filtered to `monitor.handle().id == id`. A MacBook panel is never in `enumerate()`, so the list is empty.
+- Windows: `GetCursorPos`, `MonitorFromPoint(point, MONITOR_DEFAULTTONULL)`, then `ddc_winapi::get_physical_monitors_from_hmonitor` and `unsafe ddc_winapi::Monitor::new` for each. `ddc-winapi` takes a `winapi` `HMONITOR`; the project's comes from `windows-sys`, so cast the raw pointer. A laptop panel enumerates but does not answer DDC/CI, so it fails like today.
+- macOS: pointer from `CGEvent::location(CGEvent::new(None).as_deref())` and display id from the `unsafe` `CGGetDisplaysWithPoint` (out-buffer plus count). Both come from `objc2-core-graphics`; the features they need (`CGEvent`, `CGEventTypes`, `CGDirectDisplay`, `CGError`) are already on, the last two through the crate's defaults. Both are thread-safe CoreGraphics calls, so they run on the step's worker thread. Then `ddc_macos::Monitor::enumerate()` filtered to `monitor.handle().id == id`. A MacBook panel is never in `enumerate()`, so the list is empty.
 
-The extension picks `external()` or `under_pointer()` from the setting. The fake `BrightnessMonitors` in tests gets a pointer index.
+The extension picks `external()` or `under_pointer()` from the setting. `FakeMonitors` in `src/extensions/display/` gets a pointer index; `NoMonitors` in `src/app/tests.rs` returns an empty list.
 
 Rejected:
 
@@ -60,7 +60,7 @@ The pointer is read after the bus lock is taken, together with the pending tenth
 
 ### Config access
 
-`DisplayExtension::new` takes the shared `Arc<RwLock<Config>>` (`FileConfig::shared()`), as `ConfigPolicy` does for clipboard, and reads `config.display.monitors` once per step, before the lock is taken. No read lock is held during DDC/CI work.
+`DisplayExtension::new` takes the shared `Arc<RwLock<Config>>` (`FileConfig::shared()`), as `ConfigPolicy` does for clipboard, and reads `config.display.monitors` once per step, after the bus lock is taken, next to the pointer read. A press waiting behind a running step then uses the setting current when it applies. The config read lock is dropped before any DDC/CI work.
 
 ### Contracts and copy
 
@@ -70,6 +70,6 @@ No manifest or view protocol change. No new UI and no new strings: the pointer c
 
 ## Risks / Trade-offs
 
-- [Pointer on a laptop panel gives the DDC/CI advice, which does not help there] → Accepted to avoid new copy for a rare case on the author's desktop setup. A dedicated message is a small later change.
+- [Pointer on a laptop panel gives the DDC/CI advice, which does not help there, short of `interface-copy`'s "says what failed and what to do"] → Accepted gap to avoid new copy for a rare case on the author's desktop setup. The spec only requires a failure there, not this text, so a dedicated message later needs no spec change.
 - [`Monitor::new` on Windows is `unsafe` and takes ownership of the `PHYSICAL_MONITOR`] → Its `Drop` calls `DestroyPhysicalMonitor`, same as `enumerate()`. Each handle goes into exactly one `Monitor`.
-- [macOS display id from `CGGetDisplaysWithPoint` might not match `ddc_macos`'s `CGDisplay` on some setups (mirrored displays)] → Mirrored sets report the first display; checked by hand on a Mac.
+- [macOS display id from `CGGetDisplaysWithPoint` might not match `ddc_macos`'s `CGDisplay` on some setups (mirrored displays)] → Not checked; mirroring is not part of the author's setup. A mismatch gives the "no monitor answers" failure, never a wrong monitor.
