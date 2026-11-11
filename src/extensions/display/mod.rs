@@ -1,7 +1,8 @@
 //! The `display` built-in: brightness steps for external monitors over DDC/CI.
 
-use std::sync::{Arc, Mutex, PoisonError};
+use std::sync::{Arc, Mutex, PoisonError, RwLock};
 
+use crate::config::{BrightnessTarget, Config};
 use crate::extension::{CommandDecl, Extension, InvocationMode, Manifest, NAMED_ICON};
 use crate::invocation::{Command, InvocationContext, Outcome};
 use crate::platform::{BrightnessMonitors, Level, Monitor};
@@ -67,14 +68,16 @@ pub fn message(percents: &[u32]) -> String {
 pub struct DisplayExtension {
     manifest: Manifest,
     monitors: Arc<dyn BrightnessMonitors>,
+    config: Arc<RwLock<Config>>,
     presses: Arc<Presses>,
 }
 
 impl DisplayExtension {
-    pub fn new(monitors: Arc<dyn BrightnessMonitors>) -> Self {
+    pub fn new(monitors: Arc<dyn BrightnessMonitors>, config: Arc<RwLock<Config>>) -> Self {
         Self {
             manifest: manifest(),
             monitors,
+            config,
             presses: Arc::default(),
         }
     }
@@ -93,6 +96,7 @@ impl Extension for DisplayExtension {
         };
         Some(Arc::new(BrightnessStep {
             monitors: self.monitors.clone(),
+            config: self.config.clone(),
             presses: self.presses.clone(),
             direction,
         }))
@@ -145,8 +149,18 @@ fn command(id: &str, title: &str, icon: &str, keywords: &[&str]) -> CommandDecl 
 
 pub struct BrightnessStep {
     monitors: Arc<dyn BrightnessMonitors>,
+    config: Arc<RwLock<Config>>,
     presses: Arc<Presses>,
     direction: Direction,
+}
+
+impl BrightnessStep {
+    fn target(&self) -> BrightnessTarget {
+        self.config
+            .read()
+            .map(|config| config.display.monitors)
+            .unwrap_or_default()
+    }
 }
 
 impl Command for BrightnessStep {
@@ -164,9 +178,11 @@ impl Command for BrightnessStep {
         if tenths == 0 {
             return ctx.report(Outcome::Success(None));
         }
-        let outcome = step_all(self.monitors.external(), tenths, &mut |line| {
-            crate::log::append(&line)
-        });
+        let monitors = match self.target() {
+            BrightnessTarget::All => self.monitors.external(),
+            BrightnessTarget::Pointer => self.monitors.under_pointer(),
+        };
+        let outcome = step_all(monitors, tenths, &mut |line| crate::log::append(&line));
         ctx.report(match outcome {
             Ok(message) => Outcome::Success(Some(message)),
             Err(message) => Outcome::Failure(message.into()),
@@ -327,8 +343,18 @@ mod tests {
         presses: &Arc<Presses>,
         direction: Direction,
     ) -> std::thread::JoinHandle<Option<Outcome>> {
+        press_with(monitors, &Arc::default(), presses, direction)
+    }
+
+    fn press_with(
+        monitors: &Arc<dyn BrightnessMonitors>,
+        config: &Arc<RwLock<Config>>,
+        presses: &Arc<Presses>,
+        direction: Direction,
+    ) -> std::thread::JoinHandle<Option<Outcome>> {
         let command = BrightnessStep {
             monitors: monitors.clone(),
+            config: config.clone(),
             presses: presses.clone(),
             direction,
         };
@@ -410,6 +436,83 @@ mod tests {
         up.join().unwrap();
         down.join().unwrap();
         assert_eq!(*level.lock().unwrap(), 50);
+    }
+
+    fn following_the_pointer() -> Arc<RwLock<Config>> {
+        Arc::new(RwLock::new(
+            Config::parse(r#"display = { monitors = "pointer" }"#).unwrap(),
+        ))
+    }
+
+    fn press_once(
+        monitors: &Arc<FakeMonitors>,
+        config: &Arc<RwLock<Config>>,
+        direction: Direction,
+    ) -> Option<Outcome> {
+        let monitors: Arc<dyn BrightnessMonitors> = monitors.clone();
+        press_with(&monitors, config, &Arc::default(), direction)
+            .join()
+            .unwrap()
+    }
+
+    #[test]
+    fn only_the_monitor_under_the_pointer_changes() {
+        let (a, a_level) = at(30);
+        let (b, b_level) = at(60);
+        let monitors = Arc::new(FakeMonitors::new(vec![a, b]));
+        *monitors.pointer.lock().unwrap() = 1;
+        let outcome = press_once(&monitors, &following_the_pointer(), Direction::Up);
+        assert_eq!(*a_level.lock().unwrap(), 30);
+        assert_eq!(*b_level.lock().unwrap(), 70);
+        assert_eq!(
+            outcome,
+            Some(Outcome::Success(Some("Brightness set to 70%".into())))
+        );
+    }
+
+    #[test]
+    fn moving_the_pointer_moves_the_target() {
+        let (a, a_level) = at(50);
+        let (b, b_level) = at(50);
+        let monitors = Arc::new(FakeMonitors::new(vec![a, b]));
+        let config = following_the_pointer();
+        press_once(&monitors, &config, Direction::Down);
+        *monitors.pointer.lock().unwrap() = 1;
+        press_once(&monitors, &config, Direction::Down);
+        assert_eq!(*a_level.lock().unwrap(), 40);
+        assert_eq!(*b_level.lock().unwrap(), 40);
+    }
+
+    #[test]
+    fn a_silent_monitor_under_the_pointer_fails_and_leaves_the_other_alone() {
+        let (other, other_level) = at(50);
+        let monitors = Arc::new(FakeMonitors::new(vec![Answer::Silent, other]));
+        let outcome = press_once(&monitors, &following_the_pointer(), Direction::Up);
+        assert_eq!(outcome, Some(Outcome::Failure(NO_MONITOR.into())));
+        assert_eq!(*other_level.lock().unwrap(), 50);
+    }
+
+    #[test]
+    fn no_external_monitor_under_the_pointer_fails() {
+        let (only, level) = at(50);
+        let monitors = Arc::new(FakeMonitors::new(vec![only]));
+        *monitors.pointer.lock().unwrap() = 1;
+        let outcome = press_once(&monitors, &following_the_pointer(), Direction::Up);
+        assert_eq!(outcome, Some(Outcome::Failure(NO_MONITOR.into())));
+        assert_eq!(*level.lock().unwrap(), 50);
+    }
+
+    #[test]
+    fn the_setting_applies_from_the_next_press() {
+        let (a, a_level) = at(50);
+        let (b, b_level) = at(50);
+        let monitors = Arc::new(FakeMonitors::new(vec![a, b]));
+        let config = Arc::new(RwLock::new(Config::default()));
+        press_once(&monitors, &config, Direction::Up);
+        *config.write().unwrap() = Config::parse(r#"display = { monitors = "pointer" }"#).unwrap();
+        press_once(&monitors, &config, Direction::Up);
+        assert_eq!(*a_level.lock().unwrap(), 70);
+        assert_eq!(*b_level.lock().unwrap(), 60);
     }
 
     #[test]

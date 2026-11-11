@@ -1314,9 +1314,10 @@ impl crate::platform::BrightnessMonitors for NoMonitors {
 }
 
 fn display_core(config: &str) -> (Arc<Core>, Arc<RecordingShell>) {
-    let display = Arc::new(crate::extensions::display::DisplayExtension::new(Arc::new(
-        NoMonitors,
-    )));
+    let display = Arc::new(crate::extensions::display::DisplayExtension::new(
+        Arc::new(NoMonitors),
+        Arc::default(),
+    ));
     let (core, shell) = core_with("", FakeGrab::default(), vec![display]);
     core.apply_config_reload(Config::parse(config));
     core.toggle();

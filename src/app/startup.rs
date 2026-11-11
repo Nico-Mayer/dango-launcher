@@ -372,7 +372,10 @@ fn build_services(
     )));
     register(&mut host, "window-management", window_management);
 
-    let display = Arc::new(DisplayExtension::new(platform::brightness_monitors()));
+    let display = Arc::new(DisplayExtension::new(
+        platform::brightness_monitors(),
+        file_config.shared(),
+    ));
     register(&mut host, "display", display);
 
     for error in config::schema::write_all(&config::config_dir(), &extensions::builtin_manifests())

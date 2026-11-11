@@ -12,7 +12,7 @@
 
 ## 3. Extension reads the setting
 
-- [ ] 3.1 Pass `FileConfig::shared()` into `DisplayExtension::new` (`src/app/startup.rs`, tests), read `display.monitors` once per step after the bus lock is taken, and call `external()` or `under_pointer()`. Verify: tests in `src/extensions/display/` cover the `display-brightness` scenarios "Only the monitor under the pointer changes", "Moving the pointer moves the target", "The pointer is on a monitor without DDC/CI", and "The setting applies without a restart" (change the shared config between two presses)
+- [x] 3.1 Pass `FileConfig::shared()` into `DisplayExtension::new` (`src/app/startup.rs`, tests), read `display.monitors` once per step after the bus lock is taken, and call `external()` or `under_pointer()`. Verify: tests in `src/extensions/display/` cover the `display-brightness` scenarios "Only the monitor under the pointer changes", "Moving the pointer moves the target", "The pointer is on a monitor without DDC/CI", and "The setting applies without a restart" (change the shared config between two presses)
 
 ## 4. Hand checks
 
