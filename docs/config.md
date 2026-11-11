@@ -102,6 +102,7 @@ Settings for the Display extension.
 | --- | --- | --- | --- | --- |
 | `commands` | object |  |  | Per-command settings, keyed by command id. |
 | `enabled` | boolean |  |  | Whether the extension runs. Absent means enabled. |
+| `monitors` | string | `all` | `all`, `pointer` | Which monitors the brightness commands change. "all" changes every external monitor, "pointer" only the one under the mouse pointer. Default "all". |
 
 ### `display.commands`
 

@@ -2,7 +2,7 @@
 
 ## 1. Setting
 
-- [ ] 1.1 Add `DisplayTable` in `src/config/tables.rs` with `enabled`, `commands`, and `monitors` (enum `All` default / `Pointer`, lowercase, doc comment from design.md), add it to `extension_table!`, and use it for `Config::display`. Regenerate `docs/config.md` and the schema (`env DANGO_UPDATE_DOCS=1 cargo test the_settings_reference_is_current`). Verify: new tests in `src/config/mod.rs` cover absent = `All`, `"pointer"` parsing, and `"focused"` failing with an error naming `monitors`; `cargo test` passes
+- [x] 1.1 Add `DisplayTable` in `src/config/tables.rs` with `enabled`, `commands`, and `monitors` (enum `All` default / `Pointer`, lowercase, doc comment from design.md), add it to `extension_table!`, and use it for `Config::display`. Regenerate `docs/config.md` and the schema (`env DANGO_UPDATE_DOCS=1 cargo test the_settings_reference_is_current`). Verify: new tests in `src/config/mod.rs` cover absent = `All`, `"pointer"` parsing, and `"focused"` failing with an error naming `monitors`; `cargo test` passes
 
 ## 2. Platform lookup
 

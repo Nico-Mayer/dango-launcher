@@ -27,8 +27,9 @@ pub use hotkey::{Hotkey, HotkeyError, ParsedHotkey, PerPlatform};
 pub use location::config_dir;
 pub use store::FileConfig;
 pub use tables::{
-    table_name, AiCommandSettings, AiTable, ApplicationsTable, ClipboardTable, CommandBinding,
-    ExtensionSettings, ExtensionTable, PrimaryAction, QuicklinksTable, Table,
+    table_name, AiCommandSettings, AiTable, ApplicationsTable, BrightnessTarget, ClipboardTable,
+    CommandBinding, DisplayTable, ExtensionSettings, ExtensionTable, PrimaryAction,
+    QuicklinksTable, Table,
 };
 
 #[derive(Debug, thiserror::Error)]
@@ -67,7 +68,7 @@ pub struct Config {
     pub clipboard: ClipboardTable,
     /// Settings for the Display extension.
     #[serde(default)]
-    pub display: Table,
+    pub display: DisplayTable,
     /// Settings for the Games extension.
     #[serde(default)]
     pub games: Table,
@@ -460,6 +461,22 @@ mod tests {
     fn an_unknown_launcher_display_names_the_setting() {
         let error = Config::parse(r#"launcher = { display = "secondary" }"#).unwrap_err();
         assert!(error.to_string().contains("display"), "{error}");
+    }
+
+    #[test]
+    fn brightness_follows_every_monitor_unless_set_to_the_pointer() {
+        assert_eq!(
+            Config::parse("").unwrap().display.monitors,
+            BrightnessTarget::All
+        );
+        let config = Config::parse(r#"display = { monitors = "pointer" }"#).unwrap();
+        assert_eq!(config.display.monitors, BrightnessTarget::Pointer);
+    }
+
+    #[test]
+    fn an_unknown_brightness_target_names_the_setting() {
+        let error = Config::parse(r#"display = { monitors = "focused" }"#).unwrap_err();
+        assert!(error.to_string().contains("monitors"), "{error}");
     }
 
     #[test]

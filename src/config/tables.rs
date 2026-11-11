@@ -73,6 +73,7 @@ macro_rules! extension_table {
 extension_table!(
     Table,
     ClipboardTable,
+    DisplayTable,
     QuicklinksTable,
     AiTable,
     ApplicationsTable
@@ -161,6 +162,30 @@ pub enum PrimaryAction {
     #[default]
     Paste,
     Copy,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize, JsonSchema)]
+#[serde(default, rename_all = "kebab-case")]
+pub struct DisplayTable {
+    /// Whether the extension runs. Absent means enabled.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub enabled: Option<bool>,
+    /// Per-command settings, keyed by command id.
+    #[serde(skip_serializing_if = "BTreeMap::is_empty")]
+    pub commands: BTreeMap<String, CommandSettings>,
+    /// Which monitors the brightness commands change. "all" changes every
+    /// external monitor, "pointer" only the one under the mouse pointer.
+    /// Default "all".
+    pub monitors: BrightnessTarget,
+}
+
+/// Which monitors a brightness command changes.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "lowercase")]
+pub enum BrightnessTarget {
+    #[default]
+    All,
+    Pointer,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
