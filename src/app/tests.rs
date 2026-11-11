@@ -1308,6 +1308,9 @@ impl crate::platform::BrightnessMonitors for NoMonitors {
     fn external(&self) -> Vec<Box<dyn crate::platform::Monitor>> {
         Vec::new()
     }
+    fn under_pointer(&self) -> Vec<Box<dyn crate::platform::Monitor>> {
+        Vec::new()
+    }
 }
 
 fn display_core(config: &str) -> (Arc<Core>, Arc<RecordingShell>) {

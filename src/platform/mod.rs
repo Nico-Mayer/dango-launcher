@@ -290,6 +290,9 @@ pub trait Monitor {
 pub trait BrightnessMonitors: Send + Sync {
     /// Enumerated fresh on every call, so a monitor plugged in since counts.
     fn external(&self) -> Vec<Box<dyn Monitor>>;
+    /// The external monitor under the mouse pointer, or none when the pointer
+    /// is on a built-in panel. More than one only for a mirrored set.
+    fn under_pointer(&self) -> Vec<Box<dyn Monitor>>;
 }
 
 pub fn brightness_monitors() -> std::sync::Arc<dyn BrightnessMonitors> {

@@ -257,13 +257,32 @@ mod tests {
         }
     }
 
-    struct FakeMonitors(Vec<Answer>);
+    struct FakeMonitors {
+        answers: Vec<Answer>,
+        pointer: Mutex<usize>,
+    }
+
+    impl FakeMonitors {
+        fn new(answers: Vec<Answer>) -> Self {
+            Self {
+                answers,
+                pointer: Mutex::new(0),
+            }
+        }
+    }
 
     impl BrightnessMonitors for FakeMonitors {
         fn external(&self) -> Vec<Box<dyn Monitor>> {
-            self.0
+            self.answers
                 .iter()
                 .map(|answer| Box::new(FakeMonitor(answer.clone())) as Box<dyn Monitor>)
+                .collect()
+        }
+        fn under_pointer(&self) -> Vec<Box<dyn Monitor>> {
+            self.answers
+                .get(*self.pointer.lock().unwrap())
+                .map(|answer| Box::new(FakeMonitor(answer.clone())) as Box<dyn Monitor>)
+                .into_iter()
                 .collect()
         }
     }
@@ -290,7 +309,7 @@ mod tests {
             Direction::Down => -1,
         };
         let mut lines = Vec::new();
-        let monitors = FakeMonitors(answers).external();
+        let monitors = FakeMonitors::new(answers).external();
         let outcome = match step_all(monitors, tenths, &mut |line| lines.push(line)) {
             Ok(message) => Outcome::Success(Some(message)),
             Err(message) => Outcome::Failure(message.into()),
@@ -324,7 +343,7 @@ mod tests {
     #[test]
     fn three_quick_presses_each_count_and_every_step_reports() {
         let (answer, level) = at(50);
-        let monitors: Arc<dyn BrightnessMonitors> = Arc::new(FakeMonitors(vec![answer]));
+        let monitors: Arc<dyn BrightnessMonitors> = Arc::new(FakeMonitors::new(vec![answer]));
         let presses = Arc::new(Presses::default());
         let outcomes: Vec<_> = (0..3)
             .map(|_| press(&monitors, &presses, Direction::Up))
@@ -344,7 +363,7 @@ mod tests {
     #[test]
     fn presses_during_a_step_are_applied_together() {
         let (answer, level) = at(50);
-        let monitors: Arc<dyn BrightnessMonitors> = Arc::new(FakeMonitors(vec![answer]));
+        let monitors: Arc<dyn BrightnessMonitors> = Arc::new(FakeMonitors::new(vec![answer]));
         let presses = Arc::new(Presses::default());
         let bus = lock(&presses.bus);
         let waiting: Vec<_> = (0..4)
@@ -376,7 +395,7 @@ mod tests {
     #[test]
     fn up_and_down_during_a_step_cancel_out() {
         let (answer, level) = at(50);
-        let monitors: Arc<dyn BrightnessMonitors> = Arc::new(FakeMonitors(vec![answer]));
+        let monitors: Arc<dyn BrightnessMonitors> = Arc::new(FakeMonitors::new(vec![answer]));
         let presses = Arc::new(Presses::default());
         let bus = lock(&presses.bus);
         let up = press(&monitors, &presses, Direction::Up);

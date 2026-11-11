@@ -6,8 +6,8 @@
 
 ## 2. Platform lookup
 
-- [ ] 2.1 Add `under_pointer()` to `BrightnessMonitors` in `src/platform/mod.rs`; give `FakeMonitors` in `src/extensions/display/` a pointer index; `NoMonitors` in `src/app/tests.rs` returns an empty list. Verify: `cargo build` and `cargo clippy --all-targets -- -D warnings` pass
-- [ ] 2.2 Windows: implement `under_pointer()` in `platform/windows/brightness.rs` with `GetCursorPos`, `MonitorFromPoint(.., MONITOR_DEFAULTTONULL)`, `ddc_winapi::get_physical_monitors_from_hmonitor`, and `ddc_winapi::Monitor::new`. Verify: `cargo build` and clippy pass on Windows
+- [x] 2.1 Add `under_pointer()` to `BrightnessMonitors` in `src/platform/mod.rs`; give `FakeMonitors` in `src/extensions/display/` a pointer index; `NoMonitors` in `src/app/tests.rs` returns an empty list. Verify: `cargo build` and `cargo clippy --all-targets -- -D warnings` pass
+- [x] 2.2 Windows: implement `under_pointer()` in `platform/windows/brightness.rs` with `GetCursorPos`, `MonitorFromPoint(.., MONITOR_DEFAULTTONULL)`, `ddc_winapi::get_physical_monitors_from_hmonitor`, and `ddc_winapi::Monitor::new`. Verify: `cargo build` and clippy pass on Windows
 - [ ] 2.3 macOS: implement `under_pointer()` in `platform/macos/brightness.rs` (no `Cargo.toml` change: the needed `objc2-core-graphics` features are already on) with `CGEvent::location`, `CGGetDisplaysWithPoint`, and `ddc_macos::Monitor::enumerate()` filtered by `handle().id`. Check symbol names against the vendored crate source under `~/.cargo/registry`. Verify: CI's macOS job builds after the author pushes (left open until a macOS session)
 
 ## 3. Extension reads the setting
