@@ -2,6 +2,29 @@
 
 All notable changes to Dango. Generated from commit history at release time.
 
+## [6.9.0] - 2026-11-12
+
+### Features
+
+- **config:** Add launcher.open-list setting
+- **ui:** Open the list after a reset when set
+- **shell:** Reveal launcher after its first frame
+- **macos:** Fade launcher in after first frame
+- **ui:** Slide launcher in when it opens
+- **apps:** Index Finder and core services apps on macOS
+- **config:** Add display.monitors setting
+- **platform:** Find the monitor under the pointer
+- **display:** Change only the monitor under the pointer
+
+### Fixes
+
+- **shell:** Skip conceal on the first show
+- **macos:** Let conceal replace a running fade
+- **hyperkey:** Reclaim own remap on every keyboard
+
+### Documentation
+
+- Note launcher reveal traps
 ## [6.8.1] - 2026-11-06
 
 ### Fixes
