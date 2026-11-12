@@ -309,7 +309,12 @@ async fn open_list_opens_the_list_after_a_dismiss() {
     core.toggle();
     settle().await;
     escape(&core);
-    escape(&core);
+    assert_eq!(
+        shell.calls().last(),
+        Some(&Call::Hide {
+            restore_focus: true
+        })
+    );
     core.toggle();
     settle().await;
     assert!(list_open(&shell));
@@ -321,25 +326,26 @@ async fn open_list_opens_the_list_when_the_hold_runs_out() {
         with_commands(r#"launcher = { open-list = true, reset-after-seconds = 5 }"#);
     core.toggle();
     settle().await;
-    escape(&core);
+    type_query(&core, "fi");
     core.toggle();
     tokio::time::sleep(Duration::from_secs(6)).await;
     core.toggle();
     settle().await;
+    assert_eq!(query(&shell), "");
     assert!(list_open(&shell));
 }
 
 #[tokio::test(start_paused = true)]
-async fn a_held_show_keeps_a_closed_list_despite_open_list() {
+async fn a_held_show_keeps_the_typed_prompt_despite_open_list() {
     let (core, shell) =
         with_commands(r#"launcher = { open-list = true, reset-after-seconds = 5 }"#);
     core.toggle();
     settle().await;
-    escape(&core);
+    type_query(&core, "fi");
     core.toggle();
     core.toggle();
     settle().await;
-    assert!(!list_open(&shell));
+    assert_eq!(query(&shell), "fi");
 }
 
 #[tokio::test(start_paused = true)]
