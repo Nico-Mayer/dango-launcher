@@ -2,7 +2,7 @@
 
 ## 1. `launcher.open-list` setting
 
-- [ ] 1.1 Add `open_list: Option<bool>` to `config::Launcher` with the doc comment from design.md, include it in `is_empty`, and regenerate the schema and settings reference. Verify: `cargo test` (schema and reference tests), plus a schema test that `open-list = "yes"` is rejected.
+- [x] 1.1 Add `open_list: Option<bool>` to `config::Launcher` with the doc comment from design.md, include it in `is_empty`, and regenerate the schema and settings reference. Verify: `cargo test` (schema and reference tests), plus a schema test that `open-list = "yes"` is rejected.
 - [ ] 1.2 Change `Event::Reset` to `Event::Reset { open_list: bool }` and set `root_open = open_list` in `reset()`. Verify: `src/ui/tests.rs` tests that a reset with `open_list: true` shows the sectioned list with the first row selected (with and without a pinned item), that Escape then closes it and a second Escape hides, and that `open_list: false` keeps the closed pill.
 - [ ] 1.3 Read the setting in `Core` for every reset (`settle_hide`, hold timeout) and apply one reset at startup after config load. Verify: `src/app/tests.rs` tests that a deliberate hide and an expired hold open the list when the setting is on, that a held show keeps a closed list, and that a config reload changes the next reset.
 

@@ -632,6 +632,7 @@ mod tests {
         hotkey = { macos = "cmd+space", windows = "ctrl+space" }
         autostart = true
         reset-after-seconds = 90
+        open-list = true
 
         [clipboard]
         enabled = true
@@ -687,6 +688,12 @@ mod tests {
         assert!(accepts(r#"launcher = { reset-after-seconds = 300 }"#));
         assert!(!accepts(r#"launcher = { reset-after-seconds = -5 }"#));
         assert!(!accepts(r#"launcher = { reset-after-seconds = 1.5 }"#));
+    }
+
+    #[test]
+    fn open_list_is_a_boolean() {
+        assert!(accepts(r#"launcher = { open-list = true }"#));
+        assert!(!accepts(r#"launcher = { open-list = "yes" }"#));
     }
 
     #[test]

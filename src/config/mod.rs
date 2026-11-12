@@ -176,6 +176,10 @@ pub struct Launcher {
     /// Default "pointer".
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub display: Option<LauncherDisplay>,
+    /// Open the list of suggestions each time the launcher starts fresh, as
+    /// if you pressed Down. Default false.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub open_list: Option<bool>,
 }
 
 impl Launcher {
@@ -184,6 +188,7 @@ impl Launcher {
             && self.autostart.is_none()
             && self.reset_after_seconds.is_none()
             && self.display.is_none()
+            && self.open_list.is_none()
     }
 }
 
