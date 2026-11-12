@@ -163,14 +163,18 @@ impl Shell for SlintShell {
         };
         let mut platform = self.platform.lock().unwrap();
         platform.will_show();
+        // Attached on the first show, which Slint itself keeps invisible
+        // until its first frame. The handle can exist before it on macOS.
+        let shown_before = self.attached.load(Ordering::Relaxed);
         // The native window may not exist before the first show.
         let existing = handle(window.window());
         if let Some(handle) = existing {
             self.attach_once(platform.as_mut(), handle);
             platform.position_on_active_display(handle, *self.notice.display.lock().unwrap());
-            // A hidden window keeps what it showed before the hide. On the
-            // first show Slint itself waits for the first frame.
-            platform.conceal(handle);
+            // A hidden window keeps what it showed before the hide.
+            if shown_before {
+                platform.conceal(handle);
+            }
         }
         if let Err(error) = window.show() {
             eprintln!("[dango] could not show the launcher: {error}");
