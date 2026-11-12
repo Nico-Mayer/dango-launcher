@@ -205,22 +205,27 @@ impl LauncherWindow for MacLauncherWindow {
         // is nothing to hand back.
     }
 
+    /// Through the animator, so it replaces a fade still running from the
+    /// last show; a plain set can be overtaken by it.
     fn conceal(&mut self, window: RawWindowHandle) {
         if let Some(ns_window) = ns_window(window) {
-            ns_window.setAlphaValue(0.0);
+            animate_alpha(&ns_window, 0.0, 0.0);
         }
     }
 
     fn reveal(&mut self, window: RawWindowHandle) {
-        let Some(ns_window) = ns_window(window) else {
-            return;
-        };
-        let fade = block2::RcBlock::new(move |context: NonNull<NSAnimationContext>| {
-            unsafe { context.as_ref() }.setDuration(REVEAL_SECONDS);
-            ns_window.animator().setAlphaValue(1.0);
-        });
-        NSAnimationContext::runAnimationGroup(&fade);
+        if let Some(ns_window) = ns_window(window) {
+            animate_alpha(&ns_window, 1.0, REVEAL_SECONDS);
+        }
     }
+}
+
+fn animate_alpha(ns_window: &NSWindow, alpha: f64, seconds: f64) {
+    let change = block2::RcBlock::new(|context: NonNull<NSAnimationContext>| {
+        unsafe { context.as_ref() }.setDuration(seconds);
+        ns_window.animator().setAlphaValue(alpha);
+    });
+    NSAnimationContext::runAnimationGroup(&change);
 }
 
 pub struct MacNoticeWindow;
