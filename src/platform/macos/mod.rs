@@ -36,7 +36,8 @@ use objc2::rc::Retained;
 use objc2::runtime::{AnyClass, AnyObject, Bool, ClassBuilder, Sel};
 use objc2::{msg_send, sel};
 use objc2_app_kit::{
-    NSEvent, NSScreen, NSView, NSWindow, NSWindowCollectionBehavior, NSWindowStyleMask,
+    NSAnimatablePropertyContainer, NSAnimationContext, NSEvent, NSScreen, NSView, NSWindow,
+    NSWindowCollectionBehavior, NSWindowStyleMask,
 };
 use objc2_foundation::{MainThreadMarker, NSPoint};
 use raw_window_handle::RawWindowHandle;
@@ -137,6 +138,9 @@ const NS_POPUP_MENU_WINDOW_LEVEL: isize = 101;
 /// Above the launcher, so a notice shown as the launcher hides is never under it.
 const NOTICE_WINDOW_LEVEL: isize = NS_POPUP_MENU_WINDOW_LEVEL + 1;
 
+/// Matches `Theme.reveal-duration`, in seconds.
+const REVEAL_SECONDS: f64 = 0.12;
+
 pub struct MacLauncherWindow;
 
 impl LauncherWindow for MacLauncherWindow {
@@ -199,6 +203,23 @@ impl LauncherWindow for MacLauncherWindow {
     fn restore_previous_focus(&mut self) {
         // A non-activating panel never takes application activation, so there
         // is nothing to hand back.
+    }
+
+    fn conceal(&mut self, window: RawWindowHandle) {
+        if let Some(ns_window) = ns_window(window) {
+            ns_window.setAlphaValue(0.0);
+        }
+    }
+
+    fn reveal(&mut self, window: RawWindowHandle) {
+        let Some(ns_window) = ns_window(window) else {
+            return;
+        };
+        let fade = block2::RcBlock::new(move |context: NonNull<NSAnimationContext>| {
+            unsafe { context.as_ref() }.setDuration(REVEAL_SECONDS);
+            ns_window.animator().setAlphaValue(1.0);
+        });
+        NSAnimationContext::runAnimationGroup(&fade);
     }
 }
 
