@@ -7,7 +7,7 @@
 
 ## 2. Manual check on macOS
 
-- [ ] 2.1 With the debug build through `dango-ui`, type "Finder" and press Enter. Finder comes to the front.
+- [x] 2.1 With the debug build through `dango-ui`, type "Finder" and press Enter. Finder comes to the front.
 
 ## 3. Review
 
