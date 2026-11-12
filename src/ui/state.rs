@@ -1000,11 +1000,8 @@ impl Launcher {
                 }
             }
         } else if !self.query.is_empty() {
-            self.query.clear();
             self.query_revision = self.next_revision();
-            self.root_open = self.open_list;
-            self.picked = None;
-            fx.push(Effect::Search(String::new()));
+            self.query_changed(String::new(), fx);
         } else if self.root_open && !self.open_list {
             self.root_open = false;
             self.picked = None;

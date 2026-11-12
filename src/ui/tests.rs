@@ -487,6 +487,10 @@ fn escape_with_text_returns_to_the_open_list_on_the_first_row() {
     h.press("ArrowDown");
     assert_eq!(h.selected(), id(2));
     assert!(h.press("Escape").contains(&Effect::Search(String::new())));
+    assert!(
+        h.root_screen().sections.is_empty(),
+        "no typed rows while the open list loads"
+    );
     h.results("", results(5));
     assert!(!h.root_screen().sections.is_empty());
     assert_eq!(h.selected(), id(1));
