@@ -25,8 +25,9 @@ held show alike.
 
 ### Requirement: The launcher opens with an animation
 
-Each show SHALL fade the launcher in and slide the pill and card a short way
-down into place, after the first current frame is drawn. The animation SHALL
+Each show after the first since Dango started SHALL fade the launcher in and
+slide the pill and card a short way down into place, after the first current
+frame is drawn. The first show SHALL appear without animation. The animation SHALL
 be short and SHALL NOT delay input: keys pressed during it SHALL act at once.
 It SHALL start with the first fresh frame, so activation still feels
 immediate. Hiding SHALL stay instant, with no animation.
@@ -42,6 +43,12 @@ immediate. Hiding SHALL stay instant, with no animation.
 - **GIVEN** Windows
 - **WHEN** the user activates the launcher
 - **THEN** the pill and card slide down into place
+
+#### Scenario: The first show has no animation
+
+- **WHEN** the user activates the launcher for the first time after Dango
+  starts
+- **THEN** the launcher appears in place, with no fade and no slide
 
 #### Scenario: Typing during the animation
 

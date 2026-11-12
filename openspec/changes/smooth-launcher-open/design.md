@@ -47,6 +47,10 @@ When to reveal:
 
 **Rejected: native fade on Windows via `SetLayeredWindowAttributes`.** The launcher is not a layered window. Making it one changes how it draws and how clicks pass through (see the layered-window trap in AGENTS.md).
 
+The first show has no fade and no slide: `Shell.revealed` starts `true` and `conceal` is skipped, so Slint's own first-frame handling stays in charge (see Risks). The spec says so.
+
+`conceal` sets alpha 0 through the animator with duration 0, not with a plain `setAlphaValue`: a fade still running from the last show would otherwise go on raising alpha before the fresh frame is drawn.
+
 **Rejected: a three-state reveal enum.** One bool set where the activated snapshot is placed is enough.
 
 **Rejected: write the Windows cloak now.** The flash was not seen on Windows, CI can only compile it, and cloaking risks `force_foreground` and `take_keyboard`.
@@ -67,7 +71,7 @@ Only `y` moves, so every renderer draws it correctly. No design-system part is a
   > Open the list of suggestions each time the launcher starts fresh, as if you pressed Down. Default false.
 - `Event::Reset` becomes `Event::Reset { open_list: bool }`. `reset()` sets `root_open = open_list` instead of `false`. No helper is needed: `reset()` clears the results, so the Arrow Down path would only set `root_open` anyway, and the first row is selected by default.
 - `Core::settle_hide` and the hold timeout read the setting from config at that moment, so a changed value applies at the next reset without a restart.
-- The initial state: `Core` applies the same reset input once at startup, after config is loaded, so the first show matches.
+- The initial state: `Core::new` builds the state with `ui::Launcher::starting(open_list)`, which matches a reset. The first search still comes from `Intent::Ready`.
 - A held show does not reset, so the setting never applies there.
 
 **Rejected: keep the setting in `ui::Launcher` state.** The reducer would hold a copy of config that can go stale. Passing the value in the event keeps the reducer pure and matches how `Activated` carries its inputs.
