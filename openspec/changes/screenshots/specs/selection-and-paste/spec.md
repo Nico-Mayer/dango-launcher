@@ -45,9 +45,11 @@ No clipboard write Dango makes, to read a selection, to insert text, or to put
 a clipboard history entry back on the clipboard, SHALL appear in the clipboard
 history, and no such write SHALL reorder an entry that is already there.
 
-A screenshot Dango puts on the clipboard, to copy or to paste it, is the
-user's choice of what to copy. It SHALL be recorded in the clipboard history
-as a file entry, like the user copying the file in the file manager.
+A copy the user asks for is theirs, not Dango's. What a Copy action places on
+the clipboard, and a screenshot Dango puts there to copy or paste it, SHALL be
+recorded like a copy the user made in another application. A screenshot SHALL
+be recorded as a file entry, like the user copying the file in the file
+manager.
 
 A write SHALL be recognised as Dango's own even when the system does not hand
 it back unchanged. Recognition SHALL be bounded in time, so that the user
@@ -72,6 +74,11 @@ copying the same thing later is still recorded as theirs.
 
 - **WHEN** Dango puts a clipboard history entry back on the clipboard
 - **THEN** that does not create a new entry or reorder the history
+
+#### Scenario: A copied path is recorded
+
+- **WHEN** the user runs "Copy path" on an application while the clipboard history is recording
+- **THEN** the history's newest entry is that path
 
 #### Scenario: A copied screenshot is recorded
 

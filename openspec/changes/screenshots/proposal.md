@@ -32,13 +32,14 @@ Getting a recent screenshot into a chat, a ticket, or an editor takes a trip to 
 
 ### Modified Capabilities
 
-- `selection-and-paste`: a pasted screenshot stays on the clipboard like a pasted history entry, and a screenshot Dango puts on the clipboard at the user's request is recorded in the clipboard history.
+- `selection-and-paste`: a pasted screenshot stays on the clipboard like a pasted history entry. A copy the user asks for (a Copy action, or a screenshot copied or pasted) is recorded in the clipboard history, as Copy actions already are today.
+- `clipboard-history`: the "Dango's own writes are not recorded" rule points at the exception above.
 
 ## Impact
 
 - New `src/extensions/screenshots/`, registered in `src/extensions/mod.rs` and `src/app/startup.rs`.
 - New `ScreenshotsTable` in `src/config/`, added to `BUILT_IN_TABLES`; schema and settings reference regenerate.
-- Clipboard write of image plus files in one go: new method on `ClipboardSource` (`src/extensions/clipboard/source.rs`) and a paste path in `src/text/` that does not mark the write as Dango's own.
+- Clipboard write of image plus file in one go: new default method on `ClipboardSource` (`src/extensions/clipboard/source.rs`) and a paste path in `src/text/` that does not mark the write as Dango's own. macOS goes through clipboard-rs; Windows writes directly with `clipboard-win`.
 - Platform: default screenshot folder per OS behind a narrow function in `src/platform/`; reveal-in-file-manager reused or lifted from `platform/*/apps.rs`.
 - No new thumbnail code: the renderer already shrinks large image files off the UI thread and caches them on disk (`src/slint_shell/icons.rs`).
-- New dependency: `trash` 5.3 for Move to Trash / Recycle Bin.
+- New dependencies: `trash` 5.3 for Move to Trash / Recycle Bin; `clipboard-win` 5.4 as a direct Windows-only dependency (already in the tree through clipboard-rs).

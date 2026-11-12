@@ -9,7 +9,8 @@ What already exists and shapes the approach:
 - Grid view in the view protocol (`GridView`, `TileContent::Image { image }` takes a file path). `games` is the one built-in grid today.
 - The renderer turns a large image path into a thumbnail on a worker thread, caches it under `cache_dir()/thumbnails` keyed by path + modified time, and shows it on the next render (`src/slint_shell/icons.rs`, `is_large`, `thumbnail_key`).
 - Clipboard writes go through `ClipboardSource` (`src/extensions/clipboard/source.rs`), implemented on clipboard-rs. Paste goes through `TextTarget::paste_content(&Content)` (`src/text/mod.rs`), which marks the write as Dango's own (`own_writes.expect`) so the history skips it.
-- The history reads files before images (`Snapshot::content`), so a write of image + files is recorded as a file entry.
+- The history reads files before images (`ClipboardWatcher::read` in `src/extensions/clipboard/watcher.rs`), so a write of image + file is recorded as a file entry.
+- A Copy action (`Effect::CopyText`, `src/app/mod.rs`) already writes without `own_writes.expect`, so it is recorded today. The spec deltas make that rule explicit instead of adding a screenshot-only exception.
 - Reveal in file manager exists only inside `AppIndexer` (`platform/macos/apps.rs` uses `activateFileViewerSelectingURLs`, `platform/windows/apps.rs` runs `explorer /select,`).
 - `windows` crate already has `Win32_UI_Shell` on, which holds `SHGetKnownFolderPath` and `FOLDERID_Screenshots`.
 
@@ -61,9 +62,12 @@ Rejected: making thumbnails in the extension like clipboard history does. The re
 
 ### Image + files in one clipboard write
 
-New `ClipboardSource::set_image_file(bytes: &[u8], path: &str)`. The crate impl calls `ClipboardContext::set(vec![Image, Files])` once. `RustImageData::from_bytes` decodes png, jpg, and webp through the `image` crate, so the file's raw bytes are passed in.
+New `ClipboardSource::set_image_file(image: &RustImageData, path: &str)`, a default method that does nothing, so only the crate impl and the test fakes that check it change; the other impls (`text/mod.rs`, `clipboard/extension.rs`, `clipboard/watcher.rs`, `ai/extension.rs` fakes) are untouched. The caller decodes first: `RustImageData::from_bytes` reads png, jpg, and webp through the `image` crate.
 
-On Windows clipboard-rs empties the clipboard when it writes an image (`win.rs` `set`, image arm calls `set_image`, which calls `clipboard_win::empty()`). The image therefore goes first and the files after it, written with `NoClear`. `set_image` also opens the clipboard a second time while `set` holds it open; whether that works is the first Windows task. Fallback: write the DIB and `CF_HDROP` with `clipboard-win` directly inside one open clipboard, without the crate's `set`.
+The two platforms need different writes, because clipboard-rs 0.3.5 `set` cannot write both formats correctly on either:
+
+- macOS: `set` writes `Files` on its own through `set_files` as separate pasteboard items, then one more item for the rest (`platform/macos.rs`). Instead call `set(vec![Image(img), Other("public.file-url", url)])`: `Other` goes into the same `NSPasteboardItem` as the PNG, so one item carries both types.
+- Windows: the image arm of `set` calls `set_image`, which opens a second `clipboard_win::Clipboard`; its drop closes the clipboard, so the `Files` write after it fails and `set` still returns `Ok` (`clipboard-win-5.4.1/src/lib.rs` drop). Write with `clipboard-win` directly inside one open clipboard: empty, DIB from the decoded image, then `CF_HDROP` with `NoClear`. `clipboard-win` becomes a direct Windows dependency; it is already in the tree through clipboard-rs.
 
 Rejected:
 
@@ -72,7 +76,7 @@ Rejected:
 
 ### Paste and copy paths
 
-Paste: new `TextTarget::paste_screenshot(&Path)`. Same order as `paste_content` (permission, dismiss, yield to the previous app, write, paste key, settle), but it calls `set_image_file` and does not call `own_writes.expect`, so the history records the write as a file entry (selection-and-paste delta). It reads the file before dismissing, so a deleted file fails with the clipboard untouched.
+Paste: new `TextTarget::paste_screenshot(&Path)`, a default method returning `TextError::Unavailable`, so only `TextExchange` and the fakes that test it implement it; the other impls (`app/tests.rs`, `clipboard/extension.rs`, `snippets/extension.rs`, `snippets/service.rs`, `ai/extension.rs`) are untouched. Same order as `paste_content` (permission, dismiss, yield to the previous app, write, paste key, settle), but it calls `set_image_file` and does not call `own_writes.expect`, so the history records the write as a file entry (selection-and-paste delta). It reads and decodes the file before dismissing, so a deleted or broken file fails with the launcher still up and the clipboard untouched, and decoding a large screenshot adds no delay between dismiss and paste.
 
 Copy: the extension holds the `Arc<dyn ClipboardSource>` and calls `set_image_file` directly, then returns `ActionOutcome::Copied` (grid) or `ctx.succeed_with("Copied to clipboard")` (no-view command).
 
@@ -136,8 +140,10 @@ Keywords for root search: "screenshot", "screen", "capture", "image", "paste", "
 
 ## Risks / Trade-offs
 
-- [Windows nested `OpenClipboard` in clipboard-rs `set` drops one format] → spike first; fallback to `clipboard-win` direct writes in one open clipboard.
-- [macOS pasteboard written with image and file URL makes some apps paste the file icon instead of the image] → hand check in a chat app and Preview; if an app picks the wrong one, order the pasteboard items image first.
+- [macOS app that sees a file URL pastes the file icon instead of the image] → hand check in a chat app and Preview. Both types sit in one pasteboard item, so there is no item order to tune; if an app picks wrong, note it as a limit.
+- [Windows chat app that prefers `CF_HDROP` attaches a file instead of an inline image] → hand check; acceptable, the screenshot still arrives.
+- [Recorded screenshot entry names the paste target as its "Source", since macOS attribution looks at the frontmost apps around the change] → accept; hand check and note it.
+- [Windows Screenshots folder may not exist until the first Win+PrtScn, so a fresh setup shows "Screenshot folder not found"] → accept; the hand check on Windows confirms which.
 - [A folder with thousands of screenshots makes each run slow to scan] → one `read_dir` plus metadata per entry is fast on a local disk; filtering and the 50-tile cap keep the UI bounded. Revisit only if it shows.
 - [History records a pasted screenshot as a file entry pointing at a file the user may later trash] → the history already handles file entries whose files are gone.
 - [Screenshots under the large-file threshold load at full size] → those are small by definition.
