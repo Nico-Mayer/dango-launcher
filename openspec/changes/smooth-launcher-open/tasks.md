@@ -18,7 +18,7 @@
 
 ## 4. Docs
 
-- [ ] 4.1 Update AGENTS.md: platform traps (macOS hidden window keeps its last surface; the winit event filter runs before Slint draws; Slint's `RevealOnFirstFrame` restores the saved alpha on macOS first show) and the architecture line on what the renderer keeps (add the reveal). Verify: `mise run check` passes and the text names the files involved.
+- [x] 4.1 Update AGENTS.md: platform traps (macOS hidden window keeps its last surface; the winit event filter runs before Slint draws; Slint's `RevealOnFirstFrame` restores the saved alpha on macOS first show) and the architecture line on what the renderer keeps (add the reveal). Verify: `mise run check` passes and the text names the files involved.
 
 ## 5. Hand checks
 
