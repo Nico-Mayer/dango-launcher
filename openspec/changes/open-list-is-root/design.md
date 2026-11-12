@@ -18,14 +18,17 @@ resets, so Escape and an emptied prompt land on it.
 
 ### 1. The reducer keeps the setting from the last reset
 
-`Launcher` gets a field `open_root: bool`, set in `starting` and `reset` from
-the value they already receive. Then:
+`Launcher` gets a field `open_list: bool`, named like the setting and
+`Event::Reset`, set in `starting` and `reset` from the value they already
+receive. The doc comment on `root_open` ("opened with Arrow Down") changes to
+say it is also open as the resting root view. Then:
 
-- `escape`, prompt with text: clear it, set `root_open = open_root`.
-- `escape`, empty prompt: if `root_open && !open_root`, close the list as
+- `escape`, prompt with text: clear it, set `root_open = open_list`, and
+  clear `picked` so the first row is selected.
+- `escape`, empty prompt: if `root_open && !open_list`, close the list as
   today; otherwise `Effect::Dismiss`.
-- `query_changed` to empty at root: `root_open = open_root`, and clear
-  `picked` so the first row is selected.
+- `query_changed` to empty at root: `root_open = open_list`. It already
+  clears `picked`.
 
 A config change still applies at the next reset, as the spec already says,
 because the value only enters at a reset.
@@ -54,7 +57,8 @@ against `openspec/specs/interface-copy`.
 - Old: "Open the list of suggestions each time the launcher starts fresh, as
   if you pressed Down. Default false."
 - New: "Show the list of suggestions whenever the prompt is empty, not only
-  after you press Down. Escape then hides the launcher. Default false."
+  after you press Down. Escape on an empty prompt then hides the launcher.
+  Default false."
 
 ## Risks / Trade-offs
 

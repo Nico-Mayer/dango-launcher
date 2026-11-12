@@ -42,7 +42,8 @@ None.
 
 - `launcher-shell`: "Dismissal" gets the rule that, with the setting on,
   Escape on the empty prompt hides. "The open list at start is a config
-  setting" replaces its "Escape stages still apply" scenario.
+  setting" replaces its "Escape stages still apply" scenario. "Reset to root
+  state on hide" counts every hide by Escape as a deliberate hide.
 - `root-search`: "Empty query behaviour" says an emptied query returns to the
   open list when the setting is on.
 
@@ -50,6 +51,7 @@ None.
 
 - `src/ui/state.rs` (`escape`, `query_changed`, `reset`, `starting`) and
   `src/ui/tests.rs`.
+- `src/app/tests.rs`: open-list tests that close the list with Escape.
 - `src/config/mod.rs` doc comment for `open_list`, regenerated schema and
   settings reference.
 - Depends on the `smooth-launcher-open` change, which adds the setting and is
