@@ -270,7 +270,7 @@ Per-command settings, keyed by command id.
 | `autostart` | boolean |  |  | Start Dango when you log in, on the machine that reads this file. Default false. A development build ignores it. |
 | `display` | string |  | `pointer`, `primary` | The display the launcher and its notice open on. "pointer" is the display under the mouse pointer, "primary" is your main display. Default "pointer". |
 | `hotkey` | [Hotkey](#hotkey) |  |  | The chord that summons the launcher. Default alt+space, which is Option+Space on macOS. |
-| `open-list` | boolean |  |  | Open the list of suggestions each time the launcher starts fresh, as if you pressed Down. Default false. |
+| `open-list` | boolean |  |  | Show the list of suggestions whenever the prompt is empty, not only after you press Down. Escape on an empty prompt then hides the launcher. Default false. |
 | `reset-after-seconds` | integer |  |  | Seconds the launcher keeps what you were doing after it is hidden by the hotkey or by losing focus. Pressing the hotkey again within this time continues where you left off. Default 60. 0 resets to root search at once. |
 
 ### Provider settings

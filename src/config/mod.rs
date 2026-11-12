@@ -177,8 +177,9 @@ pub struct Launcher {
     /// Default "pointer".
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub display: Option<LauncherDisplay>,
-    /// Open the list of suggestions each time the launcher starts fresh, as
-    /// if you pressed Down. Default false.
+    /// Show the list of suggestions whenever the prompt is empty, not only
+    /// after you press Down. Escape on an empty prompt then hides the
+    /// launcher. Default false.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub open_list: Option<bool>,
 }
