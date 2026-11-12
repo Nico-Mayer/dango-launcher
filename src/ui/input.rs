@@ -133,7 +133,10 @@ pub enum Event {
         /// The user opened it, rather than a command bringing it back.
         asked: bool,
     },
-    Reset,
+    /// `open_list` is `launcher.open-list`, read at the moment of the reset.
+    Reset {
+        open_list: bool,
+    },
     /// The launcher is off screen, for whatever reason it was hidden.
     Hidden,
     TickerExpired {

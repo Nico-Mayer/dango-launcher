@@ -214,6 +214,14 @@ impl Launcher {
         Self::default()
     }
 
+    /// As after a reset with this `launcher.open-list`.
+    pub fn starting(open_list: bool) -> Self {
+        Self {
+            root_open: open_list,
+            ..Self::default()
+        }
+    }
+
     /// The extension whose views are on screen, if any.
     pub fn view_owner(&self) -> Option<&str> {
         if self.stack.is_empty() {
@@ -360,7 +368,7 @@ impl Launcher {
                     }
                 }
             }
-            Event::Reset => self.reset(fx),
+            Event::Reset { open_list } => self.reset(open_list, fx),
             Event::Hidden => {
                 self.visible = false;
                 // A command that pastes asks for the hide and goes on working,
@@ -392,13 +400,13 @@ impl Launcher {
         }
     }
 
-    fn reset(&mut self, fx: &mut Vec<Effect>) {
+    fn reset(&mut self, open_list: bool, fx: &mut Vec<Effect>) {
         self.query.clear();
         self.query_revision = self.next_revision();
         self.results.clear();
         self.results_complete = false;
         self.picked = None;
-        self.root_open = false;
+        self.root_open = open_list;
         self.typed_card = false;
         self.stack.clear();
         self.owner = None;

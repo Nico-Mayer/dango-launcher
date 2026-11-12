@@ -451,9 +451,43 @@ fn a_reset_closes_the_list() {
     let mut h = bare_pill(5);
     h.press("ArrowDown");
     h.event(Event::Hidden);
-    h.event(Event::Reset);
+    h.event(Event::Reset { open_list: false });
     h.results("", results(5));
     assert!(h.root_screen().sections.is_empty());
+}
+
+#[test]
+fn a_reset_with_open_list_opens_the_list_on_the_first_row() {
+    let mut h = bare_pill(5);
+    h.event(Event::Hidden);
+    h.event(Event::Reset { open_list: true });
+    h.results("", results(5));
+    assert!(!h.root_screen().sections.is_empty());
+    assert_eq!(h.selected(), id(1));
+    assert!(!h.press("Escape").contains(&Effect::Dismiss));
+    assert!(
+        h.root_screen().sections.is_empty(),
+        "Escape closes the list"
+    );
+    assert_eq!(h.press("Escape"), vec![Effect::Dismiss]);
+}
+
+#[test]
+fn a_reset_with_open_list_selects_the_first_pinned_row() {
+    let mut h = Harness::new();
+    h.event(Event::Reset { open_list: true });
+    let mut items = results(5);
+    items[3].pinned = true;
+    items[0].suggested = true;
+    h.results("", items);
+    let headings: Vec<_> = h
+        .root_screen()
+        .sections
+        .iter()
+        .map(|s| s.heading.clone())
+        .collect();
+    assert_eq!(headings.len(), 3, "the open list, not the pinned card");
+    assert_eq!(h.selected(), id(4));
 }
 
 #[test]
@@ -1793,7 +1827,7 @@ fn a_reset_while_the_panel_is_open_closes_it_and_the_next_open_starts_fresh() {
         h.command("k");
         h.press("ArrowDown");
         h.event(Event::Hidden);
-        h.event(Event::Reset);
+        h.event(Event::Reset { open_list: false });
         h.results("", results(18));
         h.event(Event::Activated {
             held: false,
@@ -1915,7 +1949,7 @@ fn a_failure_around_a_hide_goes_to_the_notice_either_way_round() {
             h.event(Event::Failed("Couldn't paste".into()));
         }
         let mut effects = h.event(Event::Hidden);
-        h.event(Event::Reset);
+        h.event(Event::Reset { open_list: false });
         if !before_hide {
             effects = h.event(Event::Failed("Couldn't paste".into()));
         }
@@ -1983,7 +2017,7 @@ fn a_running_command_shows_a_busy_ticker_until_it_fails_or_resets() {
     h.press("Enter");
     h.wake_busy();
     assert_eq!(h.status(), "Running Clipboard History…");
-    h.event(Event::Reset);
+    h.event(Event::Reset { open_list: false });
     assert_eq!(h.status(), "");
     h.typed("Result");
     assert_eq!(h.status(), "");
@@ -2190,7 +2224,7 @@ fn a_reset_starts_at_an_empty_prompt() {
     let mut h = Harness::root(18);
     h.typed("Result 1");
     h.render(1, detail_tree("x"));
-    let effects = h.event(Event::Reset);
+    let effects = h.event(Event::Reset { open_list: false });
     assert_eq!(effects, vec![Effect::Search(String::new())]);
     h.results("", results(18));
     h.event(Event::Activated {
@@ -2210,7 +2244,7 @@ fn a_reset_starts_at_an_empty_prompt() {
 #[test]
 fn a_reset_does_not_abandon_the_running_command() {
     let mut h = Harness::view(detail_tree("x"));
-    h.event(Event::Reset);
+    h.event(Event::Reset { open_list: false });
     h.render(1, detail_tree("after work"));
     assert!(matches!(h.view_body(), ViewBody::Detail(_)));
 }
@@ -2439,7 +2473,7 @@ fn a_reset_clears_the_busy_marks_at_once() {
     let mut h = Harness::view(detail_tree("Working"));
     h.wake_busy();
     assert_eq!(h.status(), "Loading…");
-    h.event(Event::Reset);
+    h.event(Event::Reset { open_list: false });
     assert_eq!(h.launcher.busy_marks, BusyMarks::Hidden);
     assert_eq!(h.status(), "");
 }
@@ -3120,7 +3154,7 @@ fn reopening_held_onto_the_answer_s_own_view_shows_nothing_more() {
 #[test]
 fn after_a_reset_the_answer_is_offered_again() {
     let mut h = held_answer_view();
-    h.event(Event::Reset);
+    h.event(Event::Reset { open_list: false });
     let shown = h.snapshot().notice.is_some();
     assert!(shown);
     let effects = open(&mut h, false, false);

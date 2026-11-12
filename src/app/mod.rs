@@ -147,6 +147,15 @@ fn launcher_display(config: &FileConfig) -> config::LauncherDisplay {
         .unwrap_or_default()
 }
 
+fn open_list(config: &FileConfig) -> bool {
+    config
+        .shared()
+        .read()
+        .ok()
+        .and_then(|config| config.launcher.open_list)
+        .unwrap_or_default()
+}
+
 impl Core {
     fn new(
         shell: Arc<dyn Shell>,
@@ -156,12 +165,13 @@ impl Core {
         services: Services,
     ) -> Self {
         shell.set_display(launcher_display(&config));
+        let launcher = ui::Launcher::starting(open_list(&config));
         Self {
             shell,
             runtime,
             config,
             ui: Mutex::new(UiState {
-                launcher: ui::Launcher::new(),
+                launcher,
                 shown: None,
             }),
             latency: LatencyProbe::default(),
@@ -449,7 +459,12 @@ impl Core {
                 self.clear_hold();
             }
         }
-        self.apply(ui::Input::Event(ui::Event::Reset));
+        self.reset();
+    }
+
+    fn reset(self: &Arc<Self>) {
+        let open_list = open_list(&self.config);
+        self.apply(ui::Input::Event(ui::Event::Reset { open_list }));
     }
 
     fn reset_after(&self) -> Duration {
@@ -496,7 +511,7 @@ impl Core {
                 hold.take();
             }
             core.services.invoker.abandon();
-            core.apply(ui::Input::Event(ui::Event::Reset));
+            core.reset();
         });
         *hold = Some(Hold { generation, expiry });
     }

@@ -280,6 +280,81 @@ async fn a_dismiss_resets_at_once_and_drops_a_running_command() {
     assert_eq!(query(&shell), "");
 }
 
+/// The reload builds the index the fake commands are found in.
+fn with_commands(config: &str) -> (Arc<Core>, Arc<RecordingShell>) {
+    let (core, shell) = core_with(config, FakeGrab::default(), vec![two_commands()]);
+    core.apply_config_reload(Config::parse(config));
+    (core, shell)
+}
+
+fn list_open(shell: &RecordingShell) -> bool {
+    match shell.last_snapshot().screen {
+        Screen::Root(root) => !root.bare,
+        other => panic!("expected root search, got {other:?}"),
+    }
+}
+
+#[tokio::test(start_paused = true)]
+async fn open_list_opens_the_list_at_start() {
+    let (core, shell) = with_commands(r#"launcher = { open-list = true }"#);
+    core.dispatch(Intent::Ready);
+    core.toggle();
+    settle().await;
+    assert!(list_open(&shell));
+}
+
+#[tokio::test(start_paused = true)]
+async fn open_list_opens_the_list_after_a_dismiss() {
+    let (core, shell) = with_commands(r#"launcher = { open-list = true }"#);
+    core.toggle();
+    settle().await;
+    escape(&core);
+    escape(&core);
+    core.toggle();
+    settle().await;
+    assert!(list_open(&shell));
+}
+
+#[tokio::test(start_paused = true)]
+async fn open_list_opens_the_list_when_the_hold_runs_out() {
+    let (core, shell) =
+        with_commands(r#"launcher = { open-list = true, reset-after-seconds = 5 }"#);
+    core.toggle();
+    settle().await;
+    escape(&core);
+    core.toggle();
+    tokio::time::sleep(Duration::from_secs(6)).await;
+    core.toggle();
+    settle().await;
+    assert!(list_open(&shell));
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_held_show_keeps_a_closed_list_despite_open_list() {
+    let (core, shell) =
+        with_commands(r#"launcher = { open-list = true, reset-after-seconds = 5 }"#);
+    core.toggle();
+    settle().await;
+    escape(&core);
+    core.toggle();
+    core.toggle();
+    settle().await;
+    assert!(!list_open(&shell));
+}
+
+#[tokio::test(start_paused = true)]
+async fn a_reload_changes_what_the_next_reset_opens() {
+    let (core, shell) = with_commands("");
+    core.toggle();
+    settle().await;
+    assert!(!list_open(&shell));
+    core.apply_config_reload(Config::parse(r#"launcher = { open-list = true }"#));
+    escape(&core);
+    core.toggle();
+    settle().await;
+    assert!(list_open(&shell));
+}
+
 fn shows_a_view(shell: &RecordingShell) -> bool {
     matches!(shell.last_snapshot().screen, Screen::View(_))
 }
