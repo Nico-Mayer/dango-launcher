@@ -14,12 +14,20 @@ use crate::icon_cache::IconRgba;
 
 pub struct MacAppIndexer;
 
+const FINDER: &str = "/System/Library/CoreServices/Finder.app";
+
 impl AppIndexer for MacAppIndexer {
     fn index(&self) -> Vec<IndexedApp> {
         let mut apps = Vec::new();
         let mut seen = std::collections::HashSet::new();
         for root in roots() {
             collect(&root, &mut apps, &mut seen);
+        }
+        // Finder lives among the core services agents, so it is the one bundle
+        // taken from there by name instead of walking the folder.
+        let finder = Path::new(FINDER);
+        if is_bundle(finder) && seen.insert(finder.to_path_buf()) {
+            apps.push(indexed(finder));
         }
         apps
     }
@@ -77,6 +85,7 @@ fn roots() -> Vec<PathBuf> {
     let mut roots = vec![
         PathBuf::from("/Applications"),
         PathBuf::from("/System/Applications"),
+        PathBuf::from("/System/Library/CoreServices/Applications"),
     ];
     if let Some(home) = std::env::var_os("HOME") {
         roots.push(PathBuf::from(home).join("Applications"));
@@ -272,9 +281,14 @@ mod tests {
         #[ignore]
         fn the_installed_applications_are_found() {
             let apps = MacAppIndexer.index();
-            assert!(apps
-                .iter()
-                .any(|a| a.id == "/System/Applications/Utilities/Terminal.app"));
+            for found in [
+                "/System/Applications/Utilities/Terminal.app",
+                FINDER,
+                "/System/Library/CoreServices/Applications/Keychain Access.app",
+            ] {
+                assert!(apps.iter().any(|a| a.id == found), "{found} is missing");
+            }
+            assert!(!apps.iter().any(|a| a.id.ends_with("/Dock.app")));
         }
 
         /// Calculator is the subject because it holds no documents, so a
