@@ -22,7 +22,7 @@
 
 ## 5. Hand checks
 
-- [ ] 5.1 macOS hand check with `dango-ui`: push a view, reset with Escape stages, show again: no frame of the old view, fade and slide visible, typing during the fade works, hide stays instant. Also: hold (focus loss) then show, show and hide fast several times inside the fade, first show after start, show over a fullscreen app.
+- [x] 5.1 macOS hand check with `dango-ui`: push a view, reset with Escape stages, show again: no frame of the old view, fade and slide visible, typing during the fade works, hide stays instant. Also: hold (focus loss) then show, show and hide fast several times inside the fade, first show after start, show over a fullscreen app.
 - [ ] 5.2 Windows hand check with `dango-ui`, `mise run keys`, and `mise run shot`: does the launcher show an old frame after a reset? If yes, add `DWMWA_CLOAK` in `conceal`/`reveal` (check symbol names in vendored `windows-sys`) and repeat. Then check slide, focus, and paste after a show (open until a session on a Windows machine).
 
 ## 6. Review
