@@ -464,12 +464,42 @@ fn a_reset_with_open_list_opens_the_list_on_the_first_row() {
     h.results("", results(5));
     assert!(!h.root_screen().sections.is_empty());
     assert_eq!(h.selected(), id(1));
-    assert!(!h.press("Escape").contains(&Effect::Dismiss));
-    assert!(
-        h.root_screen().sections.is_empty(),
-        "Escape closes the list"
-    );
+}
+
+fn open_list_root(n: usize) -> Harness {
+    let mut h = Harness::new();
+    h.event(Event::Reset { open_list: true });
+    h.results("", results(n));
+    h
+}
+
+#[test]
+fn escape_on_the_open_list_dismisses_when_it_is_the_root() {
+    let mut h = open_list_root(5);
     assert_eq!(h.press("Escape"), vec![Effect::Dismiss]);
+}
+
+#[test]
+fn escape_with_text_returns_to_the_open_list_on_the_first_row() {
+    let mut h = open_list_root(5);
+    h.typed("R");
+    h.results("R", results(5));
+    h.press("ArrowDown");
+    assert_eq!(h.selected(), id(2));
+    assert!(h.press("Escape").contains(&Effect::Search(String::new())));
+    h.results("", results(5));
+    assert!(!h.root_screen().sections.is_empty());
+    assert_eq!(h.selected(), id(1));
+}
+
+#[test]
+fn clearing_the_query_returns_to_the_open_list() {
+    let mut h = open_list_root(5);
+    h.typed("R");
+    h.typed("");
+    h.results("", results(5));
+    assert!(!h.root_screen().sections.is_empty());
+    assert_eq!(h.selected(), id(1));
 }
 
 #[test]

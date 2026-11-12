@@ -42,9 +42,12 @@ pub struct Launcher {
     /// or before the one abandoned.
     abandoned_invocation: Option<u64>,
     panel: Option<PanelState>,
-    /// The empty-query list was opened with Arrow Down. Without it an empty
-    /// query shows only pinned items.
+    /// The empty-query list is open, by Arrow Down or because `open_list`
+    /// makes it the resting root view. Without it an empty query shows only
+    /// pinned items.
     root_open: bool,
+    /// `launcher.open-list` as of the last reset.
+    open_list: bool,
     /// The typed query has shown the card, rows or "No results". From then on
     /// the card stays while later keystrokes search, so it does not drop to
     /// the pill and back on every key.
@@ -218,6 +221,7 @@ impl Launcher {
     pub fn starting(open_list: bool) -> Self {
         Self {
             root_open: open_list,
+            open_list,
             ..Self::default()
         }
     }
@@ -407,6 +411,7 @@ impl Launcher {
         self.results_complete = false;
         self.picked = None;
         self.root_open = open_list;
+        self.open_list = open_list;
         self.typed_card = false;
         self.stack.clear();
         self.owner = None;
@@ -840,7 +845,7 @@ impl Launcher {
         match self.stack.last_mut() {
             None => {
                 if text.is_empty() {
-                    self.root_open = false;
+                    self.root_open = self.open_list;
                 }
                 // The empty-query list is no partial answer for a typed query,
                 // nor the other way round.
@@ -997,9 +1002,10 @@ impl Launcher {
         } else if !self.query.is_empty() {
             self.query.clear();
             self.query_revision = self.next_revision();
-            self.root_open = false;
+            self.root_open = self.open_list;
+            self.picked = None;
             fx.push(Effect::Search(String::new()));
-        } else if self.root_open {
+        } else if self.root_open && !self.open_list {
             self.root_open = false;
             self.picked = None;
         } else {
