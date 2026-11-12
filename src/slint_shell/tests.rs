@@ -1016,6 +1016,34 @@ mod list_view {
     }
 
     #[test]
+    fn the_launcher_slides_in_only_on_the_way_in() {
+        let h = Harness::root(results(3));
+        let pill_top = || h.find("Search bar").unwrap().absolute_position().y;
+        let offset = h.ui.global::<Theme>().get_reveal_offset();
+        assert_eq!(pill_top(), MARGIN);
+
+        hide(&h);
+        assert_eq!(pill_top(), MARGIN - offset, "hiding moves it at once");
+
+        h.renderer.borrow_mut().reveal(&h.ui);
+        i_slint_backend_testing::mock_elapsed_time(std::time::Duration::from_millis(500));
+        assert_eq!(pill_top(), MARGIN);
+    }
+
+    #[test]
+    fn typing_works_before_the_reveal() {
+        let h = Harness::new();
+        hide(&h);
+        h.event(Event::Activated {
+            held: false,
+            probe: None,
+            asked: true,
+        });
+        h.type_text("fi");
+        assert_eq!(h.query(), "fi");
+    }
+
+    #[test]
     fn a_row_is_forty_four_pixels_high() {
         let h = Harness::root(results(3));
         assert_eq!(h.row("Result 1").size().height, ROW);

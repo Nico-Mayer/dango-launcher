@@ -14,7 +14,7 @@
 
 ## 3. Slide animation
 
-- [ ] 3.1 Add `Theme.reveal-offset` and `Theme.reveal-duration`, and a `states` block in `ui/shell/launcher-window.slint` that animates the pill and card `y` only into the revealed state. Verify: UI test that after `hide` the content sits at the offset at once, that it reaches its resting position after `reveal`, and that typing into the SearchBar before `reveal` still updates the query.
+- [x] 3.1 Add `Theme.reveal-offset` and `Theme.reveal-duration`, and a `states` block in `ui/shell/launcher-window.slint` that animates the pill and card `y` only into the revealed state. Verify: UI test that after `hide` the content sits at the offset at once, that it reaches its resting position after `reveal`, and that typing into the SearchBar before `reveal` still updates the query.
 
 ## 4. Docs
 

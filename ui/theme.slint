@@ -149,6 +149,10 @@ export global Theme {
     out property <length> notice-padding: 14px;
     out property <float> loading-sweep-width: 0.25;
     out property <duration> loading-sweep-period: 1.2s;
+    /// How far the pill and card slide down as the launcher opens.
+    out property <length> reveal-offset: 8px;
+    /// Also `REVEAL_SECONDS` in `platform/macos`, the window's fade.
+    out property <duration> reveal-duration: 120ms;
 
     out property <length> text-small: 12px;
     out property <length> text-body: 14px;

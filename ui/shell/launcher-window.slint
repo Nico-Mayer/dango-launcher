@@ -73,11 +73,24 @@ export component LauncherWindow inherits Window {
             }
         }
 
-        Rectangle {
+        launcher := Rectangle {
             x: Theme.shadow-margin;
             y: Theme.shadow-margin;
             width: Theme.window-width;
             height: parent.height - 2 * Theme.shadow-margin;
+
+            // Only the way in is animated, so each show starts from the offset.
+            states [
+                concealed when !Shell.revealed: {
+                    y: Theme.shadow-margin - Theme.reveal-offset;
+                    out {
+                        animate y {
+                            duration: Theme.reveal-duration;
+                            easing: ease-out;
+                        }
+                    }
+                }
+            ]
 
             pill := Rectangle {
                 y: 0;
