@@ -990,6 +990,32 @@ mod list_view {
     }
 
     #[test]
+    fn the_launcher_is_revealed_without_a_show() {
+        let h = Harness::root(results(3));
+        assert!(h.ui.global::<Shell>().get_revealed());
+    }
+
+    #[test]
+    fn a_hide_unreveals_until_the_next_activation_is_drawn() {
+        let h = Harness::root(results(3));
+        hide(&h);
+        assert!(!h.ui.global::<Shell>().get_revealed());
+        assert!(!h.renderer.borrow_mut().take_reveal());
+
+        h.event(Event::Activated {
+            held: true,
+            probe: None,
+            asked: true,
+        });
+        assert!(h.renderer.borrow_mut().take_reveal());
+        assert!(!h.renderer.borrow_mut().take_reveal(), "taken once");
+        assert!(!h.ui.global::<Shell>().get_revealed());
+
+        h.renderer.borrow_mut().reveal(&h.ui);
+        assert!(h.ui.global::<Shell>().get_revealed());
+    }
+
+    #[test]
     fn a_row_is_forty_four_pixels_high() {
         let h = Harness::root(results(3));
         assert_eq!(h.row("Result 1").size().height, ROW);

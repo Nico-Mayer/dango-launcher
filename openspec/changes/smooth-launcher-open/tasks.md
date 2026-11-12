@@ -8,8 +8,8 @@
 
 ## 2. Reveal after the activated frame
 
-- [ ] 2.1 Add `Shell.revealed` (default `true`) and `Renderer` methods: `place_focus` sets `reveal_pending` and requests a redraw for the activated snapshot, `take_reveal`, `reveal` (sets `revealed`), `hide` (sets `revealed` false). Verify: UI tests in `src/slint_shell/tests.rs` that `revealed` is true for a headless render, false after `hide`, `take_reveal` is set only after the activated snapshot is rendered, and `reveal` sets it true.
-- [ ] 2.2 Add `conceal` and `reveal` with no-op defaults to `LauncherWindow`. In `SlintShell::show` call `conceal` only when a native window already exists; in `hide` call `Renderer::hide`; in the `RedrawRequested` handler queue the reveal with `slint::Timer::single_shot(Duration::ZERO, ...)` when `take_reveal` is set, skipping it if hidden by then. Verify: `cargo test` and `mise run check`.
+- [x] 2.1 Add `Shell.revealed` (default `true`) and `Renderer` methods: `place_focus` sets `reveal_pending` and requests a redraw for the activated snapshot, `take_reveal`, `reveal` (sets `revealed`), `hide` (sets `revealed` false). Verify: UI tests in `src/slint_shell/tests.rs` that `revealed` is true for a headless render, false after `hide`, `take_reveal` is set only after the activated snapshot is rendered, and `reveal` sets it true.
+- [x] 2.2 Add `conceal` and `reveal` with no-op defaults to `LauncherWindow`. In `SlintShell::show` call `conceal` only when a native window already exists; in `hide` call `Renderer::hide`; in the `RedrawRequested` handler queue the reveal with `slint::Timer::single_shot(Duration::ZERO, ...)` when `take_reveal` is set, skipping it if hidden by then. Verify: `cargo test` and `mise run check`.
 - [ ] 2.3 macOS: `conceal` sets `alphaValue` 0, `reveal` animates it to 1 with `NSAnimationContext` and the shared duration constant. Verify: `mise run check`.
 
 ## 3. Slide animation

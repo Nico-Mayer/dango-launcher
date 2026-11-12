@@ -20,7 +20,7 @@ use std::rc::Rc;
 
 use slint::{ComponentHandle, Image};
 
-use super::generated::{IconKind, Intents, LauncherWindow, ScreenKind};
+use super::generated::{IconKind, Intents, LauncherWindow, ScreenKind, Shell};
 use super::icons::{Icon, Icons};
 use super::keys::{self, Held};
 use crate::ui::snapshot::{Focus, Screen, Snapshot, ViewBody};
@@ -40,6 +40,8 @@ pub struct Renderer {
     focus: Option<Focus>,
     /// The activation probe still waiting for its frame.
     painting: Option<u64>,
+    /// An activation is drawn and the launcher not yet revealed.
+    reveal_pending: bool,
     height: f32,
 }
 
@@ -59,6 +61,7 @@ impl Renderer {
             activation: 0,
             focus: None,
             painting: None,
+            reveal_pending: false,
             height: height::MAX,
         }
     }
@@ -180,7 +183,7 @@ impl Renderer {
 
     /// The list and grid models and the detail hold their images too, so they
     /// go with the cache.
-    pub fn forget_images(&mut self) {
+    fn forget_images(&mut self) {
         self.list.clear();
         self.grid.clear();
         self.detail.clear();
@@ -190,6 +193,20 @@ impl Renderer {
     #[cfg(test)]
     pub fn holds_images(&self) -> bool {
         self.icons.holds_files()
+    }
+
+    pub fn take_reveal(&mut self) -> bool {
+        std::mem::take(&mut self.reveal_pending)
+    }
+
+    pub fn reveal(&mut self, ui: &LauncherWindow) {
+        ui.global::<Shell>().set_revealed(true);
+    }
+
+    pub fn hide(&mut self, ui: &LauncherWindow) {
+        self.reveal_pending = false;
+        ui.global::<Shell>().set_revealed(false);
+        self.forget_images();
     }
 
     #[cfg(test)]
@@ -211,6 +228,10 @@ impl Renderer {
         self.activation = snapshot.activation.count;
         if activated {
             self.painting = snapshot.activation.probe;
+            self.reveal_pending = true;
+            // A snapshot that changes nothing on screen draws no frame, and
+            // the launcher would stay invisible.
+            ui.window().request_redraw();
         }
         let moved = self.focus.as_ref() != Some(&snapshot.focus);
         self.focus = Some(snapshot.focus.clone());

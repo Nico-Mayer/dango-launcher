@@ -102,6 +102,8 @@ export global Shell {
     in property <bool> loading;
     /// A detail or form shows its command's title in place of the query.
     in property <string> title;
+    /// False from a hide until the first frame drawn after the next show.
+    in property <bool> revealed: true;
     in-out property <bool> pointer-resting;
     in-out property <bool> multiline-focused;
     /// The window's height, set before each snapshot is drawn.

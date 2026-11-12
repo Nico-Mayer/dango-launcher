@@ -168,6 +168,9 @@ impl Shell for SlintShell {
         if let Some(handle) = existing {
             self.attach_once(platform.as_mut(), handle);
             platform.position_on_active_display(handle, *self.notice.display.lock().unwrap());
+            // A hidden window keeps what it showed before the hide. On the
+            // first show Slint itself waits for the first frame.
+            platform.conceal(handle);
         }
         if let Err(error) = window.show() {
             eprintln!("[dango] could not show the launcher: {error}");
@@ -184,12 +187,13 @@ impl Shell for SlintShell {
     }
 
     fn hide(&self, restore_focus: bool) {
-        if let Some(window) = self.window.upgrade() {
+        let window = self.window.upgrade();
+        if let Some(window) = &window {
             let _ = window.hide();
         }
         RENDERER.with(|renderer| {
-            if let Some(renderer) = renderer.borrow().as_ref() {
-                renderer.borrow_mut().forget_images();
+            if let (Some(renderer), Some(window)) = (renderer.borrow().as_ref(), &window) {
+                renderer.borrow_mut().hide(window);
             }
         });
         if restore_focus {
@@ -338,6 +342,7 @@ pub fn run() {
     let held = instance.clone();
     let weak_window = window.as_weak();
     let weak_tray = tray.as_weak();
+    let launcher = shell.platform.clone();
     slint::Timer::single_shot(std::time::Duration::ZERO, move || {
         let core = app::start(Startup {
             shell: shell.clone(),
@@ -350,7 +355,7 @@ pub fn run() {
         let (Some(window), Some(tray)) = (weak_window.upgrade(), weak_tray.upgrade()) else {
             return;
         };
-        connect(&window, &tray, &core, renderer);
+        connect(&window, &tray, &core, renderer, launcher);
         {
             let core = core.clone();
             if let Err(error) = instance::listen(instance::NAME, move || core.show(None, true)) {
@@ -387,6 +392,7 @@ fn connect(
     tray: &Tray,
     core: &Arc<Core>,
     renderer: Rc<RefCell<Renderer>>,
+    launcher: Platform,
 ) {
     let send = {
         let core = core.clone();
@@ -400,6 +406,7 @@ fn connect(
     }
     {
         let core = core.clone();
+        let weak = window.as_weak();
         // The frame is drawn while Slint handles this redraw. A rendering
         // notifier would be exact, but the software renderer, which Slint
         // falls back to without OpenGL 2, has none.
@@ -409,8 +416,15 @@ fn connect(
                     core.hide_on_focus_loss()
                 }
                 winit::event::WindowEvent::RedrawRequested => {
-                    if let Some(probe) = renderer.borrow_mut().painted() {
+                    let (painted, reveal) = {
+                        let mut renderer = renderer.borrow_mut();
+                        (renderer.painted(), renderer.take_reveal())
+                    };
+                    if let Some(probe) = painted {
                         core.dispatch(Intent::Painted { probe });
+                    }
+                    if reveal {
+                        reveal_after_draw(weak.clone(), renderer.clone(), launcher.clone());
                     }
                 }
                 _ => {}
@@ -430,6 +444,27 @@ fn connect(
             _ => Permission::InputMonitoring,
         };
         tray_core.tray_command(TrayCommand::Grant(permission));
+    });
+}
+
+/// This filter runs before Slint draws the frame, so revealing here would show
+/// what the window held before for one frame.
+fn reveal_after_draw(
+    weak: slint::Weak<LauncherWindow>,
+    renderer: Rc<RefCell<Renderer>>,
+    platform: Platform,
+) {
+    slint::Timer::single_shot(std::time::Duration::ZERO, move || {
+        let Some(window) = weak.upgrade() else {
+            return;
+        };
+        if !window.window().is_visible() {
+            return;
+        }
+        renderer.borrow_mut().reveal(&window);
+        if let Some(handle) = handle(window.window()) {
+            platform.lock().unwrap().reveal(handle);
+        }
     });
 }
 

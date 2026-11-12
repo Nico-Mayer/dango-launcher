@@ -36,6 +36,11 @@ pub trait LauncherWindow: Send {
     /// short launcher sits where a full one would.
     fn position_on_active_display(&self, window: RawWindowHandle, display: LauncherDisplay);
     fn restore_previous_focus(&mut self);
+    /// Makes the window invisible before a show that is not its first, until
+    /// `reveal`.
+    fn conceal(&mut self, _window: RawWindowHandle) {}
+    /// After the first frame drawn since the show.
+    fn reveal(&mut self, _window: RawWindowHandle) {}
     /// Whether `set_height` keeps the top edge. Where it cannot yet, the
     /// window stays at `LAUNCHER_MAX_HEIGHT` plus the shadow margin.
     fn keeps_top_edge(&self) -> bool {
