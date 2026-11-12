@@ -230,20 +230,30 @@ fn existing() -> Existing {
 }
 
 /// Reads `hidutil`'s printed mapping. An unset mapping prints `(null)` and an
-/// empty one prints an empty list; anything else is one entry per `Src`. Pure,
-/// so the three cases are tested without touching the machine's real mapping.
+/// empty one prints an empty list. With several keyboard services it prints one
+/// list per service, so Dango's remap shows up once per service. Pure, so the
+/// cases are tested without touching the machine's real mapping.
 fn classify(text: &str) -> Existing {
-    let entries = text.matches("HIDKeyboardModifierMappingSrc").count();
-    if entries == 0 {
-        return Existing::Empty;
+    let mut entries = 0;
+    let mut ours = true;
+    for line in text.lines() {
+        let Some((key, value)) = line.split_once('=') else {
+            continue;
+        };
+        let value = value.trim().trim_end_matches(';');
+        match key.trim() {
+            "HIDKeyboardModifierMappingSrc" => {
+                entries += 1;
+                ours &= value == HID_CAPSLOCK.to_string();
+            }
+            "HIDKeyboardModifierMappingDst" => ours &= value == HID_F18.to_string(),
+            _ => {}
+        }
     }
-    let ours = entries == 1
-        && text.contains(&HID_CAPSLOCK.to_string())
-        && text.contains(&HID_F18.to_string());
-    if ours {
-        Existing::Ours
-    } else {
-        Existing::Foreign
+    match (entries, ours) {
+        (0, _) => Existing::Empty,
+        (_, true) => Existing::Ours,
+        (_, false) => Existing::Foreign,
     }
 }
 
@@ -296,6 +306,20 @@ mod tests {
         let left_behind = "(\n  {\n    HIDKeyboardModifierMappingDst = 30064771181;\n    \
                            HIDKeyboardModifierMappingSrc = 30064771129;\n  }\n)";
         assert_eq!(classify(left_behind), Existing::Ours);
+    }
+
+    #[test]
+    fn dangos_mapping_on_every_keyboard_service_is_reclaimed() {
+        use super::{classify, Existing};
+        let per_service = "RegistryID  Key                   Value\n\
+                           100000340   UserKeyMapping   (\n  {\n    \
+                           HIDKeyboardModifierMappingDst = 30064771181;\n    \
+                           HIDKeyboardModifierMappingSrc = 30064771129;\n  }\n)\n\
+                           1000007f1   UserKeyMapping   (null)\n\
+                           100000a2b   UserKeyMapping   (\n  {\n    \
+                           HIDKeyboardModifierMappingDst = 30064771181;\n    \
+                           HIDKeyboardModifierMappingSrc = 30064771129;\n  }\n)\n";
+        assert_eq!(classify(per_service), Existing::Ours);
     }
 
     #[test]
