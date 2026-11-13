@@ -159,8 +159,8 @@ an explicit operation, and when it happens SHALL depend on why the launcher
 was hidden.
 
 A deliberate hide SHALL reset at once. Deliberate hides are an action that has
-finished its work and hidden the launcher, and Escape pressed on an empty root
-prompt with the list closed. The next activation SHALL present the launcher as
+finished its work and hidden the launcher, and Escape that hides the launcher
+(see Dismissal). The next activation SHALL present the launcher as
 if it had just started.
 
 An interrupting hide SHALL hold the launcher's state for a grace period.
@@ -302,23 +302,33 @@ the pill and the card, SHALL count as a click outside the launcher.
 At the root prompt, Escape SHALL act in stages. With text in the prompt,
 Escape SHALL clear the prompt and leave the launcher open. With an empty
 prompt and the empty-query list open (see root-search), Escape SHALL close
-that list and leave the launcher open. With an empty prompt and the list
-closed, Escape SHALL hide the launcher. This is a deliberate hide. In a pushed
-view, Escape SHALL pop that view, whether or not the prompt holds text, as the
-view stack in view-protocol describes.
+that list and leave the launcher open, unless `launcher.open-list` is `true`:
+then the open list is the root view, and Escape SHALL hide the launcher. With
+an empty prompt and the list closed, Escape SHALL hide the launcher. Each hide
+by Escape is a deliberate hide. In a pushed view, Escape SHALL pop that view,
+whether or not the prompt holds text, as the view stack in view-protocol
+describes.
 
 #### Scenario: Escape clears a non-empty prompt
 
 - **WHEN** the launcher shows the root prompt with text in it and the user presses Escape
 - **THEN** the prompt is cleared
-- **AND** the launcher stays visible, showing the closed root view
+- **AND** the launcher stays visible, showing the root view as
+  `launcher.open-list` sets it
 
 #### Scenario: Escape closes the empty-query list
 
-- **WHEN** the user has opened the empty-query list with Arrow Down and
-  presses Escape
+- **WHEN** `launcher.open-list` is absent, the user has opened the empty-query
+  list with Arrow Down, and presses Escape
 - **THEN** the list closes and the launcher shows the closed root view
 - **AND** the launcher stays visible
+
+#### Scenario: Escape on the open list hides when it is the root view
+
+- **WHEN** `launcher.open-list` is `true`, the prompt is empty, and the user
+  presses Escape
+- **THEN** the launcher hides
+- **AND** the next activation shows the open list again
 
 #### Scenario: Escape on an empty prompt dismisses
 
@@ -613,7 +623,8 @@ immediate. Hiding SHALL stay instant, with no animation.
 
 Dango SHALL read a boolean from `launcher.open-list` in the config file. When
 `true`, every reset and the first show after Dango starts SHALL present the
-root view with the empty-query list open (see root-search). When absent, it
+root view with the empty-query list open (see root-search), and the open list
+SHALL stay the root view for as long as the prompt is empty. When absent, it
 SHALL mean `false`. A held show SHALL NOT be affected. A changed value SHALL
 apply to the next reset without a restart, and the setting SHALL appear in the
 generated schema and in the settings reference.
@@ -631,10 +642,10 @@ generated schema and in the settings reference.
 
 #### Scenario: A held show keeps its state
 
-- **WHEN** `launcher.open-list` is `true`, the user closes the list with
-  Escape, and focus moves to another application
+- **WHEN** `launcher.open-list` is `true`, the user types `fi`, and focus
+  moves to another application
 - **AND** the user activates the launcher within the grace period
-- **THEN** the list is still closed
+- **THEN** the prompt still reads `fi` and its results are shown
 
 #### Scenario: Setting is changed while running
 
@@ -642,13 +653,6 @@ generated schema and in the settings reference.
   while Dango is running
 - **THEN** the launcher opens with the list open after the next reset, with no
   restart
-
-#### Scenario: Escape stages still apply
-
-- **WHEN** `launcher.open-list` is `true` and the launcher opens after a reset
-- **AND** the user presses Escape
-- **THEN** the list closes and the launcher stays open
-- **AND** a second Escape hides the launcher
 
 #### Scenario: The setting is documented
 

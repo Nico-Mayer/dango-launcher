@@ -156,7 +156,8 @@ results, and the launcher SHALL be the SearchBar pill alone. When
 empty-query list open, the same as after Arrow Down (see launcher-shell). After the first
 typed character, the pill SHALL stay alone until the first result for the
 query arrives, and SHALL NOT show the empty-query list meanwhile. When the
-query becomes empty again, the root view SHALL close again.
+query becomes empty again, the root view SHALL close again, or, when
+`launcher.open-list` is `true`, return to the open list.
 
 A provider MAY mark an item as pinned, such as a missing permission warning or
 an available update. While any item is pinned, the closed root view SHALL
@@ -204,10 +205,17 @@ typed query's results").
 #### Scenario: Clearing the query brings the sections back
 
 - **WHEN** the user deletes the last character of a query, leaving it empty,
-  and no item is pinned
+  no item is pinned, and `launcher.open-list` is absent
 - **THEN** the card closes and only the pill is shown
 - **AND** Arrow Down then shows the "Suggestions" and "Everything else"
   sections again
+
+#### Scenario: Clearing the query returns to the open list
+
+- **WHEN** `launcher.open-list` is `true` and the user deletes the last
+  character of a query, leaving it empty
+- **THEN** the empty-query list is open with its sections, and the first row
+  is selected
 
 #### Scenario: Typing removes the sections
 
