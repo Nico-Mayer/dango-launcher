@@ -62,14 +62,14 @@ Rejected: making thumbnails in the extension like clipboard history does. The re
 
 ### Image + files in one clipboard write
 
-New `ClipboardSource::set_image_file(png: &[u8], path: &Path) -> Result<(), String>`, a default method that does nothing, so only the crate impl and the test fakes that check it change; the other impls (`text/mod.rs`, `clipboard/extension.rs`, `ai/extension.rs` fakes) are untouched. The crate impl calls `platform::set_image_file`.
+New `ClipboardSource::set_image_file(png: &[u8], path: &Path) -> Result<(), String>`, a default method that returns an error, so only the crate impl and the test fakes that check it change; the other impls (`text/mod.rs`, `clipboard/extension.rs`, `ai/extension.rs` fakes) are untouched. The crate impl builds a `platform::ImageFile` once, then retries only its `write` while the clipboard is busy.
 
 The extension prepares the PNG bytes (`png_of`) before anything is dismissed or written: a PNG goes through as it is once its header reads (`ImageReader::into_dimensions`, no full decode), jpg and webp are decoded and encoded as PNG with the `image` crate. A missing file fails with "That screenshot no longer exists", anything else unreadable with "Couldn't read the screenshot".
 
 The two platforms need different writes, because clipboard-rs 0.3.5 `set` cannot write both formats correctly on either:
 
 - macOS: `set` writes `Files` on its own through `set_files` as separate pasteboard items, then one more item for the rest (`platform/macos.rs`). Instead call `set(vec![Other("public.png", png), Other("public.file-url", url)])`: every `Other` goes into the same `NSPasteboardItem`, so one item carries both types, and the PNG bytes need no decode. The URL comes from `url::Url::from_file_path`.
-- Windows: the image arm of `set` calls `set_image`, which opens a second `clipboard_win::Clipboard`; its drop closes the clipboard, so the `Files` write after it fails and `set` still returns `Ok` (`clipboard-win-5.4.1/src/lib.rs` drop). Write with `clipboard-win` directly inside one open clipboard: empty, DIB from the decoded image, then `CF_HDROP` with `NoClear`. `clipboard-win` becomes a direct Windows dependency; it is already in the tree through clipboard-rs.
+- Windows: the image arm of `set` calls `set_image`, which opens a second `clipboard_win::Clipboard`; its drop closes the clipboard, so the `Files` write after it fails and `set` still returns `Ok` (`clipboard-win-5.4.1/src/lib.rs` drop). Write with `clipboard-win` directly inside one open clipboard: empty, registered `PNG`, a 24-bit `CF_DIB` (BMP without its 14-byte file header, written with `set_without_clear`, since `set_bitmap_with` mishandles the V4 header of an RGBA BMP), then `CF_HDROP` with `NoClear`. `clipboard-win` becomes a direct Windows dependency; it is already in the tree through clipboard-rs.
 
 Rejected:
 
