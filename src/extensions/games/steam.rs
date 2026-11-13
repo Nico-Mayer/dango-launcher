@@ -4,6 +4,10 @@
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Arc;
+
+use notify::{RecursiveMode, Watcher as _};
 
 use steamlocate::app::StateFlag;
 use steamlocate::{App, SteamDir};
@@ -91,32 +95,68 @@ impl GameSource for SteamSource {
         let Some(steam) = self.steam() else {
             return Box::new(|| None);
         };
-        let folders = steam.path().join("steamapps").join("libraryfolders.vdf");
-        let steamapps: Vec<PathBuf> = steam
+        let mut steamapps: Vec<PathBuf> = steam
             .library_paths()
             .unwrap_or_default()
             .iter()
             .map(|library| library.join("steamapps"))
             .collect();
-        Box::new(move || {
-            let manifests = steamapps.iter().flat_map(|dir| {
-                std::fs::read_dir(dir)
-                    .into_iter()
-                    .flatten()
-                    .filter_map(|entry| entry.ok())
-                    .map(|entry| entry.path())
-                    .filter(|path| is_manifest(path))
-            });
-            let mut hasher = DefaultHasher::new();
-            for path in std::iter::once(folders.clone()).chain(manifests) {
-                if let Ok(modified) = std::fs::metadata(&path).and_then(|m| m.modified()) {
-                    path.hash(&mut hasher);
-                    modified.hash(&mut hasher);
-                }
-            }
-            Some(hasher.finish())
-        })
+        let own = steam.path().join("steamapps");
+        if !steamapps.contains(&own) {
+            steamapps.push(own);
+        }
+        notified(&steamapps).unwrap_or_else(|| polled(steamapps))
     }
+}
+
+/// Counts the changes the OS reports, so a poll reads a counter, not the disk.
+/// A library folder that is missing now, such as one on an unplugged drive,
+/// is left to the sweep.
+fn notified(steamapps: &[PathBuf]) -> Option<Watcher> {
+    let changes = Arc::new(AtomicU64::new(0));
+    let counter = changes.clone();
+    let mut watcher = notify::recommended_watcher(move |result: notify::Result<notify::Event>| {
+        let Ok(event) = result else { return };
+        if !event.kind.is_access() && event.paths.iter().any(|path| is_watched(path)) {
+            counter.fetch_add(1, Ordering::SeqCst);
+        }
+    })
+    .ok()?;
+    for dir in steamapps.iter().filter(|dir| dir.is_dir()) {
+        watcher.watch(dir, RecursiveMode::NonRecursive).ok()?;
+    }
+    Some(Box::new(move || {
+        let _watcher = &watcher;
+        Some(changes.load(Ordering::SeqCst))
+    }))
+}
+
+fn polled(steamapps: Vec<PathBuf>) -> Watcher {
+    Box::new(move || {
+        let mut hasher = DefaultHasher::new();
+        for entry in steamapps
+            .iter()
+            .flat_map(|dir| std::fs::read_dir(dir).into_iter().flatten())
+            .filter_map(Result::ok)
+        {
+            let path = entry.path();
+            if !is_watched(&path) {
+                continue;
+            }
+            if let Ok(modified) = entry.metadata().and_then(|m| m.modified()) {
+                path.hash(&mut hasher);
+                modified.hash(&mut hasher);
+            }
+        }
+        Some(hasher.finish())
+    })
+}
+
+fn is_watched(path: &Path) -> bool {
+    is_manifest(path)
+        || path
+            .file_name()
+            .is_some_and(|name| name == "libraryfolders.vdf")
 }
 
 fn is_manifest(path: &Path) -> bool {
@@ -310,15 +350,25 @@ mod tests {
         assert!(source.watcher()().is_none());
     }
 
+    fn changes(fingerprint: &Watcher, before: Option<u64>) -> bool {
+        let started = std::time::Instant::now();
+        while started.elapsed() < std::time::Duration::from_secs(5) {
+            if fingerprint() != before {
+                return true;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(20));
+        }
+        false
+    }
+
     #[test]
     fn the_fingerprint_changes_when_a_game_is_installed() {
         let steam = Fixture::new();
         let fingerprint = steam.source().watcher();
         let before = fingerprint();
         assert_eq!(before, fingerprint());
-        std::thread::sleep(std::time::Duration::from_millis(20));
         steam.install(&steam.second, 2, "Cyberpunk 2077", 4);
-        assert_ne!(before, fingerprint());
+        assert!(changes(&fingerprint, before));
     }
 
     #[test]
@@ -327,6 +377,16 @@ mod tests {
         steam.install(&steam.second, 2, "Cyberpunk 2077", 1026);
         let fingerprint = steam.source().watcher();
         let before = fingerprint();
+        steam.install(&steam.second, 2, "Cyberpunk 2077", 4);
+        assert!(changes(&fingerprint, before));
+    }
+
+    #[test]
+    fn the_polled_fingerprint_changes_when_a_game_is_installed() {
+        let steam = Fixture::new();
+        let fingerprint = polled(vec![steam.second.join("steamapps")]);
+        let before = fingerprint();
+        assert_eq!(before, fingerprint());
         std::thread::sleep(std::time::Duration::from_millis(20));
         steam.install(&steam.second, 2, "Cyberpunk 2077", 4);
         assert_ne!(before, fingerprint());
