@@ -10,12 +10,14 @@ use crate::config::Config;
 use crate::extension::{
     ActionOutcome, CommandDecl, Extension, FormValues, InvocationMode, Manifest, NAMED_ICON,
 };
+use crate::extensions::clipboard::ClipboardSource;
 use crate::invocation::{Command, InvocationContext};
 use crate::platform::{self, Label};
 use crate::protocol::{
     Action, EmptyState, GridItem, GridView, Modifier, Shortcut, TileContent, View, ViewTree,
     PROTOCOL_VERSION,
 };
+use crate::text::{TextError, TextTarget};
 
 pub use folders::{Scan, Screenshot};
 
@@ -25,6 +27,8 @@ pub const COMMAND_SEARCH: &str = "search";
 pub const COMMAND_PASTE_LATEST: &str = "paste-latest";
 pub const COMMAND_COPY_LATEST: &str = "copy-latest";
 
+pub const ACTION_PASTE: &str = "paste";
+pub const ACTION_COPY: &str = "copy";
 pub const ACTION_OPEN: &str = "open";
 pub const ACTION_REVEAL: &str = "reveal";
 pub const ACTION_COPY_PATH: &str = "copy-path";
@@ -37,7 +41,7 @@ pub trait Files: Send + Sync {
     fn reveal(&self, path: &Path) -> std::io::Result<()>;
 }
 
-pub struct SystemFiles;
+struct SystemFiles;
 
 impl Files for SystemFiles {
     fn open(&self, path: &Path) -> Result<(), String> {
@@ -95,6 +99,8 @@ struct Shared {
     config: Arc<RwLock<Config>>,
     default_folder: fn() -> Option<PathBuf>,
     files: Arc<dyn Files>,
+    clipboard: Option<Arc<dyn ClipboardSource>>,
+    text: Option<Arc<dyn TextTarget>>,
 }
 
 impl Shared {
@@ -106,6 +112,69 @@ impl Shared {
     fn grid(&self) -> ViewTree {
         grid(&self.scan())
     }
+
+    fn latest(&self) -> Result<PathBuf, String> {
+        self.scan()
+            .screenshots
+            .into_iter()
+            .next()
+            .map(|screenshot| screenshot.path)
+            .ok_or_else(|| "No screenshots found in your screenshot folders".into())
+    }
+
+    /// The file is read and checked before the launcher hides, so a missing
+    /// or broken file fails with the launcher still up.
+    fn paste(&self, path: &Path) -> Result<(), String> {
+        let text = self
+            .text
+            .as_ref()
+            .ok_or_else(|| TextError::Unavailable.to_string())?;
+        let png = png_of(path)?;
+        text.paste_image_file(&png, path)
+            .map_err(|error| error.to_string())
+    }
+
+    fn copy(&self, path: &Path) -> Result<(), String> {
+        let clipboard = self
+            .clipboard
+            .as_ref()
+            .ok_or_else(|| TextError::Clipboard.to_string())?;
+        let png = png_of(path)?;
+        clipboard.set_image_file(&png, path).map_err(|error| {
+            crate::log::append(&format!("could not copy {}: {error}", path.display()));
+            TextError::Clipboard.to_string()
+        })
+    }
+}
+
+/// The file as PNG bytes. A PNG goes through as it is once its header reads;
+/// any other format is converted.
+fn png_of(path: &Path) -> Result<Vec<u8>, String> {
+    let unreadable = |error: &dyn std::fmt::Display| {
+        crate::log::append(&format!("could not read {}: {error}", path.display()));
+        "Couldn't read the screenshot".to_string()
+    };
+    let bytes = match std::fs::read(path) {
+        Ok(bytes) => bytes,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            return Err("That screenshot no longer exists".into())
+        }
+        Err(error) => return Err(unreadable(&error)),
+    };
+    let format = image::guess_format(&bytes).map_err(|error| unreadable(&error))?;
+    if format == image::ImageFormat::Png {
+        image::ImageReader::with_format(std::io::Cursor::new(&bytes), format)
+            .into_dimensions()
+            .map_err(|error| unreadable(&error))?;
+        return Ok(bytes);
+    }
+    let image =
+        image::load_from_memory_with_format(&bytes, format).map_err(|error| unreadable(&error))?;
+    let mut png = Vec::new();
+    image
+        .write_to(&mut std::io::Cursor::new(&mut png), image::ImageFormat::Png)
+        .map_err(|error| unreadable(&error))?;
+    Ok(png)
 }
 
 pub struct ScreenshotsExtension {
@@ -114,22 +183,24 @@ pub struct ScreenshotsExtension {
 }
 
 impl ScreenshotsExtension {
-    pub fn new(config: Arc<RwLock<Config>>, files: Arc<dyn Files>) -> Self {
-        Self::with_default_folder(config, files, platform::screenshot_folder)
+    pub fn new(
+        config: Arc<RwLock<Config>>,
+        clipboard: Option<Arc<dyn ClipboardSource>>,
+        text: Option<Arc<dyn TextTarget>>,
+    ) -> Self {
+        Self::from_shared(Shared {
+            config,
+            default_folder: platform::screenshot_folder,
+            files: Arc::new(SystemFiles),
+            clipboard,
+            text,
+        })
     }
 
-    fn with_default_folder(
-        config: Arc<RwLock<Config>>,
-        files: Arc<dyn Files>,
-        default_folder: fn() -> Option<PathBuf>,
-    ) -> Self {
+    fn from_shared(shared: Shared) -> Self {
         Self {
             manifest: manifest(),
-            shared: Arc::new(Shared {
-                config,
-                default_folder,
-                files,
-            }),
+            shared: Arc::new(shared),
         }
     }
 }
@@ -142,6 +213,14 @@ impl Extension for ScreenshotsExtension {
     fn command(&self, command_id: &str) -> Option<Arc<dyn Command>> {
         match command_id {
             COMMAND_SEARCH => Some(Arc::new(SearchCommand(self.shared.clone()))),
+            COMMAND_PASTE_LATEST => Some(Arc::new(LatestCommand {
+                shared: self.shared.clone(),
+                paste: true,
+            })),
+            COMMAND_COPY_LATEST => Some(Arc::new(LatestCommand {
+                shared: self.shared.clone(),
+                paste: false,
+            })),
             _ => None,
         }
     }
@@ -155,6 +234,14 @@ impl Extension for ScreenshotsExtension {
         let path = Path::new(item_id);
         let files = &self.shared.files;
         match action_id {
+            ACTION_PASTE => match self.shared.paste(path) {
+                Ok(()) => ActionOutcome::Done,
+                Err(message) => ActionOutcome::Failed(message),
+            },
+            ACTION_COPY => match self.shared.copy(path) {
+                Ok(()) => ActionOutcome::Copied,
+                Err(message) => ActionOutcome::Failed(message),
+            },
             ACTION_OPEN => match files.open(path) {
                 Ok(()) => ActionOutcome::Done,
                 Err(error) => {
@@ -183,6 +270,30 @@ struct SearchCommand(Arc<Shared>);
 impl Command for SearchCommand {
     fn invoke(&self, ctx: &InvocationContext) {
         ctx.push_view(self.0.grid());
+    }
+}
+
+struct LatestCommand {
+    shared: Arc<Shared>,
+    paste: bool,
+}
+
+impl Command for LatestCommand {
+    fn invoke(&self, ctx: &InvocationContext) {
+        let path = match self.shared.latest() {
+            Ok(path) => path,
+            Err(message) => return ctx.fail(message),
+        };
+        let done = if self.paste {
+            self.shared.paste(&path)
+        } else {
+            self.shared.copy(&path)
+        };
+        match (done, self.paste) {
+            (Ok(()), true) => ctx.succeed(),
+            (Ok(()), false) => ctx.succeed_with("Copied to clipboard"),
+            (Err(message), _) => ctx.fail(message),
+        }
     }
 }
 
@@ -234,6 +345,16 @@ fn actions() -> Vec<Action> {
     };
     vec![
         Action {
+            id: ACTION_PASTE.into(),
+            title: "Paste".into(),
+            ..Default::default()
+        },
+        Action {
+            id: ACTION_COPY.into(),
+            title: "Copy".into(),
+            ..Default::default()
+        },
+        Action {
             id: ACTION_OPEN.into(),
             title: "Open".into(),
             shortcut: shortcut("o", vec![Modifier::Ctrl]),
@@ -257,6 +378,7 @@ fn actions() -> Vec<Action> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::invocation::{Outcome, Sink};
     use folders::tests::file;
     use std::sync::Mutex;
 
@@ -277,17 +399,139 @@ mod tests {
         }
     }
 
-    fn config_with(folders: &[&Path]) -> Arc<RwLock<Config>> {
+    type Written = Mutex<Vec<(Vec<u8>, PathBuf)>>;
+
+    #[derive(Default)]
+    struct FakeClipboard(Written);
+
+    impl ClipboardSource for FakeClipboard {
+        fn formats(&self) -> Option<Vec<String>> {
+            None
+        }
+        fn text(&self) -> Option<String> {
+            None
+        }
+        fn image(&self) -> Option<Vec<u8>> {
+            None
+        }
+        fn files(&self) -> Option<Vec<String>> {
+            None
+        }
+        fn set_text(&self, _text: &str) {}
+        fn set_image(&self, _png: &[u8]) {}
+        fn set_files(&self, _paths: &[String]) {}
+        fn set_image_file(&self, png: &[u8], path: &Path) -> Result<(), String> {
+            self.0.lock().unwrap().push((png.to_vec(), path.into()));
+            Ok(())
+        }
+    }
+
+    #[derive(Default)]
+    struct FakeText(Written);
+
+    impl TextTarget for FakeText {
+        fn insert(&self, _text: &str, _caret: Option<usize>) -> Result<(), TextError> {
+            unreachable!()
+        }
+        fn expand(&self, _: usize, _: &str, _: Option<usize>) -> Result<(), TextError> {
+            unreachable!()
+        }
+        fn paste_content(
+            &self,
+            _content: &crate::extensions::clipboard::Content,
+        ) -> Result<(), TextError> {
+            unreachable!()
+        }
+        fn paste_image_file(&self, png: &[u8], path: &Path) -> Result<(), TextError> {
+            self.0.lock().unwrap().push((png.to_vec(), path.into()));
+            Ok(())
+        }
+        fn selection(&self) -> Result<Option<String>, TextError> {
+            unreachable!()
+        }
+        fn clipboard_text(&self) -> Option<String> {
+            None
+        }
+    }
+
+    #[derive(Default)]
+    struct RecordingSink(Mutex<Option<Outcome>>);
+
+    impl Sink for RecordingSink {
+        fn push_view(&self, _tree: ViewTree) {}
+        fn finish(&self, outcome: Outcome) {
+            *self.0.lock().unwrap() = Some(outcome);
+        }
+    }
+
+    struct Fixture {
+        extension: ScreenshotsExtension,
+        files: Arc<FakeFiles>,
+        clipboard: Arc<FakeClipboard>,
+        text: Arc<FakeText>,
+    }
+
+    impl Fixture {
+        fn run(&self, command_id: &str) -> Outcome {
+            let sink = Arc::new(RecordingSink::default());
+            let ctx = InvocationContext::for_test(command_id, sink.clone());
+            self.extension.command(command_id).unwrap().invoke(&ctx);
+            let outcome = sink.0.lock().unwrap().take();
+            outcome.expect("the command finished")
+        }
+
+        fn act(&self, path: &Path, action_id: &str) -> ActionOutcome {
+            self.extension.perform_action(
+                &path.to_string_lossy(),
+                action_id,
+                &FormValues::default(),
+            )
+        }
+
+        fn copied(&self) -> Vec<(Vec<u8>, PathBuf)> {
+            self.clipboard.0.lock().unwrap().clone()
+        }
+
+        fn pasted(&self) -> Vec<(Vec<u8>, PathBuf)> {
+            self.text.0.lock().unwrap().clone()
+        }
+    }
+
+    fn fixture(folders: &[&Path]) -> Fixture {
         let mut config = Config::default();
         config.screenshots.folders = folders
             .iter()
             .map(|folder| folder.to_string_lossy().into_owned())
             .collect();
-        Arc::new(RwLock::new(config))
+        let files = Arc::new(FakeFiles::default());
+        let clipboard = Arc::new(FakeClipboard::default());
+        let text = Arc::new(FakeText::default());
+        let extension = ScreenshotsExtension::from_shared(Shared {
+            config: Arc::new(RwLock::new(config)),
+            default_folder: || None,
+            files: files.clone(),
+            clipboard: Some(clipboard.clone()),
+            text: Some(text.clone()),
+        });
+        Fixture {
+            extension,
+            files,
+            clipboard,
+            text,
+        }
     }
 
-    fn extension(folders: &[&Path], files: Arc<FakeFiles>) -> ScreenshotsExtension {
-        ScreenshotsExtension::with_default_folder(config_with(folders), files, || None)
+    fn png(folder: &Path, name: &str, age_seconds: u64) -> PathBuf {
+        let path = folder.join(name);
+        image::RgbImage::from_pixel(4, 3, image::Rgb([10, 20, 30]))
+            .save(&path)
+            .unwrap();
+        let file = std::fs::File::options().write(true).open(&path).unwrap();
+        file.set_modified(
+            std::time::SystemTime::now() - std::time::Duration::from_secs(age_seconds),
+        )
+        .unwrap();
+        path
     }
 
     fn grid_view(tree: &ViewTree) -> &GridView {
@@ -302,7 +546,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let old = file(dir.path(), "old.png", 60);
         let new = file(dir.path(), "new.png", 0);
-        let tree = extension(&[dir.path()], Arc::default()).shared.grid();
+        let tree = fixture(&[dir.path()]).extension.shared.grid();
         let grid = grid_view(&tree);
         assert_eq!((grid.columns, grid.aspect), (4, 16.0 / 10.0));
         let ids: Vec<_> = grid.items.iter().map(|item| item.id.clone()).collect();
@@ -319,7 +563,7 @@ mod tests {
     #[test]
     fn an_empty_folder_says_no_screenshots_yet() {
         let dir = tempfile::tempdir().unwrap();
-        let tree = extension(&[dir.path()], Arc::default()).shared.grid();
+        let tree = fixture(&[dir.path()]).extension.shared.grid();
         let empty = grid_view(&tree).empty_state.clone().unwrap();
         assert_eq!(empty.title, "No screenshots yet");
         assert_eq!(
@@ -332,7 +576,7 @@ mod tests {
     fn no_folder_points_at_the_config_file() {
         let dir = tempfile::tempdir().unwrap();
         let gone = dir.path().join("gone");
-        let tree = extension(&[&gone], Arc::default()).shared.grid();
+        let tree = fixture(&[&gone]).extension.shared.grid();
         let empty = grid_view(&tree).empty_state.clone().unwrap();
         assert_eq!(empty.title, "Screenshot folder not found");
         assert_eq!(
@@ -347,11 +591,13 @@ mod tests {
         file(dir.path(), "shot.png", 0);
         thread_local!(static FOLDER: std::cell::RefCell<Option<PathBuf>> = Default::default());
         FOLDER.with(|folder| *folder.borrow_mut() = Some(dir.path().into()));
-        let extension = ScreenshotsExtension::with_default_folder(
-            Arc::default(),
-            Arc::new(FakeFiles::default()),
-            || FOLDER.with(|folder| folder.borrow().clone()),
-        );
+        let extension = ScreenshotsExtension::from_shared(Shared {
+            config: Arc::default(),
+            default_folder: || FOLDER.with(|folder| folder.borrow().clone()),
+            files: Arc::new(FakeFiles::default()),
+            clipboard: None,
+            text: None,
+        });
         assert_eq!(extension.shared.scan().screenshots.len(), 1);
     }
 
@@ -363,41 +609,129 @@ mod tests {
     }
 
     #[test]
-    fn each_tile_offers_open_show_and_copy_path() {
+    fn each_tile_offers_paste_first_then_the_rest() {
         let titles: Vec<_> = actions().into_iter().map(|action| action.title).collect();
         let show = if cfg!(target_os = "macos") {
             "Show in Finder"
         } else {
             "Show in File Explorer"
         };
-        assert_eq!(titles, ["Open", show, "Copy path"]);
+        assert_eq!(titles, ["Paste", "Copy", "Open", show, "Copy path"]);
     }
 
     #[test]
     fn open_and_show_reach_the_file() {
-        let files = Arc::new(FakeFiles::default());
-        let extension = extension(&[], files.clone());
-        let path = "/shots/a.png";
-        let values = FormValues::default();
-        assert!(matches!(
-            extension.perform_action(path, ACTION_OPEN, &values),
-            ActionOutcome::Done
-        ));
-        assert!(matches!(
-            extension.perform_action(path, ACTION_REVEAL, &values),
-            ActionOutcome::Done
-        ));
-        assert_eq!(*files.opened.lock().unwrap(), [PathBuf::from(path)]);
-        assert_eq!(*files.revealed.lock().unwrap(), [PathBuf::from(path)]);
+        let f = fixture(&[]);
+        let path = Path::new("/shots/a.png");
+        assert!(matches!(f.act(path, ACTION_OPEN), ActionOutcome::Done));
+        assert!(matches!(f.act(path, ACTION_REVEAL), ActionOutcome::Done));
+        assert_eq!(*f.files.opened.lock().unwrap(), [path]);
+        assert_eq!(*f.files.revealed.lock().unwrap(), [path]);
     }
 
     #[test]
     fn copy_path_copies_the_full_path() {
-        let outcome = extension(&[], Arc::default()).perform_action(
-            "/shots/a.png",
-            ACTION_COPY_PATH,
-            &FormValues::default(),
-        );
+        let outcome = fixture(&[]).act(Path::new("/shots/a.png"), ACTION_COPY_PATH);
         assert!(matches!(outcome, ActionOutcome::CopyToClipboard(path) if path == "/shots/a.png"));
+    }
+
+    #[test]
+    fn paste_hands_the_png_and_its_file_over() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = png(dir.path(), "a.png", 0);
+        let f = fixture(&[dir.path()]);
+        assert!(matches!(f.act(&path, ACTION_PASTE), ActionOutcome::Done));
+        assert_eq!(f.pasted(), [(std::fs::read(&path).unwrap(), path)]);
+        assert!(f.copied().is_empty());
+    }
+
+    #[test]
+    fn copy_puts_the_png_and_its_file_on_the_clipboard() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = png(dir.path(), "a.png", 0);
+        let f = fixture(&[dir.path()]);
+        assert!(matches!(f.act(&path, ACTION_COPY), ActionOutcome::Copied));
+        assert_eq!(f.copied(), [(std::fs::read(&path).unwrap(), path)]);
+    }
+
+    #[test]
+    fn a_jpg_is_converted_to_png() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("photo.jpg");
+        image::RgbImage::from_pixel(4, 3, image::Rgb([10, 20, 30]))
+            .save(&path)
+            .unwrap();
+        let f = fixture(&[dir.path()]);
+        assert!(matches!(f.act(&path, ACTION_COPY), ActionOutcome::Copied));
+        let (bytes, _) = f.copied().remove(0);
+        assert_eq!(
+            image::guess_format(&bytes).unwrap(),
+            image::ImageFormat::Png
+        );
+    }
+
+    #[test]
+    fn a_screenshot_deleted_meanwhile_is_reported_and_nothing_is_written() {
+        let dir = tempfile::tempdir().unwrap();
+        let gone = dir.path().join("gone.png");
+        let f = fixture(&[dir.path()]);
+        for action in [ACTION_PASTE, ACTION_COPY] {
+            assert!(matches!(
+                f.act(&gone, action),
+                ActionOutcome::Failed(message) if message == "That screenshot no longer exists"
+            ));
+        }
+        assert!(f.pasted().is_empty());
+        assert!(f.copied().is_empty());
+    }
+
+    #[test]
+    fn a_file_that_is_not_an_image_is_reported_and_nothing_is_written() {
+        let dir = tempfile::tempdir().unwrap();
+        let broken = file(dir.path(), "broken.png", 0);
+        std::fs::write(&broken, b"not an image").unwrap();
+        let f = fixture(&[dir.path()]);
+        assert!(matches!(
+            f.act(&broken, ACTION_PASTE),
+            ActionOutcome::Failed(message) if message == "Couldn't read the screenshot"
+        ));
+        assert!(f.pasted().is_empty());
+    }
+
+    #[test]
+    fn copy_latest_copies_the_newest_screenshot() {
+        let dir = tempfile::tempdir().unwrap();
+        png(dir.path(), "old.png", 60);
+        let new = png(dir.path(), "new.png", 0);
+        let f = fixture(&[dir.path()]);
+        assert_eq!(
+            f.run(COMMAND_COPY_LATEST),
+            Outcome::Success(Some("Copied to clipboard".into()))
+        );
+        assert_eq!(f.copied()[0].1, new);
+    }
+
+    #[test]
+    fn paste_latest_pastes_the_newest_screenshot() {
+        let dir = tempfile::tempdir().unwrap();
+        png(dir.path(), "old.png", 60);
+        let new = png(dir.path(), "new.png", 0);
+        let f = fixture(&[dir.path()]);
+        assert_eq!(f.run(COMMAND_PASTE_LATEST), Outcome::Success(None));
+        assert_eq!(f.pasted()[0].1, new);
+    }
+
+    #[test]
+    fn with_no_screenshot_the_latest_commands_fail_and_write_nothing() {
+        let dir = tempfile::tempdir().unwrap();
+        let f = fixture(&[dir.path()]);
+        for command in [COMMAND_PASTE_LATEST, COMMAND_COPY_LATEST] {
+            assert_eq!(
+                f.run(command),
+                Outcome::Failure("No screenshots found in your screenshot folders".into())
+            );
+        }
+        assert!(f.pasted().is_empty());
+        assert!(f.copied().is_empty());
     }
 }

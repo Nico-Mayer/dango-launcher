@@ -1709,6 +1709,18 @@ mod screenshots {
         h.row("bug-report.png");
         assert!(h.find("holiday.jpg").is_none());
         assert!(h.find("chart.webp").is_none());
+
+        h.key("\n");
+        let Some(request) = h.effects().into_iter().find_map(|effect| match effect {
+            Effect::RunAction(request) => Some(request),
+            _ => None,
+        }) else {
+            panic!("Enter runs the tile's action");
+        };
+        assert_eq!(
+            (request.item_id.as_str(), request.action_id.as_str()),
+            ("/shots/bug-report.png", screenshots::ACTION_PASTE)
+        );
     }
 }
 

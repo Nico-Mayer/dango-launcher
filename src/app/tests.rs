@@ -1352,7 +1352,8 @@ async fn a_disabled_display_extension_offers_no_brightness_command() {
 fn screenshots_core(config: &str) -> (Arc<Core>, Arc<RecordingShell>) {
     let screenshots = Arc::new(crate::extensions::screenshots::ScreenshotsExtension::new(
         Arc::default(),
-        Arc::new(crate::extensions::screenshots::SystemFiles),
+        None,
+        None,
     ));
     let (core, shell) = core_with("", FakeGrab::default(), vec![screenshots]);
     core.apply_config_reload(Config::parse(config));
