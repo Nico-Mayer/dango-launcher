@@ -114,7 +114,6 @@ impl Renderer {
             Screen::Root(root) => {
                 self.write_query(ui, true, &root.query.text, root.query.revision);
                 self.list.root(ui, root, &self.icons);
-                answer::write(ui, Some(root), &self.icons);
                 if let Some(text) = &root.empty {
                     empty::write(ui, text, &self.icons);
                 }
