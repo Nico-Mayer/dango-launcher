@@ -25,9 +25,12 @@ pub enum Icon {
     Missing,
 }
 
-/// A file past this size, such as a wallpaper an extension shows, is shrunk on
-/// a thread of its own: decoding it on the UI thread froze the launcher, and
-/// drawing it at full size slowed the software renderer on every frame.
+/// An image larger than an icon, such as cover art or a wallpaper, is decoded
+/// on a thread of its own: decoding it on the UI thread froze the launcher.
+const ICON_SIDE: u32 = 256;
+
+/// A file past this size is also shrunk: drawing it at full size slowed the
+/// software renderer on every frame.
 const LARGE_FILE_BYTES: u64 = 256 * 1024;
 
 /// The longest side of a shrunk image, enough for a tile or a detail.
@@ -106,7 +109,7 @@ impl Icons {
         }
         let image = match self.shown.borrow_mut().remove(path) {
             Some(image) => image,
-            None if is_large(path) => self.thumbnail(path)?,
+            None if !is_icon_sized(path) => self.thumbnail(path)?,
             None => {
                 #[cfg(test)]
                 self.decoded.set(self.decoded.get() + 1);
@@ -131,14 +134,14 @@ impl Icons {
 }
 
 impl Icons {
-    /// A large file's thumbnail once a thread has made it. Until then the
-    /// placeholder shows, and the thread is started once.
+    /// An image larger than an icon once a thread has decoded it. Until then
+    /// the placeholder shows, and the thread is started once.
     fn thumbnail(&self, path: &str) -> Option<Image> {
         if let Some(image) = self.thumbnails.borrow().get(path) {
             return Some(image.clone());
         }
         let Some((sink, dir)) = &self.sink else {
-            return shrink(path).map(|image| Image::from_rgba8(pixels(image)));
+            return decode(path).map(|image| Image::from_rgba8(pixels(image)));
         };
         if self.shrinking.borrow_mut().insert(path.to_string()) {
             let mut queue = self.queue.borrow_mut();
@@ -148,7 +151,7 @@ impl Icons {
                 std::thread::spawn(move || {
                     let cache = IconCache::new(dir);
                     for path in paths {
-                        if let Some(image) = cached_thumbnail(&cache, &path) {
+                        if let Some(image) = decode_cached(&cache, &path) {
                             sink(path, pixels(image));
                         }
                     }
@@ -161,8 +164,27 @@ impl Icons {
     }
 }
 
+/// A file `image` cannot read is left to Slint, which also draws SVG.
+fn is_icon_sized(path: &str) -> bool {
+    image::image_dimensions(path).map_or(true, |(width, height)| width.max(height) <= ICON_SIDE)
+}
+
 fn is_large(path: &str) -> bool {
     std::fs::metadata(path).is_ok_and(|metadata| metadata.len() > LARGE_FILE_BYTES)
+}
+
+fn decode(path: &str) -> Option<image::RgbaImage> {
+    if is_large(path) {
+        return shrink(path);
+    }
+    Some(image::open(path).ok()?.to_rgba8())
+}
+
+fn decode_cached(cache: &IconCache, path: &str) -> Option<image::RgbaImage> {
+    if is_large(path) {
+        return cached_thumbnail(cache, path);
+    }
+    Some(image::open(path).ok()?.to_rgba8())
 }
 
 fn cached_thumbnail(cache: &IconCache, path: &str) -> Option<image::RgbaImage> {
@@ -476,6 +498,41 @@ mod tests {
         assert!(matches!(again, Icon::Missing));
         assert!(finished.try_recv().is_err(), "it was shrunk twice");
         assert!(matches!(icons.get(Some(&path)), Icon::File(_)));
+    }
+
+    fn cover_art() -> String {
+        let path = std::env::temp_dir().join(format!("dango-cover-{}.png", uuid::Uuid::new_v4()));
+        image::RgbImage::from_pixel(600, 900, image::Rgb([40, 80, 120]))
+            .save(&path)
+            .unwrap();
+        assert!(std::fs::metadata(&path).unwrap().len() <= LARGE_FILE_BYTES);
+        path.to_string_lossy().into_owned()
+    }
+
+    #[test]
+    fn an_image_larger_than_an_icon_is_decoded_off_the_ui_thread_at_full_size() {
+        let (sender, finished) = std::sync::mpsc::channel();
+        let mut icons = Icons::default();
+        icons.set_thumbnail_sink(
+            Arc::new(move |path, pixels| {
+                let _ = sender.send((path, pixels));
+            }),
+            temp_dir(),
+        );
+        let path = cover_art();
+
+        let first = icons.get(Some(&path));
+        let (decoded, pixels) = finished
+            .recv_timeout(std::time::Duration::from_secs(10))
+            .unwrap();
+        icons.add_thumbnail(decoded, pixels);
+
+        assert!(matches!(first, Icon::Missing));
+        assert_eq!(icons.decoded.get(), 0);
+        let Icon::File(image) = icons.get(Some(&path)) else {
+            panic!("expected the image");
+        };
+        assert_eq!(image.size().height, 900);
     }
 
     #[test]
