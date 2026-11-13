@@ -27,7 +27,7 @@
 
 ## 4. Move to trash
 
-- [ ] 4.1 Add `trash = "5.3"` and the Move to Trash / Move to Recycle Bin action: on success return `ActionOutcome::Replaced` with a rescanned grid, on failure the platform's failure string and log the error. Put the trash call behind a small function the tests can swap. Verify: tests cover the label per platform, the grid without the item after success, and "The move fails" (item stays, failure text)
+- [x] 4.1 Add `trash = "5.3"` and the Move to Trash / Move to Recycle Bin action: on success return `ActionOutcome::Replaced` with a rescanned grid, on failure the platform's failure string and log the error. Put the trash call behind a small function the tests can swap. Verify: tests cover the label per platform, the grid without the item after success, and "The move fails" (item stays, failure text)
 
 ## 5. Hand checks
 

@@ -99,6 +99,7 @@ ddc = "0.2"
 image = { version = "0.25", default-features = false, features = ["png", "jpeg", "webp", "gif", "bmp"] }
 rquickjs = { version = "0.14", features = ["futures", "parallel"] }
 rquickjs-extra = { version = "0.3", default-features = false, features = ["timers", "url"] }
+trash = "5.3"
 
 [dev-dependencies]
 ts-rs = "12"

@@ -569,6 +569,7 @@ pub mod clipboard_busy {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Label {
     FileManager,
+    Trash,
     EmptyTrash,
     /// The default launcher hotkey.
     LauncherShortcut,
@@ -586,6 +587,7 @@ pub enum Label {
 pub fn label(label: Label) -> &'static str {
     let (macos, windows) = match label {
         Label::FileManager => ("Finder", "File Explorer"),
+        Label::Trash => ("Trash", "Recycle Bin"),
         Label::EmptyTrash => ("Empty Trash", "Empty Recycle Bin"),
         Label::LauncherShortcut => ("Option+Space", "Alt+Space"),
         Label::CommandKey => ("⌘", "Ctrl"),

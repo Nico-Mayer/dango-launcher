@@ -14,8 +14,8 @@ use crate::extensions::clipboard::ClipboardSource;
 use crate::invocation::{Command, InvocationContext};
 use crate::platform::{self, Label};
 use crate::protocol::{
-    Action, EmptyState, GridItem, GridView, Modifier, Shortcut, TileContent, View, ViewTree,
-    PROTOCOL_VERSION,
+    Action, ActionStyle, EmptyState, GridItem, GridView, Modifier, Shortcut, TileContent, View,
+    ViewTree, PROTOCOL_VERSION,
 };
 use crate::text::{TextError, TextTarget};
 
@@ -32,6 +32,7 @@ pub const ACTION_COPY: &str = "copy";
 pub const ACTION_OPEN: &str = "open";
 pub const ACTION_REVEAL: &str = "reveal";
 pub const ACTION_COPY_PATH: &str = "copy-path";
+pub const ACTION_TRASH: &str = "trash";
 
 const ICON: &str = "image";
 
@@ -39,6 +40,7 @@ const ICON: &str = "image";
 pub trait Files: Send + Sync {
     fn open(&self, path: &Path) -> Result<(), String>;
     fn reveal(&self, path: &Path) -> std::io::Result<()>;
+    fn trash(&self, path: &Path) -> Result<(), String>;
 }
 
 struct SystemFiles;
@@ -50,6 +52,10 @@ impl Files for SystemFiles {
 
     fn reveal(&self, path: &Path) -> std::io::Result<()> {
         platform::reveal(path)
+    }
+
+    fn trash(&self, path: &Path) -> Result<(), String> {
+        trash::delete(path).map_err(|error| error.to_string())
     }
 }
 
@@ -260,6 +266,16 @@ impl Extension for ScreenshotsExtension {
                 }
             },
             ACTION_COPY_PATH => ActionOutcome::CopyToClipboard(item_id.into()),
+            ACTION_TRASH => match files.trash(path) {
+                Ok(()) => ActionOutcome::Replaced(Box::new(self.shared.grid())),
+                Err(error) => {
+                    crate::log::append(&format!("could not trash {item_id}: {error}"));
+                    ActionOutcome::Failed(format!(
+                        "Couldn't move the screenshot to the {}",
+                        platform::label(Label::Trash)
+                    ))
+                }
+            },
             _ => ActionOutcome::Failed("That action isn't available".into()),
         }
     }
@@ -372,6 +388,13 @@ fn actions() -> Vec<Action> {
             shortcut: shortcut("c", vec![Modifier::Ctrl, Modifier::Shift]),
             ..Default::default()
         },
+        Action {
+            id: ACTION_TRASH.into(),
+            title: format!("Move to {}", platform::label(Label::Trash)),
+            shortcut: shortcut("x", vec![Modifier::Ctrl]),
+            style: ActionStyle::Danger,
+            ..Default::default()
+        },
     ]
 }
 
@@ -386,6 +409,7 @@ mod tests {
     struct FakeFiles {
         opened: Mutex<Vec<PathBuf>>,
         revealed: Mutex<Vec<PathBuf>>,
+        trash_fails: std::sync::atomic::AtomicBool,
     }
 
     impl Files for FakeFiles {
@@ -396,6 +420,12 @@ mod tests {
         fn reveal(&self, path: &Path) -> std::io::Result<()> {
             self.revealed.lock().unwrap().push(path.into());
             Ok(())
+        }
+        fn trash(&self, path: &Path) -> Result<(), String> {
+            if self.trash_fails.load(std::sync::atomic::Ordering::SeqCst) {
+                return Err("refused".into());
+            }
+            std::fs::remove_file(path).map_err(|error| error.to_string())
         }
     }
 
@@ -616,7 +646,12 @@ mod tests {
         } else {
             "Show in File Explorer"
         };
-        assert_eq!(titles, ["Paste", "Copy", "Open", show, "Copy path"]);
+        let trash = if cfg!(target_os = "macos") {
+            "Move to Trash"
+        } else {
+            "Move to Recycle Bin"
+        };
+        assert_eq!(titles, ["Paste", "Copy", "Open", show, "Copy path", trash]);
     }
 
     #[test]
@@ -733,5 +768,42 @@ mod tests {
         }
         assert!(f.pasted().is_empty());
         assert!(f.copied().is_empty());
+    }
+
+    #[test]
+    fn a_trashed_screenshot_leaves_the_grid() {
+        let dir = tempfile::tempdir().unwrap();
+        let keep = file(dir.path(), "keep.png", 10);
+        let gone = file(dir.path(), "gone.png", 0);
+        let f = fixture(&[dir.path()]);
+        let ActionOutcome::Replaced(tree) = f.act(&gone, ACTION_TRASH) else {
+            panic!("the grid is shown again");
+        };
+        let ids: Vec<_> = grid_view(&tree)
+            .items
+            .iter()
+            .map(|item| item.id.clone())
+            .collect();
+        assert_eq!(ids, [keep.to_string_lossy()]);
+    }
+
+    #[test]
+    fn a_screenshot_that_cannot_be_trashed_stays() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = file(dir.path(), "a.png", 0);
+        let f = fixture(&[dir.path()]);
+        f.files
+            .trash_fails
+            .store(true, std::sync::atomic::Ordering::SeqCst);
+        let expected = if cfg!(target_os = "macos") {
+            "Couldn't move the screenshot to the Trash"
+        } else {
+            "Couldn't move the screenshot to the Recycle Bin"
+        };
+        assert!(matches!(
+            f.act(&path, ACTION_TRASH),
+            ActionOutcome::Failed(message) if message == expected
+        ));
+        assert!(path.exists());
     }
 }
