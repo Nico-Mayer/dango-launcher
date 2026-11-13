@@ -312,14 +312,20 @@ pub fn run() {
         Arc::new(move |path, pixels| {
             let weak = weak.clone();
             let _ = slint::invoke_from_event_loop(move || {
-                let Some(window) = weak.upgrade() else {
+                let Some(renderer) = RENDERER.with(|slot| slot.borrow().clone()) else {
                     return;
                 };
-                RENDERER.with(|renderer| {
-                    if let Some(renderer) = renderer.borrow().as_ref() {
-                        let mut renderer = renderer.borrow_mut();
-                        renderer.icons_mut().add_thumbnail(path, pixels);
-                        renderer.refresh(&window);
+                let scheduled = {
+                    let mut held = renderer.borrow_mut();
+                    held.icons_mut().add_thumbnail(path, pixels);
+                    !held.request_refresh()
+                };
+                if scheduled {
+                    return;
+                }
+                slint::Timer::single_shot(std::time::Duration::ZERO, move || {
+                    if let Some(window) = weak.upgrade() {
+                        renderer.borrow_mut().refresh(&window);
                     }
                 });
             });

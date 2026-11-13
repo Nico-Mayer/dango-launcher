@@ -42,6 +42,7 @@ pub struct Renderer {
     painting: Option<u64>,
     /// An activation is drawn and the launcher not yet revealed.
     reveal_pending: bool,
+    refresh_pending: bool,
     height: f32,
 }
 
@@ -62,6 +63,7 @@ impl Renderer {
             focus: None,
             painting: None,
             reveal_pending: false,
+            refresh_pending: false,
             height: height::MAX,
         }
     }
@@ -166,6 +168,7 @@ impl Renderer {
         self.panel.write(ui, &snapshot.panel);
         self.place_focus(ui, &snapshot);
         self.icons.rendered();
+        self.refresh_pending = false;
         self.last = Some(snapshot);
     }
 
@@ -173,8 +176,17 @@ impl Renderer {
         &mut self.icons
     }
 
-    /// Draws the last snapshot again, as when an image it shows is ready.
+    /// Asks for one redraw of the last snapshot, as when an image it shows is
+    /// ready. Whether the caller still has to schedule `refresh`.
+    pub fn request_refresh(&mut self) -> bool {
+        !std::mem::replace(&mut self.refresh_pending, true)
+    }
+
+    /// Draws the last snapshot again, unless a render since the request did.
     pub fn refresh(&mut self, ui: &LauncherWindow) {
+        if !self.refresh_pending {
+            return;
+        }
         if let Some(snapshot) = self.last.clone() {
             self.render(ui, snapshot);
         }

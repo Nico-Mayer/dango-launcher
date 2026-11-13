@@ -2633,3 +2633,19 @@ mod detail_body {
         assert!(h.find("First").is_some());
     }
 }
+
+mod thumbnail_refresh {
+    use super::*;
+
+    #[test]
+    fn thumbnails_arriving_together_ask_for_one_refresh() {
+        let h = Harness::root(results(1));
+        let mut renderer = h.renderer.borrow_mut();
+        assert!(renderer.request_refresh());
+        assert!(!renderer.request_refresh());
+
+        renderer.refresh(&h.ui);
+
+        assert!(renderer.request_refresh());
+    }
+}
