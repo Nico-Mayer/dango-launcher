@@ -75,6 +75,7 @@ extension_table!(
     ClipboardTable,
     DisplayTable,
     QuicklinksTable,
+    ScreenshotsTable,
     AiTable,
     ApplicationsTable
 );
@@ -177,6 +178,21 @@ pub struct DisplayTable {
     /// external monitor, "pointer" only the one under the mouse pointer.
     /// Default "all".
     pub monitors: BrightnessTarget,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize, JsonSchema)]
+#[serde(default, rename_all = "kebab-case")]
+pub struct ScreenshotsTable {
+    /// Whether the extension runs. Absent means enabled.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub enabled: Option<bool>,
+    /// Per-command settings, keyed by command id.
+    #[serde(skip_serializing_if = "BTreeMap::is_empty")]
+    pub commands: BTreeMap<String, CommandSettings>,
+    /// Folders to look for screenshots in, instead of the one your system
+    /// saves screenshots to. A path may start with `~` for your home folder.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub folders: Vec<String>,
 }
 
 /// Which monitors a brightness command changes.

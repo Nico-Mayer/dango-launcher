@@ -21,6 +21,7 @@ Every setting is optional; anything left out uses its built-in default. Dango ke
 | `launcher` | [Launcher](#launcher) |  |  | Settings of the launcher itself. |
 | `permissions` | object |  |  | Settings for the Permissions extension. |
 | `quicklinks` | object |  |  | Settings for the Quicklinks extension. |
+| `screenshots` | object |  |  | Settings for the Screenshots extension. |
 | `snippets` | object |  |  | Settings for the Snippets extension. |
 | `system` | object |  |  | Settings for the System extension. |
 | `updates` | object |  |  | Settings for the Updates extension. |
@@ -155,6 +156,26 @@ Per-command settings, keyed by command id.
 | Setting | Type | Default | Values | Description |
 | --- | --- | --- | --- | --- |
 | `create` | [Command settings](#command-settings) |  |  | Settings for the create command. |
+| `search` | [Command settings](#command-settings) |  |  | Settings for the search command. |
+
+### `screenshots`
+
+Settings for the Screenshots extension.
+
+| Setting | Type | Default | Values | Description |
+| --- | --- | --- | --- | --- |
+| `commands` | object |  |  | Per-command settings, keyed by command id. |
+| `enabled` | boolean |  |  | Whether the extension runs. Absent means enabled. |
+| `folders` | array |  |  | Folders to look for screenshots in, instead of the one your system saves screenshots to. A path may start with `~` for your home folder. |
+
+### `screenshots.commands`
+
+Per-command settings, keyed by command id.
+
+| Setting | Type | Default | Values | Description |
+| --- | --- | --- | --- | --- |
+| `copy-latest` | [Command settings](#command-settings) |  |  | Settings for the copy-latest command. |
+| `paste-latest` | [Command settings](#command-settings) |  |  | Settings for the paste-latest command. |
 | `search` | [Command settings](#command-settings) |  |  | Settings for the search command. |
 
 ### `snippets`

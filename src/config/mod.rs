@@ -29,7 +29,7 @@ pub use store::FileConfig;
 pub use tables::{
     table_name, AiCommandSettings, AiTable, ApplicationsTable, BrightnessTarget, ClipboardTable,
     CommandBinding, DisplayTable, ExtensionSettings, ExtensionTable, PrimaryAction,
-    QuicklinksTable, Table,
+    QuicklinksTable, ScreenshotsTable, Table,
 };
 
 #[derive(Debug, thiserror::Error)]
@@ -78,6 +78,9 @@ pub struct Config {
     /// Settings for the Quicklinks extension.
     #[serde(default)]
     pub quicklinks: QuicklinksTable,
+    /// Settings for the Screenshots extension.
+    #[serde(default)]
+    pub screenshots: ScreenshotsTable,
     /// Settings for the Snippets extension.
     #[serde(default)]
     pub snippets: Table,
@@ -103,7 +106,7 @@ fn is_built_in(extension_id: &str) -> bool {
 }
 
 /// The table names of the built-in extensions, each also its id after `dango.`.
-pub const BUILT_IN_TABLES: [&str; 12] = [
+pub const BUILT_IN_TABLES: [&str; 13] = [
     "ai",
     "applications",
     "calculator",
@@ -112,6 +115,7 @@ pub const BUILT_IN_TABLES: [&str; 12] = [
     "games",
     "permissions",
     "quicklinks",
+    "screenshots",
     "snippets",
     "system",
     "updates",
@@ -341,6 +345,7 @@ impl Config {
             Some("games") => Some(&self.games),
             Some("permissions") => Some(&self.permissions),
             Some("quicklinks") => Some(&self.quicklinks),
+            Some("screenshots") => Some(&self.screenshots),
             Some("snippets") => Some(&self.snippets),
             Some("system") => Some(&self.system),
             Some("updates") => Some(&self.updates),
@@ -477,6 +482,13 @@ mod tests {
     fn an_unknown_brightness_target_names_the_setting() {
         let error = Config::parse(r#"display = { monitors = "focused" }"#).unwrap_err();
         assert!(error.to_string().contains("monitors"), "{error}");
+    }
+
+    #[test]
+    fn screenshot_folders_parse_and_default_to_empty() {
+        assert!(Config::parse("").unwrap().screenshots.folders.is_empty());
+        let config = Config::parse(r#"screenshots = { folders = ["~/Desktop"] }"#).unwrap();
+        assert_eq!(config.screenshots.folders, ["~/Desktop"]);
     }
 
     #[test]

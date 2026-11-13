@@ -1675,6 +1675,43 @@ mod games {
     }
 }
 
+mod screenshots {
+    use std::path::PathBuf;
+    use std::time::SystemTime;
+
+    use super::*;
+    use crate::extensions::screenshots::{self, Scan, Screenshot};
+
+    fn scan(names: &[&str]) -> Scan {
+        Scan {
+            screenshots: names
+                .iter()
+                .map(|name| Screenshot {
+                    path: PathBuf::from("/shots").join(name),
+                    modified: SystemTime::UNIX_EPOCH,
+                })
+                .collect(),
+            any_folder: true,
+        }
+    }
+
+    #[test]
+    fn typing_narrows_the_grid_by_file_name() {
+        let h = Harness::root(results(1));
+        h.view_of(
+            screenshots::EXTENSION_ID,
+            screenshots::grid(&scan(&["bug-report.png", "holiday.jpg", "chart.webp"])),
+        );
+        assert_eq!(h.shell().get_screen(), ScreenKind::Grid);
+        h.row("holiday.jpg");
+
+        h.type_text("bug");
+        h.row("bug-report.png");
+        assert!(h.find("holiday.jpg").is_none());
+        assert!(h.find("chart.webp").is_none());
+    }
+}
+
 mod quicklink_browser {
     use std::sync::Arc;
 

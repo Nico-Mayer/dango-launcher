@@ -21,6 +21,7 @@ use crate::extensions::clipboard::{
 use crate::extensions::display::DisplayExtension;
 use crate::extensions::games::{GameList, GamesExtension, SteamSource};
 use crate::extensions::permissions::PermissionsExtension;
+use crate::extensions::screenshots::{ScreenshotsExtension, SystemFiles};
 use crate::extensions::snippets::{self, SnippetsExtension};
 use crate::extensions::system::SystemExtension;
 use crate::extensions::updates::{self, UpdateSource, UpdatesExtension};
@@ -268,6 +269,15 @@ fn build_services(
         &mut host,
         "games",
         Arc::new(GamesExtension::new(games, Arc::new(SystemOpener))),
+    );
+
+    register(
+        &mut host,
+        "screenshots",
+        Arc::new(ScreenshotsExtension::new(
+            file_config.shared(),
+            Arc::new(SystemFiles),
+        )),
     );
 
     // Registering for application activations needs the main thread, which

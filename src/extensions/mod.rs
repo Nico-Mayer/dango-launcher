@@ -6,6 +6,7 @@ pub mod display;
 pub mod games;
 pub mod permissions;
 pub mod refresh;
+pub mod screenshots;
 pub mod snippets;
 pub mod system;
 pub mod updates;
@@ -25,6 +26,7 @@ pub fn builtin_manifests() -> Vec<Manifest> {
         display::manifest(),
         games::manifest(),
         permissions::manifest(),
+        screenshots::manifest(),
         system::manifest(),
         updates::manifest(),
         window_management::manifest(),
