@@ -2,6 +2,35 @@
 
 All notable changes to Dango. Generated from commit history at release time.
 
+## [6.10.0] - 2026-11-13
+
+### Features
+
+- **ui:** Treat the open list as root when set
+- **platform:** Add screenshot folder and reveal
+- **screenshots:** Add screenshot grid
+- **clipboard:** Write an image file as image and file
+- **screenshots:** Paste and copy screenshots
+- **screenshots:** Move a screenshot to the trash
+
+### Fixes
+
+- Check out every text file with LF
+- **ui:** Drop typed rows when Escape clears prompt
+- **clipboard:** Write a 24-bit DIB on Windows
+- **screenshots:** Skip hidden files
+
+### Documentation
+
+- **config:** Describe open-list as resting root
+- Note clipboard-rs image and file write trap
+
+### Maintenance
+
+- **app:** Hide from the open list with one Escape
+- **clipboard:** Point image round trip at icon
+- **screenshots:** Build expected path with join
+- **scripts:** Add printscreen key to send-keys
 ## [6.9.0] - 2026-11-12
 
 ### Features
