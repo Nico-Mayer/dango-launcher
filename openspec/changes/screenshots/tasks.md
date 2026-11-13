@@ -37,7 +37,7 @@
 ## 6. Wrap-up
 
 - [x] 6.1 Add any new platform trap or build fact found in tasks 1 to 5 to AGENTS.md. Verify: `mise run check` and `cargo test` pass
-- [ ] 6.2 Run the `ponytail-review` skill in a fresh subagent on this change's commits, without the apply context; report findings to the author
+- [x] 6.2 Run the `ponytail-review` skill in a fresh subagent on this change's commits, without the apply context; report findings to the author
 
 ## Workflow follow-up
 
