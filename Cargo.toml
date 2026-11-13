@@ -186,10 +186,12 @@ objc2-foundation = { version = "0.3", features = [
   "NSGeometry",
   "NSNotification",
   "NSDate",
+  "NSDictionary",
   "NSOperation",
   "NSRunLoop",
   "NSString",
   "NSURL",
+  "NSUserDefaults",
   "block2",
 ] }
 objc2-core-foundation = { version = "0.3", features = ["CFCGTypes", "CFMachPort", "CFRunLoop"] }

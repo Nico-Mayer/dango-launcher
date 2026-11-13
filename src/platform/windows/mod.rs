@@ -3,6 +3,7 @@ mod apps;
 mod brightness;
 mod browser;
 mod clipboard;
+mod files;
 mod hyperkey;
 mod keymonitor;
 mod llhook;
@@ -21,6 +22,7 @@ pub use browser::{browser_app, browser_target};
 pub use clipboard::{
     clipboard_holds_anything, clipboard_holds_image, clipboard_holds_text, WindowsAttribution,
 };
+pub use files::{reveal, screenshot_folder};
 pub use hyperkey::WindowsHyperkey;
 pub use keymonitor::WindowsKeyMonitor;
 pub use permissions::WindowsPermissions;

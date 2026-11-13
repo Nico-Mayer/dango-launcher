@@ -7,7 +7,7 @@ use std::hash::{DefaultHasher, Hash, Hasher};
 use std::path::{Path, PathBuf};
 
 use objc2_app_kit::{NSWorkspace, NSWorkspaceOpenConfiguration};
-use objc2_foundation::{NSArray, NSFileManager, NSString, NSURL};
+use objc2_foundation::{NSFileManager, NSString, NSURL};
 
 use crate::extensions::applications::{AppIndexer, IndexedApp, LaunchError};
 use crate::icon_cache::IconRgba;
@@ -69,9 +69,7 @@ impl AppIndexer for MacAppIndexer {
         if !Path::new(path).exists() {
             return Err(std::io::Error::other("this application no longer exists"));
         }
-        let urls = NSArray::from_retained_slice(&[file_url(path)]);
-        NSWorkspace::sharedWorkspace().activateFileViewerSelectingURLs(&urls);
-        Ok(())
+        super::files::reveal(Path::new(path))
     }
 
     fn icon(&self, app: &IndexedApp, size: u32) -> Option<IconRgba> {

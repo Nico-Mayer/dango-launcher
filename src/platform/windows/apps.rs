@@ -78,16 +78,9 @@ impl AppIndexer for WindowsAppIndexer {
         }
     }
 
-    /// The path is quoted on its own. Quoting the whole `/select,` argument, as
-    /// `arg` does for anything with a space, makes Explorer ignore it and open
-    /// the default folder instead.
     fn reveal(&self, app: &IndexedApp) -> std::io::Result<()> {
-        use std::os::windows::process::CommandExt;
         match &app.target {
-            Some(target) => std::process::Command::new("explorer.exe")
-                .raw_arg(format!("/select,\"{target}\""))
-                .spawn()
-                .map(|_| ()),
+            Some(target) => super::files::reveal(Path::new(target)),
             _ => Err(std::io::Error::other(
                 "this application has no file to reveal",
             )),
