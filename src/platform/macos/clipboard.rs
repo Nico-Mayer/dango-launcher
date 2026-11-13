@@ -115,6 +115,22 @@ pub(super) fn frontmost_name() -> Option<String> {
         .map(|name| name.to_string())
 }
 
+/// PNG and file URL as two types of one pasteboard item. Through the crate's
+/// `Files` the URL would be an item of its own, which some apps take instead
+/// of the image.
+pub fn set_image_file(
+    context: &clipboard_rs::ClipboardContext,
+    png: &[u8],
+    path: &std::path::Path,
+) -> clipboard_rs::Result<()> {
+    use clipboard_rs::{Clipboard, ClipboardContent};
+    let url = url::Url::from_file_path(path).map_err(|()| "not an absolute path")?;
+    context.set(vec![
+        ClipboardContent::Other("public.png".into(), png.to_vec()),
+        ClipboardContent::Other("public.file-url".into(), url.as_str().as_bytes().to_vec()),
+    ])
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

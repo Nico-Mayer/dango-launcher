@@ -97,6 +97,31 @@ fn holds(formats: &[u16]) -> bool {
     } != 0)
 }
 
+/// PNG, bitmap, and file list inside one open clipboard. Not through the
+/// crate's `set`: its image write opens the clipboard a second time and closes
+/// it on drop, so the file list after it fails and `set` still reports success.
+pub fn set_image_file(
+    _context: &clipboard_rs::ClipboardContext,
+    png: &[u8],
+    path: &std::path::Path,
+) -> clipboard_rs::Result<()> {
+    use clipboard_rs::common::RustImage;
+    use clipboard_win::{options::NoClear, raw};
+    let bitmap = clipboard_rs::RustImageData::from_bytes(png)?.to_bitmap()?;
+    let _open = clipboard_win::Clipboard::new_attempts(10)
+        .map_err(|error| format!("could not open the clipboard: {error}"))?;
+    raw::empty().map_err(|error| format!("could not empty the clipboard: {error}"))?;
+    if let Some(format) = raw::register_format("PNG") {
+        raw::set_without_clear(format.get(), png)
+            .map_err(|error| format!("could not write PNG: {error}"))?;
+    }
+    raw::set_bitmap_with(bitmap.get_bytes(), NoClear)
+        .map_err(|error| format!("could not write the bitmap: {error}"))?;
+    raw::set_file_list_with(&[path.to_string_lossy()], NoClear)
+        .map_err(|error| format!("could not write the file: {error}"))?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use windows::core::w;

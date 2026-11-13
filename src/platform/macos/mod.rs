@@ -19,7 +19,7 @@ pub use agent::{agent_known_dirs, contained_command, login_shell_env};
 pub use apps::MacAppIndexer;
 pub use brightness::MacBrightness;
 pub use browser::{browser_app, browser_target};
-pub use clipboard::MacAttribution;
+pub use clipboard::{set_image_file, MacAttribution};
 pub use files::{reveal, screenshot_folder};
 pub use hyperkey::MacHyperkey;
 pub use icons::icon_for;

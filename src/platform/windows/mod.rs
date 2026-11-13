@@ -20,7 +20,8 @@ pub use apps::{icon_for, WindowsAppIndexer};
 pub use brightness::WindowsBrightness;
 pub use browser::{browser_app, browser_target};
 pub use clipboard::{
-    clipboard_holds_anything, clipboard_holds_image, clipboard_holds_text, WindowsAttribution,
+    clipboard_holds_anything, clipboard_holds_image, clipboard_holds_text, set_image_file,
+    WindowsAttribution,
 };
 pub use files::{reveal, screenshot_folder};
 pub use hyperkey::WindowsHyperkey;

@@ -9,6 +9,7 @@
 //! are for: which keys mean copy and paste, how the launcher hands focus back,
 //! and whether the selection can be read without touching the clipboard at all.
 
+use std::path::Path;
 use std::sync::Arc;
 
 use crate::extensions::clipboard::{ClipboardSource, Content, Snapshot};
@@ -204,6 +205,10 @@ pub trait TextTarget: Send + Sync {
     /// `insert`, nothing is restored afterwards: the content is the user's own
     /// choice of what the clipboard should hold.
     fn paste_content(&self, content: &Content) -> Result<(), TextError>;
+    /// Puts an image file on the clipboard as image and file, and pastes it.
+    fn paste_image_file(&self, _png: &[u8], _path: &Path) -> Result<(), TextError> {
+        Err(TextError::Unavailable)
+    }
     fn selection(&self) -> Result<Option<String>, TextError>;
     fn clipboard_text(&self) -> Option<String>;
 }
@@ -215,6 +220,10 @@ impl TextTarget for TextExchange {
 
     fn paste_content(&self, content: &Content) -> Result<(), TextError> {
         TextExchange::paste_content(self, content)
+    }
+
+    fn paste_image_file(&self, png: &[u8], path: &Path) -> Result<(), TextError> {
+        TextExchange::paste_image_file(self, png, path)
     }
 
     fn expand(&self, backspaces: usize, text: &str, caret: Option<usize>) -> Result<(), TextError> {
@@ -376,6 +385,29 @@ impl TextExchange {
         pasted
     }
 
+    /// Pastes an image file the user picked, in the order `paste_content`
+    /// uses. The write is not declared as Dango's own: the user asked for it,
+    /// so the history records it like a copy of their own.
+    pub fn paste_image_file(&self, png: &[u8], path: &Path) -> Result<(), TextError> {
+        if !self.keys.permitted() {
+            return Err(TextError::PermissionMissing);
+        }
+
+        self.launcher.dismiss();
+        self.handoff.yield_to_previous()?;
+
+        if let Err(error) = self.clipboard.set_image_file(png, path) {
+            crate::log::append(&format!(
+                "could not put an image file on the clipboard: {error}"
+            ));
+            return Err(TextError::Clipboard);
+        }
+
+        let pasted = self.keys.paste();
+        self.handoff.settle_after_paste();
+        pasted
+    }
+
     /// Replaces a just-typed keyword with `text`: deletes the keyword with
     /// `backspaces` backspaces, then pastes the text and restores the clipboard.
     ///
@@ -509,6 +541,7 @@ mod tests {
         /// Files copied in a file manager, which a plain text or image write
         /// replaces.
         files: Mutex<Vec<String>>,
+        image_files: Mutex<Vec<(Vec<u8>, std::path::PathBuf)>>,
     }
 
     impl FakeClipboard {
@@ -564,6 +597,15 @@ mod tests {
             self.writes.lock().unwrap().push(content.clone());
             *self.content.lock().unwrap() = Some(content);
             self.files.lock().unwrap().clear();
+        }
+        fn set_image_file(&self, png: &[u8], path: &Path) -> Result<(), String> {
+            self.image_files
+                .lock()
+                .unwrap()
+                .push((png.to_vec(), path.into()));
+            *self.content.lock().unwrap() = Some(Content::Image(png.to_vec()));
+            *self.files.lock().unwrap() = vec![path.to_string_lossy().into_owned()];
+            Ok(())
         }
         fn snapshot(&self) -> Snapshot {
             let text = self.text().filter(|text| !text.is_empty());
@@ -1096,6 +1138,42 @@ mod tests {
         assert_eq!(f.keys.events(), vec!["paste"]);
         assert_eq!(f.clipboard.now(), Some(Content::Files(paths.clone())));
         assert_eq!(f.writes.declared(), vec![Content::Files(paths)]);
+    }
+
+    #[test]
+    fn pasting_an_image_file_leaves_it_on_the_clipboard_undeclared() {
+        let png = vec![0x89, b'P', b'N', b'G', 1, 2, 3];
+        let path = Path::new("/shots/a.png");
+        let f = fixture(holding("what the user had"), FakeKeys::working());
+
+        f.exchange.paste_image_file(&png, path).unwrap();
+
+        assert_eq!(f.keys.events(), vec!["paste"]);
+        assert_eq!(f.launcher.dismissals(), 1);
+        assert_eq!(
+            *f.clipboard.image_files.lock().unwrap(),
+            vec![(png, path.to_path_buf())]
+        );
+        assert_eq!(f.clipboard.files(), Some(vec!["/shots/a.png".into()]));
+        assert!(
+            f.writes.declared().is_empty(),
+            "the history records what the user chose to copy"
+        );
+    }
+
+    #[test]
+    fn pasting_an_image_file_without_permission_touches_nothing() {
+        let keys = Arc::new(FakeKeys::default());
+        let f = fixture(holding("what the user had"), keys);
+
+        assert_eq!(
+            f.exchange
+                .paste_image_file(b"png", Path::new("/shots/a.png")),
+            Err(TextError::PermissionMissing)
+        );
+        assert_eq!(f.launcher.dismissals(), 0);
+        assert!(f.clipboard.image_files.lock().unwrap().is_empty());
+        assert!(f.keys.events().is_empty());
     }
 
     #[test]

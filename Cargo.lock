@@ -1340,6 +1340,7 @@ dependencies = [
  "bytesize",
  "cargo-packager-updater",
  "clipboard-rs",
+ "clipboard-win",
  "ddc",
  "ddc-macos",
  "ddc-winapi",

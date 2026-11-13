@@ -6,6 +6,7 @@
 //! does not say which application did the copying, and that is exactly what the
 //! exclusion list needs, so attribution stays behind a platform trait.
 
+use std::path::Path;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
@@ -70,6 +71,11 @@ pub trait ClipboardSource: Send + Sync {
     fn set_text(&self, text: &str);
     fn set_image(&self, png: &[u8]);
     fn set_files(&self, paths: &[String]);
+    /// An image file as PNG and as the file itself, in one write, so an app
+    /// takes whichever it understands.
+    fn set_image_file(&self, _png: &[u8], _path: &Path) -> Result<(), String> {
+        Ok(())
+    }
 
     /// Everything on the clipboard that `put_back` can restore.
     fn snapshot(&self) -> Snapshot {
@@ -186,6 +192,14 @@ impl ClipboardSource for CrateClipboard {
                 "could not put files back on the clipboard: {error}"
             ));
         }
+    }
+
+    fn set_image_file(&self, png: &[u8], path: &Path) -> Result<(), String> {
+        until_free(
+            || platform::set_image_file(&self.context, png, path),
+            busy::possible,
+        )
+        .map_err(|error| error.to_string())
     }
 
     fn set_text(&self, text: &str) {
@@ -342,6 +356,30 @@ mod tests {
                 .any(|f| f.to_ascii_lowercase().contains("text")),
             "the format list is what the privacy check reads"
         );
+    }
+
+    #[test]
+    #[ignore]
+    fn an_image_file_reads_back_as_image_and_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("shot.png");
+        image::RgbaImage::from_pixel(4, 3, image::Rgba([200, 30, 30, 255]))
+            .save(&path)
+            .unwrap();
+        let png = std::fs::read(&path).unwrap();
+        let clipboard = CrateClipboard::new().unwrap();
+        clipboard.set_image_file(&png, &path).unwrap();
+        let files = clipboard.files().expect("the file is on the clipboard");
+        let canonical = |path: &Path| std::fs::canonicalize(path).unwrap();
+        assert_eq!(
+            files
+                .iter()
+                .map(|file| canonical(Path::new(file)))
+                .collect::<Vec<_>>(),
+            [canonical(&path)]
+        );
+        let image = clipboard.image().expect("the image is on the clipboard");
+        assert_eq!(image_dimensions(&image), Some((4, 3)));
     }
 
     /// Another process holding the clipboard open, as a target does while it
