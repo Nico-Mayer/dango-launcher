@@ -225,8 +225,12 @@ async fn run_query(
     }
 
     while let Some(joined) = set.join_next().await {
-        // A provider task that panicked is skipped; the rest keep streaming.
-        if let Ok((index, items)) = joined {
+        // Answers already in share one emit, so providers answering from
+        // memory cost one rank and render. A panicked provider is skipped.
+        for (index, items) in std::iter::once(joined)
+            .chain(std::iter::from_fn(|| set.try_join_next()))
+            .flatten()
+        {
             answered[index] = items;
         }
         let merged = commands
@@ -520,6 +524,37 @@ mod tests {
             events.contains(&("second".into(), true)),
             "the live query should have completed: {events:?}"
         );
+    }
+
+    struct InstantProvider(&'static str);
+
+    #[async_trait]
+    impl RootProvider for InstantProvider {
+        async fn items(&self, _query: String) -> Vec<Candidate> {
+            vec![candidate(self.0, Source::RootItem)]
+        }
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn providers_that_answer_at_once_share_one_update() {
+        let providers: Vec<Arc<dyn RootProvider>> = vec![
+            Arc::new(InstantProvider("One")),
+            Arc::new(InstantProvider("Two")),
+            Arc::new(InstantProvider("Three")),
+        ];
+        let pipe = pipeline(providers);
+        let mut rx = pipe.query("".into());
+
+        let mut updates = Vec::new();
+        while let Some(update) = rx.recv().await {
+            updates.push(update);
+        }
+        assert_eq!(updates.len(), 2, "{updates:?}");
+        assert!(!updates[0].complete);
+        let last = updates.last().unwrap();
+        assert!(last.complete);
+        let ids: Vec<&str> = last.items.iter().map(|c| c.id.as_str()).collect();
+        assert_eq!(ids, ["Calculator", "One", "Two", "Three"]);
     }
 
     #[tokio::test(start_paused = true)]
