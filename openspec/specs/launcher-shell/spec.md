@@ -171,8 +171,8 @@ An activation within the period SHALL show the launcher as it was: the prompt
 text, the pushed views, and the selected row intact, with the results for the
 current prompt refreshed. When the period ends with the launcher still hidden,
 the launcher SHALL reset so that the next activation presents it as if it had
-just started, with the first frame already showing the closed root view (see
-root-search).
+just started, with the first frame already showing the root view as
+`launcher.open-list` sets it (see root-search).
 
 A command still running at an interrupting hide SHALL keep running until the
 period ends. Output it produces while hidden SHALL be shown when the launcher
@@ -229,8 +229,8 @@ of hide, nor the grace period running out, SHALL cancel it.
 
 #### Scenario: The period runs out
 
-- **WHEN** the launcher is hidden by an interrupting hide and the user activates
-  it after the grace period has passed
+- **WHEN** the launcher is hidden by an interrupting hide, `launcher.open-list`
+  is absent, and the user activates it after the grace period has passed
 - **THEN** the prompt is empty, no view is pushed, and the first painted frame
   shows the closed root view
 
@@ -541,3 +541,117 @@ global shortcut on exit is in global-activation.
 
 - **WHEN** the user quits Dango from the tray menu
 - **THEN** the process exits
+
+### Requirement: Showing never paints old content
+
+When the launcher is shown, no frame drawn before the hide SHALL be visible.
+The launcher SHALL stay invisible until its first frame with the current
+state is drawn, and SHALL then appear. This holds after a reset and after a
+held show alike.
+
+#### Scenario: Show after a reset on macOS
+
+- **GIVEN** macOS, and the launcher was hidden with a pushed view and was reset
+  while hidden
+- **WHEN** the user activates the launcher
+- **THEN** no frame shows the pushed view
+- **AND** the first visible frame shows the root view
+
+#### Scenario: Show after a reset on Windows
+
+- **GIVEN** Windows, and the launcher was hidden with a pushed view and was
+  reset while hidden
+- **WHEN** the user activates the launcher
+- **THEN** no frame shows the pushed view
+- **AND** the first visible frame shows the root view
+
+### Requirement: The launcher opens with an animation
+
+Each show after the first since Dango started SHALL fade the launcher in and
+slide the pill and card a short way down into place, after the first current
+frame is drawn. The first show SHALL appear without animation. The animation SHALL
+be short and SHALL NOT delay input: keys pressed during it SHALL act at once.
+It SHALL start with the first fresh frame, so activation still feels
+immediate. Hiding SHALL stay instant, with no animation.
+
+#### Scenario: Fade and slide on macOS
+
+- **GIVEN** macOS
+- **WHEN** the user activates the launcher
+- **THEN** the launcher fades in while the pill and card slide down into place
+
+#### Scenario: Slide on Windows
+
+- **GIVEN** Windows
+- **WHEN** the user activates the launcher
+- **THEN** the pill and card slide down into place
+
+#### Scenario: The first show has no animation
+
+- **WHEN** the user activates the launcher for the first time after Dango
+  starts
+- **THEN** the launcher appears in place, with no fade and no slide
+
+#### Scenario: Typing during the animation
+
+- **WHEN** the user activates the launcher and types `fi` before the animation
+  ends
+- **THEN** the prompt holds `fi` and results for `fi` appear as usual
+
+#### Scenario: Showing again during the animation
+
+- **WHEN** the user hides the launcher and shows it again before the
+  animation ends
+- **THEN** the launcher shows no old content and the animation starts again
+
+#### Scenario: Hide is instant
+
+- **WHEN** the user presses Escape on an empty root prompt with the list closed
+- **THEN** the launcher disappears in the next frame, with no animation
+
+### Requirement: The open list at start is a config setting
+
+Dango SHALL read a boolean from `launcher.open-list` in the config file. When
+`true`, every reset and the first show after Dango starts SHALL present the
+root view with the empty-query list open (see root-search). When absent, it
+SHALL mean `false`. A held show SHALL NOT be affected. A changed value SHALL
+apply to the next reset without a restart, and the setting SHALL appear in the
+generated schema and in the settings reference.
+
+#### Scenario: Setting is absent
+
+- **WHEN** the config file does not mention `launcher.open-list` and the
+  launcher opens after a reset
+- **THEN** the root view is closed
+
+#### Scenario: Setting is on
+
+- **WHEN** `launcher.open-list` is `true` and the launcher opens after a reset
+- **THEN** the empty-query list is open
+
+#### Scenario: A held show keeps its state
+
+- **WHEN** `launcher.open-list` is `true`, the user closes the list with
+  Escape, and focus moves to another application
+- **AND** the user activates the launcher within the grace period
+- **THEN** the list is still closed
+
+#### Scenario: Setting is changed while running
+
+- **WHEN** the user sets `launcher.open-list` to `true` and saves the file
+  while Dango is running
+- **THEN** the launcher opens with the list open after the next reset, with no
+  restart
+
+#### Scenario: Escape stages still apply
+
+- **WHEN** `launcher.open-list` is `true` and the launcher opens after a reset
+- **AND** the user presses Escape
+- **THEN** the list closes and the launcher stays open
+- **AND** a second Escape hides the launcher
+
+#### Scenario: The setting is documented
+
+- **WHEN** the settings reference is generated
+- **THEN** it lists `launcher.open-list` with its type, default, and
+  description

@@ -151,7 +151,9 @@ types to find an item, so pressing it SHALL NOT change search ranking.
 ### Requirement: Empty query behaviour
 
 With an empty query the root view SHALL start closed: it SHALL show no
-results, and the launcher SHALL be the SearchBar pill alone. After the first
+results, and the launcher SHALL be the SearchBar pill alone. When
+`launcher.open-list` is `true`, the root view SHALL instead start with the
+empty-query list open, the same as after Arrow Down (see launcher-shell). After the first
 typed character, the pill SHALL stay alone until the first result for the
 query arrives, and SHALL NOT show the empty-query list meanwhile. When the
 query becomes empty again, the root view SHALL close again.
@@ -180,8 +182,16 @@ typed query's results").
 
 #### Scenario: The launcher opens as the pill
 
-- **WHEN** the launcher opens with an empty query and no item is pinned
+- **WHEN** the launcher opens with an empty query, no item is pinned, and
+  `launcher.open-list` is absent
 - **THEN** only the SearchBar pill is shown, with no results and no ActionBar
+
+#### Scenario: The setting starts with the list open
+
+- **WHEN** `launcher.open-list` is `true` and the launcher opens after a reset
+- **THEN** the empty-query list is open with the same sections as after
+  Arrow Down
+- **AND** the first row is selected
 
 #### Scenario: The first character shows results
 
