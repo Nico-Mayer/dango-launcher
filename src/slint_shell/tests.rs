@@ -2597,3 +2597,39 @@ mod root_hotkey {
         assert_eq!(shown.len(), 1, "{label} is drawn once");
     }
 }
+
+mod detail_body {
+    use super::super::generated::DetailData;
+    use super::*;
+
+    #[test]
+    fn markdown_returns_after_plain_text_with_the_same_words() {
+        let h = Harness::root(results(1));
+        h.view(detail_tree("**Same**"));
+        h.view(ViewTree::new(View::Detail(DetailView {
+            text: Some("**Same**".into()),
+            ..Default::default()
+        })));
+        assert!(h.ui.global::<DetailData>().get_plain());
+        h.view(detail_tree("**Same**"));
+        assert!(!h.ui.global::<DetailData>().get_plain());
+        assert!(h.find("**Same**").is_some());
+    }
+
+    #[test]
+    fn a_detail_shown_again_after_another_view_renders_its_body() {
+        let h = Harness::root(results(1));
+        h.view(detail_tree("First"));
+        h.view(ViewTree::new(View::List(ListView {
+            items: vec![ListItem {
+                id: "item".into(),
+                title: "Item".into(),
+                ..Default::default()
+            }],
+            ..Default::default()
+        })));
+        assert!(h.find("First").is_none());
+        h.view(detail_tree("First"));
+        assert!(h.find("First").is_some());
+    }
+}
