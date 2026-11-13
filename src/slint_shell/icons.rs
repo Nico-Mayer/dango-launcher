@@ -50,6 +50,8 @@ pub struct Icons {
     rendering: RefCell<HashMap<String, Image>>,
     thumbnails: RefCell<HashMap<String, Image>>,
     shrinking: RefCell<HashSet<String>>,
+    /// Kept across shows, so showing a file icon again reads no file header.
+    icon_sized: RefCell<HashMap<String, bool>>,
     /// Without one, as in tests, a large file is shrunk on the spot.
     sink: Option<(ThumbnailSink, PathBuf)>,
     /// One worker shrinks files in turn: a grid of wallpapers decoded all at
@@ -109,7 +111,7 @@ impl Icons {
         }
         let image = match self.shown.borrow_mut().remove(path) {
             Some(image) => image,
-            None if !is_icon_sized(path) => self.thumbnail(path)?,
+            None if !self.is_icon_sized(path) => self.thumbnail(path)?,
             None => {
                 #[cfg(test)]
                 self.decoded.set(self.decoded.get() + 1);
@@ -120,6 +122,14 @@ impl Icons {
             .borrow_mut()
             .insert(path.to_string(), image.clone());
         Some(image)
+    }
+
+    fn is_icon_sized(&self, path: &str) -> bool {
+        *self
+            .icon_sized
+            .borrow_mut()
+            .entry(path.to_string())
+            .or_insert_with(|| is_icon_sized(path))
     }
 
     #[cfg(test)]
@@ -398,6 +408,23 @@ mod tests {
 
         icons.get(Some(&first));
         assert_eq!(icons.decoded.get(), 3);
+    }
+
+    #[test]
+    fn the_size_of_a_file_icon_is_read_once_across_shows() {
+        let icons = Icons::default();
+        let path = file_icon("sized");
+        icons.get(Some(&path));
+        icons.rendered();
+        icons.forget_files();
+        std::fs::remove_file(&path).unwrap();
+        image::RgbImage::new(600, 900)
+            .save_with_format(&path, image::ImageFormat::Png)
+            .unwrap();
+
+        icons.get(Some(&path));
+
+        assert_eq!(icons.decoded.get(), 2, "the header was read again");
     }
 
     #[test]
