@@ -114,6 +114,28 @@ pub(super) enum ViewError {
     Invalid,
 }
 
+/// A pushed list's or grid's sections after narrowing, computed once per
+/// snapshot.
+pub(super) struct Sections<'a> {
+    pub(super) list: Vec<(Option<&'a Section>, Vec<&'a ListItem>)>,
+    pub(super) grid: Vec<(Option<&'a Section>, Vec<&'a GridItem>)>,
+}
+
+impl<'a> Sections<'a> {
+    /// The list's items or the grid's tiles in the order they are drawn.
+    pub(super) fn entries(&self) -> Vec<Entry<'a>> {
+        let list = self
+            .list
+            .iter()
+            .flat_map(|(_, items)| items.iter().copied());
+        let grid = self
+            .grid
+            .iter()
+            .flat_map(|(_, items)| items.iter().copied());
+        list.map(Entry::List).chain(grid.map(Entry::Grid)).collect()
+    }
+}
+
 /// A selectable item of a list or a grid.
 #[derive(Clone, Copy)]
 pub(super) enum Entry<'a> {
@@ -1242,7 +1264,7 @@ impl Launcher {
     /// A pushed list's items after launcher-side narrowing, grouped in section
     /// order, without the groups left empty. Items naming no declared section
     /// come first.
-    pub(super) fn view_sections(&self) -> Vec<(Option<&Section>, Vec<&ListItem>)> {
+    fn view_sections(&self) -> Vec<(Option<&Section>, Vec<&ListItem>)> {
         let Some(view) = self.stack.last() else {
             return Vec::new();
         };
@@ -1257,7 +1279,7 @@ impl Launcher {
     }
 
     /// A pushed grid's tiles, grouped and narrowed as a list's items are.
-    pub(super) fn grid_sections(&self) -> Vec<(Option<&Section>, Vec<&GridItem>)> {
+    fn grid_sections(&self) -> Vec<(Option<&Section>, Vec<&GridItem>)> {
         let Some(view) = self.stack.last() else {
             return Vec::new();
         };
@@ -1278,17 +1300,15 @@ impl Launcher {
         }
     }
 
-    /// The list's items or the grid's tiles in the order they are drawn.
+    pub(super) fn sections(&self) -> Sections<'_> {
+        Sections {
+            list: self.view_sections(),
+            grid: self.grid_sections(),
+        }
+    }
+
     pub(super) fn entries(&self) -> Vec<Entry<'_>> {
-        let list = self
-            .view_sections()
-            .into_iter()
-            .flat_map(|(_, items)| items);
-        let grid = self
-            .grid_sections()
-            .into_iter()
-            .flat_map(|(_, items)| items);
-        list.map(Entry::List).chain(grid.map(Entry::Grid)).collect()
+        self.sections().entries()
     }
 
     pub(super) fn entry_selected(&self) -> Option<Entry<'_>> {

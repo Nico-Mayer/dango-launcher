@@ -4,7 +4,8 @@ use crate::protocol::{
 
 use super::input::{Chord, Context, ResultItem};
 use super::state::{
-    Entry, Launcher, Mode, PushedView, TickerAction, TickerStyle, ViewError, FILTER_PREFIX,
+    Entry, Launcher, Mode, PushedView, Sections, TickerAction, TickerStyle, ViewError,
+    FILTER_PREFIX,
 };
 
 macro_rules! snapshot_types {
@@ -233,7 +234,8 @@ snapshot_types! {
 impl Launcher {
     pub fn snapshot(&self) -> Snapshot {
         let mode = self.mode();
-        let selected = self.pick_entry(&self.entries());
+        let sections = self.sections();
+        let selected = self.pick_entry(&sections.entries());
         let actions = self.actions_for(selected);
         let panel_actions = self.panel_actions_for(actions);
         Snapshot {
@@ -253,7 +255,7 @@ impl Launcher {
             screen: match (self.view_error, self.stack.last()) {
                 (Some(error), _) => Screen::Error(error_text(error)),
                 (None, None) => Screen::Root(self.root_screen()),
-                (None, Some(view)) => Screen::View(self.view_screen(view, selected)),
+                (None, Some(view)) => Screen::View(self.view_screen(view, sections, selected)),
             },
             ticker: self.ticker(),
             notice: self
@@ -417,15 +419,20 @@ impl Launcher {
         }
     }
 
-    fn view_screen(&self, view: &PushedView, selected: Option<Entry>) -> ViewScreen {
+    fn view_screen(
+        &self,
+        view: &PushedView,
+        sections: Sections,
+        selected: Option<Entry>,
+    ) -> ViewScreen {
         let list_selected = match selected {
             Some(Entry::List(item)) => Some(item),
             _ => None,
         };
         let body = match &view.tree.view {
             View::List(list) => {
-                let sections: Vec<ListSection> = self
-                    .view_sections()
+                let sections: Vec<ListSection> = sections
+                    .list
                     .into_iter()
                     .map(|(section, items)| ListSection {
                         title: section.map(|s| s.title.clone()),
@@ -463,8 +470,8 @@ impl Launcher {
                 })
             }
             View::Grid(grid) => {
-                let sections: Vec<GridSection> = self
-                    .grid_sections()
+                let sections: Vec<GridSection> = sections
+                    .grid
                     .into_iter()
                     .map(|(section, items)| GridSection {
                         title: section.map(|s| s.title.clone()),
