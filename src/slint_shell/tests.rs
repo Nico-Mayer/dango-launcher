@@ -1717,9 +1717,10 @@ mod screenshots {
         }) else {
             panic!("Enter runs the tile's action");
         };
+        let path = PathBuf::from("/shots").join("bug-report.png");
         assert_eq!(
             (request.item_id.as_str(), request.action_id.as_str()),
-            ("/shots/bug-report.png", screenshots::ACTION_PASTE)
+            (path.to_str().unwrap(), screenshots::ACTION_PASTE)
         );
     }
 }
