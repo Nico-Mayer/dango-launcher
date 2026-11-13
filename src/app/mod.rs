@@ -528,12 +528,12 @@ impl Core {
         if outcome == ActionOutcome::Done {
             // Any successful action counts as use. Revealing an application is
             // reaching for it just as much as launching it is.
+            self.hide_after_launch();
             self.record_use(
                 &request.extension_id,
                 &request.item_id,
                 request.query.as_deref(),
             );
-            self.hide_after_launch();
         }
         outcome
     }
@@ -570,14 +570,27 @@ impl Core {
             return;
         }
         let now = now_millis();
-        self.services
+        let launch = self
+            .services
             .frecency
-            .record_launch(extension_id, item_id, now);
-        if let Some(query) = query {
+            .note_launch(extension_id, item_id, now);
+        let input = query.and_then(|query| {
             self.services
                 .learned
-                .record(query, extension_id, item_id, now);
-        }
+                .note(query, extension_id, item_id, now)
+        });
+        // The store's one connection is also what a just-invoked command
+        // reaches for, and the disk write must not hold up the UI thread.
+        let frecency = self.services.frecency.clone();
+        let learned = self.services.learned.clone();
+        let extension_id = extension_id.to_owned();
+        let item_id = item_id.to_owned();
+        self.runtime.spawn_blocking(move || {
+            frecency.persist(&extension_id, &item_id, launch);
+            if let Some((input, record)) = input {
+                learned.persist(&input, &extension_id, &item_id, record);
+            }
+        });
     }
 
     /// Runs a command through the invoker and streams its output the same way

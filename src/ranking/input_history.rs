@@ -80,9 +80,21 @@ impl InputHistory {
     }
 
     pub fn record(&self, input: &str, extension_id: &str, item_id: &str, now: i64) {
+        if let Some((input, record)) = self.note(input, extension_id, item_id, now) {
+            self.persist(&input, extension_id, item_id, record);
+        }
+    }
+
+    pub fn note(
+        &self,
+        input: &str,
+        extension_id: &str,
+        item_id: &str,
+        now: i64,
+    ) -> Option<(String, Record)> {
         let input = normalise(input);
         if input.is_empty() {
-            return;
+            return None;
         }
         let record = {
             let mut pairs = self.pairs.lock().unwrap();
@@ -109,8 +121,12 @@ impl InputHistory {
             record.last_used_at = now;
             *record
         };
+        Some((input, record))
+    }
+
+    pub fn persist(&self, input: &str, extension_id: &str, item_id: &str, record: Record) {
         if let Some(persistence) = &self.persistence {
-            persistence.save(&input, extension_id, item_id, record);
+            persistence.save(input, extension_id, item_id, record);
         }
     }
 

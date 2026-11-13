@@ -70,20 +70,26 @@ impl FrecencyTable {
 
     /// Records a launch in memory and persists it. Called off the search path.
     pub fn record_launch(&self, extension_id: &str, item_id: &str, now: i64) {
-        let record = {
-            let mut records = self.records.lock().unwrap();
-            let record = records
-                .entry(extension_id.to_string())
-                .or_default()
-                .entry(item_id.to_string())
-                .or_insert(Record {
-                    launch_count: 0,
-                    last_launched_at: now,
-                });
-            record.launch_count += 1;
-            record.last_launched_at = now;
-            *record
-        };
+        let record = self.note_launch(extension_id, item_id, now);
+        self.persist(extension_id, item_id, record);
+    }
+
+    pub fn note_launch(&self, extension_id: &str, item_id: &str, now: i64) -> Record {
+        let mut records = self.records.lock().unwrap();
+        let record = records
+            .entry(extension_id.to_string())
+            .or_default()
+            .entry(item_id.to_string())
+            .or_insert(Record {
+                launch_count: 0,
+                last_launched_at: now,
+            });
+        record.launch_count += 1;
+        record.last_launched_at = now;
+        *record
+    }
+
+    pub fn persist(&self, extension_id: &str, item_id: &str, record: Record) {
         if let Some(persistence) = &self.persistence {
             persistence.save(extension_id, item_id, record);
         }
