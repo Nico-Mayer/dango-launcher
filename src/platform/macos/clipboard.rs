@@ -118,17 +118,27 @@ pub(super) fn frontmost_name() -> Option<String> {
 /// PNG and file URL as two types of one pasteboard item. Through the crate's
 /// `Files` the URL would be an item of its own, which some apps take instead
 /// of the image.
-pub fn set_image_file(
-    context: &clipboard_rs::ClipboardContext,
-    png: &[u8],
-    path: &std::path::Path,
-) -> clipboard_rs::Result<()> {
-    use clipboard_rs::{Clipboard, ClipboardContent};
-    let url = url::Url::from_file_path(path).map_err(|()| "not an absolute path")?;
-    context.set(vec![
-        ClipboardContent::Other("public.png".into(), png.to_vec()),
-        ClipboardContent::Other("public.file-url".into(), url.as_str().as_bytes().to_vec()),
-    ])
+pub struct ImageFile {
+    png: Vec<u8>,
+    url: String,
+}
+
+impl ImageFile {
+    pub fn new(png: &[u8], path: &std::path::Path) -> clipboard_rs::Result<Self> {
+        let url = url::Url::from_file_path(path).map_err(|()| "not an absolute path")?;
+        Ok(Self {
+            png: png.to_vec(),
+            url: url.into(),
+        })
+    }
+
+    pub fn write(&self, context: &clipboard_rs::ClipboardContext) -> clipboard_rs::Result<()> {
+        use clipboard_rs::{Clipboard, ClipboardContent};
+        context.set(vec![
+            ClipboardContent::Other("public.png".into(), self.png.clone()),
+            ClipboardContent::Other("public.file-url".into(), self.url.as_bytes().to_vec()),
+        ])
+    }
 }
 
 #[cfg(test)]

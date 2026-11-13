@@ -74,7 +74,7 @@ pub trait ClipboardSource: Send + Sync {
     /// An image file as PNG and as the file itself, in one write, so an app
     /// takes whichever it understands.
     fn set_image_file(&self, _png: &[u8], _path: &Path) -> Result<(), String> {
-        Ok(())
+        Err("this clipboard can't hold an image file".into())
     }
 
     /// Everything on the clipboard that `put_back` can restore.
@@ -195,11 +195,8 @@ impl ClipboardSource for CrateClipboard {
     }
 
     fn set_image_file(&self, png: &[u8], path: &Path) -> Result<(), String> {
-        until_free(
-            || platform::set_image_file(&self.context, png, path),
-            busy::possible,
-        )
-        .map_err(|error| error.to_string())
+        let image = platform::ImageFile::new(png, path).map_err(|error| error.to_string())?;
+        until_free(|| image.write(&self.context), busy::possible).map_err(|error| error.to_string())
     }
 
     fn set_text(&self, text: &str) {
@@ -338,6 +335,31 @@ fn until_free<T, E>(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_source_without_image_files_refuses_rather_than_pretends() {
+        struct TextOnly;
+        impl ClipboardSource for TextOnly {
+            fn formats(&self) -> Option<Vec<String>> {
+                None
+            }
+            fn text(&self) -> Option<String> {
+                None
+            }
+            fn image(&self) -> Option<Vec<u8>> {
+                None
+            }
+            fn files(&self) -> Option<Vec<String>> {
+                None
+            }
+            fn set_text(&self, _text: &str) {}
+            fn set_image(&self, _png: &[u8]) {}
+            fn set_files(&self, _paths: &[String]) {}
+        }
+        assert!(TextOnly
+            .set_image_file(b"png", Path::new("/shots/a.png"))
+            .is_err());
+    }
 
     /// Needs a real clipboard, so it runs on a desktop rather than in CI, and
     /// one test at a time since they share it:

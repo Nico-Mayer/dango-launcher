@@ -11,9 +11,9 @@ mod macos;
 mod windows;
 
 #[cfg(target_os = "macos")]
-pub use macos::{browser_app, browser_target, reveal, screenshot_folder, set_image_file};
+pub use macos::{browser_app, browser_target, reveal, screenshot_folder, ImageFile};
 #[cfg(target_os = "windows")]
-pub use windows::{browser_app, browser_target, reveal, screenshot_folder, set_image_file};
+pub use windows::{browser_app, browser_target, reveal, screenshot_folder, ImageFile};
 
 /// What the walkthrough harness needs to point the exchange at a window of its
 /// own and to bring that window forward the same way an insertion does.
