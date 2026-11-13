@@ -11,9 +11,9 @@ mod macos;
 mod windows;
 
 #[cfg(target_os = "macos")]
-pub use macos::{browser_app, browser_target};
+pub use macos::{browser_app, browser_target, reveal, screenshot_folder, ImageFile};
 #[cfg(target_os = "windows")]
-pub use windows::{browser_app, browser_target};
+pub use windows::{browser_app, browser_target, reveal, screenshot_folder, ImageFile};
 
 /// What the walkthrough harness needs to point the exchange at a window of its
 /// own and to bring that window forward the same way an insertion does.
@@ -120,6 +120,18 @@ pub fn runs_inline_on_main_thread() -> bool {
     return objc2_foundation::MainThreadMarker::new().is_some();
     #[cfg(target_os = "windows")]
     return false;
+}
+
+/// `path` with a leading `~` read from the home folder.
+pub fn expand_home(path: &str) -> std::path::PathBuf {
+    let rest = match path.strip_prefix('~') {
+        Some(rest) if rest.is_empty() || rest.starts_with(['/', '\\']) => rest,
+        _ => return path.into(),
+    };
+    match dirs::home_dir() {
+        Some(home) => home.join(rest.trim_start_matches(['/', '\\'])),
+        None => path.into(),
+    }
 }
 
 /// Folders an agent CLI is often installed to that a tray app's PATH lacks.
@@ -557,6 +569,7 @@ pub mod clipboard_busy {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Label {
     FileManager,
+    Trash,
     EmptyTrash,
     /// The default launcher hotkey.
     LauncherShortcut,
@@ -574,6 +587,7 @@ pub enum Label {
 pub fn label(label: Label) -> &'static str {
     let (macos, windows) = match label {
         Label::FileManager => ("Finder", "File Explorer"),
+        Label::Trash => ("Trash", "Recycle Bin"),
         Label::EmptyTrash => ("Empty Trash", "Empty Recycle Bin"),
         Label::LauncherShortcut => ("Option+Space", "Alt+Space"),
         Label::CommandKey => ("⌘", "Ctrl"),

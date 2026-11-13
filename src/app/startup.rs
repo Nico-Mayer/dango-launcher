@@ -21,6 +21,7 @@ use crate::extensions::clipboard::{
 use crate::extensions::display::DisplayExtension;
 use crate::extensions::games::{GameList, GamesExtension, SteamSource};
 use crate::extensions::permissions::PermissionsExtension;
+use crate::extensions::screenshots::ScreenshotsExtension;
 use crate::extensions::snippets::{self, SnippetsExtension};
 use crate::extensions::system::SystemExtension;
 use crate::extensions::updates::{self, UpdateSource, UpdatesExtension};
@@ -320,6 +321,18 @@ fn build_services(
             None
         }
     };
+
+    register(
+        &mut host,
+        "screenshots",
+        Arc::new(ScreenshotsExtension::new(
+            file_config.shared(),
+            clipboard
+                .clone()
+                .map(|clipboard| clipboard as Arc<dyn extensions::clipboard::ClipboardSource>),
+            exchange.clone(),
+        )),
+    );
 
     if let Some((history, watcher)) = history {
         let extension = Arc::new(ClipboardExtension::new(

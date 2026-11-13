@@ -1675,6 +1675,55 @@ mod games {
     }
 }
 
+mod screenshots {
+    use std::path::PathBuf;
+    use std::time::SystemTime;
+
+    use super::*;
+    use crate::extensions::screenshots::{self, Scan, Screenshot};
+
+    fn scan(names: &[&str]) -> Scan {
+        Scan {
+            screenshots: names
+                .iter()
+                .map(|name| Screenshot {
+                    path: PathBuf::from("/shots").join(name),
+                    modified: SystemTime::UNIX_EPOCH,
+                })
+                .collect(),
+            any_folder: true,
+        }
+    }
+
+    #[test]
+    fn typing_narrows_the_grid_by_file_name() {
+        let h = Harness::root(results(1));
+        h.view_of(
+            screenshots::EXTENSION_ID,
+            screenshots::grid(&scan(&["bug-report.png", "holiday.jpg", "chart.webp"])),
+        );
+        assert_eq!(h.shell().get_screen(), ScreenKind::Grid);
+        h.row("holiday.jpg");
+
+        h.type_text("bug");
+        h.row("bug-report.png");
+        assert!(h.find("holiday.jpg").is_none());
+        assert!(h.find("chart.webp").is_none());
+
+        h.key("\n");
+        let Some(request) = h.effects().into_iter().find_map(|effect| match effect {
+            Effect::RunAction(request) => Some(request),
+            _ => None,
+        }) else {
+            panic!("Enter runs the tile's action");
+        };
+        assert_eq!(
+            (request.item_id.as_str(), request.action_id.as_str()),
+            ("/shots/bug-report.png", screenshots::ACTION_PASTE)
+        );
+    }
+}
+
 mod quicklink_browser {
     use std::sync::Arc;
 

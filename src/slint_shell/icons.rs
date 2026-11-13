@@ -246,6 +246,7 @@ fn named(name: &str) -> Option<&'static IconData> {
         "git-pull-request" => lu::LuGitPullRequest,
         "github" => lu::LuGithub,
         "grid-2x2" => lu::LuGrid2x2,
+        "image" => lu::LuImage,
         "loader-circle" => lu::LuLoaderCircle,
         "link" => lu::LuLink,
         "lock" => lu::LuLock,

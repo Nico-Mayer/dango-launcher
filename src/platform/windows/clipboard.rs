@@ -97,6 +97,50 @@ fn holds(formats: &[u16]) -> bool {
     } != 0)
 }
 
+/// PNG, DIB, and file list inside one open clipboard. Not through the
+/// crate's `set`: its image write opens the clipboard a second time and closes
+/// it on drop, so the file list after it fails and `set` still reports success.
+pub struct ImageFile {
+    png: Vec<u8>,
+    dib: Vec<u8>,
+    path: String,
+}
+
+/// The BMP file header that `CF_DIB` leaves out.
+const BMP_FILE_HEADER: usize = 14;
+
+impl ImageFile {
+    /// The DIB is 24-bit with a plain `BITMAPINFOHEADER`. An RGBA BMP gets a
+    /// V4 header, which clipboard-win's `set_bitmap_with` copies only 40 bytes
+    /// of before handing it to `CreateDIBitmap`. The PNG keeps the alpha.
+    pub fn new(png: &[u8], path: &std::path::Path) -> clipboard_rs::Result<Self> {
+        let rgb = image::load_from_memory(png)?.to_rgb8();
+        let mut bmp = Vec::new();
+        rgb.write_to(&mut std::io::Cursor::new(&mut bmp), image::ImageFormat::Bmp)?;
+        Ok(Self {
+            png: png.to_vec(),
+            dib: bmp.split_off(BMP_FILE_HEADER),
+            path: path.to_string_lossy().into_owned(),
+        })
+    }
+
+    pub fn write(&self, _context: &clipboard_rs::ClipboardContext) -> clipboard_rs::Result<()> {
+        use clipboard_win::{formats, options::NoClear, raw};
+        let _open = clipboard_win::Clipboard::new_attempts(10)
+            .map_err(|error| format!("could not open the clipboard: {error}"))?;
+        raw::empty().map_err(|error| format!("could not empty the clipboard: {error}"))?;
+        if let Some(format) = raw::register_format("PNG") {
+            raw::set_without_clear(format.get(), &self.png)
+                .map_err(|error| format!("could not write PNG: {error}"))?;
+        }
+        raw::set_without_clear(formats::CF_DIB, &self.dib)
+            .map_err(|error| format!("could not write the bitmap: {error}"))?;
+        raw::set_file_list_with(&[self.path.as_str()], NoClear)
+            .map_err(|error| format!("could not write the file: {error}"))?;
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use windows::core::w;

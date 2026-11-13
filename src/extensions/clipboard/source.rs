@@ -6,6 +6,7 @@
 //! does not say which application did the copying, and that is exactly what the
 //! exclusion list needs, so attribution stays behind a platform trait.
 
+use std::path::Path;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
@@ -70,6 +71,11 @@ pub trait ClipboardSource: Send + Sync {
     fn set_text(&self, text: &str);
     fn set_image(&self, png: &[u8]);
     fn set_files(&self, paths: &[String]);
+    /// An image file as PNG and as the file itself, in one write, so an app
+    /// takes whichever it understands.
+    fn set_image_file(&self, _png: &[u8], _path: &Path) -> Result<(), String> {
+        Err("this clipboard can't hold an image file".into())
+    }
 
     /// Everything on the clipboard that `put_back` can restore.
     fn snapshot(&self) -> Snapshot {
@@ -186,6 +192,11 @@ impl ClipboardSource for CrateClipboard {
                 "could not put files back on the clipboard: {error}"
             ));
         }
+    }
+
+    fn set_image_file(&self, png: &[u8], path: &Path) -> Result<(), String> {
+        let image = platform::ImageFile::new(png, path).map_err(|error| error.to_string())?;
+        until_free(|| image.write(&self.context), busy::possible).map_err(|error| error.to_string())
     }
 
     fn set_text(&self, text: &str) {
@@ -325,6 +336,31 @@ fn until_free<T, E>(
 mod tests {
     use super::*;
 
+    #[test]
+    fn a_source_without_image_files_refuses_rather_than_pretends() {
+        struct TextOnly;
+        impl ClipboardSource for TextOnly {
+            fn formats(&self) -> Option<Vec<String>> {
+                None
+            }
+            fn text(&self) -> Option<String> {
+                None
+            }
+            fn image(&self) -> Option<Vec<u8>> {
+                None
+            }
+            fn files(&self) -> Option<Vec<String>> {
+                None
+            }
+            fn set_text(&self, _text: &str) {}
+            fn set_image(&self, _png: &[u8]) {}
+            fn set_files(&self, _paths: &[String]) {}
+        }
+        assert!(TextOnly
+            .set_image_file(b"png", Path::new("/shots/a.png"))
+            .is_err());
+    }
+
     /// Needs a real clipboard, so it runs on a desktop rather than in CI, and
     /// one test at a time since they share it:
     /// `cargo test -- --ignored --test-threads=1`.
@@ -342,6 +378,30 @@ mod tests {
                 .any(|f| f.to_ascii_lowercase().contains("text")),
             "the format list is what the privacy check reads"
         );
+    }
+
+    #[test]
+    #[ignore]
+    fn an_image_file_reads_back_as_image_and_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("shot.png");
+        image::RgbaImage::from_pixel(4, 3, image::Rgba([200, 30, 30, 255]))
+            .save(&path)
+            .unwrap();
+        let png = std::fs::read(&path).unwrap();
+        let clipboard = CrateClipboard::new().unwrap();
+        clipboard.set_image_file(&png, &path).unwrap();
+        let files = clipboard.files().expect("the file is on the clipboard");
+        let canonical = |path: &Path| std::fs::canonicalize(path).unwrap();
+        assert_eq!(
+            files
+                .iter()
+                .map(|file| canonical(Path::new(file)))
+                .collect::<Vec<_>>(),
+            [canonical(&path)]
+        );
+        let image = clipboard.image().expect("the image is on the clipboard");
+        assert_eq!(image_dimensions(&image), Some((4, 3)));
     }
 
     /// Another process holding the clipboard open, as a target does while it

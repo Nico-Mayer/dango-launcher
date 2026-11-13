@@ -1355,6 +1355,43 @@ async fn a_disabled_display_extension_offers_no_brightness_command() {
     assert!(root_ids(&shell).is_empty());
 }
 
+fn screenshots_core(config: &str) -> (Arc<Core>, Arc<RecordingShell>) {
+    let screenshots = Arc::new(crate::extensions::screenshots::ScreenshotsExtension::new(
+        Arc::default(),
+        None,
+        None,
+    ));
+    let (core, shell) = core_with("", FakeGrab::default(), vec![screenshots]);
+    core.apply_config_reload(Config::parse(config));
+    core.toggle();
+    (core, shell)
+}
+
+#[tokio::test]
+async fn screenshot_commands_are_found_in_root_search() {
+    let (core, shell) = screenshots_core("");
+    type_query(&core, "screenshot");
+    settle().await;
+    let mut ids = root_ids(&shell);
+    ids.sort();
+    assert_eq!(
+        ids,
+        [
+            "dango.screenshots.copy-latest",
+            "dango.screenshots.paste-latest",
+            "dango.screenshots.search",
+        ]
+    );
+}
+
+#[tokio::test]
+async fn a_disabled_screenshots_extension_offers_no_command() {
+    let (core, shell) = screenshots_core("screenshots = { enabled = false }");
+    type_query(&core, "screenshot");
+    settle().await;
+    assert!(root_ids(&shell).is_empty());
+}
+
 /// Waits to be released, then reports through `report`, like a brightness step
 /// that a quicker press superseded.
 struct ReportsLate {

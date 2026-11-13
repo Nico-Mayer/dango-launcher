@@ -442,6 +442,13 @@ mod tests {
             let paths: Vec<&str> = paths.iter().map(String::as_str).collect();
             self.copy_files(&paths);
         }
+        fn set_image_file(&self, png: &[u8], path: &std::path::Path) -> Result<(), String> {
+            *self.text.lock().unwrap() = None;
+            *self.image.lock().unwrap() = Some(png.to_vec());
+            *self.files.lock().unwrap() = Some(vec![path.to_string_lossy().into_owned()]);
+            *self.formats.lock().unwrap() = vec!["public.png".into(), "public.file-url".into()];
+            Ok(())
+        }
     }
 
     #[derive(Default)]
@@ -742,6 +749,31 @@ mod tests {
             entries[0].files(),
             ["/Users/me/report.pdf", "/Users/me/notes.txt"]
         );
+    }
+
+    #[test]
+    fn a_screenshot_put_on_the_clipboard_is_recorded_as_its_file() {
+        let f = setup();
+        f.clipboard
+            .set_image_file(&[1, 2, 3], std::path::Path::new("/shots/a.png"))
+            .unwrap();
+        assert!(f.watcher.handle_change(1));
+
+        let entries = f.history.entries().unwrap();
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].kind, super::super::Kind::Files);
+        assert_eq!(entries[0].files(), ["/shots/a.png"]);
+    }
+
+    #[test]
+    fn a_copy_the_user_asked_dango_for_is_recorded() {
+        let f = setup();
+        f.clipboard.copy_text("older");
+        assert!(f.watcher.handle_change(1));
+
+        f.clipboard.set_text("/Applications/Safari.app");
+        assert!(f.watcher.handle_change(2));
+        assert_eq!(texts(&f.history), ["/Applications/Safari.app", "older"]);
     }
 
     #[test]
