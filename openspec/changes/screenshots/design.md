@@ -62,11 +62,13 @@ Rejected: making thumbnails in the extension like clipboard history does. The re
 
 ### Image + files in one clipboard write
 
-New `ClipboardSource::set_image_file(image: &RustImageData, path: &str)`, a default method that does nothing, so only the crate impl and the test fakes that check it change; the other impls (`text/mod.rs`, `clipboard/extension.rs`, `clipboard/watcher.rs`, `ai/extension.rs` fakes) are untouched. The caller decodes first: `RustImageData::from_bytes` reads png, jpg, and webp through the `image` crate.
+New `ClipboardSource::set_image_file(png: &[u8], path: &Path) -> Result<(), String>`, a default method that does nothing, so only the crate impl and the test fakes that check it change; the other impls (`text/mod.rs`, `clipboard/extension.rs`, `ai/extension.rs` fakes) are untouched. The crate impl calls `platform::set_image_file`.
+
+The extension prepares the PNG bytes (`png_of`) before anything is dismissed or written: a PNG goes through as it is once its header reads (`ImageReader::into_dimensions`, no full decode), jpg and webp are decoded and encoded as PNG with the `image` crate. A missing file fails with "That screenshot no longer exists", anything else unreadable with "Couldn't read the screenshot".
 
 The two platforms need different writes, because clipboard-rs 0.3.5 `set` cannot write both formats correctly on either:
 
-- macOS: `set` writes `Files` on its own through `set_files` as separate pasteboard items, then one more item for the rest (`platform/macos.rs`). Instead call `set(vec![Image(img), Other("public.file-url", url)])`: `Other` goes into the same `NSPasteboardItem` as the PNG, so one item carries both types.
+- macOS: `set` writes `Files` on its own through `set_files` as separate pasteboard items, then one more item for the rest (`platform/macos.rs`). Instead call `set(vec![Other("public.png", png), Other("public.file-url", url)])`: every `Other` goes into the same `NSPasteboardItem`, so one item carries both types, and the PNG bytes need no decode. The URL comes from `url::Url::from_file_path`.
 - Windows: the image arm of `set` calls `set_image`, which opens a second `clipboard_win::Clipboard`; its drop closes the clipboard, so the `Files` write after it fails and `set` still returns `Ok` (`clipboard-win-5.4.1/src/lib.rs` drop). Write with `clipboard-win` directly inside one open clipboard: empty, DIB from the decoded image, then `CF_HDROP` with `NoClear`. `clipboard-win` becomes a direct Windows dependency; it is already in the tree through clipboard-rs.
 
 Rejected:
@@ -76,7 +78,7 @@ Rejected:
 
 ### Paste and copy paths
 
-Paste: new `TextTarget::paste_screenshot(&Path)`, a default method returning `TextError::Unavailable`, so only `TextExchange` and the fakes that test it implement it; the other impls (`app/tests.rs`, `clipboard/extension.rs`, `snippets/extension.rs`, `snippets/service.rs`, `ai/extension.rs`) are untouched. Same order as `paste_content` (permission, dismiss, yield to the previous app, write, paste key, settle), but it calls `set_image_file` and does not call `own_writes.expect`, so the history records the write as a file entry (selection-and-paste delta). It reads and decodes the file before dismissing, so a deleted or broken file fails with the launcher still up and the clipboard untouched, and decoding a large screenshot adds no delay between dismiss and paste.
+Paste: new `TextTarget::paste_image_file(png: &[u8], path: &Path)`, a default method returning `TextError::Unavailable`, so only `TextExchange` and the fakes that test it implement it; the other impls (`app/tests.rs`, `clipboard/extension.rs`, `snippets/extension.rs`, `snippets/service.rs`, `ai/extension.rs`) are untouched. Same order as `paste_content` (permission, dismiss, yield to the previous app, write, paste key, settle), but it calls `set_image_file` and does not call `own_writes.expect`, so the history records the write as a file entry (selection-and-paste delta). The extension calls `png_of` before it, so a deleted or broken file fails with the launcher still up and the clipboard untouched, and no conversion runs between dismiss and paste. On Windows the bitmap is still made from the PNG inside the write.
 
 Copy: the extension holds the `Arc<dyn ClipboardSource>` and calls `set_image_file` directly, then returns `ActionOutcome::Copied` (grid) or `ctx.succeed_with("Copied to clipboard")` (no-view command).
 
@@ -133,6 +135,7 @@ Written against `openspec/specs/interface-copy`.
 | Failure, macOS | "Couldn't move the screenshot to the Trash" |
 | Failure, Windows | "Couldn't move the screenshot to the Recycle Bin" |
 | Failure, open | "Couldn't open the screenshot" |
+| Failure, unreadable file | "Couldn't read the screenshot" |
 | Failure, reveal macOS | "Couldn't show the screenshot in Finder" |
 | Failure, reveal Windows | "Couldn't show the screenshot in File Explorer" |
 
