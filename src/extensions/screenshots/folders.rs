@@ -63,13 +63,18 @@ pub fn scan(folders: &[PathBuf]) -> Scan {
 }
 
 fn is_screenshot(path: &Path) -> bool {
-    path.extension()
-        .and_then(|extension| extension.to_str())
-        .is_some_and(|extension| {
-            EXTENSIONS
-                .iter()
-                .any(|known| extension.eq_ignore_ascii_case(known))
-        })
+    let hidden = path
+        .file_name()
+        .is_some_and(|name| name.to_string_lossy().starts_with('.'));
+    !hidden
+        && path
+            .extension()
+            .and_then(|extension| extension.to_str())
+            .is_some_and(|extension| {
+                EXTENSIONS
+                    .iter()
+                    .any(|known| extension.eq_ignore_ascii_case(known))
+            })
 }
 
 #[cfg(test)]
@@ -120,6 +125,17 @@ pub(super) mod tests {
         std::fs::create_dir(&nested).unwrap();
         file(&nested, "nested.png", 0);
         assert_eq!(names(&scan(&[dir.path().into()])), ["shot.png"]);
+    }
+
+    #[test]
+    fn hidden_files_are_skipped() {
+        let dir = tempfile::tempdir().unwrap();
+        file(dir.path(), ".Screenshot 2026-11-13 at 09.00.00.png", 0);
+        file(dir.path(), "Screenshot 2026-11-13 at 08.59.00.png", 60);
+        assert_eq!(
+            names(&scan(&[dir.path().into()])),
+            ["Screenshot 2026-11-13 at 08.59.00.png"]
+        );
     }
 
     #[test]
