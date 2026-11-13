@@ -32,7 +32,7 @@
 ## 5. Hand checks
 
 - [x] 5.1 macOS: in a debug build driven with `dango-ui`, open `Search Screenshots` on the author's folder and check thumbnails fill in without lag; paste into a chat app (image appears), copy then paste in Finder (file copy appears) and in Preview's New from Clipboard (image), run `Paste Latest Screenshot` from a bound hotkey, Show in Finder, and Move to Trash then Put Back from Finder
-- [ ] 5.2 Windows: take a screenshot with Win+PrtScn, run `Search Screenshots` and check it is first; paste into a chat app (image), copy then paste in File Explorer (file copy) and in Paint (image), run `Paste Latest Screenshot` from a hotkey (`mise run keys`, check foreground with `mise run shot`), Show in File Explorer, and Move to Recycle Bin then restore
+- [x] 5.2 Windows: take a screenshot with Win+PrtScn, run `Search Screenshots` and check it is first; paste into a chat app (image), copy then paste in File Explorer (file copy) and in Paint (image), run `Paste Latest Screenshot` from a hotkey (`mise run keys`, check foreground with `mise run shot`), Show in File Explorer, and Move to Recycle Bin then restore
 
 ## 6. Wrap-up
 
