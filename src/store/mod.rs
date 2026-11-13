@@ -79,6 +79,8 @@ impl Store {
 
     fn from_connection(mut connection: Connection) -> Result<Self, StoreError> {
         connection.pragma_update(None, "foreign_keys", true)?;
+        connection.pragma_update(None, "journal_mode", "WAL")?;
+        connection.pragma_update(None, "synchronous", "NORMAL")?;
         migrations::run(&mut connection)?;
         Ok(Self {
             connection: Mutex::new(connection),
@@ -388,6 +390,18 @@ mod tests {
             opened.store.schema_version().unwrap(),
             migrations::MIGRATIONS.len() as u32
         );
+        cleanup(&path);
+    }
+
+    #[test]
+    fn a_database_file_uses_the_write_ahead_log() {
+        let path = temp_db();
+        let store = Store::open(&path).unwrap().store;
+        let mode: String = store
+            .with(|c| c.pragma_query_value(None, "journal_mode", |row| row.get(0)))
+            .unwrap();
+        assert_eq!(mode, "wal");
+        drop(store);
         cleanup(&path);
     }
 
