@@ -472,11 +472,7 @@ mod tests {
     #[test]
     #[ignore]
     fn an_image_survives_a_round_trip() {
-        let png = std::fs::read(concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/../static/favicon.png"
-        ))
-        .unwrap();
+        let png = std::fs::read(concat!(env!("CARGO_MANIFEST_DIR"), "/icons/32x32.png")).unwrap();
         let clipboard = CrateClipboard::new().unwrap();
         clipboard.set_image(&png);
         let read = clipboard.image().expect("an image must come back");
