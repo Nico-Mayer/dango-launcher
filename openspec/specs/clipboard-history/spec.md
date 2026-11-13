@@ -508,8 +508,9 @@ The excluded applications SHALL be set by the setting `excluded-applications`
 in `[clipboard]`: a list of application names, matched ignoring case. Its
 default SHALL list mainstream password managers.
 
-Content Dango itself puts on the clipboard SHALL NOT be recorded either. That
-rule is in `openspec/specs/selection-and-paste`.
+Content Dango itself puts on the clipboard SHALL NOT be recorded either,
+except a copy the user asked for, such as a Copy action or a pasted
+screenshot. Both rules are in `openspec/specs/selection-and-paste`.
 
 #### Scenario: Concealed content on macOS
 
