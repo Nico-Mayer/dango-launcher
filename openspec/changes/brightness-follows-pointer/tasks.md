@@ -16,7 +16,7 @@
 
 ## 4. Hand checks
 
-- [ ] 4.1 Windows: on the author's two monitors with `display.monitors = "pointer"`, press and hold the brightness hotkeys (`mise run keys`) with the pointer on each monitor in turn, and check only that monitor changes and the notice shows its level (`mise run shot`); switch back to `"all"` without restarting and check both change
+- [x] 4.1 Windows: on the author's two monitors with `display.monitors = "pointer"`, press and hold the brightness hotkeys (`mise run keys`) with the pointer on each monitor in turn, and check only that monitor changes and the notice shows its level (`mise run shot`); switch back to `"all"` without restarting and check both change
 - [ ] 4.2 Windows: on a laptop with an external monitor, pointer on the laptop screen gives the DDC/CI failure and changes nothing
 - [x] 4.3 macOS: on an Apple Silicon Mac with an external monitor, pointer on the external monitor changes it; pointer on the built-in screen gives the DDC/CI failure and changes nothing
 
