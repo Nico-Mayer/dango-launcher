@@ -2,6 +2,20 @@
 
 All notable changes to Dango. Generated from commit history at release time.
 
+## [6.10.1] - 2026-11-14
+
+### Performance
+
+- **ui:** Narrow pushed views once per snapshot
+- **search:** Merge ready provider answers into one emit
+- **app:** Record a use off the UI thread
+- **store:** Use WAL with synchronous NORMAL
+- **games:** Watch steamapps folders, stop polling
+- **render:** Skip unchanged detail body and metadata
+- **render:** Write answer card once per render
+- **icons:** Decode images larger than icons off thread
+- **icons:** Remember file icon size across shows
+- **shell:** Render once for thumbnails arriving together
 ## [6.10.0] - 2026-11-13
 
 ### Features
