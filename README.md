@@ -1,121 +1,84 @@
 # Dango
 
-A keyboard-first launcher and command palette for Windows and macOS. Dango sits
-in the tray and opens a search prompt on one global shortcut.
+A keyboard-first launcher for Windows and macOS.
+
+Dango sits in the tray. Press one shortcut, type a few letters, press Enter.
+It is a hobby project that I build for my own daily use.
+
+![The launcher showing search results](docs/screenshots/search.png)
+
+## What it does
+
+- Open apps and switch to running ones
+- Do math and convert units while you type
+- Start your Steam games
+- Clipboard history, with text, images, and files
+- Snippets that expand when you type a keyword
+- Quicklinks to sites and web searches
+- Move and resize windows
+- AI commands for the selected text, such as fix spelling or translate
+- Find, copy, and paste your latest screenshots
+- System commands: lock, sleep, empty trash
+- CapsLock as an extra modifier key
+- Your own extensions, written in JavaScript
+
+Every command can have a global hotkey, so it also works without opening the
+launcher.
+
+| Answers while you type | Window management |
+| --- | --- |
+| ![A unit conversion answered in the launcher](docs/screenshots/answer.png) | ![Window management commands](docs/screenshots/windows.png) |
+
+## Install
+
+Download the installer from the
+[latest release](https://github.com/Nico-Mayer/dango-launcher/releases/latest).
+After that, Dango updates itself.
+
+- **Windows:** run `dango_<version>_x64-setup.exe`. SmartScreen warns on the
+  first run. Choose "More info", then "Run anyway".
+- **macOS (Apple Silicon):** open `Dango_<version>_aarch64.dmg` and drag Dango
+  to Applications. Then run `xattr -cr /Applications/Dango.app` once, or
+  macOS blocks the app.
+
+Press `Alt+Space` (`Option+Space` on macOS) to open the launcher.
+
+## Configuration
+
+Dango works without any setup. To change something, run **Open Config File**
+from the launcher. It opens `~/.config/dango/config.toml`.
+
+A small example:
+
+```toml
+[launcher]
+hotkey = "alt+space"
+autostart = true
+
+[hyperkey]
+enabled = true
+tap = "escape"
+
+[applications.hotkeys]
+Firefox = { hotkey = "hyper+b" }
+code = { name = "Visual Studio Code", hotkey = "hyper+c" }
+
+[window-management.commands]
+left-half = { hotkey = "ctrl+alt+left" }
+right-half = { hotkey = "ctrl+alt+right" }
+
+[clipboard.commands]
+history = { hotkey = "mod+shift+v" }
+```
+
+Every setting is listed in [docs/config.md](docs/config.md).
+
+## More
+
+- [All settings](docs/config.md)
+- [Development and releases](docs/development.md)
 
 [![Made with Slint](https://raw.githubusercontent.com/slint-ui/slint/master/logo/MadeWithSlint-logo-whitebg.png)](https://slint.dev)
 
 The interface is built with [Slint](https://slint.dev) under its royalty-free
 license, which asks for the badge above.
-
-## Development setup
-
-Tools are pinned in `mise.toml`. After cloning:
-
-```sh
-mise install
-hk install --mise
-```
-
-The second command registers git hooks for this clone. Committing runs
-`cargo fmt` on the staged Rust files and stages the result. Pushing runs
-`cargo clippy --all-targets -- -D warnings`, the same check CI runs, and aborts
-the push if it fails. `mise run check` runs the same checks on every file.
-Use `git push --no-verify` to skip the push checks once.
-
-Rust is pinned in `rust-toolchain.toml`. `mise tasks` lists the project
-commands.
-
-## Building and running
-
-```sh
-cargo run                    # development build, marked "dev" in the launcher
-cargo test                   # every test, the UI included
-cargo build --release        # target/release/dango(.exe)
-mise run ui                  # debug build with the Slint MCP server
-```
-
-Releases come from CI (see below). To build an installer locally, run
-`mise run package`. Starting Dango again
-while it runs shows the launcher.
-
-## Configuration
-
-Dango reads `~/.config/dango/config.toml` (or `$DANGO_CONFIG_DIR`). Every
-setting is optional and listed in `docs/config.md`. Run the Open Config File
-command from the launcher to open it in the app your system uses for `.toml`
-files. It creates the file if there is none yet.
-
-Dango writes a schema for each of its files into `.schemas/` in the config
-directory on every start. A file Dango creates starts with a line such as
-`#:schema ./.schemas/config.schema.json`, and an editor with a TOML language
-server (Taplo, Tombi) uses it to complete and check the file. Add the line by
-hand to a file you create yourself. The schemas are generated, so keep
-`.schemas/` out of the git repository that holds your dotfiles.
-
-API keys for the AI commands live beside it in `auth.toml`, in plain text, one
-entry per provider. See `docs/auth.example.toml`. **Keep `auth.toml` out of
-git.** The config file is meant to be committed and shared between machines;
-the key file is not.
-
-## Versioning
-
-The application version lives in `Cargo.toml` and nowhere else. Only the
-release task edits it; never bump it by hand.
-
-## Releasing
-
-Releases are cut from a clean, up-to-date `main`:
-
-```sh
-mise run release              # dry run: prints the version and the steps, changes nothing
-mise run release -- --execute # bumps, writes the changelog, commits, tags, pushes
-```
-
-The next version comes from the conventional commits since the last tag: `fix`
-bumps patch, `feat` bumps minor, a `!` after the type or a `BREAKING CHANGE`
-footer bumps major. Other types do not bump. If nothing since the last tag
-bumps, the command fails with "tag already exists" and writes nothing.
-
-To pick the version yourself, call cargo-release directly from the repo root
-with a level or a version, for example `cargo release minor --execute` or
-`cargo release 1.0.0 --execute`. The rest of the release runs the same way.
-
-The release commit touches `CHANGELOG.md`, `Cargo.toml`, and `Cargo.lock` and
-is tagged `vX.Y.Z`. The command refuses to run with uncommitted changes, from
-a branch other than `main`, or when the tag exists. Pushing the tag runs
-`.github/workflows/release.yml`: it builds both platforms, attaches the
-installers, the update files, and `latest.json`, and publishes the release
-once both builds succeeded. Running the workflow by hand is a dry run: it
-leaves a draft release named `dry-run-<run id>` and never publishes it.
-
-### Changelog
-
-`CHANGELOG.md` is generated by git-cliff from `cliff.toml` at release time and
-regenerated in full on every release, so do not edit it by hand. Commits are
-grouped by type: `feat` under Features, `fix` under Fixes, `perf` under
-Performance, `refactor` under Refactoring, `docs` under Documentation, and
-`test`, `ci`, `build`, `chore`, and `style` under Maintenance. Commits scoped
-`(openspec)`, release commits, and non-conventional subjects are left out.
-
-### Installing a build
-
-Download the installer from the latest GitHub release. After that, Dango
-updates itself from inside the app.
-
-- Windows: `dango_<version>_x64-setup.exe`. It installs for your user and needs
-  no administrator rights. The installer is unsigned, so SmartScreen warns on
-  the first run; choose "More info" and then "Run anyway".
-- macOS (Apple Silicon): `Dango_<version>_aarch64.dmg`. Drag Dango to
-  Applications. The app is signed but not notarized, so Gatekeeper blocks it
-  until you clear the quarantine flag once:
-
-  ```sh
-  xattr -cr /Applications/Dango.app
-  ```
-
-To start Dango at login, set `launcher.autostart` to `true` in the config file
-(see `docs/config.md`). The login entry records the path Dango was
-started from, so on macOS move the app to `/Applications` before turning the
-setting on, or start it from there once afterwards. macOS shows a one-time
-notification that Dango added an item that can run in the background.
