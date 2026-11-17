@@ -247,33 +247,50 @@ pub enum Cycle {
     TopHalf,
     BottomHalf,
     Center,
+    CenterColumn,
 }
 
 /// The fractions a repeat cycles through, in order.
 pub const CYCLE_FRACTIONS: [(i32, i32); 3] = [(1, 2), (2, 3), (1, 3)];
 
+/// Where the third commands enter `CYCLE_FRACTIONS`.
+pub const THIRD_STEP: usize = 2;
+
 /// The rectangle for a cycle command at a given step. The half commands scale
 /// one dimension and stay anchored to their edge; centre scales both and stays
-/// centred. At the 1/2 step the half commands delegate to the matching `Region`,
-/// so a fresh press is byte-for-byte the existing single-press result.
+/// centred; the centred column scales its width at full height.
+///
+/// The left and right rings split the width at a multiple of `w / d`, the same
+/// split `Region` uses, so every step is the matching half or third and a left
+/// step tiles with the right step that completes it. At the 1/2 step the top
+/// and bottom commands delegate to the matching `Region`.
 pub fn cycle_rect(cycle: Cycle, index: usize, area: Rect) -> Rect {
     let (n, d) = CYCLE_FRACTIONS[index % CYCLE_FRACTIONS.len()];
     let is_half = (n, d) == (1, 2);
     match cycle {
-        Cycle::LeftHalf if is_half => Region::LeftHalf.rect(area),
-        Cycle::RightHalf if is_half => Region::RightHalf.rect(area),
         Cycle::TopHalf if is_half => Region::TopHalf.rect(area),
         Cycle::BottomHalf if is_half => Region::BottomHalf.rect(area),
         Cycle::LeftHalf => Rect {
             x: area.x,
             y: area.y,
-            width: area.width * n / d,
+            width: n * (area.width / d),
             height: area.height,
         },
         Cycle::RightHalf => {
+            let left = (d - n) * (area.width / d);
+            Rect {
+                x: area.x + left,
+                y: area.y,
+                width: area.width - left,
+                height: area.height,
+            }
+        }
+        Cycle::CenterColumn if is_half => center_half(area),
+        Cycle::CenterColumn if (n, d) == (1, 3) => Region::CenterThird.rect(area),
+        Cycle::CenterColumn => {
             let width = area.width * n / d;
             Rect {
-                x: area.x + area.width - width,
+                x: area.x + (area.width - width) / 2,
                 y: area.y,
                 width,
                 height: area.height,
@@ -738,6 +755,70 @@ mod tests {
         assert_eq!((half.width, half.height), (960, 540));
         assert_eq!(half.x, (1920 - 960) / 2);
         assert_eq!(half.y, (1080 - 540) / 2);
+    }
+
+    const ODD_AREA: Rect = Rect {
+        x: 7,
+        y: 3,
+        width: 1001,
+        height: 769,
+    };
+
+    #[test]
+    fn side_rings_match_the_regions_at_every_half_and_third() {
+        assert_eq!(
+            cycle_rect(Cycle::LeftHalf, THIRD_STEP, ODD_AREA),
+            Region::LeftThird.rect(ODD_AREA)
+        );
+        assert_eq!(
+            cycle_rect(Cycle::RightHalf, THIRD_STEP, ODD_AREA),
+            Region::RightThird.rect(ODD_AREA)
+        );
+        assert_eq!(
+            cycle_rect(Cycle::LeftHalf, THIRD_STEP + 1, ODD_AREA),
+            Region::LeftHalf.rect(ODD_AREA)
+        );
+        assert_eq!(
+            cycle_rect(Cycle::RightHalf, THIRD_STEP + 1, ODD_AREA),
+            Region::RightHalf.rect(ODD_AREA)
+        );
+    }
+
+    #[test]
+    fn side_rings_tile_with_the_opposite_side() {
+        let right_edge = ODD_AREA.x + ODD_AREA.width;
+        for (left_step, right_step) in [(1, THIRD_STEP), (THIRD_STEP, 1), (0, 0)] {
+            let left = cycle_rect(Cycle::LeftHalf, left_step, ODD_AREA);
+            let right = cycle_rect(Cycle::RightHalf, right_step, ODD_AREA);
+            assert_eq!(left.x, ODD_AREA.x);
+            assert_eq!(left.x + left.width, right.x);
+            assert_eq!(right.x + right.width, right_edge);
+        }
+    }
+
+    #[test]
+    fn center_column_steps_through_half_two_thirds_and_third() {
+        assert_eq!(
+            cycle_rect(Cycle::CenterColumn, 0, ODD_AREA),
+            center_half(ODD_AREA)
+        );
+        assert_eq!(
+            cycle_rect(Cycle::CenterColumn, 1, ODD_AREA),
+            Rect {
+                x: 7 + (1001 - 667) / 2,
+                y: 3,
+                width: 667,
+                height: 769
+            }
+        );
+        assert_eq!(
+            cycle_rect(Cycle::CenterColumn, THIRD_STEP, ODD_AREA),
+            Region::CenterThird.rect(ODD_AREA)
+        );
+        assert_eq!(
+            cycle_rect(Cycle::CenterColumn, 3, ODD_AREA),
+            cycle_rect(Cycle::CenterColumn, 0, ODD_AREA)
+        );
     }
 
     #[test]

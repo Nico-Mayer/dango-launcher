@@ -12,7 +12,7 @@ use crate::platform::{Rect, WindowManager};
 
 pub mod geometry;
 
-use geometry::{Cycle, Region, Step};
+use geometry::{Cycle, Region, Step, THIRD_STEP};
 
 pub const EXTENSION_ID: &str = "dango.window-management";
 
@@ -45,9 +45,8 @@ const CYCLE_TOLERANCE: i32 = 2;
 #[derive(Clone, Copy)]
 enum Arrangement {
     Region(Region),
-    Cycle(Cycle),
+    Cycle(Cycle, usize),
     Center,
-    CenterHalf,
     AlmostMaximize,
     ReasonableSize,
     Step(Step),
@@ -56,20 +55,20 @@ enum Arrangement {
 
 fn arrangement(command_id: &str) -> Option<Arrangement> {
     Some(match command_id {
-        COMMAND_LEFT_HALF => Arrangement::Cycle(Cycle::LeftHalf),
-        COMMAND_RIGHT_HALF => Arrangement::Cycle(Cycle::RightHalf),
-        COMMAND_TOP_HALF => Arrangement::Cycle(Cycle::TopHalf),
-        COMMAND_BOTTOM_HALF => Arrangement::Cycle(Cycle::BottomHalf),
+        COMMAND_LEFT_HALF => Arrangement::Cycle(Cycle::LeftHalf, 0),
+        COMMAND_RIGHT_HALF => Arrangement::Cycle(Cycle::RightHalf, 0),
+        COMMAND_TOP_HALF => Arrangement::Cycle(Cycle::TopHalf, 0),
+        COMMAND_BOTTOM_HALF => Arrangement::Cycle(Cycle::BottomHalf, 0),
         COMMAND_TOP_LEFT => Arrangement::Region(Region::TopLeftQuarter),
         COMMAND_TOP_RIGHT => Arrangement::Region(Region::TopRightQuarter),
         COMMAND_BOTTOM_LEFT => Arrangement::Region(Region::BottomLeftQuarter),
         COMMAND_BOTTOM_RIGHT => Arrangement::Region(Region::BottomRightQuarter),
-        COMMAND_LEFT_THIRD => Arrangement::Region(Region::LeftThird),
-        COMMAND_CENTER_THIRD => Arrangement::Region(Region::CenterThird),
-        COMMAND_RIGHT_THIRD => Arrangement::Region(Region::RightThird),
+        COMMAND_LEFT_THIRD => Arrangement::Cycle(Cycle::LeftHalf, THIRD_STEP),
+        COMMAND_CENTER_THIRD => Arrangement::Cycle(Cycle::CenterColumn, THIRD_STEP),
+        COMMAND_RIGHT_THIRD => Arrangement::Cycle(Cycle::RightHalf, THIRD_STEP),
         COMMAND_MAXIMIZE => Arrangement::Region(Region::Maximize),
         COMMAND_CENTER => Arrangement::Center,
-        COMMAND_CENTER_HALF => Arrangement::CenterHalf,
+        COMMAND_CENTER_HALF => Arrangement::Cycle(Cycle::CenterColumn, 0),
         COMMAND_ALMOST_MAXIMIZE => Arrangement::AlmostMaximize,
         COMMAND_REASONABLE_SIZE => Arrangement::ReasonableSize,
         COMMAND_MAKE_LARGER => Arrangement::Step(Step::Larger),
@@ -158,12 +157,11 @@ impl Command for Arrange {
         // only move-to-next-display on a single display.
         let plan: Option<(Rect, usize)> = match self.arrangement {
             Arrangement::Region(region) => Some((region.rect(area), 0)),
-            Arrangement::CenterHalf => Some((geometry::center_half(area), 0)),
             Arrangement::AlmostMaximize => Some((geometry::almost_maximize(area), 0)),
             Arrangement::ReasonableSize => Some((geometry::reasonable_size(area), 0)),
             Arrangement::Step(step) => Some((geometry::step(placement.frame, area, step), 0)),
-            Arrangement::Cycle(cycle_kind) => {
-                let index = if repeated { cycle.step + 1 } else { 0 };
+            Arrangement::Cycle(cycle_kind, start) => {
+                let index = if repeated { cycle.step + 1 } else { start };
                 Some((geometry::cycle_rect(cycle_kind, index, area), index))
             }
             Arrangement::Center => {
@@ -615,6 +613,87 @@ mod tests {
         invoke(&extension, COMMAND_LEFT_HALF);
         let placed = sim.placed();
         assert_eq!(placed[1], geometry::cycle_rect(Cycle::LeftHalf, 0, AREA));
+    }
+
+    fn presses(command_id: &str, count: usize) -> Vec<Rect> {
+        let sim = WindowSim::new(FRAME, AREA);
+        let extension = WindowManagementExtension::new(sim.clone());
+        for _ in 0..count {
+            invoke(&extension, command_id);
+        }
+        sim.placed()
+    }
+
+    #[test]
+    fn repeating_a_third_cycles_from_a_third_and_wraps() {
+        for (command_id, cycle, third) in [
+            (COMMAND_LEFT_THIRD, Cycle::LeftHalf, Region::LeftThird),
+            (COMMAND_RIGHT_THIRD, Cycle::RightHalf, Region::RightThird),
+            (
+                COMMAND_CENTER_THIRD,
+                Cycle::CenterColumn,
+                Region::CenterThird,
+            ),
+        ] {
+            assert_eq!(
+                presses(command_id, 4),
+                vec![
+                    third.rect(AREA),
+                    geometry::cycle_rect(cycle, 0, AREA),
+                    geometry::cycle_rect(cycle, 1, AREA),
+                    third.rect(AREA),
+                ],
+                "{command_id}"
+            );
+        }
+    }
+
+    #[test]
+    fn repeating_center_half_cycles_the_column_and_wraps() {
+        assert_eq!(
+            presses(COMMAND_CENTER_HALF, 4),
+            vec![
+                geometry::center_half(AREA),
+                geometry::cycle_rect(Cycle::CenterColumn, 1, AREA),
+                Region::CenterThird.rect(AREA),
+                geometry::center_half(AREA),
+            ]
+        );
+    }
+
+    #[test]
+    fn a_repeated_size_matches_the_command_named_for_it() {
+        assert_eq!(
+            presses(COMMAND_RIGHT_THIRD, 2)[1],
+            Region::RightHalf.rect(AREA)
+        );
+        assert_eq!(
+            presses(COMMAND_CENTER_HALF, 3)[2],
+            Region::CenterThird.rect(AREA)
+        );
+    }
+
+    #[test]
+    fn a_moved_window_restarts_center_third_at_a_third() {
+        let sim = WindowSim::new(FRAME, AREA);
+        let extension = WindowManagementExtension::new(sim.clone());
+        invoke(&extension, COMMAND_CENTER_THIRD);
+        sim.set_frame(FRAME);
+        invoke(&extension, COMMAND_CENTER_THIRD);
+        assert_eq!(sim.placed()[1], Region::CenterThird.rect(AREA));
+    }
+
+    #[test]
+    fn left_half_after_left_third_starts_its_own_cycle() {
+        let sim = WindowSim::new(FRAME, AREA);
+        let extension = WindowManagementExtension::new(sim.clone());
+        invoke(&extension, COMMAND_LEFT_THIRD);
+        invoke(&extension, COMMAND_LEFT_THIRD);
+        invoke(&extension, COMMAND_LEFT_HALF);
+        invoke(&extension, COMMAND_LEFT_HALF);
+        let placed = sim.placed();
+        assert_eq!(placed[2], Region::LeftHalf.rect(AREA));
+        assert_eq!(placed[3], geometry::cycle_rect(Cycle::LeftHalf, 1, AREA));
     }
 
     #[test]
