@@ -36,7 +36,7 @@
 
 - [x] 3.1 Run `mise run check`, `cargo test`, and
   `cargo build --example window_walkthrough`; all pass.
-- [ ] 3.2 Run the `ponytail-review` skill in a fresh subagent on this change's
+- [x] 3.2 Run the `ponytail-review` skill in a fresh subagent on this change's
   commits, without the apply context, and report its findings.
 
 ## Workflow follow-up
