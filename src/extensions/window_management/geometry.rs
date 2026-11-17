@@ -285,7 +285,6 @@ pub fn cycle_rect(cycle: Cycle, index: usize, area: Rect) -> Rect {
                 height: area.height,
             }
         }
-        Cycle::CenterColumn if is_half => center_half(area),
         Cycle::CenterColumn if (n, d) == (1, 3) => Region::CenterThird.rect(area),
         Cycle::CenterColumn => {
             let width = area.width * n / d;
