@@ -2,6 +2,21 @@
 
 All notable changes to Dango. Generated from commit history at release time.
 
+## [6.11.0] - 2026-11-17
+
+### Features
+
+- Replace placeholder app icon
+- **window:** Cycle thirds and centre columns
+
+### Refactoring
+
+- **window:** Drop redundant centre column arm
+
+### Documentation
+
+- Shorten readme and add screenshots
+- Shorten readme feature list
 ## [6.10.1] - 2026-11-14
 
 ### Performance
