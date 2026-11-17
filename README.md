@@ -9,21 +9,22 @@ It is a hobby project that I build for my own daily use.
 
 ## What it does
 
-- Open apps and switch to running ones
-- Do math and convert units while you type
-- Start your Steam games
-- Clipboard history, with text, images, and files
-- Snippets that expand when you type a keyword
-- Quicklinks to sites and web searches
-- Move and resize windows
-- AI commands for the selected text, such as fix spelling or translate
-- Find, copy, and paste your latest screenshots
-- System commands: lock, sleep, empty trash
-- CapsLock as an extra modifier key
-- Your own extensions, written in JavaScript
-
-Every command can have a global hotkey, so it also works without opening the
-launcher.
+- App launcher
+- Calculator and unit conversion
+- Clipboard history
+- Snippets
+- Quicklinks
+- Window management
+- AI commands for selected text
+  - Own API key: Anthropic, or any OpenAI-compatible service
+  - Local models: Ollama
+  - No key: the Claude Code or Pi CLI you are already signed in to
+- Screenshot search
+- Steam games
+- System commands
+- CapsLock as a modifier key
+- JavaScript extensions
+- Global hotkeys for every command
 
 | Answers while you type | Window management |
 | --- | --- |
