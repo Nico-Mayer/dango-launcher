@@ -2,6 +2,11 @@
 
 All notable changes to Dango. Generated from commit history at release time.
 
+## [6.12.0] - 2026-11-23
+
+### Features
+
+- **log:** Record native crashes on Windows
 ## [6.11.0] - 2026-11-17
 
 ### Features
