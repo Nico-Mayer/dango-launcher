@@ -3,6 +3,7 @@ mod apps;
 mod brightness;
 mod browser;
 mod clipboard;
+mod crash;
 mod files;
 mod hyperkey;
 mod keymonitor;
@@ -23,6 +24,7 @@ pub use clipboard::{
     clipboard_holds_anything, clipboard_holds_image, clipboard_holds_text, ImageFile,
     WindowsAttribution,
 };
+pub use crash::record_crashes;
 pub use files::{reveal, screenshot_folder};
 pub use hyperkey::WindowsHyperkey;
 pub use keymonitor::WindowsKeyMonitor;

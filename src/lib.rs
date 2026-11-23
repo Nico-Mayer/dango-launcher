@@ -33,5 +33,6 @@ pub fn platform_attribution() -> Arc<dyn extensions::clipboard::Attribution> {
 
 pub fn run() {
     log::record_panics();
+    platform::record_crashes();
     slint_shell::run()
 }

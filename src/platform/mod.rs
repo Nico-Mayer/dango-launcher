@@ -72,6 +72,13 @@ pub trait NoticeWindow: Send {
 /// Between the notice and the bottom of the work area, in logical pixels.
 pub const NOTICE_MARGIN: f64 = 48.0;
 
+/// Writes a crash that is not a panic to the log. macOS keeps its own report
+/// of every crash under `~/Library/Logs/DiagnosticReports`.
+pub fn record_crashes() {
+    #[cfg(target_os = "windows")]
+    windows::record_crashes();
+}
+
 /// Calls `lost` on the main thread whenever another application takes the
 /// foreground. Main thread only, and once.
 ///
